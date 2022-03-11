@@ -72,7 +72,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
@@ -105,9 +105,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
   const std::string code =
       std::get<0>(GetParam()) != "null"
           ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-                "{{ test_rundir "
-                "}}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/"
-                "proxy_wasm_test_cpp.wasm"))
+                "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"))
           : "NetworkTestCpp";
   EXPECT_FALSE(code.empty());
   const std::string yaml = absl::StrCat(R"EOF(
@@ -182,7 +180,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
@@ -206,7 +204,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
@@ -227,7 +225,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
       allowed_capabilities:
   )EOF"));
@@ -254,7 +252,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
       allowed_capabilities:
         proxy_log:
@@ -283,7 +281,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
         local:
-          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
       allowed_capabilities:
         proxy_on_vm_start:

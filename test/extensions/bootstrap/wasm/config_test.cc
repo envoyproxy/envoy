@@ -28,9 +28,8 @@ protected:
         absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
     if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
-          TestEnvironment::substitute("{{ test_rundir "
-                                      "}}/test/extensions/bootstrap/wasm/test_data/start_cpp.wasm/"
-                                      "proxy_wasm_start_cpp.wasm"));
+          TestEnvironment::substitute(
+              "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/start_cpp.wasm"));
     } else {
       config_.mutable_config()
           ->mutable_vm_config()
@@ -99,9 +98,8 @@ TEST_P(WasmFactoryTest, MissingImport) {
     return;
   }
   config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir "
-                                  "}}/test/extensions/bootstrap/wasm/test_data/missing_cpp.wasm/"
-                                  "proxy_wasm_missing_cpp.wasm"));
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/missing_cpp.wasm"));
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm service test");
 }

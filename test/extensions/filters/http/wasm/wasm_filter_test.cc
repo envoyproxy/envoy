@@ -72,7 +72,7 @@ public:
     } else {
       if (std::get<1>(GetParam()) == "cpp") {
         code = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "test/extensions/filters/http/wasm/test_data/test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
+            "test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
       } else {
         auto filename = !root_id.empty() ? root_id : vm_configuration;
         const auto basic_path = TestEnvironment::runfilesPath(
@@ -659,10 +659,6 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
 
 // Script testing AccessLog::Instance::log.
 TEST_P(WasmHttpFilterTest, AccessLog) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "cpp") {
-    // WAMR hardcodes stack size, which is too small to for this test (with Emscripten v3.x).
-    return;
-  }
   setupTest("", "headers");
   setupFilter();
   EXPECT_CALL(filter(),
@@ -683,10 +679,6 @@ TEST_P(WasmHttpFilterTest, AccessLog) {
 }
 
 TEST_P(WasmHttpFilterTest, AccessLogClientDisconnected) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "cpp") {
-    // WAMR hardcodes stack size, which is too small to for this test (with Emscripten v3.x).
-    return;
-  }
   setupTest("", "headers");
   setupFilter();
   EXPECT_CALL(filter(),
@@ -703,10 +695,6 @@ TEST_P(WasmHttpFilterTest, AccessLogClientDisconnected) {
 }
 
 TEST_P(WasmHttpFilterTest, AccessLogCreate) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "cpp") {
-    // WAMR hardcodes stack size, which is too small to for this test (with Emscripten v3.x).
-    return;
-  }
   setupTest("", "headers");
   setupFilter();
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 / 200"))));
@@ -1725,10 +1713,6 @@ TEST_P(WasmHttpFilterTest, Metadata) {
 }
 
 TEST_P(WasmHttpFilterTest, Property) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "cpp") {
-    // WAMR hardcodes stack size, which is too small to for this test (with Emscripten v3.x).
-    return;
-  }
   if (std::get<1>(GetParam()) == "rust") {
     // TODO(PiotrSikora): test not yet implemented using Rust SDK.
     return;
@@ -1786,10 +1770,6 @@ TEST_P(WasmHttpFilterTest, Property) {
 }
 
 TEST_P(WasmHttpFilterTest, ClusterMetadata) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "cpp") {
-    // WAMR hardcodes stack size, which is too small to for this test (with Emscripten v3.x).
-    return;
-  }
   if (std::get<1>(GetParam()) == "rust") {
     // TODO(PiotrSikora): test not yet implemented using Rust SDK.
     return;

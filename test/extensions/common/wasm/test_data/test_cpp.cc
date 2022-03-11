@@ -19,10 +19,7 @@
 
 START_WASM_PLUGIN(CommonWasmTestCpp)
 
-// With Emscripten, dereferencing a null pointer does not immediately cause a segmentation fault,
-// so use an invalid address to trigger it.
-static uintptr_t* badptr = reinterpret_cast<uintptr_t*>(0xDEADBEEF);
-
+static int* badptr = nullptr;
 static float gNan = std::nan("1");
 static float gInfinity = INFINITY;
 volatile double zero_unbeknownst_to_the_compiler = 0.0;

@@ -75,9 +75,8 @@ private:
       code_ = "NetworkTestCpp";
     } else {
       if (std::get<1>(GetParam()) == "cpp") {
-        code_ = TestEnvironment::readFileToStringForTest(
-            TestEnvironment::runfilesPath("test/extensions/filters/network/wasm/test_data/"
-                                          "test_cpp.wasm/proxy_wasm_test_cpp.wasm"));
+        code_ = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "test/extensions/filters/network/wasm/test_data/test_cpp.wasm"));
       } else {
         auto filename = !root_id.empty() ? root_id : vm_configuration;
         code_ = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(absl::StrCat(

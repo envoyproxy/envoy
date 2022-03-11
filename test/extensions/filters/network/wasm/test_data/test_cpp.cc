@@ -9,9 +9,7 @@
 
 START_WASM_PLUGIN(NetworkTestCpp)
 
-// With Emscripten, dereferencing a null pointer does not immediately cause a segmentation fault,
-// so use an invalid address to trigger it.
-static uintptr_t* badptr = reinterpret_cast<uintptr_t*>(0xDEADBEEF);
+static int* badptr = nullptr;
 
 class ExampleContext : public Context {
 public:

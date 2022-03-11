@@ -63,10 +63,8 @@ TEST_P(WasmCommonContextTest, OnStat) {
   std::string code;
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
   if (std::get<0>(GetParam()) != "null") {
-    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-        absl::StrCat("{{ test_rundir "
-                     "}}/test/extensions/stats_sinks/wasm/test_data/test_context_cpp.wasm/"
-                     "proxy_wasm_test_context_cpp.wasm")));
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/stats_sinks/wasm/test_data/test_context_cpp.wasm")));
   } else {
     // The name of the Null VM plugin.
     code = "CommonWasmTestContextCpp";
