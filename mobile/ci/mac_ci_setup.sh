@@ -6,7 +6,7 @@ set -e
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
 # See:
-# https://github.com/actions/virtual-environments/blob/master/images/macos/macos-10.15-Readme.md for
+# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-11-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
@@ -47,15 +47,17 @@ pip3 install slackclient
 # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-11-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_13.2.1.app
 
-# Download and set up ndk 21. Github upgraded to ndk 22 for their Mac image.
-ANDROID_HOME=$ANDROID_SDK_ROOT
-SDKMANAGER=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager
+if [[ "${1:-}" == "--android" ]]; then
+  # Download and set up ndk 21. Github upgraded to ndk 22 for their Mac image.
+  ANDROID_HOME=$ANDROID_SDK_ROOT
+  SDKMANAGER=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager
 
-$SDKMANAGER --uninstall "ndk-bundle"
-$SDKMANAGER --install "ndk;21.3.6528147"
+  $SDKMANAGER --uninstall "ndk-bundle"
+  $SDKMANAGER --install "ndk;21.3.6528147"
 
-# Download and set up build-tools 30.0.3, 31.0.0 is missing dx.jar.
-$SDKMANAGER --uninstall "build-tools;31.0.0"
-$SDKMANAGER --install "build-tools;30.0.3"
+  # Download and set up build-tools 30.0.3, 31.0.0 is missing dx.jar.
+  $SDKMANAGER --uninstall "build-tools;31.0.0"
+  $SDKMANAGER --install "build-tools;30.0.3"
 
-export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.3.6528147
+  export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.3.6528147
+fi
