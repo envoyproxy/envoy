@@ -781,7 +781,16 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
 
 absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
-};
+}
+
+void ConnectionImpl::configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                      std::chrono::microseconds rtt) {
+  return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+}
+
+absl::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
+  return socket_->congestionWindowInBytes();
+}
 
 void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {
@@ -896,8 +905,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
-  const Api::SysCallIntResult result =
-      socket_->connect(socket_->connectionInfoProvider().remoteAddress());
+  const Api::SysCallIntResult result = transport_socket_->connect(*socket_);
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.

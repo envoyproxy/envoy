@@ -266,7 +266,7 @@ resources:
 
       auto sds_path =
           TestEnvironment::writeStringToFileForTest("server_cert_ecdsa.sds.yaml", sds_content);
-      config_source->set_path(sds_path);
+      config_source->mutable_path_config_source()->set_path(sds_path);
       config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
   }
@@ -297,22 +297,7 @@ resources:
           address, Network::Address::InstanceConstSharedPtr(),
           client_ssl_ctx_->createTransportSocket(nullptr), nullptr);
     }
-#ifdef ENVOY_ENABLE_QUIC
-    std::string url = "udp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
-                      std::to_string(port);
-    Network::Address::InstanceConstSharedPtr local_address;
-    if (version_ == Network::Address::IpVersion::v4) {
-      local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
-    } else {
-      // Docker only works with loopback v6 address.
-      local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    }
-    return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                             Network::Utility::resolveUrl(url), local_address,
-                                             quic_stat_names_, {}, stats_store_);
-#else
-    PANIC("reached unexpected code");
-#endif
+    return makeClientConnectionWithOptions(port, nullptr);
   }
 
 protected:

@@ -4,12 +4,13 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 
-class PassthroughFactory : public Network::TransportSocketFactory {
+class PassthroughFactory : public Network::CommonTransportSocketFactory {
 public:
   PassthroughFactory(Network::TransportSocketFactoryPtr&& transport_socket_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)) {
@@ -20,9 +21,6 @@ public:
     return transport_socket_factory_->implementsSecureTransport();
   }
   bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
-  bool usesProxyProtocolOptions() const override {
-    return transport_socket_factory_->usesProxyProtocolOptions();
-  }
 
 protected:
   // The wrapped factory.
@@ -44,6 +42,8 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // startSecureTransport method should not be called for this transport socket.
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override;
 
 protected:
   Network::TransportSocketPtr transport_socket_;

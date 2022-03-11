@@ -18,6 +18,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
@@ -147,6 +148,10 @@ protected:
     }
   }
 
+  virtual TransportSocketPtr createTransportSocket() {
+    return Network::Test::createRawBufferSocket();
+  }
+
   void setUpBasicConnection() {
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -156,7 +161,7 @@ protected:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
-        Network::Test::createRawBufferSocket(), socket_options_);
+        createTransportSocket(), socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -265,7 +270,7 @@ protected:
     return ConnectionMocks{std::move(dispatcher), timer_, std::move(transport_socket), file_event,
                            &file_ready_cb_};
   }
-  Network::TestClientConnectionImpl* testClientConnection() {
+  Network::TestClientConnectionImpl* testClientConnection() const {
     return dynamic_cast<Network::TestClientConnectionImpl*>(client_connection_.get());
   }
 
@@ -301,6 +306,23 @@ TEST_P(ConnectionImplTest, UniqueId) {
   setUpBasicConnection();
   EXPECT_NE(first_id, client_connection_->id());
   disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, GetCongestionWindow) {
+  setUpBasicConnection();
+  connect();
+
+// Congestion window is available on Posix(guarded by TCP_INFO) and Windows(guarded by
+// SIO_TCP_INFO).
+#if defined(TCP_INFO) || defined(SIO_TCP_INFO)
+  EXPECT_GT(client_connection_->congestionWindowInBytes().value(), 500);
+  EXPECT_GT(server_connection_->congestionWindowInBytes().value(), 500);
+#else
+  EXPECT_FALSE(client_connection_->congestionWindowInBytes().has_value());
+  EXPECT_FALSE(server_connection_->congestionWindowInBytes().has_value());
+#endif
+
+  disconnect(true);
 }
 
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
@@ -3013,9 +3035,8 @@ protected:
 
 TEST_F(InternalClientConnectionImplTest,
        CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto runtime = std::make_unique<TestScopedRuntime>();
+  runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
@@ -3029,6 +3050,37 @@ TEST_F(InternalClientConnectionImplTest,
                                                 Network::Test::createRawBufferSocket(), nullptr);
       },
       "panic: not implemented");
+}
+
+class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTest {
+protected:
+  class TestRawBufferSocket : public RawBufferSocket {
+  public:
+    bool compareCallbacks(TransportSocketCallbacks* callback) const {
+      return this->transportSocketCallbacks() == callback;
+    }
+  };
+
+  TransportSocketPtr createTransportSocket() override {
+    return std::make_unique<TestRawBufferSocket>();
+  }
+
+  TestRawBufferSocket* getTransportSocket() const {
+    Network::TestClientConnectionImpl* client_conn_impl = testClientConnection();
+    return dynamic_cast<TestRawBufferSocket*>(client_conn_impl->transportSocket().get());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClientConnectionWithCustomRawBufferSocketTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) {
+  setUpBasicConnection();
+
+  EXPECT_TRUE(getTransportSocket()->compareCallbacks(testClientConnection()));
+
+  disconnect(false);
 }
 
 } // namespace
