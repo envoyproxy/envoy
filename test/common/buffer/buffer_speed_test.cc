@@ -1,4 +1,8 @@
+#include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/http/stream_reset_handler.h"
+
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
@@ -7,6 +11,11 @@
 namespace Envoy {
 
 static constexpr uint64_t MaxBufferLength = 1024 * 1024;
+
+class FakeStreamResetHandler : public Http::StreamResetHandler {
+public:
+  void resetStream(Http::StreamResetReason reason) override { UNREFERENCED_PARAMETER(reason); }
+};
 
 // The fragment needs to be heap allocated in order to survive past the processing done in the inner
 // loop in the benchmarks below. Do not attempt to release the actual contents of the buffer.
@@ -23,6 +32,82 @@ static void bufferCreateEmpty(benchmark::State& state) {
   benchmark::DoNotOptimize(length);
 }
 BENCHMARK(bufferCreateEmpty);
+
+// Test add performance of OwnedImpl vs WatermarkBuffer
+static void bufferVsWatermarkBuffer(benchmark::State& state) {
+  const uint64_t length = state.range(0);
+  const uint64_t high_watermark = state.range(1);
+  const uint64_t step = state.range(2);
+  const bool use_watermark_buffer = (state.range(3) != 0);
+  const std::string data(step, 'a');
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::unique_ptr<Buffer::Instance> buffer;
+    if (use_watermark_buffer) {
+      buffer = std::make_unique<Buffer::WatermarkBuffer>([]() {}, []() {}, []() {});
+      buffer->setWatermarks(high_watermark);
+    } else {
+      buffer = std::make_unique<Buffer::OwnedImpl>();
+    }
+
+    for (uint64_t idx = 0; idx < length; idx += step) {
+      buffer->add(data);
+    }
+  }
+}
+BENCHMARK(bufferVsWatermarkBuffer)
+    ->Args({1024, 0, 1, 0})
+    ->Args({1024, 0, 1, 1})
+    ->Args({1024, 1, 1, 1})
+    ->Args({1024, 1024, 1, 1})
+    ->Args({64 * 1024, 0, 1, 0})
+    ->Args({64 * 1024, 0, 1, 1})
+    ->Args({64 * 1024, 1, 1, 1})
+    ->Args({64 * 1024, 64 * 1024, 1, 1})
+    ->Args({64 * 1024, 0, 32, 0})
+    ->Args({64 * 1024, 64 * 1024, 32, 1})
+    ->Args({1024 * 1024, 0, 1, 0})
+    ->Args({1024 * 1024, 0, 1, 1})
+    ->Args({1024 * 1024, 1, 1, 1})
+    ->Args({1024 * 1024, 1024 * 1024, 1, 1})
+    ->Args({1024 * 1024, 0, 32, 0})
+    ->Args({1024 * 1024, 1024 * 1024, 32, 1});
+
+// Measure performance impact of enabling accounts.
+static void bufferAccountUse(benchmark::State& state) {
+  const std::string data(state.range(0), 'a');
+  uint64_t iters = state.range(1);
+  const bool enable_accounts = (state.range(2) != 0);
+
+  auto config = envoy::config::overload::v3::BufferFactoryConfig();
+  config.set_minimum_account_to_track_power_of_two(2);
+  Buffer::WatermarkBufferFactory buffer_factory(config);
+  FakeStreamResetHandler reset_handler;
+  auto account = buffer_factory.createAccount(reset_handler);
+  RELEASE_ASSERT(account != nullptr, "");
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    Buffer::OwnedImpl buffer;
+    if (enable_accounts) {
+      buffer.bindAccount(account);
+    }
+    for (uint64_t idx = 0; idx < iters; ++idx) {
+      buffer.add(data);
+    }
+  }
+  account->clearDownstream();
+}
+BENCHMARK(bufferAccountUse)
+    ->Args({1, 1024 * 1024, 0})
+    ->Args({1, 1024 * 1024, 1})
+    ->Args({1024, 1024, 0})
+    ->Args({1024, 1024, 1})
+    ->Args({4 * 1024, 1024, 0})
+    ->Args({4 * 1024, 1024, 1})
+    ->Args({16 * 1024, 1024, 0})
+    ->Args({16 * 1024, 1024, 1});
 
 // Test the creation of an OwnedImpl with varying amounts of content.
 static void bufferCreate(benchmark::State& state) {
@@ -217,9 +302,9 @@ BENCHMARK(bufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 // fully used (and therefore the commit size equals the reservation size).
 static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
+  auto size = state.range(0);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto size = state.range(0);
     Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
     reservation.commit(reservation.length());
     if (buffer.length() >= MaxBufferLength) {
@@ -239,9 +324,9 @@ BENCHMARK(bufferReserveCommit)
 // only partially used (and therefore the commit size is smaller than the reservation size).
 static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
+  auto size = state.range(0);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto size = state.range(0);
     Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
     // Commit one byte from the first slice and nothing from any subsequent slice.
     reservation.commit(1);
@@ -387,5 +472,90 @@ BENCHMARK(bufferStartsWithMatch)
     ->Args({4096, 16})
     ->Args({16384, 256})
     ->Args({65536, 4096});
+
+static void bufferAddVsAddFragments(benchmark::State& state) {
+  static constexpr size_t OwnedImplBufferType = 0;
+  static constexpr size_t WatermarkBufferType = 1;
+
+  static constexpr size_t ClassicalAddApi = 0;
+  static constexpr size_t AddFragmentsApi = 1;
+
+  static constexpr size_t Write2UnitsPerCall = 2;
+  static constexpr size_t Write5UnitsPerCall = 5;
+
+  static constexpr size_t DataSizeToWrite = 32 * 1024 * 1024;
+
+  size_t buffer_type = state.range(0);
+  size_t api_type = state.range(1);
+  size_t data_unit_size = state.range(2);
+  size_t write_cycle = state.range(3);
+
+  std::string data_unit(data_unit_size, 'c');
+  absl::string_view data_unit_view(data_unit);
+
+  for (auto _ : state) { // NOLINT
+    ASSERT(buffer_type == OwnedImplBufferType || buffer_type == WatermarkBufferType);
+    Buffer::InstancePtr buffer_ptr =
+        buffer_type == OwnedImplBufferType
+            ? std::make_unique<Buffer::OwnedImpl>()
+            : std::make_unique<Buffer::WatermarkBuffer>([]() {}, []() {}, []() {});
+    Buffer::Instance& buffer = *buffer_ptr;
+
+    ASSERT(api_type == ClassicalAddApi || api_type == AddFragmentsApi);
+    ASSERT(write_cycle == Write2UnitsPerCall || write_cycle == Write5UnitsPerCall);
+    if (api_type == ClassicalAddApi) {
+      if (write_cycle == Write2UnitsPerCall) {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
+          for (size_t c = 0; c < Write2UnitsPerCall; c++) {
+            buffer.add(data_unit_view);
+          }
+        }
+      } else {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
+          for (size_t c = 0; c < Write5UnitsPerCall; c++) {
+            buffer.add(data_unit_view);
+          }
+        }
+      }
+    } else {
+      if (write_cycle == Write2UnitsPerCall) {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
+          buffer.addFragments({data_unit_view, data_unit_view});
+        }
+      } else {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
+          buffer.addFragments(
+              {data_unit_view, data_unit_view, data_unit_view, data_unit_view, data_unit_view});
+        }
+      }
+    }
+  }
+}
+
+BENCHMARK(bufferAddVsAddFragments)
+    ->Args({0, 0, 16, 2})
+    ->Args({0, 0, 64, 2})
+    ->Args({0, 0, 4096, 2})
+    ->Args({0, 0, 16, 5})
+    ->Args({0, 0, 64, 5})
+    ->Args({0, 0, 4096, 5})
+    ->Args({0, 1, 16, 2})
+    ->Args({0, 1, 64, 2})
+    ->Args({0, 1, 4096, 2})
+    ->Args({0, 1, 16, 5})
+    ->Args({0, 1, 64, 5})
+    ->Args({0, 1, 4096, 5})
+    ->Args({1, 0, 16, 2})
+    ->Args({1, 0, 64, 2})
+    ->Args({1, 0, 4096, 2})
+    ->Args({1, 0, 16, 5})
+    ->Args({1, 0, 64, 5})
+    ->Args({1, 0, 4096, 5})
+    ->Args({1, 1, 16, 2})
+    ->Args({1, 1, 64, 2})
+    ->Args({1, 1, 4096, 2})
+    ->Args({1, 1, 16, 5})
+    ->Args({1, 1, 64, 5})
+    ->Args({1, 1, 4096, 5});
 
 } // namespace Envoy

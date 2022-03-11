@@ -43,7 +43,8 @@ public:
 
   private:
     const std::string name_;
-    const absl::optional<Matchers::StringMatcherImpl> matcher_;
+    const absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
+        matcher_;
   };
 
   using QueryParameterMatcherPtr = std::unique_ptr<const QueryParameterMatcher>;

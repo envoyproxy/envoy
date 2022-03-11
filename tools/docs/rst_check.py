@@ -1,19 +1,32 @@
+import pathlib
 import re
 import sys
-from typing import Iterator
+from functools import cached_property
+from typing import Iterator, List, Pattern
 
-from tools.base import checker
+from aio.run import checker
 
-INVALID_REFLINK = re.compile(r".* ref:.*")
-REF_WITH_PUNCTUATION_REGEX = re.compile(r".*\. <[^<]*>`\s*")
-RELOADABLE_FLAG_REGEX = re.compile(r".*(...)(envoy.reloadable_features.[^ ]*)\s.*")
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile(r"\* ([a-z \-_]+): ([a-z:`]+)")
-VERSION_HISTORY_SECTION_NAME = re.compile(r"^[A-Z][A-Za-z ]*$")
+INVALID_REFLINK = r".* ref:.*"
+REF_WITH_PUNCTUATION_REGEX = r".*\. <[^<]*>`\s*"
+VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([0-9a-z \-_]+): ([a-z:`]+)"
+VERSION_HISTORY_SECTION_NAME = r"^[A-Z][A-Za-z ]*$"
+# Make sure backticks come in pairs.
+# Exceptions: reflinks (ref:`` where the backtick won't be preceded by a space
+#             links `title <link>`_ where the _ is checked for in the regex.
+SINGLE_TICK_REGEX = re.compile(r"[^`]`[^`]")
+REF_TICKS_REGEX = re.compile(r" ref:`.*`")
+LINK_TICKS_REGEX = re.compile(r".* `[^`].*`_")
+
+# TODO(phlax):
+#   - generalize these checks to all rst files
+#   - improve checks/handling of "default role"/inline literals
+#       (perhaps using a sphinx plugin)
+#   - add rstcheck and/or rstlint
 
 
-class CurrentVersionFile(object):
+class CurrentVersionFile:
 
-    def __init__(self, path):
+    def __init__(self, path: pathlib.Path):
         self._path = path
 
     @property
@@ -22,8 +35,28 @@ class CurrentVersionFile(object):
             for line in f.readlines():
                 yield line.strip()
 
+    @cached_property
+    def single_tick_re(self) -> Pattern[str]:
+        return re.compile(SINGLE_TICK_REGEX)
+
+    @cached_property
+    def ref_ticks_re(self) -> Pattern[str]:
+        return re.compile(REF_TICKS_REGEX)
+
+    @cached_property
+    def link_ticks_re(self) -> Pattern[str]:
+        return re.compile(LINK_TICKS_REGEX)
+
+    @cached_property
+    def invalid_reflink_re(self) -> Pattern[str]:
+        return re.compile(INVALID_REFLINK)
+
+    @cached_property
+    def new_line_re(self) -> Pattern[str]:
+        return re.compile(VERSION_HISTORY_NEW_LINE_REGEX)
+
     @property
-    def path(self) -> str:
+    def path(self) -> pathlib.Path:
         return self._path
 
     @property
@@ -33,18 +66,18 @@ class CurrentVersionFile(object):
             # Don't punctuation-check empty lines.
             or not self.prior_line
             # The text in the :ref ends with a .
-            or
-            (self.prior_line.endswith('`') and REF_WITH_PUNCTUATION_REGEX.match(self.prior_line)))
+            or (self.prior_line.endswith('`') and self.punctuation_re.match(self.prior_line)))
 
-    def check_flags(self, line: str) -> list:
-        # TODO(phlax): improve checking of inline literals
-        # make sure flags are surrounded by ``s (ie "inline literal")
-        flag_match = RELOADABLE_FLAG_REGEX.match(line)
-        return ([f"Flag {flag_match.groups()[1]} should be enclosed in double back ticks"]
-                if flag_match and not flag_match.groups()[0].startswith(' ``') else [])
+    @cached_property
+    def punctuation_re(self) -> Pattern[str]:
+        return re.compile(REF_WITH_PUNCTUATION_REGEX)
 
-    def check_line(self, line: str) -> list:
-        errors = self.check_reflink(line) + self.check_flags(line)
+    @cached_property
+    def section_name_re(self) -> Pattern[str]:
+        return re.compile(VERSION_HISTORY_SECTION_NAME)
+
+    def check_line(self, line: str) -> List[str]:
+        errors = self.check_reflink(line) + self.check_ticks(line)
         if line.startswith("* "):
             errors += self.check_list_item(line)
         elif not line:
@@ -55,16 +88,16 @@ class CurrentVersionFile(object):
             self.prior_line += line
         return errors
 
-    def check_list_item(self, line: str) -> list:
+    def check_list_item(self, line: str) -> List[str]:
         errors = []
         if not self.prior_endswith_period:
             errors.append(f"The following release note does not end with a '.'\n {self.prior_line}")
 
-        match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
+        match = self.new_line_re.match(line)
         if not match:
             return errors + [
                 "Version history line malformed. "
-                f"Does not match VERSION_HISTORY_NEW_LINE_REGEX in docs_check.py\n {line}\n"
+                f"Does not match VERSION_HISTORY_NEW_LINE_REGEX\n {line}\n"
                 "Please use messages in the form 'category: feature explanation.', "
                 "starting with a lower-cased letter and ending with a period."
             ]
@@ -86,19 +119,25 @@ class CurrentVersionFile(object):
         self.set_tokens(line, first_word, next_word)
         return errors
 
-    def check_previous_period(self) -> list:
+    def check_previous_period(self) -> List[str]:
         return ([f"The following release note does not end with a '.'\n {self.prior_line}"]
                 if not self.prior_endswith_period else [])
 
-    def check_reflink(self, line: str) -> list:
-        # TODO(phlax): Check reflinks for all rst files
+    def check_reflink(self, line: str) -> List[str]:
         return ([f"Found text \" ref:\". This should probably be \" :ref:\"\n{line}"]
-                if INVALID_REFLINK.match(line) else [])
+                if self.invalid_reflink_re.match(line) else [])
+
+    def check_ticks(self, line: str) -> List[str]:
+        return ([
+            f"Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): {line}"
+        ] if (
+            self.single_tick_re.match(line) and (not self.ref_ticks_re.match(line)) and
+            (not self.link_ticks_re.match(line))) else [])
 
     def run_checks(self) -> Iterator[str]:
         self.set_tokens()
         for line_number, line in enumerate(self.lines):
-            if VERSION_HISTORY_SECTION_NAME.match(line):
+            if self.section_name_re.match(line):
                 if line == "Deprecated":
                     break
                 self.set_tokens()
@@ -114,14 +153,15 @@ class CurrentVersionFile(object):
 class RSTChecker(checker.Checker):
     checks = ("current_version",)
 
-    def check_current_version(self):
-        errors = list(CurrentVersionFile("docs/root/version_history/current.rst").run_checks())
+    async def check_current_version(self) -> None:
+        errors = list(
+            CurrentVersionFile(pathlib.Path("docs/root/version_history/current.rst")).run_checks())
         if errors:
             self.error("current_version", errors)
 
 
-def main(*args) -> int:
-    return RSTChecker(*args).run()
+def main(*args: str) -> int:
+    return RSTChecker(*args)()
 
 
 if __name__ == "__main__":

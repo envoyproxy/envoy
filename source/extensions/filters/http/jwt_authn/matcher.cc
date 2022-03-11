@@ -117,6 +117,9 @@ public:
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers)) {
+      if (headers.Path() == nullptr) {
+        return false;
+      }
       const Http::HeaderString& path = headers.Path()->value();
       const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
       absl::string_view path_view = path.getStringView();
@@ -159,14 +162,14 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     return std::make_unique<PrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kPath:
     return std::make_unique<PathMatcherImpl>(rule);
-  case RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
   case RouteMatch::PathSpecifierCase::kSafeRegex:
     return std::make_unique<RegexMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kConnectMatcher:
     return std::make_unique<ConnectMatcherImpl>(rule);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
+    break; // Fall through to PANIC.
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace JwtAuthn

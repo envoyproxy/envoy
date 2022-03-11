@@ -29,7 +29,7 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
   if (!config.tls_certificates().empty()) {
     for (const auto& tls_certificate : config.tls_certificates()) {
       if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
-          !tls_certificate.has_private_key()) {
+          !tls_certificate.has_private_key() && !tls_certificate.has_pkcs12()) {
         continue;
       }
       providers.push_back(
@@ -169,7 +169,7 @@ ContextConfigImpl::ContextConfigImpl(
     const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : api_(factory_context.api()),
+    : api_(factory_context.api()), options_(factory_context.options()),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
@@ -181,7 +181,8 @@ ContextConfigImpl::ContextConfigImpl(
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                default_max_protocol_version)) {
+                                                default_max_protocol_version)),
+      factory_context_(factory_context) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -212,12 +213,12 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), &factory_context, api_);
+        tls_certificate_configs_.emplace_back(*provider->secret(), factory_context, api_);
       }
     }
   }
 
-  HandshakerFactoryContextImpl handshaker_factory_context(api_, alpn_protocols_);
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_);
   Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.
@@ -257,7 +258,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           for (const auto& tls_certificate_provider : tls_certificate_providers_) {
             auto* secret = tls_certificate_provider->secret();
             if (secret != nullptr) {
-              tls_certificate_configs_.emplace_back(*secret, nullptr, api_);
+              tls_certificate_configs_.emplace_back(*secret, factory_context_, api_);
             }
           }
           callback();
@@ -297,6 +298,7 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
     unsigned default_version) {
   switch (version) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
     return default_version;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
@@ -307,9 +309,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
     return TLS1_2_VERSION;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
@@ -353,7 +354,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   }
 }
 
-const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
+const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_3_VERSION;
 
 const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
@@ -475,15 +476,15 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
         policy) {
   switch (policy) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
     return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
     return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tls

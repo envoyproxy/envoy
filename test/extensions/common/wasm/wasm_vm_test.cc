@@ -56,11 +56,11 @@ TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.inva
 TEST_F(BaseVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
-  EXPECT_TRUE(wasm_vm->runtime() == "null");
+  EXPECT_TRUE(wasm_vm->getEngineName() == "null");
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
-  EXPECT_EQ(wasm_vm->runtime(), "null");
+  EXPECT_EQ(wasm_vm->getEngineName(), "null");
   std::function<void()> f;
   EXPECT_FALSE(wasm_vm->integration()->getNullVmFunction("bad_function", false, 0, nullptr, &f));
 }
@@ -103,18 +103,18 @@ public:
 #if defined(PROXY_WASM_HAS_RUNTIME_V8)
 MockHostFunctions* g_host_functions;
 
-void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
+void pong(Word value) { g_host_functions->pong(convertWordToUint32(value)); }
 
-Word random(void*) { return {g_host_functions->random()}; }
+Word random() { return {g_host_functions->random()}; }
 
 // pong() with wrong number of arguments.
-void bad_pong1(void*) {}
+void badPong1() {}
 
 // pong() with wrong return type.
-Word bad_pong2(void*, Word) { return 2; }
+Word badPong2(Word) { return 2; }
 
 // pong() with wrong argument type.
-double bad_pong3(void*, double) { return 3; }
+double badPong3(double) { return 3; }
 
 class WasmVmTest : public testing::TestWithParam<bool> {
 public:
@@ -184,7 +184,7 @@ TEST_P(WasmVmTest, V8BadCode) { ASSERT_FALSE(init("bad code")); }
 
 TEST_P(WasmVmTest, V8Load) {
   ASSERT_TRUE(init());
-  EXPECT_TRUE(wasm_vm_->runtime() == "v8");
+  EXPECT_TRUE(wasm_vm_->getEngineName() == "v8");
   EXPECT_TRUE(wasm_vm_->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm_->clone() != nullptr);
 }
@@ -195,13 +195,13 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   EXPECT_FALSE(wasm_vm_->link("test"));
 
-  wasm_vm_->registerCallback("env", "pong", &bad_pong1, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong1));
+  wasm_vm_->registerCallback("env", "pong", &badPong1, CONVERT_FUNCTION_WORD_TO_UINT32(badPong1));
   EXPECT_FALSE(wasm_vm_->link("test"));
 
-  wasm_vm_->registerCallback("env", "pong", &bad_pong2, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong2));
+  wasm_vm_->registerCallback("env", "pong", &badPong2, CONVERT_FUNCTION_WORD_TO_UINT32(badPong2));
   EXPECT_FALSE(wasm_vm_->link("test"));
 
-  wasm_vm_->registerCallback("env", "pong", &bad_pong3, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong3));
+  wasm_vm_->registerCallback("env", "pong", &badPong3, CONVERT_FUNCTION_WORD_TO_UINT32(badPong3));
   EXPECT_FALSE(wasm_vm_->link("test"));
 }
 

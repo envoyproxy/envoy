@@ -2,28 +2,45 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/regex.h"
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Server {
 
 namespace {
 
-const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
-const std::regex& namespaceRegex() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
+const Regex::CompiledGoogleReMatcher& promRegex() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false);
 }
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
  */
-std::string sanitizeName(const std::string& name) {
+std::string sanitizeName(const absl::string_view name) {
   // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
-  return std::regex_replace(name, promRegex(), "_");
+  return promRegex().replaceAll(name, "_");
+}
+
+/**
+ * Take tag values and sanitize it for text serialization, according to
+ * Prometheus conventions.
+ */
+std::string sanitizeValue(const absl::string_view value) {
+  // Removes problematic characters from Prometheus tag values to prevent
+  // text serialization issues. This matches the prometheus text formatting code:
+  // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
+  // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
+  return absl::StrReplaceAll(value, {
+                                        {R"(\)", R"(\\)"},
+                                        {"\n", R"(\n)"},
+                                        {R"(")", R"(\")"},
+                                    });
 }
 
 /*
@@ -67,7 +84,7 @@ uint64_t outputStatType(
     const std::vector<Stats::RefcountPtr<StatType>>& metrics,
     const std::function<std::string(
         const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
-    absl::string_view type) {
+    absl::string_view type, const Stats::CustomStatNamespaces& custom_namespaces) {
 
   /*
    * From
@@ -112,10 +129,16 @@ uint64_t outputStatType(
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
+  auto result = groups.size();
   for (auto& group : groups) {
-    const std::string prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first));
-    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+    const absl::optional<std::string> prefixed_tag_extracted_name =
+        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first),
+                                             custom_namespaces);
+    if (!prefixed_tag_extracted_name.has_value()) {
+      --result;
+      continue;
+    }
+    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), type));
 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
@@ -123,11 +146,11 @@ uint64_t outputStatType(
     std::sort(group.second.begin(), group.second.end(), MetricLessThan());
 
     for (const auto& metric : group.second) {
-      response.add(generate_output(*metric, prefixed_tag_extracted_name));
+      response.add(generate_output(*metric, prefixed_tag_extracted_name.value()));
     }
     response.add("\n");
   }
-  return groups.size();
+  return result;
 }
 
 /*
@@ -138,6 +161,21 @@ std::string generateNumericOutput(const StatType& metric,
                                   const std::string& prefixed_tag_extracted_name) {
   const std::string tags = PrometheusStatsFormatter::formattedTags(metric.tags());
   return fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, metric.value());
+}
+
+/*
+ * Returns the prometheus output for a TextReadout in gauge format.
+ * It is a workaround of a limitation of prometheus which stores only numeric metrics.
+ * The output is a gauge named the same as a given text-readout. The value of returned gauge is
+ * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
+ * tag {"text_value":"textReadout.value"}.
+ */
+std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
+                                      const std::string& prefixed_tag_extracted_name) {
+  auto tags = text_readout.tags();
+  tags.push_back(Stats::Tag{"text_value", text_readout.value()});
+  const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
+  return fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags);
 }
 
 /*
@@ -176,73 +214,70 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
-absl::flat_hash_set<std::string>& prometheusNamespaces() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
-}
-
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   buf.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
   }
   return absl::StrJoin(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
-  std::string sanitized_name = sanitizeName(extracted_name);
-
-  absl::string_view prom_namespace{sanitized_name};
-  prom_namespace = prom_namespace.substr(0, prom_namespace.find_first_of('_'));
-
-  if (prometheusNamespaces().contains(prom_namespace)) {
+absl::optional<std::string>
+PrometheusStatsFormatter::metricName(const std::string& extracted_name,
+                                     const Stats::CustomStatNamespaces& custom_namespaces) {
+  const absl::optional<absl::string_view> custom_namespace_stripped =
+      custom_namespaces.stripRegisteredPrefix(extracted_name);
+  if (custom_namespace_stripped.has_value()) {
+    // This case the name has a custom namespace, and it is a custom metric.
+    const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
+    // We expose these metrics without modifying (e.g. without "envoy_"),
+    // so we have to check the "user-defined" stat name complies with the Prometheus naming
+    // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
+    // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
+    // thanks to sanitizeName above, so the only thing we have to do is check
+    // if it does not start with digits.
+    if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
+      return absl::nullopt;
+    }
     return sanitized_name;
   }
 
-  // Add namespacing prefix to avoid conflicts, as per best practice:
-  // https://prometheus.io/docs/practices/naming/#metric-names
-  // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return absl::StrCat("envoy_", sanitized_name);
+  // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best
+  // practice: https://prometheus.io/docs/practices/naming/#metric-names Also, naming conventions on
+  // https://prometheus.io/docs/concepts/data_model/
+  return absl::StrCat("envoy_", sanitizeName(extracted_name));
 }
 
-// TODO(efimki): Add support of text readouts stats.
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex) {
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts, Buffer::Instance& response,
+    const bool used_only, const absl::optional<std::regex>& regex,
+    const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
-  metric_name_count += outputStatType<Stats::Counter>(
-      response, used_only, regex, counters, generateNumericOutput<Stats::Counter>, "counter");
+  metric_name_count += outputStatType<Stats::Counter>(response, used_only, regex, counters,
+                                                      generateNumericOutput<Stats::Counter>,
+                                                      "counter", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
-                                                    generateNumericOutput<Stats::Gauge>, "gauge");
+  metric_name_count +=
+      outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
+                                   generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::ParentHistogram>(
-      response, used_only, regex, histograms, generateHistogramOutput, "histogram");
+  // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
+  metric_name_count +=
+      outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
+                                         generateTextReadoutOutput, "gauge", custom_namespaces);
+
+  metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
+                                                              histograms, generateHistogramOutput,
+                                                              "histogram", custom_namespaces);
 
   return metric_name_count;
-}
-
-bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view prometheus_namespace) {
-  if (std::regex_match(prometheus_namespace.begin(), prometheus_namespace.end(),
-                       namespaceRegex())) {
-    return prometheusNamespaces().insert(std::string(prometheus_namespace)).second;
-  }
-  return false;
-}
-
-bool PrometheusStatsFormatter::unregisterPrometheusNamespace(
-    absl::string_view prometheus_namespace) {
-  auto it = prometheusNamespaces().find(prometheus_namespace);
-  if (it == prometheusNamespaces().end()) {
-    return false;
-  }
-  prometheusNamespaces().erase(it);
-  return true;
 }
 
 } // namespace Server

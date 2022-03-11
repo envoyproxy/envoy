@@ -18,6 +18,12 @@ IoSocketError* IoSocketError::getIoSocketInvalidAddressInstance() {
   return instance;
 }
 
+IoSocketError* IoSocketError::getIoSocketEbadfInstance() {
+  static auto* instance =
+      new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::NoSupport);
+  return instance;
+}
+
 IoSocketError* IoSocketError::getIoSocketEagainInstance() {
   static auto* instance = new IoSocketError(SOCKET_ERROR_AGAIN, Api::IoError::IoErrorCode::Again);
   return instance;
@@ -58,6 +64,8 @@ Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {
     return IoErrorCode::BadFd;
   case SOCKET_ERROR_CONNRESET:
     return IoErrorCode::ConnectionReset;
+  case SOCKET_ERROR_NETUNREACH:
+    return IoErrorCode::NetworkUnreachable;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", sys_errno, errorDetails(sys_errno));
     return IoErrorCode::UnknownError;

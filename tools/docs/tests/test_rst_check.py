@@ -13,6 +13,31 @@ def test_rst_check_current_version_constructor():
     assert version_file.path == "PATH"
 
 
+@pytest.mark.parametrize(
+    "constant",
+    (("single_tick_re", "SINGLE_TICK_REGEX"),
+     ("ref_ticks_re", "REF_TICKS_REGEX"),
+     ("link_ticks_re", "LINK_TICKS_REGEX"),
+     ("invalid_reflink_re", "INVALID_REFLINK"),
+     ("new_line_re", "VERSION_HISTORY_NEW_LINE_REGEX"),
+     ("punctuation_re", "REF_WITH_PUNCTUATION_REGEX"),
+     ("section_name_re", "VERSION_HISTORY_SECTION_NAME")))
+def test_rst_check_current_version_regexes(patches, constant):
+    version_file = rst_check.CurrentVersionFile("PATH")
+    prop, constant = constant
+    patched = patches(
+        "re",
+        prefix="tools.docs.rst_check")
+
+    with patched as (m_re, ):
+        assert getattr(version_file, prop) == m_re.compile.return_value
+
+    assert (
+        list(m_re.compile.call_args)
+        == [(getattr(rst_check, constant),), {}])
+    assert prop in version_file.__dict__
+
+
 def test_rst_check_current_version_lines(patches):
     version_file = rst_check.CurrentVersionFile("PATH")
     patched = patches(
@@ -50,47 +75,6 @@ def test_rst_check_current_version_prior_ends_with_period(prior):
     assert version_file.prior_endswith_period == expected
 
 
-@pytest.mark.parametrize("matches", [True, False, "partial"])
-def test_rst_check_current_version_check_flags(patches, matches):
-    version_file = rst_check.CurrentVersionFile("PATH")
-    patched = patches(
-        "RELOADABLE_FLAG_REGEX",
-        prefix="tools.docs.rst_check")
-
-    with patched as (m_flag, ):
-        if matches == "partial":
-            m_flag.match.return_value.groups.return_value.__getitem__.return_value.startswith.return_value = False
-        elif not matches:
-            m_flag.match.return_value = False
-        result = version_file.check_flags("LINE")
-
-    assert (
-        list(m_flag.match.call_args)
-        == [('LINE',), {}])
-
-    if matches:
-        assert (
-            list(m_flag.match.return_value.groups.call_args)
-            == [(), {}])
-        assert (
-            list(m_flag.match.return_value.groups.return_value.__getitem__.return_value.startswith.call_args)
-            == [(' ``',), {}])
-        if matches == "partial":
-            assert (
-                result
-                == [f"Flag {m_flag.match.return_value.groups.return_value.__getitem__.return_value} should be enclosed in double back ticks"])
-            assert (
-                list(list(c) for c in m_flag.match.return_value.groups.return_value.__getitem__.call_args_list)
-                == [[(0,), {}], [(1,), {}]])
-        else:
-            assert (
-                list(list(c) for c in m_flag.match.return_value.groups.return_value.__getitem__.call_args_list)
-                == [[(0,), {}]])
-            assert result == []
-    else:
-        assert result == []
-
-
 @pytest.mark.parametrize("line", ["", " ", "* ", "*asdf"])
 @pytest.mark.parametrize("prior_period", [True, False])
 @pytest.mark.parametrize("prior_line", ["", "line_content"])
@@ -98,25 +82,26 @@ def test_rst_check_current_version_check_line(patches, line, prior_period, prior
     version_file = rst_check.CurrentVersionFile("PATH")
     patched = patches(
         "CurrentVersionFile.check_reflink",
-        "CurrentVersionFile.check_flags",
         "CurrentVersionFile.check_list_item",
         "CurrentVersionFile.check_previous_period",
+        "CurrentVersionFile.check_ticks",
         prefix="tools.docs.rst_check")
     version_file.prior_line = prior_line
 
-    with patched as (m_ref, m_flags, m_item, m_period):
+    with patched as (m_ref, m_item, m_period, m_ticks):
         result = version_file.check_line(line)
 
     expected = m_ref.return_value.__add__.return_value
+
     assert (
         list(m_ref.call_args)
         == [(line,), {}])
     assert (
-        list(m_flags.call_args)
+        list(m_ticks.call_args)
         == [(line,), {}])
     assert (
         list(m_ref.return_value.__add__.call_args)
-        == [(m_flags.return_value,), {}])
+        == [(m_ticks.return_value,), {}])
 
     if line.startswith("* "):
         assert (
@@ -159,9 +144,9 @@ def test_rst_check_current_version_check_line(patches, line, prior_period, prior
 def test_rst_check_current_version_check_list_item(patches, matches, prior, prior_first, prior_next, first_word, next_word):
     version_file = rst_check.CurrentVersionFile("PATH")
     patched = patches(
-        "VERSION_HISTORY_NEW_LINE_REGEX",
         "CurrentVersionFile.set_tokens",
         ("CurrentVersionFile.prior_endswith_period", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.new_line_re", dict(new_callable=PropertyMock)),
         prefix="tools.docs.rst_check")
     version_file.prior_line = "PRIOR LINE"
     version_file.first_word_of_prior_line = prior_first
@@ -172,11 +157,11 @@ def test_rst_check_current_version_check_list_item(patches, matches, prior, prio
             return first_word
         return next_word
 
-    with patched as (m_regex, m_tokens, m_prior):
+    with patched as (m_tokens, m_prior, m_regex):
         if not matches:
-            m_regex.match.return_value = False
+            m_regex.return_value.match.return_value = False
         else:
-            m_regex.match.return_value.groups.return_value.__getitem__.side_effect = _get_item
+            m_regex.return_value.match.return_value.groups.return_value.__getitem__.side_effect = _get_item
         m_prior.return_value = prior
         result = version_file.check_list_item("LINE")
 
@@ -185,13 +170,13 @@ def test_rst_check_current_version_check_list_item(patches, matches, prior, prio
         expected += ["The following release note does not end with a '.'\n PRIOR LINE"]
 
     assert (
-        list(m_regex.match.call_args)
+        list(m_regex.return_value.match.call_args)
         == [('LINE',), {}])
 
     if not matches:
         expected += [
             f"Version history line malformed. "
-            f"Does not match VERSION_HISTORY_NEW_LINE_REGEX in docs_check.py\n LINE\n"
+            f"Does not match VERSION_HISTORY_NEW_LINE_REGEX\n LINE\n"
             "Please use messages in the form 'category: feature explanation.', "
             "starting with a lower-cased letter and ending with a period."]
         assert result == expected
@@ -199,7 +184,7 @@ def test_rst_check_current_version_check_list_item(patches, matches, prior, prio
         return
 
     assert (
-        list(list(c) for c in m_regex.match.return_value.groups.call_args_list)
+        list(list(c) for c in m_regex.return_value.match.return_value.groups.call_args_list)
         == [[(), {}], [(), {}]])
 
     if prior_first and prior_first > first_word:
@@ -236,15 +221,15 @@ def test_rst_check_current_version_check_previous_period(patches, prior):
 def test_rst_check_current_version_check_reflink(patches, matches):
     version_file = rst_check.CurrentVersionFile("PATH")
     patched = patches(
-        "INVALID_REFLINK",
+        ("CurrentVersionFile.invalid_reflink_re", dict(new_callable=PropertyMock)),
         prefix="tools.docs.rst_check")
 
     with patched as (m_reflink, ):
-        m_reflink.match.return_value = matches
+        m_reflink.return_value.match.return_value = matches
         result = version_file.check_reflink("LINE")
 
     assert (
-        list(m_reflink.match.call_args)
+        list(m_reflink.return_value.match.call_args)
         == [('LINE',), {}])
 
     if matches:
@@ -253,6 +238,30 @@ def test_rst_check_current_version_check_reflink(patches, matches):
             == ['Found text " ref:". This should probably be " :ref:"\nLINE'])
     else:
         assert result == []
+
+
+@pytest.mark.parametrize("single_tick_re_matches", [True, False])
+@pytest.mark.parametrize("ref_ticks_re", [True, False])
+@pytest.mark.parametrize("link_ticks_re", [True, False])
+def test_rst_check_current_version_check_ticks(patches, single_tick_re_matches, ref_ticks_re, link_ticks_re):
+    version_file = rst_check.CurrentVersionFile("PATH")
+    patched = patches(
+        ("CurrentVersionFile.single_tick_re", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.ref_ticks_re", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.link_ticks_re", dict(new_callable=PropertyMock)),
+        prefix="tools.docs.rst_check")
+
+    with patched as (m_single_tick_re, m_ref_tickes_re, m_link_ticks_re):
+        m_single_tick_re.return_value.match.return_value = single_tick_re_matches
+        m_ref_tickes_re.return_value.match.return_value = ref_ticks_re
+        m_link_ticks_re.return_value.match.return_value = link_ticks_re
+        assert (
+            version_file.check_ticks("LINE")
+            == (["Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): LINE"]
+                if (single_tick_re_matches and (not ref_ticks_re) and (not link_ticks_re)) else []))
+    assert (
+        list(m_single_tick_re.return_value.match.call_args)
+        == [('LINE',), {}])
 
 
 @pytest.mark.parametrize(
@@ -267,16 +276,16 @@ def test_rst_check_current_version_run_checks(patches, lines, errors, matches):
     version_file = rst_check.CurrentVersionFile("PATH")
     patched = patches(
         "enumerate",
-        "VERSION_HISTORY_SECTION_NAME",
         "CurrentVersionFile.set_tokens",
         "CurrentVersionFile.check_line",
         ("CurrentVersionFile.lines", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.section_name_re", dict(new_callable=PropertyMock)),
         prefix="tools.docs.rst_check")
 
-    with patched as (m_enum, m_section, m_tokens, m_check, m_lines):
+    with patched as (m_enum, m_tokens, m_check, m_lines, m_section):
         m_enum.return_value = lines
         m_check.return_value = errors
-        m_section.match.return_value = matches
+        m_section.return_value.match.return_value = matches
         _result = version_file.run_checks()
         assert isinstance(_result, types.GeneratorType)
         result = list(_result)
@@ -287,7 +296,7 @@ def test_rst_check_current_version_run_checks(patches, lines, errors, matches):
 
     if not lines:
         assert result == []
-        assert not m_section.match.called
+        assert not m_section.return_value.match.called
         assert not m_check.called
         assert (
             list(list(c) for c in m_tokens.call_args_list)
@@ -309,7 +318,7 @@ def test_rst_check_current_version_run_checks(patches, lines, errors, matches):
         for error in errors:
             _errors.append((line_number, error))
     assert (
-        list(list(c) for c in m_section.match.call_args_list)
+        list(list(c) for c in m_section.return_value.match.call_args_list)
         == [[(line,), {}] for line in _match])
     assert (
         list(list(c) for c in m_tokens.call_args_list)
@@ -340,21 +349,24 @@ def test_rst_checker_constructor():
 
 
 @pytest.mark.parametrize("errors", [[], ["err1", "err2"]])
-def test_rst_checker_check_current_version(patches, errors):
+async def test_rst_checker_check_current_version(patches, errors):
     checker = rst_check.RSTChecker("path1", "path2", "path3")
-
     patched = patches(
+        "pathlib",
         "CurrentVersionFile",
         "RSTChecker.error",
         prefix="tools.docs.rst_check")
 
-    with patched as (m_version, m_error):
+    with patched as (m_plib, m_version, m_error):
         m_version.return_value.run_checks.return_value = errors
-        checker.check_current_version()
+        assert not await checker.check_current_version()
 
     assert (
-        list(m_version.call_args)
+        list(m_plib.Path.call_args)
         == [('docs/root/version_history/current.rst',), {}])
+    assert (
+        list(m_version.call_args)
+        == [(m_plib.Path.return_value,), {}])
     assert (
         list(m_version.return_value.run_checks.call_args)
         == [(), {}])

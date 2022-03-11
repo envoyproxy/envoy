@@ -1,5 +1,5 @@
 import types
-from unittest.mock import patch, PropertyMock
+from unittest.mock import patch, PropertyMock, call
 
 import pytest
 
@@ -12,49 +12,63 @@ def test_extensions_checker_constructor():
     assert checker.extension_categories == extensions_check.EXTENSION_CATEGORIES
 
 
-def test_extensions_checker_all_extensions():
+def test_extensions_checker_all_extensions(patches):
     checker = extensions_check.ExtensionsChecker()
-    exts_mock = patch(
-        "tools.extensions.extensions_check.ExtensionsChecker.configured_extensions",
-        new_callable=PropertyMock)
-    _configured = dict(foo="FOO", bar="BAR")
+    patched = patches(
+        ("ExtensionsChecker.configured_extensions",
+         dict(new_callable=PropertyMock)),
+        ("ExtensionsChecker.configured_contrib_extensions",
+         dict(new_callable=PropertyMock)),
+        prefix="tools.extensions.extensions_check")
+    configured_exts = {f"EXT{i}": f"EXT_DATA{i}" for i in range(0, 5)}
+    contrib_exts = {f"CONTRIB_EXT{i}": f"EXT_DATA{i}" for i in range(0, 3)}
 
-    with exts_mock as m_exts:
-        m_exts.return_value = _configured
+    with patched as (m_exts, m_contrib):
+        m_exts.return_value = configured_exts
+        m_contrib.return_value = contrib_exts
         result = checker.all_extensions
 
     assert (
         result
-        == set(_configured.keys()) | set(extensions_check.BUILTIN_EXTENSIONS))
+        == (set(configured_exts.keys())
+            | set(extensions_check.BUILTIN_EXTENSIONS)
+            | set(contrib_exts.keys())))
     assert "all_extensions" in checker.__dict__
 
 
-def test_extensions_checker_configured_extensions(patches):
+@pytest.mark.parametrize("exts", ["", "contrib"])
+def test_extensions_checker_configured_extensions(patches, exts):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
-        "spec_from_loader",
-        "SourceFileLoader",
-        "module_from_spec",
+        "json",
+        "pathlib",
+        ("ExtensionsChecker.args",
+         dict(new_callable=PropertyMock)),
         prefix="tools.extensions.extensions_check")
+    attr = (
+        "configured_%s_extensions" % exts
+        if exts
+        else "configured_extensions")
+    config = (
+        "%s_build_config" % exts
+        if exts
+        else "build_config")
 
-    with patched as (m_spec, m_loader, m_module):
+    with patched as (m_json, m_plib, m_args):
         assert (
-            checker.configured_extensions
-            == m_module.return_value.EXTENSIONS)
+            getattr(checker, attr)
+            == m_json.loads.return_value)
 
     assert (
-        list(m_spec.call_args)
-        == [('extensions_build_config', m_loader.return_value), {}])
+        m_json.loads.call_args
+        == [(m_plib.Path.return_value.read_text.return_value, ), {}])
     assert (
-        list(m_loader.call_args)
-        == [('extensions_build_config', extensions_check.BUILD_CONFIG_PATH), {}])
+        m_plib.Path.call_args
+        == [(getattr(m_args.return_value, config), ), {}])
     assert (
-        list(m_module.call_args)
-        == [(m_spec.return_value,), {}])
-    assert (
-        list(m_spec.return_value.loader.exec_module.call_args)
-        == [(m_module.return_value,), {}])
-    assert "configured_extensions" in checker.__dict__
+        m_plib.Path.return_value.read_text.call_args
+        == [(), {}])
+    assert attr in checker.__dict__
 
 
 def test_extensions_fuzzed_count(patches):
@@ -88,20 +102,34 @@ def test_extensions_fuzzed_count(patches):
     assert "fuzzed_count" not in checker.__dict__
 
 
-def test_extensions_metadata(patches):
+@pytest.mark.parametrize("is_dict", [True, False])
+def test_extensions_metadata(patches, is_dict):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
+        "isinstance",
         "utils",
         prefix="tools.extensions.extensions_check")
 
-    with patched as (m_utils, ):
-        assert (
-            checker.metadata
-            == m_utils.from_yaml.return_value)
+    with patched as (m_inst, m_utils):
+        m_inst.return_value = is_dict
+
+        if is_dict:
+            assert (
+                checker.metadata
+                == m_utils.from_yaml.return_value)
+        else:
+            with pytest.raises(extensions_check.ExtensionsConfigurationError) as e:
+                checker.metadata
 
     assert (
-        list(m_utils.from_yaml.call_args)
-        == [(extensions_check.METADATA_PATH,), {}])
+        list(m_utils.from_yaml.call_args_list)
+        == [call(extensions_check.METADATA_PATH), call(extensions_check.CONTRIB_METADATA_PATH)])
+
+    if not is_dict:
+        assert (
+            e.value.args[0]
+            == f'Unable to parse metadata: {extensions_check.METADATA_PATH} {extensions_check.CONTRIB_METADATA_PATH}')
+        return
     assert "metadata" in checker.__dict__
 
 
@@ -134,7 +162,7 @@ def test_extensions_robust_to_downstream_count():
 
 
 @pytest.mark.parametrize("robust", ["FUZZED_COUNT", "NOT_FUZZED_COUNT"])
-def test_extensions_check_fuzzed(patches, robust):
+async def test_extensions_check_fuzzed(patches, robust):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         ("ExtensionsChecker.robust_to_downstream_count", dict(new_callable=PropertyMock)),
@@ -145,7 +173,7 @@ def test_extensions_check_fuzzed(patches, robust):
     with patched as (m_robust, m_fuzzed, m_error):
         m_fuzzed.return_value = "FUZZED_COUNT"
         m_robust.return_value = robust
-        checker.check_fuzzed()
+        assert not await checker.check_fuzzed()
 
     ERR_MESSAGE = (
         "Check that all network filters robust against untrusted downstreams are fuzzed "
@@ -163,7 +191,7 @@ def test_extensions_check_fuzzed(patches, robust):
     "meta_errors",
     [dict(foo=True, bar=False, baz=True),
      dict(foo=False, bar=False, baz=False)])
-def test_extensions_check_metadata(patches, meta_errors):
+async def test_extensions_check_metadata(patches, meta_errors):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         ("ExtensionsChecker.metadata", dict(new_callable=PropertyMock)),
@@ -178,7 +206,7 @@ def test_extensions_check_metadata(patches, meta_errors):
     with patched as (m_meta, m_check, m_error):
         m_meta.return_value = meta_errors
         m_check.side_effect = _check
-        checker.check_metadata()
+        assert not await checker.check_metadata()
 
     assert (
         list(list(c) for c in m_check.call_args_list)
@@ -201,7 +229,7 @@ def test_extensions_check_metadata(patches, meta_errors):
     [("A", "B", "C", "D"),
      ("A", "B"),
      ("B", "C", "D")])
-def test_extensions_registered(patches, all_ext, metadata):
+async def test_extensions_check_registered(patches, all_ext, metadata):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         ("ExtensionsChecker.metadata", dict(new_callable=PropertyMock)),
@@ -212,7 +240,7 @@ def test_extensions_registered(patches, all_ext, metadata):
     with patched as (m_meta, m_all, m_error):
         m_meta.return_value = {k: k for k in metadata}
         m_all.return_value = set(all_ext)
-        checker.check_registered()
+        assert not await checker.check_registered()
 
     if set(all_ext) == set(metadata):
         assert not m_error.called
@@ -299,7 +327,8 @@ def test_extensions__check_metadata_categories(ext_cats, all_cats):
     if wrong_cats:
         assert (
             result
-            == [f'Unknown extension category for EXTENSION: {cat}' for cat in wrong_cats])
+            == [f'Unknown extension category for EXTENSION: {cat}. '
+                'Please add it to tools/extensions/extensions_check.py' for cat in wrong_cats])
         return
 
     assert result == []
@@ -372,4 +401,4 @@ def test_extensions_checker_main(command_main):
     command_main(
         extensions_check.main,
         "tools.extensions.extensions_check.ExtensionsChecker",
-        args=())
+        args=("ARGS", ))

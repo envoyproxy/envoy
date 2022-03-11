@@ -350,8 +350,10 @@ static_resources:
             trusted_ca:
               filename: certs/cacert.pem
             {% if host.get('verify_subject_alt_name', False) %}
-            match_subject_alt_names:
-              exact: "{{host['verify_subject_alt_name'] }}"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "{{host['verify_subject_alt_name'] }}"
             {% endif %}
         {% if host.get('sni', False) %}
         sni: "{{ host['sni'] }}"
@@ -520,8 +522,10 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-              exact: "collector-grpc.lightstep.com"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "collector-grpc.lightstep.com"
   - name: cds_cluster
     connect_timeout: 0.25s
     type: STRICT_DNS

@@ -342,8 +342,6 @@ protected:
   StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
-  const bool header_map_correctly_coalesce_cookies_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.header_map_correctly_coalesce_cookies");
 };
 
 /**
@@ -484,10 +482,15 @@ public:
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
   // Tracing::TraceContext
-  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override;
-  void setTraceContext(absl::string_view key, absl::string_view val) override;
-  void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override;
-  void setTraceContextReference(absl::string_view key, absl::string_view val) override;
+  absl::string_view protocol() const override;
+  absl::string_view authority() const override;
+  absl::string_view path() const override;
+  absl::string_view method() const override;
+  void forEach(Tracing::TraceContext::IterateCallback callback) const override;
+  absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
+  void setByKey(absl::string_view key, absl::string_view val) override;
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override;
+  void setByReference(absl::string_view key, absl::string_view val) override;
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the

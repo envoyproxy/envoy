@@ -25,13 +25,15 @@ namespace {
 Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match) {
   envoy::type::matcher::v3::StringMatcher config;
   config.set_exact(exact_match);
-  return std::make_unique<Matchers::StringMatcherImpl>(config);
+  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+      config);
 }
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
   envoy::type::matcher::v3::StringMatcher config;
   config.MergeFrom(TestUtility::createRegexMatcher(regex));
-  return std::make_unique<Matchers::StringMatcherImpl>(config);
+  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+      config);
 }
 
 } // namespace
@@ -448,8 +450,7 @@ TEST_F(CorsFilterTest, EncodeWithAllowCredentialsTrue) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
@@ -469,8 +470,7 @@ TEST_F(CorsFilterTest, EncodeWithExposeHeaders) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -703,14 +703,59 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
-// Test that the deprecated extension name still functions.
-TEST(CorsFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.cors";
+TEST_F(CorsFilterTest, OptionsRequestWithWildcardAllowMethods) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "OPTIONS"},
+                                                 {"origin", "www.envoyproxy.com"},
+                                                 {"access-control-request-method", "GET"}};
 
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"access-control-allow-origin", "www.envoyproxy.com"},
+      {"access-control-allow-methods", "GET"},
+      {"access-control-allow-headers", "content-type"},
+      {"access-control-max-age", "0"},
+  };
+
+  cors_policy_->allow_methods_ = "*";
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
+TEST_F(CorsFilterTest, OptionsRequestWithWildcardAllowHeaders) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "OPTIONS"},
+                                                 {"origin", "www.envoyproxy.com"},
+                                                 {"access-control-request-method", "GET"},
+                                                 {"access-control-request-headers", "test,pre"}};
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"access-control-allow-origin", "www.envoyproxy.com"},
+      {"access-control-allow-methods", "GET"},
+      {"access-control-allow-headers", "test,pre"},
+      {"access-control-max-age", "0"},
+  };
+
+  cors_policy_->allow_headers_ = "*";
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
 } // namespace Cors

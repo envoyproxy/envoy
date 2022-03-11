@@ -169,24 +169,31 @@ private:
       return;
     }
 
-    const uint64_t ms_since_first_close = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                              time_source_.monotonicTime() - last_close_time_)
-                                              .count();
+    const auto duration_since_first_close = time_source_.monotonicTime() - last_close_time_;
+    const uint64_t seconds_since_first_close =
+        std::chrono::duration_cast<std::chrono::seconds>(duration_since_first_close).count();
     const Grpc::Status::GrpcStatus close_status = last_close_status_.value();
 
     if (status != close_status) {
       // This is a different failure. Warn on both statuses and remember the new one.
-      ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {} (previously {}, {} since {}ms ago)",
+      ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {} (previously {}, {} since {}s ago)",
                 service_method_.name(), status, message, close_status, last_close_message_,
-                ms_since_first_close);
+                seconds_since_first_close);
       setCloseStatus(status, message);
       return;
     }
 
+    // #18508: The error message may have changed.
+    // To reduce noise, do not update the last close time, or use the message to distinguish the
+    // error in the previous condition.
+    last_close_message_ = message;
+
+    const uint64_t ms_since_first_close =
+        std::chrono::duration_cast<std::chrono::milliseconds>(duration_since_first_close).count();
     if (ms_since_first_close > RetryMaxDelayMs) {
       // Warn if we are over the time limit.
-      ENVOY_LOG(warn, "{} gRPC config stream closed since {}ms ago: {}, {}", service_method_.name(),
-                ms_since_first_close, close_status, last_close_message_);
+      ENVOY_LOG(warn, "{} gRPC config stream closed since {}s ago: {}, {}", service_method_.name(),
+                seconds_since_first_close, close_status, message);
       return;
     }
 

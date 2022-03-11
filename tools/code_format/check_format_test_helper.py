@@ -163,7 +163,7 @@ def run_checks():
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     real_time_inject_error = (
-        "Don't reference real-world time sources from production code; use injection")
+        "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)")
     errors += check_unfixable_error("real_time_source.cc", real_time_inject_error)
     errors += check_unfixable_error("real_time_system.cc", real_time_inject_error)
     errors += check_unfixable_error(
@@ -174,7 +174,8 @@ def run_checks():
     errors += check_unfixable_error("steady_clock.cc", real_time_inject_error)
     errors += check_unfixable_error(
         "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
-    errors += check_unfixable_error("condvar_wait_for.cc", real_time_inject_error)
+    errors += check_unfixable_error(
+        "condvar_wait_for.cc", "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.")
     errors += check_unfixable_error("sleep.cc", real_time_inject_error)
     errors += check_unfixable_error("std_atomic_free_functions.cc", "std::atomic_*")
     errors += check_unfixable_error("std_get_time.cc", "std::get_time")

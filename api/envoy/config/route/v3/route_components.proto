@@ -5,6 +5,7 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/metadata/v3/metadata.proto";
@@ -16,6 +17,9 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -25,6 +29,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.route.v3";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/route/v3;routev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP route components]
@@ -36,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -86,7 +91,14 @@ message VirtualHost {
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
+  // Only one of this and `matcher` can be specified.
   repeated Route routes = 3;
+
+  // [#next-major-version: This should be included in a oneof with routes wrapped in a message.]
+  // The match tree to use when resolving route actions for incoming requests. Only one of this and `routes`
+  // can be specified.
+  xds.type.matcher.v3.Matcher matcher = 21
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
@@ -311,7 +323,7 @@ message Route {
 message WeightedCluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.WeightedCluster";
 
-  // [#next-free-field: 12]
+  // [#next-free-field: 13]
   message ClusterWeight {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.WeightedCluster.ClusterWeight";
@@ -320,9 +332,31 @@ message WeightedCluster {
 
     reserved "per_filter_config";
 
+    // Only one of *name* and *cluster_header* may be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
+
+    // Only one of *name* and *cluster_header* may be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1 }]
+    // Envoy will determine the cluster to route to by reading the value of the
+    // HTTP header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist, Envoy will
+    // return a 404 response.
+    //
+    // .. attention::
+    //
+    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
+    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
+    string cluster_header = 12 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+    ];
 
     // An integer between 0 and :ref:`total_weight
     // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
@@ -403,9 +437,18 @@ message WeightedCluster {
   // configuration file will be used as the default weight. See the :ref:`runtime documentation
   // <operations_runtime>` for how key names map to the underlying implementation.
   string runtime_key_prefix = 2;
+
+  oneof random_value_specifier {
+    // Specifies the header name that is used to look up the random value passed in the request header.
+    // This is used to ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    // If header is not present or invalid, Envoy will fall back to use the internally generated random value.
+    // This header is expected to be single-valued header as we only want to have one selected value throughout
+    // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
+    string header_name = 4;
+  }
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -506,6 +549,14 @@ message RouteMatch {
   // against all the specified query parameters. If the number of specified
   // query parameters is nonzero, they all must match the *path* header's
   // query string for a match to occur.
+  //
+  // .. note::
+  //
+  //    If query parameters are used to pass request message fields when
+  //    `grpc_json_transcoder <https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter>`_
+  //    is used, the transcoded message fields maybe different. The query parameters are
+  //    url encoded, but the message fields are not. For example, if a query
+  //    parameter is "foo%20bar", the message field will be "foo bar".
   repeated QueryParameterMatcher query_parameters = 7;
 
   // If specified, only gRPC requests will be matched. The router will check
@@ -518,6 +569,12 @@ message RouteMatch {
   //
   // [#next-major-version: unify with RBAC]
   TlsContextMatchOptions tls_context = 11;
+
+  // Specifies a set of dynamic metadata matchers on which the route should match.
+  // The router will check the dynamic metadata against all the specified dynamic metadata matchers.
+  // If the number of specified dynamic metadata matchers is nonzero, they all must match the
+  // dynamic metadata for a match to occur.
+  repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
 // [#next-free-field: 12]
@@ -570,7 +627,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 38]
+// [#next-free-field: 39]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -705,8 +762,8 @@ message RouteAction {
           "envoy.api.v2.route.RouteAction.HashPolicy.FilterState";
 
       // The name of the Object in the per-request filterState, which is an
-      // Envoy::Http::Hashable object. If there is no data associated with the key,
-      // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
+      // Envoy::Hashable object. If there is no data associated with the key,
+      // or the stored object is not Envoy::Hashable, no hash will be produced.
       string key = 1 [(validate.rules).string = {min_len: 1}];
     }
 
@@ -934,20 +991,29 @@ message RouteAction {
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
-    // this value.
+    // this value. Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     string host_rewrite_literal = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
     // option is applicable only when the destination cluster for a route is of
-    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster
-    // types has no effect.
+    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster types
+    // has no effect. Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     google.protobuf.BoolValue auto_host_rewrite = 7;
 
     // Indicates that during forwarding, the host header will be swapped with the content of given
     // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
-    // If header value is empty, host header is left intact.
+    // If header value is empty, host header is left intact. Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     //
     // .. attention::
     //
@@ -963,6 +1029,10 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
     // This is useful for transitioning variable content between path segment and subdomain.
+    // Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     //
     // For example with the following config:
     //
@@ -977,6 +1047,15 @@ message RouteAction {
     // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
     type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
   }
+
+  // If set, then a host rewrite action (one of
+  // :ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+  // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+  // :ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+  // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+  // causes the original value of the host header, if any, to be appended to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header.
+  bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
   // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
@@ -1135,7 +1214,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
 
@@ -1276,8 +1355,8 @@ message RetryPolicy {
   google.protobuf.UInt32Value num_retries = 2
       [(udpa.annotations.field_migrate).rename = "max_retries"];
 
-  // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
-  // same conditions documented for
+  // Specifies a non-zero upstream timeout per retry attempt (including the initial attempt). This
+  // parameter is optional. The same conditions documented for
   // :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
   //
   // .. note::
@@ -1289,6 +1368,27 @@ message RetryPolicy {
   //   would have been exhausted.
   google.protobuf.Duration per_try_timeout = 3;
 
+  // Specifies an upstream idle timeout per retry attempt (including the initial attempt). This
+  // parameter is optional and if absent there is no per try idle timeout. The semantics of the per
+  // try idle timeout are similar to the
+  // :ref:`route idle timeout <envoy_v3_api_field_config.route.v3.RouteAction.timeout>` and
+  // :ref:`stream idle timeout
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
+  // both enforced by the HTTP connection manager. The difference is that this idle timeout
+  // is enforced by the router for each individual attempt and thus after all previous filters have
+  // run, as opposed to *before* all previous filters run for the other idle timeouts. This timeout
+  // is useful in cases in which total request timeout is bounded by a number of retries and a
+  // :ref:`per_try_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_timeout>`, but
+  // there is a desire to ensure each try is making incremental progress. Note also that similar
+  // to :ref:`per_try_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_timeout>`,
+  // this idle timeout does not start until after both the entire request has been received by the
+  // router *and* a connection pool connection has been obtained. Unlike
+  // :ref:`per_try_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_timeout>`,
+  // the idle timer continues once the response starts streaming back to the downstream client.
+  // This ensures that response data continues to make progress without using one of the HTTP
+  // connection manager idle timeouts.
+  google.protobuf.Duration per_try_idle_timeout = 13;
+
   // Specifies an implementation of a RetryPriority which is used to determine the
   // distribution of load across priorities used for retries. Refer to
   // :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more details.
@@ -1299,6 +1399,11 @@ message RetryPolicy {
   // Refer to :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more
   // details.
   repeated RetryHostPredicate retry_host_predicate = 5;
+
+  // Retry options predicates that will be applied prior to retrying a request. These predicates
+  // allow customizing request behavior between retries.
+  // [#comment: add [#extension-category: envoy.retry_options_predicates] when there are built-in extensions]
+  repeated core.v3.TypedExtensionConfig retry_options_predicates = 12;
 
   // The maximum number of times host selection will be reattempted before giving up, at which
   // point the host that was last selected will be routed to. If unspecified, this will default to
@@ -1477,7 +1582,7 @@ message DirectResponseAction {
       "envoy.api.v2.route.DirectResponseAction";
 
   // Specifies the HTTP response status to be returned.
-  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 100}];
+  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // Specifies the content of the response body. If this setting is omitted,
   // no body is included in the generated response.

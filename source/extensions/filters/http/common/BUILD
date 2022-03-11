@@ -43,21 +43,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "utility_lib",
-    hdrs = ["utility.h"],
-    # Used by the router filter.  TODO(#9953) clean up.
-    visibility = [
-        "//source:__subpackages__",
-        "//test:__subpackages__",
-    ],
-    deps = [
-        "//envoy/runtime:runtime_interface",
-        "//source/common/common:macros",
-        "//source/extensions/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "stream_rate_limiter_lib",
     srcs = ["stream_rate_limiter.cc"],
     hdrs = ["stream_rate_limiter.h"],
@@ -69,5 +54,13 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:token_bucket_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "ratelimit_headers_lib",
+    hdrs = ["ratelimit_headers.h"],
+    deps = [
+        "//source/common/http:header_map_lib",
     ],
 )

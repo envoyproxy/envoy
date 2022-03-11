@@ -11,7 +11,7 @@ namespace Router {
 UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                                  MessageMetadataSharedPtr& metadata, TransportType transport_type,
                                  ProtocolType protocol_type)
-    : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
+    : parent_(parent), stats_(parent.stats()), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
@@ -114,7 +114,7 @@ void UpstreamRequest::handleUpgradeResponse(Buffer::Instance& data) {
 }
 
 ThriftFilters::ResponseStatus
-UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
+UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
                                        UpstreamResponseCallbacks& callbacks) {
   ENVOY_LOG(trace, "reading response: {} bytes", data.length());
 
@@ -123,36 +123,35 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& own
     response_started_ = true;
   }
 
-  const auto& cluster = owner.cluster();
+  const auto& cluster = parent_.cluster();
 
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
     ENVOY_LOG(debug, "response complete");
 
-    owner.recordUpstreamResponseSize(cluster, response_size_);
+    stats_.recordUpstreamResponseSize(cluster, response_size_);
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
-      owner.incResponseReply(cluster);
       if (callbacks.responseSuccess()) {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestSuccess);
-        owner.incResponseReplySuccess(cluster);
+        stats_.incResponseReplySuccess(cluster, upstream_host_);
       } else {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestFailed);
-        owner.incResponseReplyError(cluster);
+        stats_.incResponseReplyError(cluster, upstream_host_);
       }
       break;
 
     case MessageType::Exception:
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
-      owner.incResponseException(cluster);
+      stats_.incResponseRemoteException(cluster, upstream_host_);
       break;
 
     default:
-      owner.incResponseInvalidType(cluster);
+      stats_.incResponseInvalidType(cluster, upstream_host_);
       break;
     }
     onResponseComplete();
@@ -160,6 +159,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& own
     // Note: invalid responses are not accounted in the response size histogram.
     ENVOY_LOG(debug, "upstream reset");
     upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::ExtOriginRequestFailed);
+    stats_.incResponseDecodingError(cluster, upstream_host_);
     resetStream();
   }
 
@@ -167,7 +167,6 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& own
 }
 
 bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
-                                         RequestOwner& owner,
                                          UpstreamResponseCallbacks& callbacks) {
   ASSERT(!response_complete_);
 
@@ -176,7 +175,7 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
   if (upgrade_response_ != nullptr) {
     handleUpgradeResponse(data);
   } else {
-    const auto status = handleRegularResponse(data, owner, callbacks);
+    const auto status = handleRegularResponse(data, callbacks);
     if (status != ThriftFilters::ResponseStatus::MoreData) {
       return true;
     }
@@ -205,9 +204,9 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "upstream local close");
     onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("reached unexpectedly");
   }
 
   releaseConnection(false);
@@ -268,9 +267,10 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
+    stats_.incResponseLocalException(parent_.cluster());
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
-                           true);
+                           false /* Don't close the downstream connection. */);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_host_->outlierDetector().putResult(
@@ -287,6 +287,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::LocalOriginConnectFailed);
     }
+    stats_.incResponseLocalException(parent_.cluster());
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
@@ -302,8 +303,6 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     // Error occurred after a partial response, propagate the reset to the downstream.
     parent_.resetDownstreamConnection();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -316,7 +315,7 @@ void UpstreamRequest::chargeResponseTiming() {
   const std::chrono::milliseconds response_time =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-  parent_.recordResponseDuration(response_time.count(), Stats::Histogram::Unit::Milliseconds);
+  stats_.recordUpstreamResponseTime(parent_.cluster(), upstream_host_, response_time.count());
 }
 
 } // namespace Router

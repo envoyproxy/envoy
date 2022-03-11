@@ -42,7 +42,8 @@ namespace Envoy {
 namespace Router {
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
-                                 std::unique_ptr<GenericConnPool>&& conn_pool)
+                                 std::unique_ptr<GenericConnPool>&& conn_pool,
+                                 bool can_send_early_data, bool can_use_http3)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -50,7 +51,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
+      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
+      cleaned_up_(false), had_upstream_(false),
+      stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
@@ -60,6 +63,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
     }
   }
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
@@ -69,7 +74,13 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 }
 
-UpstreamRequest::~UpstreamRequest() {
+UpstreamRequest::~UpstreamRequest() { cleanUp(); }
+
+void UpstreamRequest::cleanUp() {
+  if (cleaned_up_) {
+    return;
+  }
+  cleaned_up_ = true;
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
                                                      upstream_trailers_.get(), stream_info_,
@@ -79,6 +90,10 @@ UpstreamRequest::~UpstreamRequest() {
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
+  }
+  if (per_try_idle_timeout_ != nullptr) {
+    // Allows for testing.
+    per_try_idle_timeout_->disableTimer();
   }
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
@@ -111,7 +126,6 @@ UpstreamRequest::~UpstreamRequest() {
     }
   }
 
-  stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
@@ -125,21 +139,22 @@ UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersSize(headers->byteSize());
-  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
+  parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
-  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
-  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
+  // as part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
   //
   // We could in principle handle other headers here, but this might result in the double invocation
   // of decodeHeaders() (once for informational, again for non-informational), which is likely an
@@ -157,7 +172,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
-  upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
+  upstreamTiming().onFirstUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
   awaiting_headers_ = false;
@@ -177,6 +192,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  resetPerTryIdleTimer();
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
   parent_.onUpstreamData(data, *this, end_stream);
@@ -195,7 +211,7 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().addressProviderSharedPtr();
+  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
   DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
@@ -213,15 +229,15 @@ void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
 
 void UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
-    upstream_timing_.onLastUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
+    upstreamTiming().onLastUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
     decode_complete_ = true;
   }
 }
 
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
-  stream_info_.onUpstreamHostSelected(host);
+  StreamInfo::UpstreamInfo& upstream_info = *streamInfo().upstreamInfo();
+  upstream_info.setUpstreamHost(host);
   upstream_host_ = host;
-  parent_.callbacks()->streamInfo().onUpstreamHostSelected(host);
   parent_.onUpstreamHostSelected(host);
 }
 
@@ -254,7 +270,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
     stream_info_.addBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
     if (end_stream) {
-      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
+      upstreamTiming().onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
     }
   }
 }
@@ -271,7 +287,7 @@ void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
 
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks());
     upstream_->encodeTrailers(trailers);
-    upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
+    upstreamTiming().onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
   }
 }
 
@@ -297,7 +313,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
-
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -331,6 +346,12 @@ void UpstreamRequest::resetStream() {
   }
 }
 
+void UpstreamRequest::resetPerTryIdleTimer() {
+  if (per_try_idle_timeout_ != nullptr) {
+    per_try_idle_timeout_->enableTimer(parent_.timeout().per_try_idle_timeout_);
+  }
+}
+
 void UpstreamRequest::setupPerTryTimeout() {
   ASSERT(!per_try_timeout_);
   if (parent_.timeout().per_try_timeout_.count() > 0) {
@@ -338,6 +359,19 @@ void UpstreamRequest::setupPerTryTimeout() {
         parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryTimeout(); });
     per_try_timeout_->enableTimer(parent_.timeout().per_try_timeout_);
   }
+
+  ASSERT(!per_try_idle_timeout_);
+  if (parent_.timeout().per_try_idle_timeout_.count() > 0) {
+    per_try_idle_timeout_ =
+        parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryIdleTimeout(); });
+    resetPerTryIdleTimer();
+  }
+}
+
+void UpstreamRequest::onPerTryIdleTimeout() {
+  ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  parent_.onPerTryIdleTimeout(*this);
 }
 
 void UpstreamRequest::onPerTryTimeout() {
@@ -369,12 +403,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
-      reset_reason = Http::StreamResetReason::ConnectionFailure;
-    } else {
-      reset_reason = Http::StreamResetReason::LocalReset;
-    }
+    reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
   // Mimic an upstream reset.
@@ -390,7 +419,7 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
-
+  had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
@@ -409,16 +438,33 @@ void UpstreamRequest::onPoolReady(
     stream_info_.protocol(protocol.value());
   }
 
-  stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
-      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
-  parent_.callbacks()->streamInfo().setUpstreamFilterState(
-      std::make_shared<StreamInfo::FilterStateImpl>(info.filterState().parent()->parent(),
-                                                    StreamInfo::FilterState::LifeSpan::Request));
-  stream_info_.setUpstreamLocalAddress(upstream_local_address);
-  parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
+  StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
+  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
+  if (info.upstreamInfo().has_value()) {
+    auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
+    upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
+    upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
+    upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
+    upstream_info.setUpstreamNumStreams(info.upstreamInfo().value().get().upstreamNumStreams());
+  }
 
-  stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
-  parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
+  upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
+      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  upstream_info.setUpstreamLocalAddress(upstream_local_address);
+  upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
+
+  if (info.downstreamAddressProvider().connectionID().has_value()) {
+    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+  }
+
+  if (info.downstreamAddressProvider().interfaceName().has_value()) {
+    upstream_info.setUpstreamInterfaceName(
+        info.downstreamAddressProvider().interfaceName().value());
+  }
+
+  stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
+  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
+                                                              stream_info_);
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();
@@ -434,14 +480,15 @@ void UpstreamRequest::onPoolReady(
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
   if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstreamHeaders()->setHost(host->hostname());
+    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
+                                   parent_.routeEntry()->appendXfh());
   }
 
   if (span_ != nullptr) {
     span_->injectContext(*parent_.downstreamHeaders());
   }
 
-  upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
+  upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
@@ -450,14 +497,18 @@ void UpstreamRequest::onPoolReady(
     paused_for_connect_ = true;
   }
 
-  if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    const auto max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  if (parent_.dynamicMaxStreamDuration().has_value()) {
+    max_stream_duration = parent_.dynamicMaxStreamDuration().value();
+  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
-    if (max_stream_duration.count()) {
-      max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
-          [this]() -> void { onStreamMaxDurationReached(); });
-      max_stream_duration_timer_->enableTimer(max_stream_duration);
-    }
+  }
+
+  if (max_stream_duration.has_value() && max_stream_duration->count()) {
+    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
   const Http::Status status =
@@ -470,7 +521,7 @@ void UpstreamRequest::onPoolReady(
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
     const std::string details =
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
-                     "{", status.message(), "}");
+                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
     parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                         absl::nullopt, details);
     return;
@@ -508,7 +559,7 @@ void UpstreamRequest::encodeBodyAndTrailers() {
     }
 
     if (encode_complete_) {
-      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
+      upstreamTiming().onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
     }
   }
 }

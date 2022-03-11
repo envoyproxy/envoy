@@ -16,6 +16,7 @@ envoy_cc_mock(
         "//envoy/buffer:buffer_interface",
         "//envoy/tcp:conn_pool_interface",
         "//test/mocks:common_lib",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:host_mocks",
     ],

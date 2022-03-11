@@ -8,26 +8,27 @@
 #include "source/common/common/assert.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/timespan_impl.h"
 
 namespace Envoy {
 namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config, uint32_t worker_index)
-    : ActiveStreamListenerBase(parent, parent.dispatcher(),
-                               parent.dispatcher().createListener(
-                                   config.listenSocketFactory().getListenSocket(worker_index),
-                                   *this, config.bindToPort()),
-                               config),
+                                     Network::ListenerConfig& config, Runtime::Loader& runtime,
+                                     uint32_t worker_index)
+    : OwnedActiveStreamListenerBase(parent, parent.dispatcher(),
+                                    parent.dispatcher().createListener(
+                                        config.listenSocketFactory().getListenSocket(worker_index),
+                                        *this, runtime, config.bindToPort(),
+                                        config.ignoreGlobalConnLimit()),
+                                    config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
+                                     Network::ListenerConfig& config, Runtime::Loader&)
+    : OwnedActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -62,53 +63,17 @@ ActiveTcpListener::~ActiveTcpListener() {
                                                      config_->name(), numConnections()));
 }
 
-void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
-  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-  ActiveConnections& active_connections = connection.active_connections_;
-  auto removed = connection.removeFromList(active_connections.connections_);
-  dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
-  if (active_connections.connections_.empty()) {
-    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
-    ASSERT(iter != connections_by_context_.end());
-    // To cover the lifetime of every single connection, Connections need to be deferred deleted
-    // because the previously contained connection is deferred deleted.
-    dispatcher().deferredDelete(std::move(iter->second));
-    // The erase will break the iteration over the connections_by_context_ during the deletion.
-    if (!is_deleting_) {
-      connections_by_context_.erase(iter);
-    }
-  }
-}
-
 void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
   ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
 }
 
-void ActiveTcpListener::removeFilterChain(const Network::FilterChain* filter_chain) {
-  auto iter = connections_by_context_.find(filter_chain);
-  if (iter == connections_by_context_.end()) {
-    // It is possible when listener is stopping.
-  } else {
-    auto& connections = iter->second->connections_;
-    while (!connections.empty()) {
-      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-    }
-    // Since is_deleting_ is on, we need to manually remove the map value and drive the
-    // iterator. Defer delete connection container to avoid race condition in destroying
-    // connection.
-    dispatcher().deferredDelete(std::move(iter->second));
-    connections_by_context_.erase(iter);
-  }
-}
-
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    RELEASE_ASSERT(socket->connectionInfoProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(trace, "closing connection from {}: listener connection limit reached for {}",
-              socket->addressProvider().remoteAddress()->asString(), config_->name());
+              socket->connectionInfoProvider().remoteAddress()->asString(), config_->name());
     socket->close();
     stats_.downstream_cx_overflow_.inc();
     return;
@@ -172,20 +137,12 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
                                             dispatcher().timeSource(), std::move(stream_info));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
-                   active_connection->connection_->addressProvider().remoteAddress()->asString());
+    ENVOY_CONN_LOG(
+        debug, "new connection from {}", *active_connection->connection_,
+        active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
-}
-
-ActiveConnections&
-ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
-  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
-  if (connections == nullptr) {
-    connections = std::make_unique<ActiveConnections>(*this, filter_chain);
-  }
-  return *connections;
 }
 
 void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {

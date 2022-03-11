@@ -4,42 +4,42 @@
 Changes
 -------
 
-* macOS is :repo:`now supported <v1.5.0:/bazel#quick-start-bazel-build-for-developers>`. (A few features
+* macOS is :repo:`now supported <v1.5:/bazel#quick-start-bazel-build-for-developers>`. (A few features
   are missing such as hot restart and original destination routing).
 * YAML is now directly supported for config files.
 * Added /routes admin endpoint.
 * End-to-end flow control is now supported for TCP proxy, HTTP/1, and HTTP/2. HTTP flow control
   that includes filter buffering is incomplete and will be implemented in 1.5.0.
-* Log verbosity :repo:`compile time flag <v1.5.0:/bazel#log-verbosity>` added.
-* Hot restart :repo:`compile time flag <v1.5.0:/bazel#hot-restart>` added.
-* Original destination :ref:`cluster <v1.5.0:arch_overview_service_discovery_types_original_destination>`
-  and :ref:`load balancer <v1.5.0:arch_overview_load_balancing_types_original_destination>` added.
-* :ref:`WebSocket <v1.5.0:arch_overview_websocket>` is now supported.
+* Log verbosity :repo:`compile time flag <v1.5:/bazel#log-verbosity>` added.
+* Hot restart :repo:`compile time flag <v1.5:/bazel#hot-restart>` added.
+* Original destination :ref:`cluster <v1.5:arch_overview_service_discovery_types_original_destination>`
+  and :ref:`load balancer <v1.5:arch_overview_load_balancing_types_original_destination>` added.
+* :ref:`WebSocket <v1.5:arch_overview_websocket>` is now supported.
 * Virtual cluster priorities have been hard removed without deprecation as we are reasonably sure
   no one is using this feature.
 * Route ``validate_clusters`` option added.
-* :ref:`x-envoy-downstream-service-node <v1.5.0:config_http_conn_man_headers_downstream-service-node>`
+* :ref:`x-envoy-downstream-service-node <v1.5:config_http_conn_man_headers_downstream-service-node>`
   header added.
-* :ref:`x-forwarded-client-cert <v1.5.0:config_http_conn_man_headers_x-forwarded-client-cert>` header
+* :ref:`x-forwarded-client-cert <v1.5:config_http_conn_man_headers_x-forwarded-client-cert>` header
   added.
 * Initial HTTP/1 forward proxy support for absolute URLs has been added.
 * HTTP/2 codec settings are now configurable.
-* gRPC/JSON transcoder :ref:`filter <v1.5.0:config_http_filters_grpc_json_transcoder>` added.
-* gRPC web :ref:`filter <v1.5.0:config_http_filters_grpc_web>` added.
+* gRPC/JSON transcoder :ref:`filter <v1.5:config_http_filters_grpc_json_transcoder>` added.
+* gRPC web :ref:`filter <v1.5:config_http_filters_grpc_web>` added.
 * Configurable timeout for the rate limit service call in the :ref:`network
-  <v1.5.0:config_network_filters_rate_limit>` and :ref:`HTTP <v1.5.0:config_http_filters_rate_limit>` rate limit
+  <v1.5:config_network_filters_rate_limit>` and :ref:`HTTP <v1.5:config_http_filters_rate_limit>` rate limit
   filters.
-* :ref:`x-envoy-retry-grpc-on <v1.5.0:config_http_filters_router_x-envoy-retry-grpc-on>` header added.
-* :ref:`LDS API <v1.5.0:arch_overview_dynamic_config_lds>` added.
+* :ref:`x-envoy-retry-grpc-on <v1.5:config_http_filters_router_x-envoy-retry-grpc-on>` header added.
+* :ref:`LDS API <v1.5:arch_overview_dynamic_config_lds>` added.
 * TLS :``require_client_certificate`` option added.
-* :ref:`Configuration check tool <v1.5.0:install_tools_config_load_check_tool>` added.
-* :ref:`JSON schema check tool <v1.5.0:install_tools_schema_validator_check_tool>` added.
+* :ref:`Configuration check tool <v1.5:install_tools_config_load_check_tool>` added.
+* :ref:`JSON schema check tool <v1.5:install_tools_schema_validator_check_tool>` added.
 * Config validation mode added via the :option:`--mode` option.
 * :option:`--local-address-ip-version` option added.
 * IPv6 support is now complete.
 * UDP ``statsd_ip_address`` option added.
 * Per-cluster DNS resolvers added.
-* :ref:`Fault filter <v1.5.0:config_http_filters_fault_injection>` enhancements and fixes.
+* :ref:`Fault filter <v1.5:config_http_filters_fault_injection>` enhancements and fixes.
 * Several features are `deprecated as of the 1.4.0 release <https://github.com/envoyproxy/envoy/blob/v1.4.0/DEPRECATED.md>`_. They
   will be removed at the beginning of the 1.5.0 release cycle. We explicitly call out that the
   ``HttpFilterConfigFactory`` filter API has been deprecated in favor of

@@ -114,6 +114,7 @@ public:
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
+  const Upstream::ClusterManager* clusterManager() const override { return cluster_manager_.get(); }
   StatsConfig& statsConfig() override { return *stats_config_; }
   const Watchdog& mainThreadWatchdogConfig() const override { return *main_thread_watchdog_; }
   const Watchdog& workerWatchdogConfig() const override { return *worker_watchdog_; }
@@ -170,7 +171,7 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -192,14 +193,15 @@ private:
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     std::string profile_path_;
     std::list<AccessLog::InstanceSharedPtr> access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
+    bool ignore_global_conn_limit_;
   };
 
-  const bool enable_deprecated_v2_api_;
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;

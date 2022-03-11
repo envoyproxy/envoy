@@ -72,6 +72,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "key_value_store_interface",
+    hdrs = ["key_value_store.h"],
+    deps = [
+        "//envoy/protobuf:message_validator_interface",
+        "//envoy/registry",
+    ],
+)
+
+envoy_cc_library(
     name = "interval_set_interface",
     hdrs = ["interval_set.h"],
 )
@@ -89,4 +98,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "scope_tracker_interface",
     hdrs = ["scope_tracker.h"],
+)
+
+envoy_cc_library(
+    name = "hashable_interface",
+    hdrs = ["hashable.h"],
 )

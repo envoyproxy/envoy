@@ -1,6 +1,5 @@
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -10,12 +9,12 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -49,6 +48,7 @@ class GrpcMuxImplTestBase : public testing::Test {
 public:
   GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
+        config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
         control_plane_pending_requests_(
@@ -60,17 +60,16 @@ public:
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true);
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+        random_, stats_, rate_limit_settings_, true, std::move(config_validators_));
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, custom_rate_limit_settings,
-        true);
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+        random_, stats_, custom_rate_limit_settings, true, std::move(config_validators_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -78,9 +77,9 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
+    envoy::service::discovery::v3::DiscoveryRequest expected_request;
     if (first) {
-      expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
     }
     for (const auto& resource : resource_names) {
       expected_request.add_resource_names(resource);
@@ -103,6 +102,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
+  CustomConfigValidatorsPtr config_validators_;
   GrpcMuxImplPtr grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<MockOpaqueResourceDecoder> resource_decoder_;
@@ -883,8 +883,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true),
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_, rate_limit_settings_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -896,8 +897,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true),
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_, rate_limit_settings_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

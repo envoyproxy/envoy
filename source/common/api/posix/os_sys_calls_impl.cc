@@ -6,6 +6,7 @@
 #include <string>
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -62,7 +63,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   UNREFERENCED_PARAMETER(vlen);
   UNREFERENCED_PARAMETER(flags);
   UNREFERENCED_PARAMETER(timeout);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return {false, EOPNOTSUPP};
 #endif
 }
 
@@ -148,6 +149,20 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
     return result;
   }();
   return is_supported;
+#endif
+}
+
+bool OsSysCallsImpl::supportsMptcp() const {
+#if !defined(__linux__)
+  return false;
+#else
+  int fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (fd < 0) {
+    return false;
+  }
+
+  ::close(fd);
+  return true;
 #endif
 }
 
@@ -275,11 +290,78 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
   if (!SOCKET_FAILURE(result)) {
     tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
+
+    const uint64_t mss = (unix_tcp_info.tcpi_snd_mss > 0) ? unix_tcp_info.tcpi_snd_mss : 1460;
+    // Convert packets to bytes.
+    tcp_info->tcpi_snd_cwnd = unix_tcp_info.tcpi_snd_cwnd * mss;
   }
   return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
 #endif
 
   return {false, EOPNOTSUPP};
+}
+
+bool OsSysCallsImpl::supportsGetifaddrs() const {
+// TODO: eliminate this branching by upstreaming an alternative Android implementation
+// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  if (alternate_getifaddrs_.has_value()) {
+    return true;
+  }
+  return false;
+#else
+  // Note: posix defaults to true regardless of whether an alternate getifaddrs has been set or not.
+  // This is because as far as we are aware only Android<24 lacks an implementation and thus another
+  // posix based platform that lacks a native getifaddrs implementation should be a programming
+  // error.
+  //
+  // That being said, if an alternate getifaddrs impl is set, that will be used in calls to
+  // OsSysCallsImpl::getifaddrs as seen below.
+  return true;
+#endif
+}
+
+SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
+  if (alternate_getifaddrs_.has_value()) {
+    return alternate_getifaddrs_.value()(interfaces);
+  }
+
+// TODO: eliminate this branching by upstreaming an alternative Android implementation
+// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  PANIC("not implemented");
+#else
+  struct ifaddrs* ifaddr;
+  struct ifaddrs* ifa;
+
+  const int rc = ::getifaddrs(&ifaddr);
+  if (rc == -1) {
+    return {rc, errno};
+  }
+
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+      const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
+      size_t ss_len =
+          ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+      StatusOr<Network::Address::InstanceConstSharedPtr> address =
+          Network::Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
+      if (address.ok()) {
+        interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
+      }
+    }
+  }
+
+  if (ifaddr) {
+    ::freeifaddrs(ifaddr);
+  }
+
+  return {rc, 0};
+#endif
 }
 
 } // namespace Api

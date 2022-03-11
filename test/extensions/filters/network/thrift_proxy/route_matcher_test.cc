@@ -20,9 +20,9 @@ namespace Router {
 namespace {
 
 envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
-parseRouteConfigurationFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, route_config);
   TestUtility::validate(route_config);
   return route_config;
 }

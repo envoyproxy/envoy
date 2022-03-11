@@ -18,22 +18,22 @@ use(
     },
     {
       "owner": "envoyproxy/api-shepherds!",
-      "path": "api/envoy/",
+      "path": "(api/envoy/|docs/root/api-docs/)",
       "label": "api",
       "github_status_label": "any API change",
       "auto_assign": True,
     },
     {
       "owner": "envoyproxy/api-watchers",
-      "path": "api/envoy/",
+      "path": "(api/envoy/|docs/root/api-docs/)",
     },
     {
       "owner": "envoyproxy/dependency-shepherds!",
       "path":
       "(bazel/.*repos.*\.bzl)|(bazel/dependency_imports\.bzl)|(api/bazel/.*\.bzl)|(.*/requirements\.txt)|(.*\.patch)",
       "label": "deps",
-      "allow_global_approval": False,
       "github_status_label": "any dependency change",
+      "auto_assign": True,
     },
   ],
 )

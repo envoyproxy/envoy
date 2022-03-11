@@ -102,6 +102,19 @@ you may instead just tag the PR with the issue:
 
 \#Issue
 
+### <a name="commit"></a>Commit
+
+If this PR fixes or reverts a buggy commit, please add a line of the form:
+
+Fixes commit #PR
+
+or
+
+Fixes commit SHA
+
+This will allow automated tools to detect tainted commit ranges on the main branch when the PR is
+merged.
+
 ### <a name="deprecated"></a>Deprecated
 
 If this PR deprecates existing Envoy APIs or code, it should include an update to the deprecated

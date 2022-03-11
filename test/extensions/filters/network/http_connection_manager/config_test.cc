@@ -143,10 +143,7 @@ http_filters:
                             "chain.");
 }
 
-// When deprecating v2, remove the old style "operation_name: egress" config
-// but retain the rest of the test.
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 server_name: foo
@@ -162,14 +159,13 @@ route_config:
       route:
         cluster: cluster
 tracing:
-  operation_name: egress
   max_path_tag_length: 128
 http_filters:
 - name: envoy.filters.http.router
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
@@ -427,7 +423,7 @@ tracing:
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: zipkin
-      collector_endpoint: "/api/v1/spans"
+      collector_endpoint: "/api/v2/spans"
       collector_endpoint_version: HTTP_JSON
 http_filters:
 - name: envoy.filters.http.router
@@ -445,7 +441,7 @@ http_filters:
   inlined_tracing_config.set_name("zipkin");
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
   zipkin_config.set_collector_cluster("zipkin");
-  zipkin_config.set_collector_endpoint("/api/v1/spans");
+  zipkin_config.set_collector_endpoint("/api/v2/spans");
   zipkin_config.set_collector_endpoint_version(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
   inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
 
@@ -455,8 +451,8 @@ http_filters:
   EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(Pointee(ProtoEq(inlined_tracing_config))))
       .WillOnce(Return(http_tracer_));
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
@@ -499,85 +495,6 @@ tracing:
   }
 }
 
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_string = R"EOF(
-stat_prefix: router
-route_config:
-  name: local_route
-tracing:
-  request_headers_for_tags:
-  - foo
-  )EOF";
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-
-  const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
-  const Tracing::RequestHeaderCustomTag* foo = dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
-      custom_tag_map.find("foo")->second.get());
-  EXPECT_NE(foo, nullptr);
-  EXPECT_EQ(foo->tag(), "foo");
-}
-
-TEST_F(HttpConnectionManagerConfigTest,
-       DEPRECATED_FEATURE_TEST(ListenerDirectionOutboundOverride)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_string = R"EOF(
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-tracing:
-  operation_name: ingress
-http_filters:
-- name: envoy.filters.http.router
-  )EOF";
-
-  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::OUTBOUND));
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-  EXPECT_EQ(Tracing::OperationName::Egress, config.tracingConfig()->operation_name_);
-}
-
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(ListenerDirectionInboundOverride)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_string = R"EOF(
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-tracing:
-  operation_name: egress
-http_filters:
-- name: envoy.filters.http.router
-  )EOF";
-
-  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::INBOUND));
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-  EXPECT_EQ(Tracing::OperationName::Ingress, config.tracingConfig()->operation_name_);
-}
-
 TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -590,8 +507,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   - name: envoy.filters.http.router
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
@@ -625,8 +542,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   - name: envoy.filters.http.router
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
@@ -659,8 +576,8 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   - name: envoy.filters.http.router
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
@@ -693,8 +610,8 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   - name: envoy.filters.http.router
  )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
@@ -1790,16 +1707,6 @@ http2_protocol_options:
       R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
 }
 
-// Test that the deprecated extension name still functions.
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.http_connection_manager";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -2075,6 +1982,46 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   EXPECT_EQ(1, original_ip_detection_extensions.size());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithUseRemoteAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  use_remote_address: true
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extensions and use_remote_address may not be mixed");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithNumTrustedHops) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  xff_num_trusted_hops: 1
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -2195,6 +2142,38 @@ http_filters:
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrl) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { resource_api_version: V3, ads: {} }
+    default_config:
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
+      type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+- name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: filter config has type URL envoy.extensions.filters.http.router.v3.Router but "
+      "expect envoy.extensions.filters.http.health_check.v3.HealthCheck.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrlWithOldTypedStruct) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -2490,7 +2469,7 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
 
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
       config;
-  TestUtility::loadFromYamlAndValidate(yaml_string, config, false, true);
+  TestUtility::loadFromYamlAndValidate(yaml_string, config);
 
   MobileHttpConnectionManagerFilterConfigFactory factory;
   Network::FilterFactoryCb create_hcm_cb = factory.createFilterFactoryFromProto(config, context_);

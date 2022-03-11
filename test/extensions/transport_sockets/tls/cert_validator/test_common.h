@@ -33,7 +33,8 @@ class TestCertificateValidationContextConfig
 public:
   TestCertificateValidationContextConfig(
       envoy::config::core::v3::TypedExtensionConfig config, bool allow_expired_certificate = false,
-      std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers = {})
+      std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+          san_matchers = {})
       : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
         custom_validator_config_(config), san_matchers_(san_matchers){};
   TestCertificateValidationContextConfig()
@@ -47,7 +48,7 @@ public:
   const std::string& certificateRevocationListPath() const final {
     CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
-  const std::vector<envoy::type::matcher::v3::StringMatcher>&
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
   subjectAltNameMatchers() const override {
     return san_matchers_;
   }
@@ -72,12 +73,14 @@ public:
   }
 
   Api::Api& api() const override { return *api_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
 private:
   bool allow_expired_certificate_{false};
   Api::ApiPtr api_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
-  const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+      san_matchers_{};
 };
 
 } // namespace Tls

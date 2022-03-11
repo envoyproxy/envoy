@@ -11,6 +11,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
@@ -42,11 +43,7 @@ http_filters:
   - name: envoy.filters.http.router
 codec_type: HTTP1
 use_remote_address: false
-original_ip_detection_extensions:
-- name: envoy.http.original_ip_detection.xff
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
-    xff_num_trusted_hops: 1
+xff_num_trusted_hops: 1
 stat_prefix: header_test
 route_config:
   virtual_hosts:

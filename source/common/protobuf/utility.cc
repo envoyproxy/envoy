@@ -10,35 +10,22 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/documentation_url.h"
 #include "source/common/common/fmt.h"
-#include "source/common/config/api_type_oracle.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/visitor.h"
-#include "source/common/protobuf/well_known.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
+#include "udpa/annotations/status.pb.h"
+#include "validate/validate.h"
+#include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
 
 using namespace std::chrono_literals;
 
 namespace Envoy {
 namespace {
-
-// For historical reasons, these v2 protos are allowed in v3 and will not be removed during the v2
-// turn down.
-static const absl::flat_hash_set<absl::string_view>& v2ProtosAllowedInV3() {
-  CONSTRUCT_ON_FIRST_USE(
-      absl::flat_hash_set<absl::string_view>,
-      {"envoy.config.health_checker.redis.v2.Redis",
-       "envoy.config.filter.thrift.router.v2alpha1.Router",
-       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig",
-       "envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig",
-       "envoy.config.retry.omit_canary_hosts.v2.OmitCanaryHostsPredicate",
-       "envoy.config.retry.previous_hosts.v2.PreviousHostsPredicate"});
-}
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind("/");
@@ -122,7 +109,7 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
 
 void jsonConvertInternal(const Protobuf::Message& source,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Protobuf::Message& dest, bool do_boosting = true) {
+                         Protobuf::Message& dest) {
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   std::string json;
@@ -131,66 +118,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest, validation_visitor, do_boosting);
-}
-
-enum class MessageVersion {
-  // This is an earlier version of a message, a later one exists.
-  EarlierVersion,
-  // This is the latest version of a message.
-  LatestVersion,
-  // Validating to see if the latest version will also be accepted; only apply message validators
-  // without side effects, validations should be strict.
-  LatestVersionValidate,
-};
-
-using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
-
-class ApiBoostRetryException : public EnvoyException {
-public:
-  ApiBoostRetryException(const std::string& message) : EnvoyException(message) {}
-};
-
-// Apply a function transforming a message (e.g. loading JSON into the message).
-// First we try with the message's earlier type, and if unsuccessful (or no
-// earlier) type, then the current type. This allows us to take a v3 Envoy
-// internal proto and ingest both v2 and v3 in methods such as loadFromJson.
-// This relies on the property that any v3 configuration that is readable as
-// v2 has the same semantics in v2/v3, which holds due to the highly structured
-// vN/v(N+1) mechanical transforms.
-void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
-  const Protobuf::Descriptor* earlier_version_desc =
-      Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
-  // If there is no earlier version of a message, just apply f directly.
-  if (earlier_version_desc == nullptr) {
-    f(message, MessageVersion::LatestVersion);
-    return;
-  }
-
-  Protobuf::DynamicMessageFactory dmf;
-  auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-  ASSERT(earlier_message != nullptr);
-  TRY_ASSERT_MAIN_THREAD {
-    // Try apply f with an earlier version of the message, then upgrade the
-    // result.
-    f(*earlier_message, MessageVersion::EarlierVersion);
-    // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
-    // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
-    // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
-    TRY_ASSERT_MAIN_THREAD { f(message, MessageVersion::LatestVersionValidate); }
-    END_TRY
-    catch (EnvoyException& e) {
-      MessageUtil::onVersionUpgradeDeprecation(e.what());
-    }
-    // Now we do the real work of upgrading.
-    Config::VersionConverter::upgrade(*earlier_message, message);
-  }
-  END_TRY
-  catch (ApiBoostRetryException&) {
-    // If we fail at the earlier version, try f at the current version of the
-    // message.
-    f(message, MessageVersion::LatestVersion);
-  }
+  MessageUtil::loadFromJson(json, dest, validation_visitor);
 }
 
 // Logs a warning for use of a deprecated field or runtime-overridden use of an
@@ -260,16 +188,15 @@ bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint6
 uint64_t fractionalPercentDenominatorToInt(
     const envoy::type::v3::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::type::v3::FractionalPercent::HUNDRED:
     return 100;
   case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
     return 10000;
   case envoy::type::v3::FractionalPercent::MILLION:
     return 1000000;
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 } // namespace ProtobufPercentHelper
@@ -296,41 +223,6 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
   throw ProtoValidationException(validation_error, message);
 }
 
-void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool /*reject*/) {
-  const std::string& warning_str =
-      fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
-                  "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
-                  desc);
-  // Always log at trace level. This is useful for tests that don't want to rely on possible
-  // elision.
-  ENVOY_LOG_MISC(trace, warning_str);
-  // Log each distinct message at warn level once every 5s. We use a static map here, which is fine
-  // as we are always on the main thread.
-  static auto* last_warned = new absl::flat_hash_map<std::string, int64_t>();
-  const auto now = t_logclock::now().time_since_epoch().count();
-  const auto it = last_warned->find(warning_str);
-  if (it == last_warned->end() ||
-      (now - it->second) > std::chrono::duration_cast<std::chrono::nanoseconds>(5s).count()) {
-    ENVOY_LOG_MISC(warn, warning_str);
-    (*last_warned)[warning_str] = now;
-  }
-  Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting();
-  // We only log, and don't bump stats, if we're sufficiently early in server initialization (i.e.
-  // bootstrap).
-  if (loader != nullptr) {
-    loader->countDeprecatedFeatureUse();
-  }
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
-    throw DeprecatedMajorVersionException(fmt::format(
-        "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
-        "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
-        "following "
-        "the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition. ({})",
-        desc));
-  }
-}
-
 size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 
@@ -347,51 +239,50 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               bool do_boosting) {
-  auto load_json = [&json, &validation_visitor](Protobuf::Message& message,
-                                                MessageVersion message_version) {
-    Protobuf::util::JsonParseOptions options;
-    options.case_insensitive_enum_parsing = true;
-    // Let's first try and get a clean parse when checking for unknown fields;
-    // this should be the common case.
-    options.ignore_unknown_fields = false;
-    const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-    if (strict_status.ok()) {
-      // Success, no need to do any extra work.
-      return;
-    }
-    // If we fail, we see if we get a clean parse when allowing unknown fields.
-    // This is essentially a workaround
-    // for https://github.com/protocolbuffers/protobuf/issues/5967.
-    // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
-    // detection directly.
-    options.ignore_unknown_fields = true;
-    const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-    // If we still fail with relaxed unknown field checking, the error has nothing
-    // to do with unknown fields.
-    if (!relaxed_status.ok()) {
-      throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                           "): " + json);
-    }
-    // We know it's an unknown field at this point. If we're at the latest
-    // version, then it's definitely an unknown field, otherwise we try to
-    // load again at a later version.
-    if (message_version == MessageVersion::LatestVersion) {
-      validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                        strict_status.ToString());
-    } else if (message_version == MessageVersion::LatestVersionValidate) {
-      throw ProtobufMessage::UnknownProtoFieldException(absl::StrCat("Unknown field in: ", json));
-    } else {
-      throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
-    }
-  };
-
-  if (do_boosting) {
-    tryWithApiBoosting(load_json, message);
-  } else {
-    load_json(message, MessageVersion::LatestVersion);
+                               ProtobufMessage::ValidationVisitor& validation_visitor) {
+  bool has_unknown_field;
+  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
+  if (status.ok()) {
+    return;
   }
+  if (has_unknown_field) {
+    // If the parsing failure is caused by the unknown fields.
+    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                      status.ToString());
+  } else {
+    // If the error has nothing to do with unknown field.
+    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+  }
+}
+
+Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
+                                                        Protobuf::Message& message,
+                                                        bool& has_unknown_fileld) {
+  has_unknown_fileld = false;
+  Protobuf::util::JsonParseOptions options;
+  options.case_insensitive_enum_parsing = true;
+  // Let's first try and get a clean parse when checking for unknown fields;
+  // this should be the common case.
+  options.ignore_unknown_fields = false;
+  const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+  if (strict_status.ok()) {
+    // Success, no need to do any extra work.
+    return strict_status;
+  }
+  // If we fail, we see if we get a clean parse when allowing unknown fields.
+  // This is essentially a workaround
+  // for https://github.com/protocolbuffers/protobuf/issues/5967.
+  // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
+  // detection directly.
+  options.ignore_unknown_fields = true;
+  const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+  // If we still fail with relaxed unknown field checking, the error has nothing
+  // to do with unknown fields.
+  if (relaxed_status.ok()) {
+    has_unknown_fileld = true;
+    return strict_status;
+  }
+  return relaxed_status;
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
@@ -401,92 +292,42 @@ void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& mes
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               bool do_boosting) {
+                               ProtobufMessage::ValidationVisitor& validation_visitor) {
   ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
   if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
       value.kind_case() == ProtobufWkt::Value::kListValue) {
-    jsonConvertInternal(value, validation_visitor, message, do_boosting);
+    jsonConvertInternal(value, validation_visitor, message);
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message) {
-  // No need to validate if converting to a Struct, since there are no unknown
-  // fields possible.
-  return loadFromYaml(yaml, message, ProtobufMessage::getNullValidationVisitor());
-}
-
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api, bool do_boosting) {
+                               Api::Api& api) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
-                                                              MessageVersion message_version) {
-      TRY_ASSERT_MAIN_THREAD {
-        if (message.ParseFromString(contents)) {
-          MessageUtil::checkForUnexpectedFields(
-              message, message_version == MessageVersion::LatestVersionValidate
-                           ? ProtobufMessage::getStrictValidationVisitor()
-                           : validation_visitor);
-        }
-        return;
-      }
-      END_TRY
-      catch (EnvoyException& ex) {
-        if (message_version == MessageVersion::LatestVersion ||
-            message_version == MessageVersion::LatestVersionValidate) {
-          // Failed reading the latest version - pass the same error upwards
-          throw ex;
-        }
-      }
-      throw ApiBoostRetryException(
-          "Failed to parse at earlier version, trying again at later version.");
-    };
-
-    if (do_boosting) {
-      // Attempts to read as the previous version and upgrade, and if it fails
-      // attempts to read as latest version.
-      tryWithApiBoosting(read_proto_binary, message);
-    } else {
-      read_proto_binary(message, MessageVersion::LatestVersion);
+    if (message.ParseFromString(contents)) {
+      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
     }
     return;
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
-    auto read_proto_text = [&contents, &path](Protobuf::Message& message,
-                                              MessageVersion message_version) {
-      if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-        return;
-      }
-      if (message_version == MessageVersion::LatestVersion ||
-          message_version == MessageVersion::LatestVersionValidate) {
-        throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                             message.GetTypeName() + ")");
-      } else {
-        throw ApiBoostRetryException(
-            "Failed to parse at earlier version, trying again at later version.");
-      }
-    };
-
-    if (do_boosting) {
-      tryWithApiBoosting(read_proto_text, message);
-    } else {
-      read_proto_text(message, MessageVersion::LatestVersion);
+    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+      return;
     }
-    return;
+    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                         message.GetTypeName() + ")");
   }
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
       absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
-    loadFromYaml(contents, message, validation_visitor, do_boosting);
+    loadFromYaml(contents, message, validation_visitor);
   } else {
-    loadFromJson(contents, message, validation_visitor, do_boosting);
+    loadFromJson(contents, message, validation_visitor);
   }
 }
 
@@ -521,14 +362,18 @@ void checkForDeprecatedNonRepeatedEnumValue(
       message, validation_visitor);
 }
 
+constexpr absl::string_view WipWarning =
+    "API features marked as work-in-progress are not considered stable, are not covered by the "
+    "threat model, are not supported by the security team, and are subject to breaking changes. Do "
+    "not use this feature without understanding each of the previous points.";
+
 class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   UnexpectedFieldProtoVisitor(ProtobufMessage::ValidationVisitor& validation_visitor,
                               Runtime::Loader* runtime)
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  const void* onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-                      const void*) override {
+  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
     const Protobuf::Reflection* reflection = message.GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
 
@@ -540,26 +385,17 @@ public:
     // If this field is not in use, continue.
     if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
         (!field.is_repeated() && !reflection->HasField(message, &field))) {
-      return nullptr;
+      return;
+    }
+
+    const auto& field_status = field.options().GetExtension(xds::annotations::v3::field_status);
+    if (field_status.work_in_progress()) {
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "field '{}' is marked as work-in-progress. {}", field.full_name(), WipWarning));
     }
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
-      if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
-        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
-        // unless it is part of an explicit test that needs access to the deprecated field
-        // when we enable runtime deprecation override to allow point field overrides for tests.
-        if (!runtime_ ||
-            !runtime_->snapshot().deprecatedFeatureEnabled(
-                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
-          const std::string fatal_error = absl::StrCat(
-              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
-              "' from file ", filename,
-              " while using the latest V3 configuration. This field has been removed from the "
-              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-          throw ProtoValidationException(fatal_error, message);
-        }
-      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -570,26 +406,45 @@ public:
                             absl::StrCat("envoy.deprecated_features:", field.full_name()), warning,
                             message, validation_visitor_);
     }
-    return nullptr;
   }
 
-  void onMessage(const Protobuf::Message& message, const void*) override {
+  void onMessage(const Protobuf::Message& message,
+                 absl::Span<const Protobuf::Message* const> parents, bool) override {
+    if (message.GetDescriptor()
+            ->options()
+            .GetExtension(xds::annotations::v3::message_status)
+            .work_in_progress()) {
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "message '{}' is marked as work-in-progress. {}", message.GetTypeName(), WipWarning));
+    }
+
+    const auto& udpa_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(udpa::annotations::file_status);
+    const auto& xds_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(xds::annotations::v3::file_status);
+    if (udpa_file_options.work_in_progress() || xds_file_options.work_in_progress()) {
+      validation_visitor_.onWorkInProgress(
+          fmt::format("message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
+                      message.GetTypeName(), message.GetDescriptor()->file()->name(), WipWarning));
+    }
+
     // Reject unknown fields.
     const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
     if (!unknown_fields.empty()) {
       std::string error_msg;
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
-        if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
-          continue;
-        }
-        error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+        absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
-      // We use the validation visitor but have hard coded behavior below for deprecated fields.
-      // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
-      // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
       if (!error_msg.empty()) {
-        validation_visitor_.onUnknownField("type " + message.GetTypeName() +
-                                           " with unknown field set {" + error_msg + "}");
+        validation_visitor_.onUnknownField(
+            fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
+                        !parents.empty()
+                            ? absl::StrJoin(parents, "::",
+                                            [](std::string* out, const Protobuf::Message* const m) {
+                                              absl::StrAppend(out, m->GetTypeName());
+                                            })
+                            : "root",
+                        error_msg));
       }
     }
   }
@@ -603,10 +458,37 @@ private:
 
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           Runtime::Loader* runtime) {
+                                           bool recurse_into_any) {
+  Runtime::Loader* runtime = validation_visitor.runtime().has_value()
+                                 ? &validation_visitor.runtime().value().get()
+                                 : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
-  ProtobufMessage::traverseMessage(unexpected_field_visitor, API_RECOVER_ORIGINAL(message),
-                                   nullptr);
+  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+}
+
+namespace {
+
+class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
+                 bool was_any_or_top_level) override {
+    std::string err;
+    // PGV verification is itself recursive up to the point at which it hits an Any message. As
+    // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
+    // at which PGV would have stopped because it does not itself check within Any messages.
+    if (was_any_or_top_level && !pgv::BaseValidator::AbstractCheckMessage(message, &err)) {
+      ProtoExceptionUtil::throwProtoValidationException(err, message);
+    }
+  }
+
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+};
+
+} // namespace
+
+void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
+  PgvCheckVisitor visitor;
+  ProtobufMessage::traverseMessage(visitor, message, true);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
@@ -673,35 +555,6 @@ std::string MessageUtil::getJsonStringFromMessageOrError(const Protobuf::Message
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-  // If we don't have a type URL match, try an earlier version.
-  const absl::string_view any_full_name =
-      TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
-  if (any_full_name != message.GetDescriptor()->full_name()) {
-    const Protobuf::Descriptor* earlier_version_desc =
-        Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
-    // If the earlier version matches, unpack and upgrade.
-    if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
-      // Take the Any message but adjust its type URL, since earlier/later versions are wire
-      // compatible.
-      ProtobufWkt::Any any_message_with_fixup;
-      any_message_with_fixup.MergeFrom(any_message);
-      any_message_with_fixup.set_type_url("type.googleapis.com/" +
-                                          message.GetDescriptor()->full_name());
-      if (!any_message_with_fixup.UnpackTo(&message)) {
-        throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                         earlier_version_desc->full_name(),
-                                         any_message_with_fixup.DebugString()));
-      }
-      Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      // We allow some v2 protos in v3 for historical reasons.
-      if (v2ProtosAllowedInV3().count(any_full_name) == 0) {
-        MessageUtil::onVersionUpgradeDeprecation(any_full_name);
-      }
-      return;
-    }
-  }
-  // Otherwise, just unpack to the message. Type URL mismatches will be signaled
-  // by UnpackTo failure.
   if (!any_message.UnpackTo(&message)) {
     throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
                                      message.GetDescriptor()->full_name(),
@@ -722,8 +575,20 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
   jsonConvertInternal(source, validation_visitor, dest);
 }
 
-void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
+bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  std::string json;
+  auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  if (!status.ok()) {
+    return false;
+  }
+  bool has_unknow_field;
+  status = MessageUtil::loadFromJsonNoThrow(json, dest, has_unknow_field);
+  if (status.ok() || has_unknow_field) {
+    return true;
+  }
+  return false;
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -825,9 +690,10 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
 }
 
 // To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
-bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
+bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type,
+                       bool ancestor_is_sensitive) {
   return redactOpaque(
-      message, ancestor_is_sensitive, "udpa.type.v1.TypedStruct",
+      message, ancestor_is_sensitive, typed_struct_type,
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To unpack a `TypedStruct`, convert the struct from JSON.
@@ -845,7 +711,8 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
 // Recursive helper method for MessageUtil::redact() below.
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   if (redactAny(message, ancestor_is_sensitive) ||
-      redactTypedStruct(message, ancestor_is_sensitive)) {
+      redactTypedStruct(message, "xds.type.v3.TypedStruct", ancestor_is_sensitive) ||
+      redactTypedStruct(message, "udpa.type.v1.TypedStruct", ancestor_is_sensitive)) {
     return;
   }
 
@@ -860,7 +727,25 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
-      if (field_descriptor->is_repeated()) {
+      if (field_descriptor->is_map()) {
+        // Redact values of maps only. Redacting both leaves the map with multiple "[redacted]"
+        // keys.
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          Protobuf::Message* map_pair =
+              reflection->MutableRepeatedMessage(message, field_descriptor, i);
+          auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
+          if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+                            value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {
+            map_pair->GetReflection()->SetString(map_pair, value_field_desc, "[redacted]");
+          } else if (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+            redact(map_pair->GetReflection()->MutableMessage(map_pair, value_field_desc),
+                   sensitive);
+          } else if (sensitive) {
+            map_pair->GetReflection()->ClearField(map_pair, value_field_desc);
+          }
+        }
+      } else if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
           redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);
@@ -891,6 +776,14 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
 void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
+}
+
+void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
+  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
+  // this can fail.
+  if (!dst.ParseFromString(src.SerializeAsString())) {
+    throw EnvoyException("Unable to deserialize during wireCast()");
+  }
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
@@ -965,10 +858,8 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
     }
     return true;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  return false;
 }
 
 const ProtobufWkt::Value& ValueUtil::nullValue() {

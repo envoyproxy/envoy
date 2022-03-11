@@ -66,6 +66,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/retry/priority/previous_priorities:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/runtime:runtime_mocks",

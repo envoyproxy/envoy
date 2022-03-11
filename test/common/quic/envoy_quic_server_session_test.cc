@@ -1,11 +1,31 @@
 #include <memory>
+#include <string>
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/stats/stats_macros.h"
 
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/server/configuration_impl.h"
+
+#include "test/common/quic/test_proof_source.h"
+#include "test/common/quic/test_utils.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_decoder.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/global.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -14,36 +34,6 @@
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include <string>
-
-#include "source/common/quic/envoy_quic_server_session.h"
-#include "source/common/quic/envoy_quic_server_stream.h"
-#include "source/common/quic/envoy_quic_server_connection.h"
-#include "source/common/quic/codec_impl.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
-#include "source/common/quic/envoy_quic_alarm_factory.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "test/common/quic/test_proof_source.h"
-#include "test/common/quic/test_utils.h"
-
-#include "envoy/stats/stats_macros.h"
-#include "source/common/event/libevent_scheduler.h"
-#include "source/server/configuration_impl.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/http/stream_decoder.h"
-#include "test/mocks/http/mocks.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/test_common/global.h"
-#include "test/test_common/logging.h"
-#include "test/test_common/simulated_time_system.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -64,6 +54,8 @@ public:
     // behavior.
     return false;
   }
+
+  using EnvoyQuicServerSession::GetCryptoStream;
 };
 
 class ProofSourceDetailsSetter {
@@ -152,7 +144,7 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_({quic::CurrentSupportedHttp3Versions()[0]}),
+        quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
@@ -164,8 +156,7 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_,
-                            makeOptRefFromPtr<const Network::TransportSocketFactory>(nullptr)),
+                            crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -291,6 +282,8 @@ TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
 TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
+  EXPECT_EQ(envoy_quic_session_.GetCryptoStream()->GetSsl(),
+            static_cast<const QuicSslConnectionInfo&>(*envoy_quic_session_.ssl()).ssl());
   Http::MockRequestDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
@@ -1003,8 +996,8 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   EXPECT_TRUE(stream2->IsFlowControlBlocked());
 
   // Resetting stream3 should lower the buffered bytes, but callbacks will not
-  // be triggered because reset callback has been already triggered.
-  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, ""));
+  // be triggered because end stream is already encoded.
+  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, "")).Times(0);
   // Connection buffered data book keeping should also be updated.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark());
   stream3->resetStream(Http::StreamResetReason::LocalReset);
@@ -1021,6 +1014,35 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   EXPECT_TRUE(stream1->write_side_closed());
   EXPECT_TRUE(stream2->write_side_closed());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // IETF stream 2 is client initiated uni-directional stream.
+  quic::QuicStreamId stream_id = 2u;
+  auto payload = std::make_unique<char[]>(8);
+  quic::QuicDataWriter payload_writer(8, payload.get());
+  EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0u);
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_HTTP_RECEIVE_SERVER_PUSH, _,
+                                                           "Received server push stream"));
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
+  envoy_quic_session_.OnStreamFrame(stream_frame);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
+  installReadFilter();
+  EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
+  // Just make sure the CWND is non-zero. We don't want to make strong assertions on what the value
+  // should be in this test, that is the job the congestion controllers' tests.
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 500);
+
+  envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
+            quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
 }
 
 } // namespace Quic

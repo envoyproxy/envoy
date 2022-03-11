@@ -13,9 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/api_type_oracle.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/common/utility.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -282,9 +280,6 @@ public:
       return nullptr;
     }
 
-    if (!checkDeprecated(name)) {
-      return nullptr;
-    }
     return it->second;
   }
 
@@ -303,17 +298,6 @@ public:
   static absl::string_view canonicalFactoryName(absl::string_view name) {
     const auto it = deprecatedFactoryNames().find(name);
     return (it == deprecatedFactoryNames().end()) ? name : it->second;
-  }
-
-  static bool checkDeprecated(absl::string_view name) {
-    auto it = deprecatedFactoryNames().find(name);
-    const bool deprecated = it != deprecatedFactoryNames().end();
-    if (deprecated) {
-      return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-          "", it->first, it->second);
-    }
-
-    return true;
   }
 
   /**
@@ -356,25 +340,16 @@ private:
         continue;
       }
 
-      // Register config types in the mapping and traverse the deprecated message type chain.
-      while (true) {
-        auto it = mapping->find(config_type);
-        if (it != mapping->end() && it->second != factory) {
-          // Mark double-registered types with a nullptr.
-          // See issue https://github.com/envoyproxy/envoy/issues/9643.
-          ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
-                    factory->name(), it->second ? it->second->name() : "");
-          it->second = nullptr;
-        } else {
-          mapping->emplace(std::make_pair(config_type, factory));
-        }
-
-        const Protobuf::Descriptor* previous =
-            Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
-        if (previous == nullptr) {
-          break;
-        }
-        config_type = previous->full_name();
+      // Register config types in the mapping.
+      auto it = mapping->find(config_type);
+      if (it != mapping->end() && it->second != factory) {
+        // Mark double-registered types with a nullptr.
+        // See issue https://github.com/envoyproxy/envoy/issues/9643.
+        ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                  factory->name(), it->second ? it->second->name() : "");
+        it->second = nullptr;
+      } else {
+        mapping->emplace(std::make_pair(config_type, factory));
       }
     }
 

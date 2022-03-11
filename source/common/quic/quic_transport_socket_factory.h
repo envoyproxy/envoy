@@ -6,6 +6,7 @@
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {
@@ -34,7 +35,7 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
+class QuicTransportSocketFactoryBase : public Network::CommonTransportSocketFactory,
                                        protected Logger::Loggable<Logger::Id::quic> {
 public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
@@ -46,10 +47,9 @@ public:
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   bool implementsSecureTransport() const override { return true; }
-  bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
 
 protected:
@@ -108,7 +108,7 @@ public:
     return fallback_factory_->createTransportSocket(options);
   }
 
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
 
   const Ssl::ClientContextConfig& clientContextConfig() const {
     return fallback_factory_->config();

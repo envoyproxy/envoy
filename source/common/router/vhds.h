@@ -42,9 +42,8 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   absl::optional<RouteConfigProvider*>& route_config_providers,
-                   const envoy::config::core::v3::ApiVersion resource_api_version =
-                       envoy::config::core::v3::ApiVersion::AUTO);
+                   absl::optional<Rds::RouteConfigProvider*>& route_config_providers);
+
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
@@ -61,9 +60,7 @@ public:
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
-                      const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                      const std::string&) override {}
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -74,7 +71,7 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
-  absl::optional<RouteConfigProvider*>& route_config_provider_opt_;
+  absl::optional<Rds::RouteConfigProvider*>& route_config_provider_opt_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

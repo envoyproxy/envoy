@@ -52,6 +52,7 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
       : delegated_callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
+  Event::Dispatcher& dispatcher() override { return delegated_callbacks_.dispatcher(); }
   void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), match_tree_);
   }
@@ -89,10 +90,6 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api")) {
-    throw EnvoyException("Experimental matching API is not enabled");
-  }
-
   ASSERT(proto_config.has_extension_config());
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -105,10 +102,17 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
   Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context};
-  auto match_tree = Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
-                                              Envoy::Http::Matching::HttpFilterActionContext>(
-                        action_context, context.getServerFactoryContext(), validation_visitor)
-                        .create(proto_config.matcher());
+  Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
+                            Envoy::Http::Matching::HttpFilterActionContext>
+      matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
+  Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb;
+  if (proto_config.has_xds_matcher()) {
+    factory_cb = matcher_factory.create(proto_config.xds_matcher());
+  } else if (proto_config.has_matcher()) {
+    factory_cb = matcher_factory.create(proto_config.matcher());
+  } else {
+    throw EnvoyException("one of `matcher` and `matcher_tree` must be set.");
+  }
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
@@ -116,8 +120,8 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
                                      validation_visitor.errors()[0]));
   }
 
-  return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree());
+  return [filter_factory, factory_cb](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    DelegatingFactoryCallbacks delegated_callbacks(callbacks, factory_cb());
 
     return filter_factory(delegated_callbacks);
   };

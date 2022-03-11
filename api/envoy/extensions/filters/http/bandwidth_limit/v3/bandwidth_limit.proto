@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.bandwidth_limit.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3";
+option java_outer_classname = "BandwidthLimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/bandwidth_limit/v3;bandwidth_limitv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Bandwidth limit]
+// Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
+// [#extension: envoy.filters.http.bandwidth_limit]
+
+// [#next-free-field: 8]
+message BandwidthLimit {
+  // Defines the mode for the bandwidth limit filter.
+  // Values represent bitmask.
+  enum EnableMode {
+    // Filter is disabled.
+    DISABLED = 0;
+
+    // Filter enabled only for incoming traffic.
+    REQUEST = 1;
+
+    // Filter enabled only for outgoing traffic.
+    RESPONSE = 2;
+
+    // Filter enabled for both incoming and outgoing traffic.
+    REQUEST_AND_RESPONSE = 3;
+  }
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The enable mode for the bandwidth limit filter.
+  // Default is Disabled.
+  EnableMode enable_mode = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // The limit supplied in KiB/s.
+  //
+  // .. note::
+  //   It's fine for the limit to be unset for the global configuration since the bandwidth limit
+  //   can be applied at a the virtual host or route level. Thus, the limit must be set for the
+  //   per route configuration otherwise the config will be rejected.
+  //
+  // .. note::
+  //   When using per route configuration, the limit becomes unique to that route.
+  //
+  google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
+
+  // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
+  // It must be at least 20ms to avoid too aggressive refills.
+  google.protobuf.Duration fill_interval = 4 [(validate.rules).duration = {
+    lte {seconds: 1}
+    gte {nanos: 20000000}
+  }];
+
+  // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
+  // to enabled.
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
+
+  // Enable response trailers.
+  //
+  // .. note::
+  //
+  //   * If set true, the response trailers *bandwidth-request-delay-ms* and *bandwidth-response-delay-ms* will be added, prefixed by *response_trailer_prefix*.
+  //   * bandwidth-request-delay-ms: delay time in milliseconds it took for the request stream transfer.
+  //   * bandwidth-response-delay-ms: delay time in milliseconds it took for the response stream transfer.
+  //   * If :ref:`enable_mode <envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit.enable_mode>` is DISABLED or REQUEST, the trailers will not be set.
+  //   * If both the request and response delay time is 0, the trailers will not be set.
+  //
+  bool enable_response_trailers = 6;
+
+  // Optional The prefix for the response trailers.
+  string response_trailer_prefix = 7;
+}

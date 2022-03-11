@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -15,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/grpc/common.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -72,30 +74,36 @@ public:
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
+  const Upstream::ClusterManager& clusterManager() const override {
+    return *config_.clusterManager();
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
-  void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void drainListeners() override {}
+  DrainManager& drainManager() override { PANIC("not implemented"); }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
-  void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void failHealthcheck(bool) override {}
+  HotRestart& hotRestart() override { PANIC("not implemented"); }
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
+  Runtime::Loader& runtime() override { return runtime_singleton_->instance(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
-  void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void shutdownAdmin() override {}
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
-  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
+  time_t startTimeFirstEpoch() override { PANIC("not implemented"); }
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
@@ -105,14 +113,14 @@ public:
   LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void flushStats() override {}
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -120,6 +128,7 @@ public:
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
+  void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
@@ -144,11 +153,10 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
-  Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                              Network::Socket::Type,
-                                              const Network::Socket::OptionsSharedPtr&,
-                                              ListenerComponentFactory::BindType,
-                                              uint32_t) override {
+  Network::SocketSharedPtr
+  createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+                     const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
+                     const Network::SocketCreationOptions&, uint32_t) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
     // TODO(mattklein123): The fact that this returns nullptr makes the production code more
@@ -195,6 +203,7 @@ private:
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;

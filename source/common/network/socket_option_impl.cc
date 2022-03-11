@@ -5,6 +5,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 
@@ -30,6 +31,14 @@ bool SocketOptionImpl::setOption(Socket& socket,
   }
 
   return true;
+}
+
+void SocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+  if (optname_.hasValue()) {
+    pushScalarToByteVector(optname_.level(), hash_key);
+    pushScalarToByteVector(optname_.option(), hash_key);
+    hash_key.insert(hash_key.end(), value_.begin(), value_.end());
+  }
 }
 
 absl::optional<Socket::Option::Details>

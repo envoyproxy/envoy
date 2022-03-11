@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+#include "source/common/common/thread.h"
 #include "source/exe/platform_impl.h"
 
 #include "test/test_common/test_runtime.h"

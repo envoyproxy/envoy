@@ -13,7 +13,7 @@ set -e
 #   tree structure.)
 
 # Determine base directory of unmodified QUICHE source files. In practice, this
-# ends up being "external/com_googlesource_quiche".
+# ends up being "external/com_github_google_quiche".
 src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constants.h))))
 
 # sed commands to apply to each source file.
@@ -52,6 +52,8 @@ cat <<EOF >sed_commands
 # Use envoy specific implementations for below platform APIs.
 /^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"source/common/quic/platform/quiche_logging_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_bug_tracker_impl.h!"source/common/quic/platform/quiche_bug_tracker_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_flags_impl.h!"source/common/quic/platform/quiche_flags_impl.h!
+/^#include/ s!"quiche_platform_impl/quic_flags_impl.h!"source/common/quic/platform/quic_flags_impl.h!
 
 # The reset platform APIs use the QUICHE default implementations.
 /^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!
@@ -62,6 +64,8 @@ cat <<EOF >sed_commands
 
 # Rewrite third_party includes.
 /^#include/ s!third_party/boringssl/src/include/!!
+/^#include/ s!third_party/nghttp2/src/lib/includes/nghttp2!nghttp2!
+/^#include/ s!third_party/nghttp2!nghttp2!
 /^#include/ s!third_party/zlib/zlib!zlib!
 
 /^import/ s!quic/core/proto/cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!
@@ -73,7 +77,7 @@ EOF
 
 for src_file in $(SRCS); do
   # Extract relative path (e.g. "quic/core/quic_utils.cc") from full path in
-  # src_path (e.g. "external/com_googlesource_quiche/quic/core/quic_utils.cc").
+  # src_path (e.g. "external/com_github_google_quiche/quic/core/quic_utils.cc").
   src_path="$${src_file#$$src_base_dir/}"
 
   # Map to output file with quiche/ base directory inserted in path.

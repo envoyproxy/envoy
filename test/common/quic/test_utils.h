@@ -1,32 +1,22 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "test/test_common/environment.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_config_peer.h"
-#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "test/test_common/environment.h"
-#include "source/common/stats/isolated_store_impl.h"
+#include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
+#include "quiche/quic/test_tools/quic_config_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -83,7 +73,7 @@ public:
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
         QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit),
+                                        send_buffer_limit, {nullptr}),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -102,13 +92,13 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               absl::optional<quic::EncryptionLevel> level));
+               quic::EncryptionLevel level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
   MOCK_METHOD(void, MaybeSendRstStreamFrame,
-              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+              (quic::QuicStreamId id, quic::QuicResetStreamError error,
                quic::QuicStreamOffset bytes_written));
   MOCK_METHOD(void, MaybeSendStopSendingFrame,
-              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error));
+              (quic::QuicStreamId id, quic::QuicResetStreamError error));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
@@ -170,7 +160,7 @@ public:
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, stats_store_) {}
+                               quic_stat_names_, {}, stats_store_) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
@@ -188,7 +178,7 @@ public:
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               absl::optional<quic::EncryptionLevel> level));
+               quic::EncryptionLevel level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 

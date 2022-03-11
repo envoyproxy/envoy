@@ -8,8 +8,8 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/common/ratelimit_headers.h"
 #include "source/extensions/filters/http/ratelimit/config.h"
-#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -22,15 +22,12 @@ namespace Envoy {
 namespace {
 
 // Tests Ratelimit functionality with config in filter.
-class RatelimitIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
+class RatelimitIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion()) {}
 
-  void SetUp() override {
-    XDS_DEPRECATED_FEATURE_TEST_SKIP;
-    initialize();
-  }
+  void SetUp() override { initialize(); }
 
   void createUpstreams() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -46,9 +43,6 @@ public:
   }
 
   void initialize() override {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -62,12 +56,13 @@ public:
       proto_config_.set_disable_x_envoy_ratelimited_header(disable_x_envoy_ratelimited_header_);
       setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
                      "ratelimit", fake_upstreams_.back()->localAddress());
-      proto_config_.mutable_rate_limit_service()->set_transport_api_version(apiVersion());
+      proto_config_.mutable_rate_limit_service()->set_transport_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
 
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
       ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ratelimit_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ratelimit_filter));
     });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -111,8 +106,7 @@ public:
       result = ratelimit_requests_[i]->waitForEndStream(*dispatcher_);
       RELEASE_ASSERT(result, result.message());
       EXPECT_EQ("POST", ratelimit_requests_[i]->headers().getMethodValue());
-      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.ratelimit.{}.RateLimitService",
-                                                    "ShouldRateLimit", apiVersion()),
+      EXPECT_EQ("/envoy.service.ratelimit.v3.RateLimitService/ShouldRateLimit",
                 ratelimit_requests_[i]->headers().getPathValue());
       EXPECT_EQ("application/grpc", ratelimit_requests_[i]->headers().getContentTypeValue());
 
@@ -238,26 +232,22 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFilterHeadersEnabledIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType,
                          RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
-TEST_P(RatelimitIntegrationTest, Ok) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
-  basicFlow();
-}
+TEST_P(RatelimitIntegrationTest, Ok) { basicFlow(); }
 
 TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{{"x-ratelimit-limit", "1000"},
@@ -282,7 +272,6 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimit) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
@@ -301,7 +290,6 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{
@@ -329,7 +317,6 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
 }
 
 TEST_P(RatelimitIntegrationTest, Error) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   ratelimit_requests_[0]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, true);
@@ -344,7 +331,6 @@ TEST_P(RatelimitIntegrationTest, Error) {
 }
 
 TEST_P(RatelimitIntegrationTest, Timeout) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   switch (clientType()) {
@@ -358,7 +344,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
     EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_total")->value());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   // Rate limiter fails open
@@ -368,7 +354,6 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
 }
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_));
   ASSERT_TRUE(fake_ratelimit_connection_->close());
@@ -380,7 +365,6 @@ TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
 }
 
 TEST_P(RatelimitIntegrationTest, FailedConnect) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Do not reset the fake upstream for the ratelimiter, but have it stop listening.
   // If we reset, the Envoy will continue to send H2 to the original rate limiter port, which may
   // be used by another test, and data sent to that port "unexpectedly" will cause problems for
@@ -393,7 +377,6 @@ TEST_P(RatelimitIntegrationTest, FailedConnect) {
 }
 
 TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   ratelimit_requests_[0]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
@@ -408,7 +391,6 @@ TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
 
@@ -424,17 +406,18 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
           "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitRemaining,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
           "2"));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+          "3"));
 
   cleanup();
 
@@ -444,7 +427,6 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
 
@@ -461,17 +443,18 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
           "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitRemaining,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
           "2"));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+          "3"));
 
   cleanup();
 
@@ -482,7 +465,6 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
 
 TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
        OverLimitWithoutEnvoyRatelimitedHeader) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
@@ -500,7 +482,6 @@ TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   const int num_requests = 4;
   setNumRequests(num_requests);
 

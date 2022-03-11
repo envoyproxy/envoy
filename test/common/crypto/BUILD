@@ -22,7 +22,6 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
     ],
 )
 
@@ -35,7 +34,7 @@ envoy_cc_fuzz_test(
     name = "get_sha_256_digest_fuzz_test",
     srcs = ["get_sha_256_digest_fuzz_test.cc"],
     corpus = "get_sha_256_digest_corpus",
-    deps = ["//source/extensions/common/crypto:utility_lib"],
+    deps = ["//source/common/crypto:utility_lib"],
 )
 
 envoy_cc_fuzz_test(
@@ -47,6 +46,5 @@ envoy_cc_fuzz_test(
         ":verify_signature_fuzz_proto_cc_proto",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
     ],
 )

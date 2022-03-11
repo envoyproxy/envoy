@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -46,6 +47,11 @@ public:
   size_t size() const;
 
   /**
+   * @return true if the pools are empty.
+   */
+  bool empty() const;
+
+  /**
    * Destroys all mapped pools.
    */
   void clear();
@@ -59,14 +65,9 @@ public:
   void addIdleCallback(const IdleCb& cb);
 
   /**
-   * See `Envoy::ConnectionPool::Instance::startDrain()`.
-   */
-  void startDrain();
-
-  /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   /**

@@ -151,7 +151,6 @@ stats_sinks:
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
     tcp_cluster_name: statsd
-watchdog: {}
 layered_runtime:
   layers:
   - name: root

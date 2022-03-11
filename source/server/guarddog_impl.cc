@@ -13,7 +13,7 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3/abort_action.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -21,7 +21,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/server/watchdog_impl.h"
 
 #include "absl/synchronization/mutex.h"
@@ -69,14 +69,14 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
         // Add default abort_action if kill and/or multi-kill is enabled.
         if (config.killTimeout().count() > 0) {
-          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
+          envoy::watchdog::v3::AbortActionConfig abort_config;
           WatchDogAction* abort_action_config = actions.Add();
           abort_action_config->set_event(WatchDogAction::KILL);
           abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
         }
 
         if (config.multiKillTimeout().count() > 0) {
-          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
+          envoy::watchdog::v3::AbortActionConfig abort_config;
           WatchDogAction* abort_action_config = actions.Add();
           abort_action_config->set_event(WatchDogAction::MULTIKILL);
           abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);

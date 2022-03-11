@@ -19,7 +19,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_join.h"
 
@@ -31,7 +31,7 @@ namespace Statsd {
 
 UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
     : parent_(parent), io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram,
-                                                           parent_.server_address_)) {}
+                                                           parent_.server_address_, {})) {}
 
 void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   // TODO(mattklein123): We can avoid this const_cast pattern by having a constant variant of
@@ -112,12 +112,22 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
-  const std::string message =
-      buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
+  std::string message;
+  if (histogram.unit() == Stats::Histogram::Unit::Percent) {
+    // 32-bit floating point values should have plenty of range for these values, and are faster to
+    // operate on than 64-bit doubles.
+    constexpr float divisor = Stats::Histogram::PercentScale;
+    const float float_value = value;
+    const float scaled = float_value / divisor;
+    message = buildMessage(histogram, scaled, "|h");
+  } else {
+    message = buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
+  }
   tls_->getTyped<Writer>().write(message);
 }
 
-const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, uint64_t value,
+template <typename ValueType>
+const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
                                               const std::string& type) const {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
@@ -142,7 +152,7 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, uint6
     return message;
   }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
@@ -198,6 +208,21 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   }
   // TODO(efimki): Add support of text readouts stats.
   tls_sink.endFlush(true);
+}
+
+void TcpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
+  // For statsd histograms are all timers except percents.
+  if (histogram.unit() == Stats::Histogram::Unit::Percent) {
+    // 32-bit floating point values should have plenty of range for these values, and are faster to
+    // operate on than 64-bit doubles.
+    constexpr float divisor = Stats::Histogram::PercentScale;
+    const float float_value = value;
+    const float scaled = float_value / divisor;
+    tls_->getTyped<TlsSink>().onPercentHistogramComplete(histogram.name(), scaled);
+  } else {
+    tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
+                                                 std::chrono::milliseconds(value));
+  }
 }
 
 TcpStatsdSink::TlsSink::TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher)
@@ -285,6 +310,12 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));
+  write(buffer);
+}
+
+void TcpStatsdSink::TlsSink::onPercentHistogramComplete(const std::string& name, float value) {
+  ASSERT(current_slice_mem_ == nullptr);
+  Buffer::OwnedImpl buffer(fmt::format("{}.{}:{}|h\n", parent_.getPrefix().c_str(), name, value));
   write(buffer);
 }
 

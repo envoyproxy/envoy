@@ -22,14 +22,11 @@ namespace {
 
 class TrackedWatermarkBufferTest : public testing::Test {
 public:
-  TrackedWatermarkBufferFactory factory_;
+  TrackedWatermarkBufferFactory factory_{absl::bit_width(4096u)};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 
 TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "2"}});
-
   InSequence s;
 
   ReadyWatcher low_watermark;
@@ -43,13 +40,13 @@ TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
   // Test highWatermarkRange
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(0, 0));
 
-  buffer->setWatermarks(100);
+  buffer->setWatermarks(100, 2);
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 100));
 
   auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 0));
 
-  buffer2->setWatermarks(200);
+  buffer2->setWatermarks(200, 2);
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 200));
 
   // Verify that the buffer watermark functions are called.

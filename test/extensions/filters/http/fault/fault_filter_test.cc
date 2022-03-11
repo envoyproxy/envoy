@@ -147,9 +147,6 @@ public:
     EXPECT_CALL(*timer_, disableTimer());
   }
 
-  void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
-                                const Router::RouteSpecificFilterConfig* vhost_fault);
-
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -1192,16 +1189,13 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-void FaultFilterTest::TestPerFilterConfigFault(
-    const Router::RouteSpecificFilterConfig* route_fault,
-    const Router::RouteSpecificFilterConfig* vhost_fault) {
+TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
+  setUpTest(v2_empty_fault_config_yaml);
+  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
 
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig("envoy.filters.http.fault"))
-      .WillByDefault(Return(route_fault));
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig("envoy.filters.http.fault"))
-      .WillByDefault(Return(vhost_fault));
+  ON_CALL(*decoder_filter_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.fault"))
+      .WillByDefault(Return(&delay_fault));
 
   const std::string upstream_cluster("www1");
 
@@ -1238,34 +1232,6 @@ void FaultFilterTest::TestPerFilterConfigFault(
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
-}
-
-TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
-
-  Fault::FaultSettings abort_fault(convertYamlStrToProtoConfig(abort_only_yaml));
-  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
-
-  // route-level fault overrides listener-level fault
-  {
-    setUpTest(v2_empty_fault_config_yaml); // This is a valid listener level fault
-    TestPerFilterConfigFault(&delay_fault, nullptr);
-  }
-
-  // virtual-host-level fault overrides listener-level fault
-  {
-    config_->stats().aborts_injected_.reset();
-    config_->stats().delays_injected_.reset();
-    setUpTest(v2_empty_fault_config_yaml);
-    TestPerFilterConfigFault(nullptr, &delay_fault);
-  }
-
-  // route-level fault overrides virtual-host-level fault
-  {
-    config_->stats().aborts_injected_.reset();
-    config_->stats().delays_injected_.reset();
-    setUpTest(v2_empty_fault_config_yaml);
-    TestPerFilterConfigFault(&delay_fault, &abort_fault);
-  }
 }
 
 class FaultFilterRateLimitTest : public FaultFilterTest {
@@ -1402,8 +1368,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));

@@ -37,7 +37,13 @@ OriginalConnPoolImpl::~OriginalConnPoolImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-void OriginalConnPoolImpl::drainConnections() {
+void OriginalConnPoolImpl::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    is_draining_ = true;
+    checkForIdleAndCloseIdleConnsIfDraining();
+    return;
+  }
+
   ENVOY_LOG(debug, "draining connections");
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
@@ -69,11 +75,6 @@ void OriginalConnPoolImpl::closeConnections() {
 }
 
 void OriginalConnPoolImpl::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
-
-void OriginalConnPoolImpl::startDrain() {
-  is_draining_ = true;
-  checkForIdleAndCloseIdleConnsIfDraining();
-}
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
                                             ConnectionPool::Callbacks& callbacks) {
@@ -197,7 +198,8 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
         PendingRequestPtr request =
             pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
         host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-        request->callbacks_.onPoolFailure(reason, "", conn.real_host_description_);
+        request->callbacks_.onPoolFailure(reason, conn.conn_->transportFailureReason(),
+                                          conn.real_host_description_);
       }
     }
 
@@ -225,7 +227,6 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
   // whether the connection is in the ready list (connected) or the pending list (failed to
   // connect).
   if (event == Network::ConnectionEvent::Connected) {
-    conn.conn_->streamInfo().setDownstreamSslConnection(conn.conn_->ssl());
     conn_connect_ms_->complete();
     processIdleConnection(conn, true, false);
   }

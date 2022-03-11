@@ -2,7 +2,7 @@
 
 set -e
 
-LLVM_VERSION="11.0.1"
+LLVM_VERSION="12.0.1"
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
@@ -28,7 +28,7 @@ fi
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
-[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.5
+[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.2
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
@@ -65,6 +65,8 @@ fi
 
 # Don't block coverage on flakes.
 BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2")
+# Output unusually long logs due to trace logging.
+BAZEL_BUILD_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
 
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
@@ -92,7 +94,7 @@ fi
 
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
-    COVERAGE_THRESHOLD=27.0
+    COVERAGE_THRESHOLD=23.75
   fi
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then

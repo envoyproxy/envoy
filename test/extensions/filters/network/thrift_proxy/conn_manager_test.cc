@@ -1750,9 +1750,9 @@ payload_passthrough: true
   EXPECT_EQ(1U, store_.counter("test.response_reply").value());
   EXPECT_EQ(0U, store_.counter("test.response_exception").value());
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  // In payload_passthrough mode, Envoy cannot detect response error.
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("test.response_passthrough").value());
+  EXPECT_EQ(0U, store_.counter("test.response_success").value());
+  EXPECT_EQ(1U, store_.counter("test.response_error").value());
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndInvalidResponse) {

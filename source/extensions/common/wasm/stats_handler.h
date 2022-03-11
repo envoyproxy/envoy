@@ -8,12 +8,16 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Wasm {
+
+// The custom stat namespace which prepends all the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "wasmcustom";
 
 #define CREATE_WASM_STATS(COUNTER, GAUGE)                                                          \
   COUNTER(remote_load_cache_hits)                                                                  \

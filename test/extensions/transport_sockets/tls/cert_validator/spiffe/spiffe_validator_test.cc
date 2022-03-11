@@ -64,13 +64,34 @@ public:
   // Setter.
   void setAllowExpiredCertificate(bool val) { allow_expired_certificate_ = val; }
   void setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
-    san_matchers_ = san_matchers;
+    san_matchers_.clear();
+    for (auto& matcher : san_matchers) {
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
+      *san_matchers_.back().mutable_matcher() = matcher;
+    }
   };
 
 private:
   bool allow_expired_certificate_{false};
   TestCertificateValidationContextConfigPtr config_;
-  std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_{};
   Stats::TestUtil::TestStore store_;
   SslStats stats_;
   Event::TestRealTimeSystem time_system_;
@@ -193,7 +214,8 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
 
   // Non-SPIFFE SAN
   cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // SPIFFE SAN
@@ -372,6 +394,37 @@ typed_config:
     EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
     stats().fail_verify_error_.reset();
   }
+}
+
+TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainIntermediateCerts) {
+  initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  )EOF"));
+
+  X509StorePtr ssl_ctx = X509_STORE_new();
+
+  // Chain contains workload, intermediate, and ca cert, so it should be accepted.
+  auto cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/"
+      "spiffe_san_signed_by_intermediate_cert.pem"));
+  auto intermediate_ca_cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/"
+      "intermediate_ca_cert.pem"));
+
+  STACK_OF(X509)* intermediates = sk_X509_new_null();
+  sk_X509_push(intermediates, intermediate_ca_cert.release());
+
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), intermediates));
+  EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+
+  sk_X509_pop_free(intermediates, X509_free);
 }
 
 void addIA5StringGenNameExt(X509* cert, int type, const std::string name) {

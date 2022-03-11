@@ -6,6 +6,7 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -131,6 +132,7 @@ envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error);
+
 } // namespace Utility
 } // namespace Http3
 namespace Http {
@@ -194,6 +196,14 @@ void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remo
 void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
 
 /**
+ * Update authority with the specified hostname.
+ * @param headers headers where authority should be updated.
+ * @param hostname hostname that authority should be updated with.
+ * @param append_xfh append the original authority to the x-forwarded-host header.
+ */
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh);
+
+/**
  * Creates an SSL (https) redirect path based on the input host and path headers.
  * @param headers supplies the request headers.
  * @return std::string the redirect path.
@@ -248,12 +258,43 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 std::string stripQueryString(const HeaderString& path);
 
 /**
+ * Replace the query string portion of a given path with a new one.
+ *
+ * e.g. replaceQueryString("/foo?key=1", {key:2}) -> "/foo?key=2"
+ *      replaceQueryString("/bar", {hello:there}) -> "/bar?hello=there"
+ *
+ * @param path the original path that may or may not contain an existing query string
+ * @param params the new params whose string representation should be formatted onto
+ *               the `path` above
+ * @return std::string the new path whose query string has been replaced by `params` and whose path
+ *         portion from `path` remains unchanged.
+ */
+std::string replaceQueryString(const HeaderString& path, const QueryParams& params);
+
+/**
  * Parse a particular value out of a cookie
  * @param headers supplies the headers to get the cookie from.
  * @param key the key for the particular cookie value to return
  * @return std::string the parsed cookie value, or "" if none exists
  **/
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
+
+/**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @param key_filter predicate that returns true for every cookie key to be included.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string>
+parseCookies(const RequestHeaderMap& headers,
+             const std::function<bool(absl::string_view)>& key_filter);
+
+/**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
 
 /**
  * Parse a particular value out of a set-cookie
@@ -512,40 +553,10 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
                                                      const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  if (!route || !route->routeEntry()) {
+  if (!route) {
     return nullptr;
   }
-  return route->routeEntry()->mostSpecificPerFilterConfigTyped<ConfigType>(filter_name);
-}
-
-/**
- * The non template implementation of traversePerFilterConfig. see
- * traversePerFilterConfig for docs.
- */
-void traversePerFilterConfigGeneric(
-    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
-
-/**
- * Fold all the available per route filter configs, invoking the callback with each config (if
- * it is present). Iteration of the configs is in order of specificity. That means that the callback
- * will be called first for a config on a Virtual host, then a route, and finally a route entry
- * (weighted cluster). If a config is not present, the callback will not be invoked.
- */
-template <class ConfigType>
-void traversePerFilterConfig(const std::string& filter_name,
-                             const Router::RouteConstSharedPtr& route,
-                             std::function<void(const ConfigType&)> cb) {
-  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
-                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-
-  traversePerFilterConfigGeneric(
-      filter_name, route, [&cb](const Router::RouteSpecificFilterConfig& cfg) {
-        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-        if (typed_cfg != nullptr) {
-          cb(*typed_cfg);
-        }
-      });
+  return dynamic_cast<const ConfigType*>(route->mostSpecificPerFilterConfig(filter_name));
 }
 
 /**
@@ -567,14 +578,17 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
 
   absl::optional<ConfigType> merged;
 
-  traversePerFilterConfig<ConfigType>(filter_name, route,
-                                      [&reduce, &merged](const ConfigType& cfg) {
-                                        if (!merged) {
-                                          merged.emplace(cfg);
-                                        } else {
-                                          reduce(merged.value(), cfg);
-                                        }
-                                      });
+  if (route) {
+    route->traversePerFilterConfig(
+        filter_name, [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
+          const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+          if (!merged) {
+            merged.emplace(*typed_cfg);
+          } else {
+            reduce(merged.value(), *typed_cfg);
+          }
+        });
+  }
 
   return merged;
 }
@@ -598,6 +612,24 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
+
+/**
+ * It returns RetryPolicy defined in core api to route api.
+ * @param retry_policy core retry policy
+ * @param retry_on this specifies when retry should be invoked.
+ * @return route retry policy
+ */
+envoy::config::route::v3::RetryPolicy
+convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
+                              const std::string& retry_on);
+
+/**
+ * @param request_headers the request header to be looked into.
+ * @return true if the request method is safe as defined in
+ * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
+ */
+bool isSafeRequest(Http::RequestHeaderMap& request_headers);
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

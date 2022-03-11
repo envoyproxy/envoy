@@ -69,7 +69,9 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
     header_match_type_ = HeaderMatchType::StringMatch;
-    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
+    string_match_ =
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config.string_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -174,8 +176,6 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   case HeaderMatchType::StringMatch:
     match = header_data.string_match_->match(value);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return match != header_data.invert_match_;
@@ -197,6 +197,15 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
                                  header_value.size()) != 0;
+}
+
+bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_102_103") &&
+      (response_headers.Status()->value() == "102" ||
+       response_headers.Status()->value() == "103")) {
+    return true;
+  }
+  return response_headers.Status()->value() == "100";
 }
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
@@ -246,12 +255,6 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
                                                           absl::optional<uint32_t> listener_port) {
-  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strip_port_from_connect")) {
-    // According to RFC 2817 Connect method should have port part in host header.
-    // In this case we won't strip it even if configured to do so.
-    return absl::nullopt;
-  }
   const absl::string_view original_host = headers.getHostValue();
   const absl::string_view::size_type port_start = getPortStart(original_host);
   if (port_start == absl::string_view::npos) {
@@ -337,6 +340,18 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_connect")) {
+      if (headers.Path() && !headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
+      }
+      if (!headers.Path() && headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+      }
+    }
   } else {
     if (!headers.Path()) {
       // :path header must be present for non-CONNECT requests.
@@ -363,12 +378,11 @@ bool HeaderUtility::isRemovableHeader(absl::string_view header) {
 
 bool HeaderUtility::isModifiableHeader(absl::string_view header) {
   return (header.empty() || header[0] != ':') &&
-         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
-          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
 }
 
 HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
-    const std::string& header_name,
+    absl::string_view header_name,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
     Stats::Counter& dropped_headers_with_underscores,
@@ -391,7 +405,7 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
 HeaderUtility::HeaderValidationResult
 HeaderUtility::validateContentLength(absl::string_view header_value,
                                      bool override_stream_error_on_invalid_http_message,
-                                     bool& should_close_connection) {
+                                     bool& should_close_connection, size_t& content_length_output) {
   should_close_connection = false;
   std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
   absl::optional<uint64_t> content_length;
@@ -416,6 +430,7 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
       return HeaderValidationResult::REJECT;
     }
   }
+  content_length_output = content_length.value();
   return HeaderValidationResult::ACCEPT;
 }
 

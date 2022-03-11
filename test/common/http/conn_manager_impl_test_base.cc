@@ -64,14 +64,16 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setDirectRemoteAddressForTest(std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRequestedServerName(
-      server_name_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRequestedServerName(server_name_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
+      ssl_connection_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());
@@ -218,8 +220,9 @@ void HttpConnectionManagerImplTest::sendRequestHeadersAndData() {
   conn_manager_->onData(fake_input, false);
 }
 
-ResponseHeaderMap*
-HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& response_headers) {
+ResponseHeaderMap* HttpConnectionManagerImplTest::sendResponseHeaders(
+    ResponseHeaderMapPtr&& response_headers, absl::optional<StreamInfo::ResponseFlag> response_flag,
+    std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
@@ -230,8 +233,12 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  if (response_flag.has_value()) {
+    decoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(response_flag.value());
+  }
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false,
+                                                 response_code_details);
   return altered_response_headers;
 }
 
@@ -262,7 +269,9 @@ void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
 }
 
 void HttpConnectionManagerImplTest::doRemoteClose(bool deferred) {
-  EXPECT_CALL(stream_, removeCallbacks(_));
+  // We will call removeCallbacks twice.
+  // Once in resetAllStreams, and once in doDeferredStreamDestroy.
+  EXPECT_CALL(stream_, removeCallbacks(_)).Times(2);
   expectOnDestroy(deferred);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

@@ -20,14 +20,10 @@ namespace Common {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version)
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
-      service_method_(
-          Grpc::VersionedMethods("envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit",
-                                 "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")
-              .getMethodDescriptorForVersion(transport_api_version)),
-      transport_api_version_(transport_api_version) {}
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit")) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -71,8 +67,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   request_ =
       async_client_->send(service_method_, request, *this, parent_span,
                           Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
-                              Http::AsyncClient::ParentContext{&stream_info}),
-                          transport_api_version_);
+                              Http::AsyncClient::ParentContext{&stream_info}));
 }
 
 void GrpcClientImpl::onSuccess(
@@ -115,23 +110,24 @@ void GrpcClientImpl::onSuccess(
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string& msg,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
+  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
+                      "rate limit fail, status={} msg={}", status, msg);
   callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
   callbacks_ = nullptr;
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const envoy::config::core::v3::GrpcService& grpc_service,
-                          const std::chrono::milliseconds timeout,
-                          envoy::config::core::v3::ApiVersion transport_api_version) {
+                          const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
       context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
           grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled),
-      timeout, transport_api_version);
+      timeout);
 }
 
 } // namespace RateLimit

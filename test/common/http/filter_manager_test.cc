@@ -536,7 +536,9 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*decoder_filter, onLocalReply(_));
     EXPECT_CALL(*stream_filter, onLocalReply(_));
     EXPECT_CALL(*encoder_filter, onLocalReply(_));
-    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty());
+    // trackedObjectStackIsEmpty() is never called since sendLocalReply will abort encoder filter
+    // iteration.
+    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                                absl::nullopt, "details");
@@ -566,6 +568,25 @@ TEST_F(FilterManagerTest, ResetIdleTimer) {
 
   filter_manager_->destroyFilters();
 }
+
+TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+      }));
+  filter_manager_->createFilterChain();
+
+  decoder_filter->callbacks_->setUpstreamOverrideHost("1.2.3.4");
+
+  auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
+  EXPECT_EQ(override_host.value(), "1.2.3.4");
+
+  filter_manager_->destroyFilters();
+};
 
 } // namespace
 } // namespace Http

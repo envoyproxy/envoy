@@ -26,7 +26,7 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -66,7 +66,7 @@ protected:
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
             server_.accessLogManager(), server_.singletonManager(), server_.options(),
-            server_.quic_stat_names_) {}
+            server_.quic_stat_names_, server_) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -402,7 +402,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "http": {
         "name": "invalid",
         "typed_config": {
-          "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+          "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
           "type_url": "type.googleapis.com/envoy.config.trace.v2.BlackHoleConfig",
           "value": {
             "collector_cluster": "cluster_0",
@@ -583,7 +583,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  udpa::type::v1::TypedStruct typed_struct;
+  xds::type::v3::TypedStruct typed_struct;
   auto untyped_struct = typed_struct.mutable_value();
   (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
   sink.mutable_typed_config()->PackFrom(typed_struct);
@@ -612,9 +612,8 @@ TEST(InitialImplTest, LayeredRuntime) {
       admin_layer: {}
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -625,9 +624,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   )EOF";
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -676,9 +674,8 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
@@ -717,9 +714,8 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
@@ -1041,9 +1037,8 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
@@ -1078,8 +1073,7 @@ TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -1114,8 +1108,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
@@ -1129,8 +1122,7 @@ TEST_F(ConfigurationImplTest, EmptyAdmin) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 0);
@@ -1152,9 +1144,8 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options);
+  InitialImpl config(bootstrap);
   config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 

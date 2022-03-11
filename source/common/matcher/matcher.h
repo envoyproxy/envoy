@@ -25,16 +25,17 @@ namespace Matcher {
 
 template <class ProtoType> class ActionBase : public Action {
 public:
-  ActionBase() : type_name_(ProtoType().GetTypeName()) {}
+  absl::string_view typeUrl() const override { return staticTypeUrl(); }
 
-  absl::string_view typeUrl() const override { return type_name_; }
+  static absl::string_view staticTypeUrl() {
+    const static std::string typeUrl = ProtoType().GetTypeName();
 
-private:
-  const std::string type_name_;
+    return typeUrl;
+  }
 };
 
 struct MaybeMatchResult {
-  const ActionPtr result_;
+  const ActionFactoryCb result_;
   const MatchState match_state_;
 };
 
@@ -55,49 +56,83 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
-  return MaybeMatchResult{result.on_match_->action_cb_(), MatchState::MatchComplete};
+  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
-template <class DataType>
-using MatchTreeFactoryCb = std::function<std::unique_ptr<MatchTree<DataType>>()>;
-template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
-template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<DataType>()>;
+
+/**
+ * A matcher that will always resolve to associated on_no_match. This is used when
+ * the matcher is configured without a matcher, allowing for a tree that always resolves
+ * to a specific OnMatch.
+ */
+template <class DataType> class AnyMatcher : public MatchTree<DataType> {
+public:
+  explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
+      : on_no_match_(std::move(on_no_match)) {}
+
+  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
+    return {MatchState::MatchComplete, on_no_match_};
+  }
+  const absl::optional<OnMatch<DataType>> on_no_match_;
+};
 
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
  */
-template <class DataType, class ActionFactoryContext> class MatchTreeFactory {
+template <class DataType, class ActionFactoryContext>
+class MatchTreeFactory : public OnMatchFactory<DataType> {
 public:
   MatchTreeFactory(ActionFactoryContext& context,
-                   Server::Configuration::ServerFactoryContext& server_factory_context,
+                   Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : action_factory_context_(context), server_factory_context_(server_factory_context),
+      : action_factory_context_(context), server_factory_context_(factory_context),
         validation_visitor_(validation_visitor) {}
 
-  MatchTreeFactoryCb<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
+  // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
+  template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {
     switch (config.matcher_type_case()) {
-    case envoy::config::common::matcher::v3::Matcher::kMatcherTree:
+    case MatcherType::kMatcherTree:
       return createTreeMatcher(config);
-    case envoy::config::common::matcher::v3::Matcher::kMatcherList:
+    case MatcherType::kMatcherList:
       return createListMatcher(config);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-      return nullptr;
+    case MatcherType::MATCHER_TYPE_NOT_SET:
+      return createAnyMatcher(config);
     }
+    return nullptr;
+  }
+
+  absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch& on_match) override {
+    return createOnMatchBase(on_match);
+  }
+
+  absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) override {
+    return createOnMatchBase(on_match);
   }
 
 private:
-  MatchTreeFactoryCb<DataType>
-  createListMatcher(const envoy::config::common::matcher::v3::Matcher& config) {
+  template <class MatcherType>
+  MatchTreeFactoryCb<DataType> createAnyMatcher(const MatcherType& config) {
+    auto on_no_match = createOnMatch(config.on_no_match());
+
+    return [on_no_match]() {
+      return std::make_unique<AnyMatcher<DataType>>(
+          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+    };
+  }
+  template <class MatcherType>
+  MatchTreeFactoryCb<DataType> createListMatcher(const MatcherType& config) {
     std::vector<std::pair<FieldMatcherFactoryCb<DataType>, OnMatchFactoryCb<DataType>>>
         matcher_factories;
     matcher_factories.reserve(config.matcher_list().matchers().size());
     for (const auto& matcher : config.matcher_list().matchers()) {
-      matcher_factories.push_back(std::make_pair(createFieldMatcher(matcher.predicate()),
-                                                 *createOnMatch(matcher.on_match())));
+      matcher_factories.push_back(std::make_pair(
+          createFieldMatcher<typename MatcherType::MatcherList::Predicate>(matcher.predicate()),
+          *createOnMatch(matcher.on_match())));
     }
 
     auto on_no_match = createOnMatch(config.on_no_match());
@@ -114,13 +149,12 @@ private:
     };
   }
 
-  template <class MatcherT>
+  template <class MatcherT, class PredicateType, class FieldPredicateType>
   FieldMatcherFactoryCb<DataType> createAggregateFieldMatcherFactoryCb(
-      const Protobuf::RepeatedPtrField<
-          envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate>& predicates) {
+      const Protobuf::RepeatedPtrField<FieldPredicateType>& predicates) {
     std::vector<FieldMatcherFactoryCb<DataType>> sub_matchers;
     for (const auto& predicate : predicates) {
-      sub_matchers.emplace_back(createFieldMatcher(predicate));
+      sub_matchers.emplace_back(createFieldMatcher<PredicateType>(predicate));
     }
 
     return [sub_matchers]() {
@@ -134,10 +168,10 @@ private:
     };
   }
 
-  FieldMatcherFactoryCb<DataType> createFieldMatcher(
-      const envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate& field_predicate) {
+  template <class PredicateType, class FieldMatcherType>
+  FieldMatcherFactoryCb<DataType> createFieldMatcher(const FieldMatcherType& field_predicate) {
     switch (field_predicate.match_type_case()) {
-    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kSinglePredicate): {
+    case (PredicateType::kSinglePredicate): {
       auto data_input = createDataInput(field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
@@ -145,28 +179,32 @@ private:
         return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
       };
     }
-    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kOrMatcher):
-      return createAggregateFieldMatcherFactoryCb<AnyFieldMatcher<DataType>>(
+    case (PredicateType::kOrMatcher):
+      return createAggregateFieldMatcherFactoryCb<AnyFieldMatcher<DataType>, PredicateType>(
           field_predicate.or_matcher().predicate());
-    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kAndMatcher):
-      return createAggregateFieldMatcherFactoryCb<AllFieldMatcher<DataType>>(
+    case (PredicateType::kAndMatcher):
+      return createAggregateFieldMatcherFactoryCb<AllFieldMatcher<DataType>, PredicateType>(
           field_predicate.and_matcher().predicate());
-    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kNotMatcher): {
-      auto matcher_factory = createFieldMatcher(field_predicate.not_matcher());
+    case (PredicateType::kNotMatcher): {
+      auto matcher_factory = createFieldMatcher<PredicateType>(field_predicate.not_matcher());
 
       return [matcher_factory]() {
         return std::make_unique<NotFieldMatcher<DataType>>(matcher_factory());
       };
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case PredicateType::MATCH_TYPE_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  MatchTreeFactoryCb<DataType>
-  createTreeMatcher(const envoy::config::common::matcher::v3::Matcher& matcher) {
+  template <class MatcherType>
+  MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
+    auto data_input = createDataInput(matcher.matcher_tree().input());
+    auto on_no_match = createOnMatch(matcher.on_no_match());
+
     switch (matcher.matcher_tree().tree_type_case()) {
-    case envoy::config::common::matcher::v3::Matcher_MatcherTree::kExactMatchMap: {
+    case MatcherType::MatcherTree::kExactMatchMap: {
       std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
       match_children.reserve(matcher.matcher_tree().exact_match_map().map().size());
 
@@ -174,9 +212,6 @@ private:
         match_children.push_back(
             std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
       }
-
-      auto data_input = createDataInput(matcher.matcher_tree().input());
-      auto on_no_match = createOnMatch(matcher.on_no_match());
 
       return [match_children, data_input, on_no_match]() {
         auto multimap_matcher = std::make_unique<ExactMapMatcher<DataType>>(
@@ -187,16 +222,25 @@ private:
         return multimap_matcher;
       };
     }
-    case envoy::config::common::matcher::v3::Matcher_MatcherTree::kPrefixMatchMap:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    case envoy::config::common::matcher::v3::Matcher_MatcherTree::kCustomMatch:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case MatcherType::MatcherTree::kPrefixMatchMap:
+      PANIC("unexpected matcher type");
+    case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
+      PANIC("unexpected matcher type");
+    case MatcherType::MatcherTree::kCustomMatch: {
+      auto& factory = Config::Utility::getAndCheckFactory<CustomMatcherFactory<DataType>>(
+          matcher.matcher_tree().custom_match());
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          matcher.matcher_tree().custom_match().typed_config(),
+          server_factory_context_.messageValidationVisitor(), factory);
+      return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
+                                                  on_no_match, *this);
     }
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
-  absl::optional<OnMatchFactoryCb<DataType>>
-  createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) {
+
+  template <class OnMatchType>
+  absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     if (on_match.has_matcher()) {
       return [matcher_factory = create(on_match.matcher())]() {
         return OnMatch<DataType>{{}, matcher_factory()};
@@ -231,8 +275,8 @@ private:
     const CommonProtocolInputPtr common_protocol_input_;
   };
 
-  DataInputFactoryCb<DataType>
-  createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
+  template <class TypedExtensionConfigType>
+  DataInputFactoryCb<DataType> createDataInput(const TypedExtensionConfigType& config) {
     auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
     if (factory != nullptr) {
       validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
@@ -257,17 +301,15 @@ private:
         [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
   }
 
-  InputMatcherFactoryCb createInputMatcher(
-      const envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::SinglePredicate&
-          predicate) {
+  template <class SinglePredicateType>
+  InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
     switch (predicate.matcher_case()) {
-    case envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::SinglePredicate::
-        kValueMatch:
+    case SinglePredicateType::kValueMatch:
       return [value_match = predicate.value_match()]() {
-        return std::make_unique<StringInputMatcher>(value_match);
+        return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
+            value_match);
       };
-    case envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::SinglePredicate::
-        kCustomMatch: {
+    case SinglePredicateType::kCustomMatch: {
       auto& factory =
           Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
@@ -275,9 +317,10 @@ private:
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case SinglePredicateType::MATCHER_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   const std::string stats_prefix_;

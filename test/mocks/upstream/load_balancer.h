@@ -17,6 +17,11 @@ public:
   // Upstream::LoadBalancer
   MOCK_METHOD(HostConstSharedPtr, chooseHost, (LoadBalancerContext * context));
   MOCK_METHOD(HostConstSharedPtr, peekAnotherHost, (LoadBalancerContext * context));
+  MOCK_METHOD(absl::optional<Upstream::SelectedPoolAndConnection>, selectExistingConnection,
+              (Upstream::LoadBalancerContext * context, const Upstream::Host& host,
+               std::vector<uint8_t>& hash_key));
+  MOCK_METHOD(OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>, lifetimeCallbacks,
+              ());
 
   std::shared_ptr<MockHost> host_{new MockHost()};
 };

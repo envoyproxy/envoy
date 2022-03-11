@@ -22,7 +22,8 @@ def envoy_cc_binary(
         stamped = False,
         deps = [],
         linkopts = [],
-        tags = []):
+        tags = [],
+        features = []):
     if not linkopts:
         linkopts = _envoy_linkopts()
     if stamped:
@@ -42,6 +43,7 @@ def envoy_cc_binary(
         stamp = 1,
         deps = deps,
         tags = tags,
+        features = features,
     )
 
 # Select the given values if exporting is enabled in the current build.
@@ -76,6 +78,7 @@ def _envoy_linkopts():
             "-Wl,--hash-style=gnu",
         ],
     }) + select({
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:boringssl_fips": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],

@@ -8,7 +8,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
 
@@ -52,7 +52,7 @@ private:
   OptRef<SymbolTable> symbol_table_;
   std::unique_ptr<StatNamePool> stat_name_pool_;
 
-  std::vector<Matchers::StringMatcherImpl> matchers_;
+  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> matchers_;
   std::vector<StatName> prefixes_;
 };
 

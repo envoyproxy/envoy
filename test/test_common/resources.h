@@ -16,6 +16,7 @@ public:
   const std::string Cluster{"type.googleapis.com/envoy.config.cluster.v3.Cluster"};
   const std::string ClusterLoadAssignment{
       "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"};
+  const std::string LbEndpoint{"type.googleapis.com/envoy.config.endpoint.v3.LbEndpoint"};
   const std::string Secret{"type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"};
   const std::string RouteConfiguration{
       "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"};

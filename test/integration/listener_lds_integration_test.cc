@@ -9,9 +9,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
-#include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -82,7 +82,7 @@ protected:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
       listener_config_.set_name(listener_name_);
-      ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
+      ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
       bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
       auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
       lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -250,14 +250,14 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
                         route:
                           cluster: cluster_0
                     typed_per_filter_config:
-                      envoy.filters.http.health_check:
-                        "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-                        pass_through_mode: false
+                      set-response-code:
+                        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        code: 403
               http_filters:
-                - name: envoy.filters.http.health_check
+                - name: set-response-code
                   typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-                    pass_through_mode: false
+                    "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                    code: 402
           - name: envoy.filters.http.router
         )EOF");
     sendLdsResponse({listener}, "2");
@@ -554,6 +554,11 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 }
 
+struct PerConnection {
+  std::string response_;
+  std::unique_ptr<RawConnectionDriver> client_conn_;
+  FakeRawConnectionPtr upstream_conn_;
+};
 class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion>,
                        public BaseIntegrationTest {
 public:
@@ -585,10 +590,7 @@ public:
           virtual_listener_config.mutable_bind_to_port()->set_value(false);
           virtual_listener_config.set_name("balanced_target_listener");
           virtual_listener_config.mutable_connection_balance_config()->mutable_exact_balance();
-
-          // TODO(lambdai): Replace by getLoopbackAddressUrlString to emulate the real world.
-          *virtual_listener_config.mutable_address()->mutable_socket_address()->mutable_address() =
-              "127.0.0.2";
+          *virtual_listener_config.mutable_stat_prefix() = target_listener_prefix_;
           virtual_listener_config.mutable_address()->mutable_socket_address()->set_port_value(80);
         });
     BaseIntegrationTest::initialize();
@@ -604,13 +606,65 @@ public:
         },
         version_, *dispatcher_);
   }
+
+  void verifyBalance(uint32_t repeats = 10) {
+    // The balancer is balanced as per active connection instead of total connection.
+    // The below vector maintains all the connections alive.
+    std::vector<PerConnection> connections;
+    for (uint32_t i = 0; i < repeats * concurrency_; ++i) {
+      connections.emplace_back();
+      connections.back().client_conn_ =
+          createConnectionAndWrite("dummy", connections.back().response_);
+      connections.back().client_conn_->waitForConnection();
+      ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+    }
+    for (auto& conn : connections) {
+      conn.client_conn_->close();
+      while (!conn.client_conn_->closed()) {
+        dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+      }
+    }
+    ASSERT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                       absl::StrCat("listener.", target_listener_prefix_,
+                                                    ".worker_0.downstream_cx_total"))
+                  ->value(),
+              repeats);
+    ASSERT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                       absl::StrCat("listener.", target_listener_prefix_,
+                                                    ".worker_1.downstream_cx_total"))
+                  ->value(),
+              repeats);
+  }
+
+  // The stats prefix that shared by ipv6 and ipv4 listener.
+  std::string target_listener_prefix_{"balanced_listener"};
 };
 
-struct PerConnection {
-  std::string response_;
-  std::unique_ptr<RawConnectionDriver> client_conn_;
-  FakeRawConnectionPtr upstream_conn_;
-};
+TEST_P(RebalancerTest, BindToPortUpdate) {
+  concurrency_ = 2;
+  initialize();
+
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+
+  new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+                                          -> void {
+    // This virtual listener need updating.
+    auto& virtual_listener_config = *bootstrap.mutable_static_resources()->mutable_listeners(1);
+    *virtual_listener_config.mutable_address()->mutable_socket_address()->mutable_address() =
+        bootstrap.static_resources().listeners(0).address().socket_address().address();
+    (*(*virtual_listener_config.mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
+          .mutable_fields())["random_key"]
+        .set_number_value(2);
+  });
+  // Create an LDS response with the new config, and reload config.
+  new_config_helper.setLds("1");
+
+  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+
+  verifyBalance();
+}
 
 // Verify the connections are distributed evenly on the 2 worker threads of the redirected
 // listener.
@@ -620,36 +674,8 @@ TEST_P(RebalancerTest, DISABLED_RedirectConnectionIsBalancedOnDestinationListene
   auto ip_address_str =
       Network::Test::getLoopbackAddressUrlString(TestEnvironment::getIpVersionsForTest().front());
   concurrency_ = 2;
-  int repeats = 10;
   initialize();
-
-  // The balancer is balanced as per active connection instead of total connection.
-  // The below vector maintains all the connections alive.
-  std::vector<PerConnection> connections;
-  for (uint32_t i = 0; i < repeats * concurrency_; ++i) {
-    connections.emplace_back();
-    connections.back().client_conn_ =
-        createConnectionAndWrite("dummy", connections.back().response_);
-    connections.back().client_conn_->waitForConnection();
-    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
-  }
-  for (auto& conn : connections) {
-    conn.client_conn_->close();
-    while (!conn.client_conn_->closed()) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-  }
-
-  ASSERT_EQ(TestUtility::findCounter(
-                test_server_->statStore(),
-                absl::StrCat("listener.", ip_address_str, "_80.worker_0.downstream_cx_total"))
-                ->value(),
-            repeats);
-  ASSERT_EQ(TestUtility::findCounter(
-                test_server_->statStore(),
-                absl::StrCat("listener.", ip_address_str, "_80.worker_1.downstream_cx_total"))
-                ->value(),
-            repeats);
+  verifyBalance();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RebalancerTest,

@@ -11,6 +11,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -95,6 +96,10 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
 class HttpConnManFinalizerImplTest : public testing::Test {
 protected:
+  HttpConnManFinalizerImplTest() {
+    Upstream::HostDescriptionConstSharedPtr shared_host(host_);
+    stream_info.upstreamInfo()->setUpstreamHost(shared_host);
+  }
   struct CustomTagCase {
     std::string custom_tag;
     bool set;
@@ -105,7 +110,7 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      config.custom_tags_.emplace(custom_tag.tag(), HttpTracerUtility::createCustomTag(custom_tag));
+      config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {
@@ -117,6 +122,7 @@ protected:
   NiceMock<MockSpan> span;
   NiceMock<MockConfig> config;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Upstream::MockHostDescription* host_{new NiceMock<Upstream::MockHostDescription>()};
 };
 
 TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
@@ -141,7 +147,7 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
@@ -172,7 +178,7 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
@@ -202,7 +208,7 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("")));
@@ -219,7 +225,7 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(nullptr));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
@@ -257,25 +263,30 @@ metadata:
 }
 
 TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
-  stream_info.host_->cluster_.name_ = "my_upstream_cluster";
+  host_->hostname_ = "my_upstream_cluster";
 
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).Times(3);
   const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
 
   const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
-  EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, firstUpstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, lastUpstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, firstDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
+  const MonotonicTime time = MonotonicTime(nanoseconds.value());
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(MonotonicTime(std::chrono::nanoseconds(10))));
+  auto& timing = stream_info.upstream_info_->upstreamTiming();
+  timing.first_upstream_tx_byte_sent_ = time;
+  timing.last_upstream_tx_byte_sent_ = time;
+  timing.first_upstream_rx_byte_received_ = time;
+  timing.last_upstream_rx_byte_received_ = time;
+  stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
+  stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   const auto log_timestamp =
       start_timestamp + std::chrono::duration_cast<SystemTime::duration>(*nanoseconds);
@@ -292,14 +303,13 @@ TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
 }
 
 TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSet) {
-  stream_info.host_->cluster_.name_ = "my_upstream_cluster";
-  stream_info.host_->cluster_.observability_name_ = "my_upstream_cluster_observable";
+  host_->cluster_.name_ = "my_upstream_cluster";
+  host_->cluster_.observability_name_ = "my_upstream_cluster_observable";
 
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).Times(3);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
@@ -326,7 +336,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that span is populated correctly.
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
@@ -341,7 +351,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -364,7 +374,7 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
   const auto remote_address = Network::Utility::resolveUrl("unix://" + path_);
 
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that the PeerAddress is populated correctly for Unix domain sockets.
   EXPECT_CALL(span, setTag(_, _)).Times(AnyNumber());
@@ -402,8 +412,7 @@ ree:
   std::shared_ptr<envoy::config::core::v3::Metadata> host_metadata =
       std::make_shared<envoy::config::core::v3::Metadata>();
   (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);
-  (*stream_info.host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(
-      fake_struct);
+  (*host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(fake_struct);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
@@ -411,7 +420,7 @@ ree:
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
-  EXPECT_CALL(*stream_info.host_, metadata()).WillRepeatedly(Return(host_metadata));
+  EXPECT_CALL(*host_, metadata()).WillRepeatedly(Return(host_metadata));
 
   EXPECT_CALL(config, customTags());
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
@@ -511,7 +520,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that span is populated correctly.
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
@@ -532,7 +541,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
   ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("503")));
@@ -570,7 +579,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().DownstreamCluster), Eq("-")));
@@ -613,8 +622,15 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"}};
-  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "7"},
-                                                     {"grpc-message", "permission denied"}};
+
+  Http::TestResponseTrailerMapImpl response_trailers;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    response_trailers.setGrpcStatus("14");
+    response_trailers.setGrpcMessage("unavailable");
+  } else {
+    response_trailers.setGrpcStatus("7");
+    response_trailers.setGrpcMessage("permission denied");
+  }
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   absl::optional<uint32_t> response_code(200);
@@ -622,10 +638,9 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
@@ -633,8 +648,14 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcTimeout), Eq("10s")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  } else {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  }
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
@@ -656,9 +677,16 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
                                                  {"te", "trailers"}};
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                   {"content-type", "application/grpc"},
-                                                   {"grpc-status", "7"},
-                                                   {"grpc-message", "permission denied"}};
+                                                   {"content-type", "application/grpc"}};
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    response_headers.setGrpcStatus("14");
+    response_headers.setGrpcMessage("unavailable");
+  } else {
+    response_headers.setGrpcStatus("7");
+    response_headers.setGrpcMessage("permission denied");
+  }
+
   Http::TestResponseTrailerMapImpl response_trailers;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
@@ -667,18 +695,23 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  } else {
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
+    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  }
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
@@ -728,20 +761,22 @@ public:
     driver_ = new NiceMock<MockDriver>();
     DriverPtr driver_ptr(driver_);
     tracer_ = std::make_shared<HttpTracerImpl>(std::move(driver_ptr), local_info_);
+    Upstream::HostDescriptionConstSharedPtr shared_host(host_);
+    stream_info_.upstreamInfo()->setUpstreamHost(shared_host);
   }
-
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"content-type", "application/grpc"},
-                                                    {"grpc-status", "7"},
-                                                    {"grpc-message", "permission denied"}};
+                                                    {"grpc-status", "14"},
+                                                    {"grpc-message", "unavailable"}};
   Http::TestResponseTrailerMapImpl response_trailers_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<MockConfig> config_;
   NiceMock<MockDriver>* driver_;
   HttpTracerSharedPtr tracer_;
+  Upstream::MockHostDescription* host_{new NiceMock<Upstream::MockHostDescription>()};
 };
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
@@ -799,10 +834,9 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
   const std::string ob_cluster_name = "ob fake cluster";
   EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  EXPECT_CALL(*(stream_info_.host_), address()).WillOnce(Return(remote_address));
-  EXPECT_CALL(stream_info_.host_->cluster_, name()).WillOnce(ReturnRef(cluster_name));
-  EXPECT_CALL(stream_info_.host_->cluster_, observabilityName())
-      .WillOnce(ReturnRef(ob_cluster_name));
+  EXPECT_CALL(*host_, address()).WillOnce(Return(remote_address));
+  EXPECT_CALL(host_->cluster_, name()).WillOnce(ReturnRef(cluster_name));
+  EXPECT_CALL(host_->cluster_, observabilityName()).WillOnce(ReturnRef(ob_cluster_name));
 
   EXPECT_CALL(*second_span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
@@ -812,8 +846,8 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
-  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
 
   HttpTracerUtility::finalizeUpstreamSpan(*child_span, &response_headers_, &response_trailers_,

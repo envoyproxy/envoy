@@ -26,7 +26,17 @@ public:
   const Router::RouteEntry* routeEntry() const override;
   const Router::Decorator* decorator() const override;
   const Router::RouteTracing* tracingConfig() const override;
-  const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+
+  const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const override {
+    return base_route_->mostSpecificPerFilterConfig(name);
+  }
+  void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
+    base_route_->traversePerFilterConfig(filter_name, cb);
+  }
+
   const envoy::config::core::v3::Metadata& metadata() const override {
     return base_route_->metadata();
   }
@@ -66,6 +76,9 @@ public:
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
+  Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                 bool do_formatting = true) const override;
+
   const Http::HashPolicy* hashPolicy() const override;
   const HedgePolicy& hedgePolicy() const override;
   Upstream::ResourcePriority priority() const override;
@@ -85,12 +98,12 @@ public:
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override;
   const VirtualHost& virtualHost() const override;
   bool autoHostRewrite() const override;
+  bool appendXfh() const override;
   const MetadataMatchCriteria* metadataMatchCriteria() const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override;
   bool includeVirtualHostRateLimits() const override;
   const TlsContextMatchCriteria* tlsContextMatchCriteria() const override;
   const PathMatchCriterion& pathMatchCriterion() const override;
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
   bool includeAttemptCountInRequest() const override;
   bool includeAttemptCountInResponse() const override;
   const UpgradeMap& upgradeMap() const override;

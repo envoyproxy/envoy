@@ -62,10 +62,10 @@ close map to 5xx. All other responses from Redis are counted as a success.
 
 .. _arch_overview_redis_cluster_support:
 
-Redis Cluster Support (Experimental)
-----------------------------------------
+Redis Cluster Support
+---------------------
 
-Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+Envoy offers support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
 
 When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
 implemented in any language to connect to the proxy as if it's a single node Redis instance.
@@ -80,6 +80,8 @@ following information:
 * List of known nodes.
 * The primaries for each shard.
 * Nodes entering or leaving the cluster.
+
+Envoy proxy supports identification of the nodes via both IP address and hostnames in the `cluster slots` command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v3 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.

@@ -2,7 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -69,77 +70,39 @@ genrule(
     ],
 )
 
-pkg_tar(
-    name = "sphinx_base",
-    srcs = glob(
-        [
-            "conf.py",
-            "_ext/*",
-        ],
-    ) + [":redirects"],
-    extension = "tar",
-    strip_prefix = "/docs/",
-)
-
-pkg_tar(
-    name = "sphinx_root",
-    srcs = glob(["root/**/*"]),
-    extension = "tar",
-    strip_prefix = "/docs/root",
-)
-
-pkg_tar(
-    name = "base_rst",
-    extension = "tar",
-    deps = [
-        ":sphinx_base.tar",
-        ":sphinx_root.tar",
-    ],
-)
-
-pkg_tar(
-    name = "google_vrp_config",
-    srcs = ["//configs:google-vrp/envoy-edge.yaml"],
-    extension = "tar",
-    package_dir = "/best_practices",
-    strip_prefix = "/configs/configuration",
-)
-
-pkg_tar(
-    name = "examples_rst",
-    srcs = ["//examples:files"],
-    extension = "tar",
-    package_dir = "/start/sandboxes/_include",
-    strip_prefix = "/examples",
-)
-
 genrule(
     name = "extensions_security_rst",
-    srcs = ["//source/extensions:extensions_metadata.yaml"],
+    srcs = [
+        "//source/extensions:extensions_metadata.yaml",
+        "//contrib:extensions_metadata.yaml",
+    ],
     outs = ["extensions_security_rst.tar"],
     cmd = """
     $(location //tools/docs:generate_extensions_security_rst) \\
-        $(location //source/extensions:extensions_metadata.yaml) $@
+        $(location //source/extensions:extensions_metadata.yaml) \\
+        $(location //contrib:extensions_metadata.yaml) $@
     """,
     tools = ["//tools/docs:generate_extensions_security_rst"],
 )
 
 genrule(
     name = "external_deps_rst",
-    srcs = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
-    ],
     outs = ["external_deps_rst.tar"],
-    cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
-    tools = ["//tools/docs:generate_external_deps_rst"],
+    cmd = """
+    $(location //tools/docs:generate_external_deps_rst) \
+        $(location //bazel:all_repository_locations) \
+        $@
+    """,
+    tools = [
+        "//bazel:all_repository_locations",
+        "//tools/docs:generate_external_deps_rst",
+    ],
 )
 
 genquery(
     name = "v3_proto_srcs",
-    expression = "labels(srcs, labels(deps, @envoy_api_canonical//:v3_protos))",
-    scope = ["@envoy_api_canonical//:v3_protos"],
+    expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
+    scope = ["@envoy_api//:v3_protos"],
 )
 
 genrule(
@@ -167,14 +130,54 @@ genrule(
     tools = ["//tools/docs:generate_api_rst"],
 )
 
+pkg_files(
+    name = "sphinx_base",
+    srcs = glob(
+        [
+            "conf.py",
+            "_ext/*",
+        ],
+    ) + [":redirects"],
+    strip_prefix = "/docs",
+)
+
+pkg_files(
+    name = "sphinx_root",
+    srcs = glob(["root/**/*"]),
+    strip_prefix = "/docs/root",
+)
+
+# TODO(phlax): this appears unused, fix or remove
+pkg_files(
+    name = "google_vrp_config",
+    srcs = ["//configs:google-vrp/envoy-edge.yaml"],
+    prefix = "config/best_practices",
+    strip_prefix = "/configs",
+)
+
+pkg_files(
+    name = "examples_rst",
+    srcs = ["//examples:files"],
+    prefix = "start/sandboxes/_include",
+    strip_prefix = "/examples",
+)
+
+pkg_filegroup(
+    name = "rst_files",
+    srcs = [
+        ":examples_rst",
+        ":sphinx_base",
+        ":sphinx_root",
+    ],
+)
+
 pkg_tar(
     name = "rst",
+    srcs = [":rst_files"],
     extension = "tar",
     deps = [
         ":api_rst",
-        ":base_rst.tar",
         ":empty_protos_rst",
-        ":examples_rst.tar",
         ":extensions_security_rst",
         ":external_deps_rst",
     ],

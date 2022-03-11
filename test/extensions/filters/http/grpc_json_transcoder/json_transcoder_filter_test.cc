@@ -335,6 +335,79 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   EXPECT_FALSE(transcoder);
 }
 
+// By default, the transcoder will treat unregistered custom verb as part of path segment,
+// which can be captured in a wildcard.
+TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
+  JsonTranscoderConfig config(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", false),
+      *api_);
+
+  // It is matched to PostWildcard `POST /wildcard/{arg=**}`.
+  // ":unknown" was not treated as custom verb but as part of path segment,
+  // so it matches *.
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/wildcard/random:unknown"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+  EXPECT_EQ("bookstore.Bookstore.PostWildcard", method_info->descriptor_->full_name());
+}
+
+// By default, the transcoder will always try to match the registered custom
+// verbs.
+TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
+  JsonTranscoderConfig config(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", false),
+      *api_);
+
+  // Now, the `verb` is registered by PostCustomVerb `POST /foo/bar:verb`,
+  // so the transcoder will strictly match `verb`.
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/wildcard/random:verb"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_EQ(status.code(), StatusCode::kNotFound);
+  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:verb to a method.");
+  EXPECT_FALSE(transcoder);
+}
+
+// When `set_match_unregistered_custom_verb=true`, the transcoder will always
+// try to match the unregistered custom verbs like the registered ones.
+TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
+  auto proto_config =
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", false);
+  proto_config.set_match_unregistered_custom_verb(true);
+  JsonTranscoderConfig config(proto_config, *api_);
+
+  // Even though the `unknown` is not registered, but as match_unregistered_custom_verb=true, the
+  // transcoder will strictly try to match it.
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/wildcard/random:unknown"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_EQ(status.code(), StatusCode::kNotFound);
+  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unknown to a method.");
+  EXPECT_FALSE(transcoder);
+}
+
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTest(
@@ -366,16 +439,6 @@ protected:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
-  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
-                        const Router::RouteSpecificFilterConfig* vhost_settings) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_,
-            perFilterConfig("envoy.filters.http.grpc_json_transcoder"))
-        .WillByDefault(Return(route_settings));
-    ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
-            perFilterConfig("envoy.filters.http.grpc_json_transcoder"))
-        .WillByDefault(Return(vhost_settings));
-  }
-
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
@@ -402,18 +465,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg;
   route_cfg.set_proto_descriptor_bin("");
   JsonTranscoderConfig route_config(route_cfg, *api_);
-  routeLocalConfig(&route_config, nullptr);
 
-  Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
-}
-
-TEST_F(GrpcJsonTranscoderFilterTest, PerVHostDisabledConfigOverride) {
-  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg;
-  vhost_cfg.set_proto_descriptor_bin("");
-  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
-  routeLocalConfig(nullptr, &vhost_config);
-
+  ON_CALL(*decoder_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.grpc_json_transcoder"))
+      .WillByDefault(Return(&route_config));
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
 }
@@ -494,8 +549,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -562,8 +616,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -623,8 +676,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, forwarded_request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -687,8 +739,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -1263,8 +1314,7 @@ public:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
     Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_.encode100ContinueHeaders(continue_headers));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
   }
 
 private:
@@ -1507,25 +1557,10 @@ TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerRouteEnabledOverride) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg =
       bookstoreProtoConfig();
   JsonTranscoderConfig route_config(route_cfg, *api_);
-  routeLocalConfig(&route_config, nullptr);
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
-
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
-  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
-  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
-  EXPECT_EQ("trailers", request_headers.get_("te"));
-}
-
-TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerVhostEnabledOverride) {
-  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg =
-      bookstoreProtoConfig();
-  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
-  routeLocalConfig(nullptr, &vhost_config);
+  ON_CALL(*decoder_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.grpc_json_transcoder"))
+      .WillByDefault(Return(&route_config));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};

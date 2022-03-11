@@ -24,6 +24,7 @@ namespace Server {
 // After the active socket passes all the listener filters, a server connection is created. The
 // derived listener must override ``newActiveConnection`` to take the ownership of that server
 // connection.
+// TODO(lambdai): Refactor the listener filter test cases to adopt this class.
 class ActiveStreamListenerBase : public ActiveListenerImplBase,
                                  protected Logger::Loggable<Logger::Id::conn_handler> {
 public:
@@ -37,8 +38,8 @@ public:
    * Schedule to remove and destroy the active connections which are not tracked by listener
    * config. Caution: The connection are not destroyed yet when function returns.
    */
-  void
-  deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  void onFilterChainDraining(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override {
     // Need to recover the original deleting state.
     const bool was_deleting = is_deleting_;
     is_deleting_ = true;
@@ -137,20 +138,21 @@ private:
 };
 
 struct ActiveTcpConnection;
-class ActiveTcpListener;
+class OwnedActiveStreamListenerBase;
 
 /**
  * Wrapper for a group of active connections which are attached to the same filter chain context.
  */
 class ActiveConnections : public Event::DeferredDeletable {
 public:
-  ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
+  ActiveConnections(OwnedActiveStreamListenerBase& listener,
+                    const Network::FilterChain& filter_chain);
   ~ActiveConnections() override;
 
   // listener filter chain pair is the owner of the connections
-  ActiveTcpListener& listener_;
+  OwnedActiveStreamListenerBase& listener_;
   const Network::FilterChain& filter_chain_;
-  // Owned connections
+  // Owned connections.
   std::list<std::unique_ptr<ActiveTcpConnection>> connections_;
 };
 
@@ -179,5 +181,37 @@ struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
 using ActiveConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
 using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
 
+// The mixin that handles the composition type ActiveConnectionCollection. This mixin
+// provides the connection removal helper and the filter chain removal helper.
+// All the prod stream listeners should inherit from this class and leave ActiveStreamListenerBase
+// for unit test only.
+class OwnedActiveStreamListenerBase : public ActiveStreamListenerBase {
+public:
+  OwnedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                                Network::ListenerPtr&& listener, Network::ListenerConfig& config)
+      : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
+
+  /**
+   * Remove and destroy an active connection.
+   * @param connection supplies the connection to remove.
+   */
+  void removeConnection(ActiveTcpConnection& connection);
+
+protected:
+  /**
+   * Return the active connections container attached to the given filter chain.
+   */
+  ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
+  /**
+   * Remove an filter chain. All the active connections that are attached to the filter chain will
+   * be destroyed.
+   * @param filter_chain supplies the filter chain to remove.
+   */
+  void removeFilterChain(const Network::FilterChain* filter_chain) override;
+
+  absl::flat_hash_map<const Network::FilterChain*, ActiveConnectionCollectionPtr>
+      connections_by_context_;
+};
 } // namespace Server
 } // namespace Envoy

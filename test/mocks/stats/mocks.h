@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <string>
 
@@ -17,7 +18,7 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/timespan_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -147,14 +148,6 @@ public:
   bool used_;
   uint64_t value_;
   uint64_t latch_;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 class MockGauge : public MockStatWithRefcount<Gauge> {
@@ -177,14 +170,6 @@ public:
   bool used_;
   uint64_t value_;
   ImportMode import_mode_;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 class MockHistogram : public MockMetric<Histogram> {
@@ -214,8 +199,8 @@ public:
   ~MockParentHistogram() override;
 
   void merge() override {}
-  const std::string quantileSummary() const override { return ""; };
-  const std::string bucketSummary() const override { return ""; };
+  std::string quantileSummary() const override { return ""; };
+  std::string bucketSummary() const override { return ""; };
 
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(Histogram::Unit, unit, (), (const));
@@ -279,13 +264,24 @@ public:
   MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value));
 };
 
+class MockSinkPredicates : public SinkPredicates {
+public:
+  MockSinkPredicates();
+  ~MockSinkPredicates() override;
+  MOCK_METHOD(bool, includeCounter, (const Counter&));
+  MOCK_METHOD(bool, includeGauge, (const Gauge&));
+  MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
+};
+
 class MockStore : public TestUtil::TestStore {
 public:
   MockStore();
   ~MockStore() override;
 
-  ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
-  ScopePtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr createScope(const std::string& name) override {
+    return ScopeSharedPtr(createScope_(name));
+  }
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
     return createScope(symbolTable().toString(name));
   }
 
@@ -301,6 +297,10 @@ public:
   MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
   MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
+  MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
+  MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
+  MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
+  MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
@@ -329,6 +329,7 @@ public:
 
   TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
+  testing::NiceMock<MockGauge> gauge_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
 

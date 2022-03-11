@@ -33,8 +33,8 @@ constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
 std::string generateRcDetails(absl::string_view error_msg) {
   // Replace space with underscore since RCDetails may be written to access log.
   // Some log processors assume each log segment is separated by whitespace.
-  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
-                      absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
+  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{", StringUtil::replaceAllEmptySpace(error_msg),
+                      "}");
 }
 
 } // namespace
@@ -100,8 +100,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::setPayload(const ProtobufWkt::Struct& payload) {
-  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn", payload);
+void Filter::setExtractedData(const ProtobufWkt::Struct& extracted_data) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn",
+                                                      extracted_data);
 }
 
 void Filter::onComplete(const Status& status) {

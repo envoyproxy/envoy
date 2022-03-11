@@ -14,10 +14,6 @@ const Decorator* DelegatingRoute::decorator() const { return base_route_->decora
 
 const RouteTracing* DelegatingRoute::tracingConfig() const { return base_route_->tracingConfig(); }
 
-const RouteSpecificFilterConfig* DelegatingRoute::perFilterConfig(const std::string& name) const {
-  return base_route_->perFilterConfig(name);
-}
-
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
     Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
@@ -52,6 +48,12 @@ void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& header
                                                   bool insert_envoy_original_path) const {
   return base_route_->routeEntry()->finalizeRequestHeaders(headers, stream_info,
                                                            insert_envoy_original_path);
+}
+
+Http::HeaderTransforms
+DelegatingRouteEntry::requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                              bool do_formatting) const {
+  return base_route_->routeEntry()->requestHeaderTransforms(stream_info, do_formatting);
 }
 
 const Http::HashPolicy* DelegatingRouteEntry::hashPolicy() const {
@@ -130,6 +132,8 @@ bool DelegatingRouteEntry::autoHostRewrite() const {
   return base_route_->routeEntry()->autoHostRewrite();
 }
 
+bool DelegatingRouteEntry::appendXfh() const { return base_route_->routeEntry()->appendXfh(); }
+
 const MetadataMatchCriteria* DelegatingRouteEntry::metadataMatchCriteria() const {
   return base_route_->routeEntry()->metadataMatchCriteria();
 }
@@ -148,11 +152,6 @@ const TlsContextMatchCriteria* DelegatingRouteEntry::tlsContextMatchCriteria() c
 
 const PathMatchCriterion& DelegatingRouteEntry::pathMatchCriterion() const {
   return base_route_->routeEntry()->pathMatchCriterion();
-}
-
-const RouteSpecificFilterConfig*
-DelegatingRouteEntry::perFilterConfig(const std::string& name) const {
-  return base_route_->routeEntry()->perFilterConfig(name);
 }
 
 bool DelegatingRouteEntry::includeAttemptCountInRequest() const {

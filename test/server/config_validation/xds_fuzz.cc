@@ -12,26 +12,25 @@ namespace Envoy {
 
 // Helper functions to build API responses.
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
+  return ConfigHelper::buildCluster(name, "ROUND_ROBIN");
 };
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
       name, Network::Test::getLoopbackAddressString(ip_version_),
-      fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
+      fake_upstreams_[0]->localAddress()->ip()->port());
 }
 
 envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(const std::string& listener_name,
                                                                  const std::string& route_name) {
-  return ConfigHelper::buildListener(listener_name, route_name,
-                                     Network::Test::getLoopbackAddressString(ip_version_),
-                                     "ads_test", api_version_);
+  return ConfigHelper::buildListener(
+      listener_name, route_name, Network::Test::getLoopbackAddressString(ip_version_), "ads_test");
 }
 
 envoy::config::route::v3::RouteConfiguration
 XdsFuzzTest::buildRouteConfig(const std::string& route_name) {
-  return ConfigHelper::buildRouteConfig(route_name, "cluster_0", api_version_);
+  return ConfigHelper::buildRouteConfig(route_name, "cluster_0");
 }
 
 // Helper functions to send API responses.
@@ -56,16 +55,18 @@ void XdsFuzzTest::updateRoute(
 }
 
 XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
-                         envoy::config::core::v3::ApiVersion api_version)
+                         bool use_unified_mux)
     : HttpIntegrationTest(
           Http::CodecType::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
-                                         : "DELTA_GRPC",
-                                     api_version)),
+                                         : "DELTA_GRPC")),
       verifier_(input.config().sotw_or_delta()), actions_(input.actions()), version_(1),
-      api_version_(api_version), ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
+      ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
+  if (use_unified_mux) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+  }
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
@@ -74,9 +75,9 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   drain_time_ = std::chrono::seconds(60);
 
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
-    sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
+    sotw_or_delta_ = use_unified_mux ? Grpc::SotwOrDelta::UnifiedSotw : Grpc::SotwOrDelta::Sotw;
   } else {
-    sotw_or_delta_ = Grpc::SotwOrDelta::Delta;
+    sotw_or_delta_ = use_unified_mux ? Grpc::SotwOrDelta::UnifiedDelta : Grpc::SotwOrDelta::Delta;
   }
 }
 
@@ -209,7 +210,8 @@ void XdsFuzzTest::addRoute(const std::string& route_name) {
  */
 AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
                                         const std::string& expected_version) {
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     envoy::service::discovery::v3::DiscoveryRequest discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
@@ -240,8 +242,11 @@ void XdsFuzzTest::replay() {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "0");
+  // TODO (dmitri-d) legacy delta sends node with every DiscoveryRequest, other mux implementations
+  // follow set_node_on_first_message_only config flag
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {"cluster_0"}, {}));
+                                      {"cluster_0"}, {"cluster_0"}, {},
+                                      sotw_or_delta_ == Grpc::SotwOrDelta::Delta));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");
@@ -342,7 +347,7 @@ void XdsFuzzTest::verifyListeners() {
       FUZZ_ASSERT(listener_dump->has_active_state());
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 }

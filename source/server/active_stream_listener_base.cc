@@ -3,7 +3,6 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/stats/timespan_impl.h"
-#include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
 namespace Server {
@@ -30,9 +29,9 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    RELEASE_ASSERT(socket->connectionInfoProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
-              socket->addressProvider().remoteAddress()->asString());
+              socket->connectionInfoProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
@@ -42,26 +41,26 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   }
   stream_info->setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto server_conn_ptr = dispatcher().createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
-    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
+    server_conn_ptr->setTransportSocketConnectTimeout(
+        timeout, stats_.downstream_cx_transport_socket_connect_timeout_);
   }
   server_conn_ptr->setBufferLimits(config_->perConnectionBufferLimitBytes());
-  RELEASE_ASSERT(server_conn_ptr->addressProvider().remoteAddress() != nullptr, "");
+  RELEASE_ASSERT(server_conn_ptr->connectionInfoProvider().remoteAddress() != nullptr, "");
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *server_conn_ptr, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
     ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *server_conn_ptr,
-                   server_conn_ptr->addressProvider().remoteAddress()->asString());
+                   server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
     server_conn_ptr->close(Network::ConnectionCloseType::NoFlush);
   }
   newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
 }
 
-ActiveConnections::ActiveConnections(ActiveTcpListener& listener,
+ActiveConnections::ActiveConnections(OwnedActiveStreamListenerBase& listener,
                                      const Network::FilterChain& filter_chain)
     : listener_(listener), filter_chain_(filter_chain) {}
 
@@ -114,6 +113,51 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     active_connections_.listener_.removeConnection(*this);
+  }
+}
+
+void OwnedActiveStreamListenerBase::removeConnection(ActiveTcpConnection& connection) {
+  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
+  dispatcher().deferredDelete(std::move(removed));
+  // Delete map entry only iff connections becomes empty.
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
+    dispatcher().deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
+  }
+}
+
+ActiveConnections& OwnedActiveStreamListenerBase::getOrCreateActiveConnections(
+    const Network::FilterChain& filter_chain) {
+  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
+  if (connections == nullptr) {
+    connections = std::make_unique<ActiveConnections>(*this, filter_chain);
+  }
+  return *connections;
+}
+
+void OwnedActiveStreamListenerBase::removeFilterChain(const Network::FilterChain* filter_chain) {
+  auto iter = connections_by_context_.find(filter_chain);
+  if (iter == connections_by_context_.end()) {
+    // It is possible when listener is stopping.
+  } else {
+    auto& connections = iter->second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+    // Since is_deleting_ is on, we need to manually remove the map value and drive the
+    // iterator. Defer delete connection container to avoid race condition in destroying
+    // connection.
+    dispatcher().deferredDelete(std::move(iter->second));
+    connections_by_context_.erase(iter);
   }
 }
 

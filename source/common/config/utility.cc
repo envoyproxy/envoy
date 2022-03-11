@@ -13,8 +13,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/api_type_oracle.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -93,8 +91,7 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
   // watch addition.
   if (!api.fileSystem().fileExists(path)) {
     throw EnvoyException(fmt::format(
-        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
-        path));
+        "paths must refer to an existing path in the system: '{}' does not exist", path));
   }
 }
 
@@ -218,8 +215,9 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
 }
 
 Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
+Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                           const Stats::TagVector& cli_tags) {
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 
 Stats::StatsMatcherPtr
@@ -252,12 +250,13 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
 }
 
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
   static const std::string typed_struct_type =
+      xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+  static const std::string legacy_typed_struct_type =
       udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
@@ -266,6 +265,17 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
     absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
 
     if (type == typed_struct_type) {
+      xds::type::v3::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // if out_proto is expecting Struct, return directly
+      if (out_proto.GetDescriptor()->full_name() == struct_type) {
+        out_proto.CopyFrom(typed_struct.value());
+      } else {
+        // The typed struct might match out_proto, or some earlier version, let
+        // MessageUtil::jsonConvert sort this out.
+        MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+      }
+    } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
@@ -284,10 +294,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
     }
-  }
-
-  if (!config.fields().empty()) {
-    MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
 }
 

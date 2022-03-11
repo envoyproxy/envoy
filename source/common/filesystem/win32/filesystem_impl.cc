@@ -52,6 +52,9 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
 
+  if (truncate_) {
+    SetEndOfFile(fd_);
+  }
   BOOL result = CloseHandle(fd_);
   fd_ = INVALID_HANDLE;
   if (result == 0) {
@@ -70,6 +73,9 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
+    if (!in.test(File::Operation::Append)) {
+      truncate_ = true;
+    }
   }
 
   // Order of tests matter here. There reason for that
@@ -96,7 +102,7 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   case DestinationType::Stdout:
     return std::make_unique<StdStreamFileImplWin32<STD_OUTPUT_HANDLE>>();
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr; // for gcc
 }
 
 bool InstanceImplWin32::fileExists(const std::string& path) {

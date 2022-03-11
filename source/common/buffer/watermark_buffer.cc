@@ -1,14 +1,25 @@
 #include "source/common/buffer/watermark_buffer.h"
+#include "watermark_buffer.h"
 
+#include <cstdint>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Buffer {
+namespace {
+// Effectively disables tracking as this should zero out all reasonable account
+// balances when shifted by this amount.
+constexpr uint32_t kEffectivelyDisableTrackingBitshift = 63;
+// 50 is an arbitrary limit, and is meant to both limit the number of streams
+// Envoy ends up resetting and avoid triggering the Watchdog system.
+constexpr uint32_t kMaxNumberOfStreamsToResetPerInvocation = 50;
+} // end namespace
 
 void WatermarkBuffer::add(const void* data, uint64_t size) {
   OwnedImpl::add(data, size);
@@ -94,13 +105,18 @@ void WatermarkBuffer::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
 }
 
-void WatermarkBuffer::setWatermarks(uint32_t high_watermark) {
-  uint32_t overflow_watermark_multiplier =
-      Runtime::getInteger("envoy.buffer.overflow_multiplier", 0);
+size_t WatermarkBuffer::addFragments(absl::Span<const absl::string_view> fragments) {
+  size_t total_size_to_write = OwnedImpl::addFragments(fragments);
+  checkHighAndOverflowWatermarks();
+  return total_size_to_write;
+}
+
+void WatermarkBuffer::setWatermarks(uint32_t high_watermark,
+                                    uint32_t overflow_watermark_multiplier) {
   if (overflow_watermark_multiplier > 0 &&
       (static_cast<uint64_t>(overflow_watermark_multiplier) * high_watermark) >
           std::numeric_limits<uint32_t>::max()) {
-    ENVOY_LOG_MISC(debug, "Error setting overflow threshold: envoy.buffer.overflow_multiplier * "
+    ENVOY_LOG_MISC(debug, "Error setting overflow threshold: overflow_watermark_multiplier * "
                           "high_watermark is overflowing. Disabling overflow watermark.");
     overflow_watermark_multiplier = 0;
   }
@@ -142,37 +158,84 @@ void WatermarkBuffer::checkHighAndOverflowWatermarks() {
 
 BufferMemoryAccountSharedPtr
 WatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
+  if (bitshift_ == kEffectivelyDisableTrackingBitshift) {
+    return nullptr; // No tracking
+  }
   return BufferMemoryAccountImpl::createAccount(this, reset_handler);
 }
 
 void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedPtr& account,
-                                                int current_class, int new_class) {
+                                                absl::optional<uint32_t> current_class,
+                                                absl::optional<uint32_t> new_class) {
   ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
 
-  if (current_class == -1 && new_class >= 0) {
+  if (!current_class.has_value()) {
     // Start tracking
-    ASSERT(!size_class_account_sets_[new_class].contains(account));
-    size_class_account_sets_[new_class].insert(account);
-  } else if (current_class >= 0 && new_class == -1) {
+    ASSERT(new_class.has_value());
+    ASSERT(!size_class_account_sets_[new_class.value()].contains(account));
+    size_class_account_sets_[new_class.value()].insert(account);
+  } else if (!new_class.has_value()) {
     // No longer track
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    size_class_account_sets_[current_class].erase(account);
+    ASSERT(current_class.has_value());
+    ASSERT(size_class_account_sets_[current_class.value()].contains(account));
+    size_class_account_sets_[current_class.value()].erase(account);
   } else {
     // Moving between buckets
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    ASSERT(!size_class_account_sets_[new_class].contains(account));
-    size_class_account_sets_[new_class].insert(
-        std::move(size_class_account_sets_[current_class].extract(account).value()));
+    ASSERT(size_class_account_sets_[current_class.value()].contains(account));
+    ASSERT(!size_class_account_sets_[new_class.value()].contains(account));
+    size_class_account_sets_[new_class.value()].insert(
+        std::move(size_class_account_sets_[current_class.value()].extract(account).value()));
   }
 }
 
 void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                               int current_class) {
-  if (current_class >= 0) {
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    size_class_account_sets_[current_class].erase(account);
+                                               absl::optional<uint32_t> current_class) {
+  if (current_class.has_value()) {
+    ASSERT(size_class_account_sets_[current_class.value()].contains(account));
+    size_class_account_sets_[current_class.value()].erase(account);
   }
 }
+
+uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
+  ASSERT(pressure >= 0.0 && pressure <= 1.0, "Provided pressure is out of range [0, 1].");
+
+  // Compute buckets to clear
+  const uint32_t buckets_to_clear = std::min<uint32_t>(
+      std::floor(pressure * BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) + 1, 8);
+
+  uint32_t last_bucket_to_clear = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
+  ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", last_bucket_to_clear);
+
+  // Clear buckets, prioritizing the buckets with larger streams.
+  uint32_t num_streams_reset = 0;
+  for (uint32_t buckets_cleared = 0; buckets_cleared < buckets_to_clear; ++buckets_cleared) {
+    const uint32_t bucket_to_clear =
+        BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_cleared - 1;
+    ENVOY_LOG_MISC(warn, "resetting {} streams in bucket {}.",
+                   size_class_account_sets_[bucket_to_clear].size(), bucket_to_clear);
+
+    auto it = size_class_account_sets_[bucket_to_clear].begin();
+    while (it != size_class_account_sets_[bucket_to_clear].end()) {
+      if (num_streams_reset >= kMaxNumberOfStreamsToResetPerInvocation) {
+        return num_streams_reset;
+      }
+      auto next = std::next(it);
+      // This will trigger an erase, which avoids rehashing and invalidates the
+      // iterator *it*. *next* is still valid.
+      (*it)->resetDownstream();
+      it = next;
+      ++num_streams_reset;
+    }
+  }
+
+  return num_streams_reset;
+}
+
+WatermarkBufferFactory::WatermarkBufferFactory(
+    const envoy::config::overload::v3::BufferFactoryConfig& config)
+    : bitshift_(config.minimum_account_to_track_power_of_two()
+                    ? config.minimum_account_to_track_power_of_two() - 1
+                    : kEffectivelyDisableTrackingBitshift) {}
 
 WatermarkBufferFactory::~WatermarkBufferFactory() {
   for (auto& account_set : size_class_account_sets_) {
@@ -194,19 +257,19 @@ BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
   return account;
 }
 
-int BufferMemoryAccountImpl::balanceToClassIndex() {
-  const uint64_t shifted_balance = buffer_memory_allocated_ >> 20; // shift by 1MB.
+absl::optional<uint32_t> BufferMemoryAccountImpl::balanceToClassIndex() {
+  const uint64_t shifted_balance = buffer_memory_allocated_ >> factory_->bitshift();
 
   if (shifted_balance == 0) {
-    return -1; // Not worth tracking anything < 1MB.
+    return {}; // Not worth tracking anything < configured minimum threshold
   }
 
   const int class_idx = absl::bit_width(shifted_balance) - 1;
-  return std::min<int>(class_idx, NUM_MEMORY_CLASSES_ - 1);
+  return std::min<uint32_t>(class_idx, NUM_MEMORY_CLASSES_ - 1);
 }
 
 void BufferMemoryAccountImpl::updateAccountClass() {
-  const int new_class = balanceToClassIndex();
+  auto new_class = balanceToClassIndex();
   if (shared_this_ && new_class != current_bucket_idx_) {
     factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
     current_bucket_idx_ = new_class;
@@ -230,7 +293,7 @@ void BufferMemoryAccountImpl::clearDownstream() {
   if (reset_handler_.has_value()) {
     reset_handler_.reset();
     factory_->unregisterAccount(shared_this_, current_bucket_idx_);
-    current_bucket_idx_ = -1;
+    current_bucket_idx_.reset();
     shared_this_ = nullptr;
   }
 }

@@ -27,6 +27,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -48,6 +49,7 @@ envoy_cc_test(
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
+    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
     deps = [
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/listener/original_dst:config",
@@ -74,6 +76,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

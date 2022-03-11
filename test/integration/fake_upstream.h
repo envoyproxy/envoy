@@ -13,6 +13,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -43,6 +44,7 @@
 #include "source/server/active_raw_udp_listener_config.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -80,7 +82,7 @@ public:
   // allows execution of non-interrupted sequences of operations on the fake stream which may run
   // into trouble if client-side events are interleaved.
   void postToConnectionThread(std::function<void()> cb);
-  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
+  void encode1xxHeaders(const Http::ResponseHeaderMap& headers);
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
@@ -147,9 +149,11 @@ public:
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // gRPC convenience methods.
-  void startGrpcStream();
+  void startGrpcStream(bool send_headers = true);
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
+    ASSERT(grpc_stream_started_,
+           "start gRPC stream by calling startGrpcStream before sending a message");
     auto serialized_response = Grpc::Common::serializeToGrpcFrame(message);
     encodeData(*serialized_response, false);
     ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
@@ -210,7 +214,7 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
-  const StreamInfo::StreamInfo& streamInfo() const override {
+  StreamInfo::StreamInfo& streamInfo() override {
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
@@ -249,6 +253,7 @@ private:
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool received_data_{false};
+  bool grpc_stream_started_{false};
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -397,6 +402,12 @@ public:
     absl::MutexLock lock(&lock_);
     initialized_ = true;
   }
+
+  // Some upstream connection are supposed to be alive forever.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult virtual waitForNoPost(
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -458,6 +469,9 @@ public:
 
   // Should only be called for HTTP2 or above, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
+
+  // Update the maximum number of concurrent streams.
+  void updateConcurrentStreams(uint64_t max_streams);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -567,6 +581,7 @@ struct FakeUpstreamConfig {
     // Legacy options which are always set.
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);
+    http3_options_.set_allow_extended_connect(true);
   }
 
   Event::TestTimeSystem& time_system_;
@@ -575,6 +590,7 @@ struct FakeUpstreamConfig {
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -617,7 +633,7 @@ public:
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   Network::Address::InstanceConstSharedPtr localAddress() const {
-    return socket_->addressProvider().localAddress();
+    return socket_->connectionInfoProvider().localAddress();
   }
 
   virtual std::unique_ptr<FakeRawConnection>
@@ -702,7 +718,7 @@ private:
     // Network::ListenSocketFactory
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->addressProvider().localAddress();
+      return socket_->connectionInfoProvider().localAddress();
     }
     Network::SocketSharedPtr getListenSocket(uint32_t) override { return socket_; }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
@@ -719,8 +735,12 @@ private:
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
 
     // Network::UdpListenerReadFilter
-    void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
-    void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    Network::FilterStatus onData(Network::UdpRecvData& data) override {
+      return parent_.onRecvDatagram(data);
+    }
+    Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+      PANIC("not implemented");
+    }
 
   private:
     FakeUpstream& parent_;
@@ -752,7 +772,9 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
+            parent_.quic_options_, 1, parent_.quic_stat_names_);
+        // Initialize QUICHE flags.
+        quiche::FlagRegistry::getInstance();
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
@@ -780,6 +802,9 @@ private:
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override {
+      return Network::InternalListenerConfigOptRef();
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -790,6 +815,7 @@ private:
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return false; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);
@@ -806,13 +832,14 @@ private:
 
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  void onRecvDatagram(Network::UdpRecvData& data);
+  Network::FilterStatus onRecvDatagram(Network::UdpRecvData& data);
   AssertionResult
   runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactoryPtr socket_factory_;
   ConditionalInitializer server_initialized_;
@@ -825,6 +852,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Runtime::MockLoader> runtime_;
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is

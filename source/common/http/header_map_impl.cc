@@ -22,6 +22,9 @@ namespace {
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
 
+constexpr absl::string_view DelimiterForInlineHeaders{","};
+constexpr absl::string_view DelimiterForInlineCookies{"; "};
+
 void validateCapacity(uint64_t new_capacity) {
   // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
   // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
@@ -44,6 +47,13 @@ const InlineHeaderVector& getInVec(const VariantHeader& buffer) {
 bool validatedLowerCaseString(absl::string_view str) {
   auto lower_case_str = LowerCaseString(str);
   return lower_case_str == str;
+}
+
+absl::string_view delimiterByHeader(const LowerCaseString& key) {
+  if (key == Http::Headers::get().Cookie) {
+    return DelimiterForInlineCookies;
+  }
+  return DelimiterForInlineHeaders;
 }
 
 } // namespace
@@ -368,8 +378,9 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
+      const auto delimiter = delimiterByHeader(*lookup.value().key_);
       const uint64_t added_size =
-          appendToHeader((*lookup.value().entry_)->value(), value.getStringView());
+          appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
       value.clear();
     }
@@ -434,10 +445,8 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const std::string delimiter = (key == Http::Headers::get().Cookie ? "; " : ",");
-    const uint64_t added_size = header_map_correctly_coalesce_cookies_
-                                    ? appendToHeader(entry[0]->value(), value, delimiter)
-                                    : appendToHeader(entry[0]->value(), value);
+    const auto delimiter = delimiterByHeader(key);
+    const uint64_t added_size = appendToHeader(entry[0]->value(), value, delimiter);
     addSize(added_size);
   } else {
     addCopy(key, value);
@@ -658,8 +667,24 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
   return ret;
 }
 
-absl::optional<absl::string_view>
-RequestHeaderMapImpl::getTraceContext(absl::string_view key) const {
+absl::string_view RequestHeaderMapImpl::protocol() const { return getProtocolValue(); }
+
+absl::string_view RequestHeaderMapImpl::authority() const { return getHostValue(); }
+
+absl::string_view RequestHeaderMapImpl::path() const { return getPathValue(); }
+
+absl::string_view RequestHeaderMapImpl::method() const { return getMethodValue(); }
+
+void RequestHeaderMapImpl::forEach(Tracing::TraceContext::IterateCallback callback) const {
+  HeaderMapImpl::iterate([cb = std::move(callback)](const HeaderEntry& entry) {
+    if (cb(entry.key().getStringView(), entry.value().getStringView())) {
+      return HeaderMap::Iterate::Continue;
+    }
+    return HeaderMap::Iterate::Break;
+  });
+}
+
+absl::optional<absl::string_view> RequestHeaderMapImpl::getByKey(absl::string_view key) const {
   ASSERT(validatedLowerCaseString(key));
   auto result = const_cast<RequestHeaderMapImpl*>(this)->getExisting(key);
 
@@ -669,7 +694,7 @@ RequestHeaderMapImpl::getTraceContext(absl::string_view key) const {
   return result[0]->value().getStringView();
 }
 
-void RequestHeaderMapImpl::setTraceContext(absl::string_view key, absl::string_view val) {
+void RequestHeaderMapImpl::setByKey(absl::string_view key, absl::string_view val) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);
 
@@ -681,8 +706,7 @@ void RequestHeaderMapImpl::setTraceContext(absl::string_view key, absl::string_v
   HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
 }
 
-void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
-                                                       absl::string_view val) {
+void RequestHeaderMapImpl::setByReferenceKey(absl::string_view key, absl::string_view val) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);
 
@@ -692,7 +716,7 @@ void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
   HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
 }
 
-void RequestHeaderMapImpl::setTraceContextReference(absl::string_view key, absl::string_view val) {
+void RequestHeaderMapImpl::setByReference(absl::string_view key, absl::string_view val) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);
 

@@ -25,9 +25,9 @@ protected:
   std::string conditionalHeader() const { return GetParam(); }
 };
 
-envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
   // Allows 'accept' to be varied in the tests.
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
   add_accept->set_exact("accept");
   return config;
@@ -42,7 +42,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_ = {{":status", "200"},
                                                        {"date", "Sun, 06 Nov 1994 08:49:37 GMT"},
                                                        {"cache-control", cache_control_}};
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 };
 
 TEST_F(CanServeRequestFromCacheTest, CacheableRequest) {

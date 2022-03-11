@@ -25,6 +25,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v2;bootstrapv2";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Bootstrap]

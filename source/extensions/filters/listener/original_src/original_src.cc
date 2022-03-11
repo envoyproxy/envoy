@@ -15,7 +15,7 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 
 Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   auto& socket = cb.socket();
-  auto address = socket.addressProvider().remoteAddress();
+  auto address = socket.connectionInfoProvider().remoteAddress();
   ASSERT(address);
 
   ENVOY_LOG(debug,

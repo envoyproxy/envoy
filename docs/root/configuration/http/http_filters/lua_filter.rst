@@ -248,8 +248,7 @@ There are two ways of doing this, the first one is via the ``body()`` API.
 .. code-block:: lua
 
     function envoy_on_response(response_handle)
-      local content_length = response_handle:body():setBytes("<html><b>Not Found<b></html>")
-      response_handle:headers():replace("content-length", content_length)
+      response_handle:body():setBytes("<html><b>Not Found<b></html>")
       response_handle:headers():replace("content-type", "text/html")
     end
 
@@ -260,8 +259,7 @@ Or, through ``bodyChunks()`` API, which let Envoy to skip buffering the upstream
 
     function envoy_on_response(response_handle)
 
-      -- Sets the content-length.
-      response_handle:headers():replace("content-length", 28)
+      -- Sets the content-type.
       response_handle:headers():replace("content-type", "text/html")
 
       local last
@@ -510,8 +508,6 @@ base64Escape()
 
 Encodes the input string as base64. This can be useful for escaping binary data.
 
-.. _config_http_filters_lua_header_wrapper:
-
 timestamp()
 ^^^^^^^^^^^
 
@@ -522,6 +518,8 @@ timestamp()
 High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
+
+.. _config_http_filters_lua_header_wrapper:
 
 Header object API
 -----------------
@@ -545,6 +543,29 @@ get()
 
 Gets a header. *key* is a string that supplies the header key. Returns a string that is the header
 value or nil if there is no such header.
+
+getAtIndex()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:getAtIndex(key, index)
+
+Gets the header value at the given index. It can be used to fetch a specific value in case the
+given header has multiple values. *key* is a string that supplies the header key and index is
+an integer that supplies the position. It returns a string that is the header value or nil if
+there is no such header or if there is no value at the specified index.
+
+getNumValues()
+^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:getNumValues(key)
+
+Gets the number of values of a given header. It can be used to fetch the total number of values in case
+the given header has multiple values. *key* is a string that supplies the header key. It returns
+an integer with the value size for the given header or *0* if there is no such header.
 
 __pairs()
 ^^^^^^^^^
@@ -746,8 +767,8 @@ its keys can only be *string* or *numeric*.
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
     request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
-      auth: headers:get("authorization"),
-      token: headers:get("x-request-token"),
+      auth = headers:get("authorization"),
+      token = headers:get("x-request-token"),
     })
   end
 

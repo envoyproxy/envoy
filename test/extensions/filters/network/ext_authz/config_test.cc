@@ -21,11 +21,7 @@ namespace NetworkFilters {
 namespace ExtAuthz {
 
 namespace {
-void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
-  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
-  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
-    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
-  }
+void expectCorrectProto() {
   std::string yaml = R"EOF(
   grpc_service:
     google_grpc:
@@ -33,13 +29,12 @@ void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
       stat_prefix: google
   failure_mode_allow: false
   stat_prefix: name
-  transport_api_version: {}
+  transport_api_version: V3
 )EOF";
 
   ExtAuthzConfigFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(
-      fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
+  TestUtility::loadFromYaml(yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
@@ -67,23 +62,7 @@ TEST(ExtAuthzFilterConfigTest, ValidateFail) {
                ProtoValidationException);
 }
 
-TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  expectCorrectProto(envoy::config::core::v3::ApiVersion::AUTO);
-  expectCorrectProto(envoy::config::core::v3::ApiVersion::V2);
-#endif
-  expectCorrectProto(envoy::config::core::v3::ApiVersion::V3);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(ExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.ext_authz";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
+TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) { expectCorrectProto(); }
 
 } // namespace ExtAuthz
 } // namespace NetworkFilters

@@ -14,7 +14,7 @@ using quic::QuicTime;
 namespace Envoy {
 namespace Quic {
 
-class TestDelegate : public quic::QuicAlarm::Delegate {
+class TestDelegate : public quic::QuicAlarm::DelegateWithoutContext {
 public:
   TestDelegate() = default;
 

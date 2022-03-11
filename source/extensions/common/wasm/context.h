@@ -185,7 +185,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override;
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(::Envoy::Buffer::Instance& data, bool end_stream) override;
@@ -304,12 +304,6 @@ public:
     return dynamic_cast<T*>(it->second.get());
   }
 
-  uint32_t nextGrpcCallToken();
-  uint32_t nextGrpcStreamToken();
-  uint32_t nextHttpCallToken();
-  void setNextGrpcTokenForTesting(uint32_t token) { next_grpc_token_ = token; }
-  void setNextHttpCallTokenForTesting(uint32_t token) { next_http_call_token_ = token; }
-
 protected:
   friend class Wasm;
 
@@ -391,9 +385,6 @@ protected:
   void onGrpcReceiveTrailingMetadataWrapper(uint32_t token, Http::HeaderMapPtr&& metadata);
   void onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus& status,
                           const std::string_view message);
-
-  bool isGrpcStreamToken(uint32_t token) { return (token & 1) == 0; }
-  bool isGrpcCallToken(uint32_t token) { return (token & 1) == 1; }
 
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);

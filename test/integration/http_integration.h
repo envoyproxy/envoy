@@ -26,6 +26,10 @@ public:
                          Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecType type);
+  IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                         Network::ClientConnectionPtr&& conn,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
+                         Http::CodecType type, bool wait_till_connected);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
@@ -52,7 +56,8 @@ public:
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
-    ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
+    ConnectionCallbacks(IntegrationCodecClient& parent, bool block_till_connected)
+        : parent_(parent), block_till_connected_(block_till_connected) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -60,6 +65,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
+    bool block_till_connected_;
   };
 
   struct CodecCallbacks : public Http::ConnectionCallbacks {
@@ -89,13 +95,24 @@ using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
+  HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version)
+      : HttpIntegrationTest(
+            downstream_protocol, version,
+            ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/downstream_protocol ==
+                                          Http::CodecType::HTTP3)) {}
   HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::httpProxyConfig());
+                      const std::string& config);
 
   HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
-                      Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::httpProxyConfig());
+                      Network::Address::IpVersion version)
+      : HttpIntegrationTest(
+            downstream_protocol, upstream_address_fn, version,
+            ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/downstream_protocol ==
+                                          Http::CodecType::HTTP3)) {}
+  HttpIntegrationTest(Http::CodecType downstream_protocol,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version, const std::string& config);
   ~HttpIntegrationTest() override;
 
   void initialize() override;
@@ -125,6 +142,9 @@ protected:
   // Enable the encoding/decoding of Http1 trailers upstream
   ConfigHelper::ConfigModifierFunction setEnableUpstreamTrailersHttp1();
 
+  // Enable Proxy-Status response header.
+  ConfigHelper::HttpModifierFunction configureProxyStatus();
+
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
@@ -136,7 +156,13 @@ protected:
   IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
-      int upstream_index = 0, std::chrono::milliseconds time = TestUtility::DefaultTimeout);
+      uint64_t upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+      const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
+      const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
+      const std::vector<uint64_t>& upstream_indices,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
@@ -169,7 +195,9 @@ protected:
   void sendRequestAndVerifyResponse(const Http::TestRequestHeaderMapImpl& request_headers,
                                     const int request_size,
                                     const Http::TestResponseHeaderMapImpl& response_headers,
-                                    const int response_size, const int backend_idx);
+                                    const int response_size, const int backend_idx,
+                                    absl::optional<const Http::TestResponseHeaderMapImpl>
+                                        expected_response_headers = absl::nullopt);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
@@ -194,7 +222,6 @@ protected:
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
                                               const std::string& authority = "host");
-  void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();
@@ -223,11 +250,14 @@ protected:
   void testRetryAttemptCountHeader();
   void testGrpcRetry();
 
-  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
-                                    const std::string& via = "", bool disconnect_after_100 = false);
+  void testEnvoyHandling1xx(bool additional_continue_from_upstream = false,
+                            const std::string& via = "", bool disconnect_after_100 = false);
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
-                            bool with_multiple_1xx_headers = false);
+                            bool with_multiple_1xx_headers = false,
+                            absl::string_view initial_code = "100");
+  void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
+                           uint32_t response1_bytes, uint32_t response2_bytes);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
@@ -237,11 +267,8 @@ protected:
   void testTrailers(uint64_t request_size, uint64_t response_size, bool request_trailers_present,
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
-  void testAdminDrain(Http::CodecType admin_request_type);
-  // Test max stream duration.
-  void testMaxStreamDuration();
-  void testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect);
-  Http::CodecType downstreamProtocol() const { return downstream_protocol_; }
+  void testAdminDrain(Http::CodecClient::Type admin_request_type);
+  Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
   std::string upstreamProtocolStatsRoot() const;

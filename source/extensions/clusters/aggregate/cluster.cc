@@ -17,9 +17,9 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                  Random::RandomGenerator& random,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                 Stats::ScopePtr&& stats_scope, bool added_via_api)
+                 Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api, factory_context.dispatcher().timeSource()),
+                                added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 
@@ -180,13 +180,39 @@ AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
   return nullptr;
 }
 
+Upstream::HostConstSharedPtr
+AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
+  if (load_balancer_) {
+    return load_balancer_->peekAnotherHost(context);
+  }
+  return nullptr;
+}
+
+absl::optional<Upstream::SelectedPoolAndConnection>
+AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
+                                                       const Upstream::Host& host,
+                                                       std::vector<uint8_t>& hash_key) {
+  if (load_balancer_) {
+    return load_balancer_->selectExistingConnection(context, host, hash_key);
+  }
+  return absl::nullopt;
+}
+
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+AggregateClusterLoadBalancer::lifetimeCallbacks() {
+  if (load_balancer_) {
+    return load_balancer_->lifetimeCallbacks();
+  }
+  return {};
+}
+
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
+    Stats::ScopeSharedPtr&& stats_scope) {
   auto new_cluster =
       std::make_shared<Cluster>(cluster, proto_config, context.clusterManager(), context.runtime(),
                                 context.api().randomGenerator(), socket_factory_context,

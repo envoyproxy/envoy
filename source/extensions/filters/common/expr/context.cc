@@ -128,6 +128,15 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       return convertHeaderEntry(headers_.value_->RequestId());
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
+    } else if (value == Query) {
+      absl::string_view path = headers_.value_->getPathValue();
+      auto query_offset = path.find('?');
+      if (query_offset == absl::string_view::npos) {
+        return CelValue::CreateStringView(absl::string_view());
+      }
+      path = path.substr(query_offset + 1);
+      auto fragment_offset = path.find('#');
+      return CelValue::CreateStringView(path.substr(0, fragment_offset));
     }
   }
   return {};
@@ -181,8 +190,9 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == MTLS) {
-    return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
-                                info_.downstreamSslConnection()->peerCertificatePresented());
+    return CelValue::CreateBool(
+        info_.downstreamAddressProvider().sslConnection() != nullptr &&
+        info_.downstreamAddressProvider().sslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
     return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
   } else if (value == ID) {
@@ -198,7 +208,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     return {};
   }
 
-  auto ssl_info = info_.downstreamSslConnection();
+  auto ssl_info = info_.downstreamAddressProvider().sslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }
@@ -207,31 +217,32 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
 }
 
 absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
-  if (!key.IsString()) {
+  if (!key.IsString() || !info_.upstreamInfo().has_value()) {
     return {};
   }
   auto value = key.StringOrDie().value();
   if (value == Address) {
-    auto upstream_host = info_.upstreamHost();
+    auto upstream_host = info_.upstreamInfo().value().get().upstreamHost();
     if (upstream_host != nullptr && upstream_host->address() != nullptr) {
       return CelValue::CreateStringView(upstream_host->address()->asStringView());
     }
   } else if (value == Port) {
-    auto upstream_host = info_.upstreamHost();
+    auto upstream_host = info_.upstreamInfo().value().get().upstreamHost();
     if (upstream_host != nullptr && upstream_host->address() != nullptr &&
         upstream_host->address()->ip() != nullptr) {
       return CelValue::CreateInt64(upstream_host->address()->ip()->port());
     }
   } else if (value == UpstreamLocalAddress) {
-    auto upstream_local_address = info_.upstreamLocalAddress();
+    auto upstream_local_address = info_.upstreamInfo().value().get().upstreamLocalAddress();
     if (upstream_local_address != nullptr) {
       return CelValue::CreateStringView(upstream_local_address->asStringView());
     }
   } else if (value == UpstreamTransportFailureReason) {
-    return CelValue::CreateStringView(info_.upstreamTransportFailureReason());
+    return CelValue::CreateStringView(
+        info_.upstreamInfo().value().get().upstreamTransportFailureReason());
   }
 
-  auto ssl_info = info_.upstreamSslConnection();
+  auto ssl_info = info_.upstreamInfo().value().get().upstreamSslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }
@@ -274,8 +285,8 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (filter_state_.hasDataWithName(value)) {
-    const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+  if (const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+      object != nullptr) {
     const CelState* cel_state = dynamic_cast<const CelState*>(object);
     if (cel_state) {
       return cel_state->exprValue(arena_, false);

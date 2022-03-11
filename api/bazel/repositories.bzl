@@ -23,9 +23,6 @@ def api_dependencies():
         name = "com_google_googleapis",
     )
     external_http_archive(
-        name = "com_github_bazelbuild_buildtools",
-    )
-    external_http_archive(
         name = "com_github_cncf_udpa",
     )
 
@@ -46,6 +43,11 @@ def api_dependencies():
     external_http_archive(
         name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_LOGS_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "com_github_bufbuild_buf",
+        build_file_content = BUF_BUILD_CONTENT,
+        tags = ["manual"],
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
@@ -148,5 +150,19 @@ go_proto_library(
     importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
     proto = ":logs",
     visibility = ["//visibility:public"],
+)
+"""
+
+BUF_BUILD_CONTENT = """
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "buf",
+    srcs = [
+        "@com_github_bufbuild_buf//:bin/buf",
+    ],
+    tags = ["manual"], # buf is downloaded as a linux binary; tagged manual to prevent build for non-linux users
 )
 """

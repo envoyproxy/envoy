@@ -179,18 +179,26 @@ Dynamic Metadata
 ----------------
 .. _config_http_filters_ext_authz_dynamic_metadata:
 
-.. note::
+The External Authorization filter supports emitting dynamic metadata as an opaque ``google.protobuf.Struct``.
 
-  The External Authorization filter emits dynamic metadata only when it is configured to use
-  gRPC service as the authorization server.
-
-The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
-*only* when the gRPC authorization server returns a :ref:`CheckResponse
-<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
+When using a gRPC authorization server, dynamic metadata will be emitted only when the :ref:`CheckResponse
+<envoy_v3_api_msg_service.auth.v3.CheckResponse>` contains a filled :ref:`dynamic_metadata
 <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field.
+
+When using an HTTP authorization server, dynamic metadata will be emitted only when there are response headers
+from the authorization server that match the configured
+:ref:`dynamic_metadata_from_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.dynamic_metadata_from_headers>`,
+if set. For every response header that matches, the filter will emit dynamic metadata whose key is the name of the matched header and whose value is the value of the matched header.
+
+Both the HTTP and gRPC external authorization filters support a dynamic metadata field called ``ext_authz_duration`` which records the time it takes to complete an authorization request in milliseconds.
+This field will not be populated if the request does not complete.
 
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
 <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
 <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` field.
+
+Tracing
+-------
+The ext_authz span keeps the sampling status of the parent span, i.e. in the tracing backend we will either see both the parent span and the child ext_authz span, or none of them.

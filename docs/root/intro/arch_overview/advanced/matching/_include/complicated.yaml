@@ -29,7 +29,7 @@ static_resources:
                     percentage:
                       numerator: 0
                       denominator: HUNDRED
-              matcher:
+              xds_matcher:
                 # The top level matcher is a matcher tree which conceptually selects one of several subtrees.
                 matcher_tree:
                   input:
@@ -90,11 +90,3 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 8080
-
-layered_runtime:
-  layers:
-  - name: static-layer
-    static_layer:
-      envoy:
-        reloadable_features:
-          experimental_matching_api: true
