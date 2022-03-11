@@ -1,6 +1,6 @@
 workspace(name = "envoy_mobile")
 
-# TODO[fz]: Remove once envoy updates PGV
+# The pgv imports require gazelle to be available early on.
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "bazel_gazelle",

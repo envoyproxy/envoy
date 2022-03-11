@@ -228,7 +228,7 @@ private:
     // It only has an effect in explicit flow control mode, where when all buffers are drained,
     // on_send_window_available callbacks are called.
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override {
+    uint32_t bufferLimit() const override {
       // 1Mb
       return 1024000;
     }

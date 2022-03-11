@@ -10,29 +10,11 @@ def envoy_mobile_repositories():
         urls = ["https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"],
     )
 
-    # Uses PGV that includes the CC NOP template to disable validation.
-    # TODO(fz): Remove this once PGV is updated on envoy
-    override_pgv()
-
     upstream_envoy_overrides()
     swift_repos()
     kotlin_repos()
     android_repos()
     python_repos()
-
-def override_pgv():
-    go_repository(
-        name = "com_github_lyft_protoc_gen_star",
-        importpath = "github.com/lyft/protoc-gen-star",
-        sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
-        version = "v0.6.0",
-    )
-
-    git_repository(
-        name = "com_envoyproxy_protoc_gen_validate",
-        commit = "79071f0f8b04188b297a0517a6e55b2d3641ab5a",
-        remote = "https://github.com/envoyproxy/protoc-gen-validate"
-    )
 
 def upstream_envoy_overrides():
     # Workaround due to a Detekt version compatibility with protobuf: https://github.com/envoyproxy/envoy-mobile/issues/1869
