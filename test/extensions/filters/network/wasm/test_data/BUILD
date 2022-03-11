@@ -71,7 +71,4 @@ envoy_wasm_cc_binary(
         "test_panic_cpp.cc",
         "test_resume_call_cpp.cc",
     ],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics_lite",
-    ],
 )
