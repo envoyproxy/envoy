@@ -103,6 +103,7 @@ protected:
 
   void sendRequestHeadersPost(bool expect_callback) {
     HttpTestUtility::addDefaultHeaders(request_headers_);
+    request_headers_.setMethod("POST");
     request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
     request_headers_.addCopy(LowerCaseString("content-length"), "10");
     EXPECT_EQ(expect_callback ? FilterHeadersStatus::StopIteration : FilterHeadersStatus::Continue,
