@@ -17,6 +17,9 @@ class StatsRequest : public Admin::Request {
   using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
                                      Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
 
+  // Ordered to match the StatsOrScopes variant.
+  enum class StatOrScopesIndex { Scopes, TextReadout, Counter, Gauge, Histogram };
+
   // In order to keep the output consistent with the fully buffered behavior
   // prior to the chunked implementation that buffered each type, we iterate
   // over all scopes for each type. This enables the complex chunking

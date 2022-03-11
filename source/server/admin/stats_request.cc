@@ -54,52 +54,54 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
     }
 
     auto iter = stat_map_.begin();
-    const std::string& name = iter->first;
-    StatOrScopes& variant = iter->second;
-    switch (variant.index()) {
-    case 0:
+    StatOrScopes variant = std::move(iter->second);
+    StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
+    switch (index) {
+    case StatOrScopesIndex::Scopes:
+      // Erase the current element before adding new ones, as absl::btree_map
+      // does not have stable iterators. When we hit leaf stats we will erase
+      // second, so that we can use the name held as a map key, and don't need
+      // to re-serialize the name from the symbol table.
+      stat_map_.erase(iter);
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
-    case 1:
-      renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
+    case StatOrScopesIndex::TextReadout:
+      renderStat<Stats::TextReadoutSharedPtr>(iter->first, response, variant);
+      stat_map_.erase(iter);
       break;
-    case 2:
-      renderStat<Stats::CounterSharedPtr>(name, response, variant);
+    case StatOrScopesIndex::Counter:
+      renderStat<Stats::CounterSharedPtr>(iter->first, response, variant);
+      stat_map_.erase(iter);
       break;
-    case 3:
-      renderStat<Stats::GaugeSharedPtr>(name, response, variant);
+    case StatOrScopesIndex::Gauge:
+      renderStat<Stats::GaugeSharedPtr>(iter->first, response, variant);
+      stat_map_.erase(iter);
       break;
-    case 4: {
+    case StatOrScopesIndex::Histogram: {
       auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
       auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
       if (parent_histogram != nullptr) {
-        render_->generate(response, name, *parent_histogram);
+        render_->generate(response, iter->first, *parent_histogram);
       }
+      stat_map_.erase(iter);
     }
     }
-    stat_map_.erase(iter);
   }
   return true;
 }
 
 void StatsRequest::startPhase() {
   ASSERT(stat_map_.empty());
+
+  // Insert all the scopes in the alphabetically ordered map. As we iterate
+  // through the map we'll erase the scopes and replace them with the stats held
+  // in the scopes.
   for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
     StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
     if (variant.index() == absl::variant_npos) {
       variant = ScopeVec();
     }
     absl::get<ScopeVec>(variant).emplace_back(scope);
-  }
-
-  // Populate stat_map with all the counters found in all the scopes with an
-  // empty prefix. This is needed to seed the iteration for the current phase.
-  auto iter = stat_map_.find("");
-  if (iter != stat_map_.end()) {
-    StatOrScopes variant = std::move(iter->second);
-    stat_map_.erase(iter);
-    auto& scope_vec = absl::get<ScopeVec>(variant);
-    populateStatsForCurrentPhase(scope_vec);
   }
 }
 
