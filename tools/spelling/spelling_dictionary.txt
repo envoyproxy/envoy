@@ -401,9 +401,7 @@ XFF
 XML
 XN
 XNOR
-XRay
 XSS
-Xray
 YAML
 ZXID
 absl

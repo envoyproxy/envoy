@@ -43,7 +43,7 @@ message Segment {
   }
   // Object containing one or more fields that X-Ray indexes for use with filter expressions.
   map<string, string> annotations = 8;
-  // Set type to "subsegment" when sending a child span so XRay treats it as a subsegment.
+  // Set type to "subsegment" when sending a child span so X-Ray treats it as a subsegment.
   // https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-subsegments
   string type = 14;
 }
