@@ -70,7 +70,7 @@ public:
                                     const Http::ResponseHeaderMap*) override {}
 
   MOCK_METHOD(void, asyncGetAccessToken,
-              (const std::string&, const std::string&, const std::string&, const std::string&));
+              (const std::string&, const std::string&, const std::string&, const std::string&, const bool));
 };
 
 class OAuth2Test : public testing::Test {
@@ -106,6 +106,7 @@ public:
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(true);
+    p.set_disable_chunked_transfer(false);
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
     p.add_auth_scopes("email");
@@ -294,6 +295,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
   p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
   p.set_forward_bearer_token(true);
+  p.set_disable_chunked_transfer(false);
   auto* matcher = p.add_pass_through_matcher();
   matcher->set_name(":method");
   matcher->mutable_string_match()->set_exact("OPTIONS");
@@ -509,7 +511,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                                  "https://traffic.example.com" + TEST_CALLBACK));
+                                                  "https://traffic.example.com" + TEST_CALLBACK, false));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -764,7 +766,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                                  "https://traffic.example.com" + TEST_CALLBACK));
+                                                  "https://traffic.example.com" + TEST_CALLBACK, false));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,

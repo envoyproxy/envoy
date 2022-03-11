@@ -43,6 +43,14 @@ with the same value.
   setting
   :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>`.
 
+By default, the access token request to the authn server uses ``Transfer-Encoding: chunked``. If
+:ref:`disable_chunked_transfer <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_chunked_transfer>`
+is set to true, the ``Content-Length`` header will be set, which effectively disables chunked transfer.
+
+.. note::
+  The authn server for Azure AD, ``login.microsoftonline.com``, does not support chunked transfers.
+  The token endpoint returns a 404 response code if chunked transfer is used.
+
 .. attention::
 
   The OAuth2 filter is currently under active development.

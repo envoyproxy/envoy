@@ -31,7 +31,8 @@ constexpr const char* GetAccessTokenBodyFormatString =
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
-                                           const std::string& cb_url) {
+                                           const std::string& cb_url,
+                                           const bool disable_chunked_transfer) {
   const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
   const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
@@ -40,7 +41,9 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
                                        encoded_secret, encoded_cb_url);
   request->body().add(body);
-  request->headers().setContentLength(body.length());
+  if (disable_chunked_transfer) {
+    request->headers().setContentLength(body.length());
+  }
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
 
