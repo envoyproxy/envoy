@@ -494,7 +494,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
-  // inherit mirror policy from virtual host, which might be from RouteConfigure
+  // Inherit policies from the virtual host, which might be from the route config.
   if (shadow_policies_.empty()) {
     shadow_policies_ = vhost.shadowPolicies();
   }
@@ -1450,7 +1450,7 @@ VirtualHostImpl::VirtualHostImpl(
       shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
     }
   }
-  // inherit mirror policy from RouteConfigure
+  // Inherit policies from the route config.
   if (shadow_policies_.empty()) {
     shadow_policies_ = global_route_config_.shadowPolicies();
   }
@@ -1743,7 +1743,6 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
-  // Need to parse mirror policy before the creating route matcher
   if (!config.request_mirror_policies().empty()) {
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
       shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
