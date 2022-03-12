@@ -90,7 +90,7 @@ void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
 #ifndef NDEBUG
   // When running in debug mode, verify we don't modify the underlying store
   // while iterating.
-  absl::flat_hash_map store_before_iteration = store_;
+  absl::flat_hash_map<std::string, std::string> store_before_iteration = store_;
   absl::Cleanup verify_store_is_not_modified = [this, &store_before_iteration] {
     ASSERT(store_ == store_before_iteration,
            "Expected iterate to not modify the underlying store.");
