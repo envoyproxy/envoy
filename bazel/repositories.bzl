@@ -202,6 +202,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
+    _com_github_facebook_zstd()
     _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
@@ -453,6 +454,17 @@ def _org_brotli():
     native.bind(
         name = "brotlidec",
         actual = "@org_brotli//:brotlidec",
+    )
+
+def _com_github_facebook_zstd():
+    external_http_archive(
+        name = "com_github_facebook_zstd",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "zstd",
+        actual = "@envoy//bazel/foreign_cc:zstd",
     )
 
 def _com_google_cel_cpp():

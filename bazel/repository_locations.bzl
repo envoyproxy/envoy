@@ -500,6 +500,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-09-08",
         cpe = "cpe:2.3:a:google:brotli:*",
     ),
+    com_github_facebook_zstd = dict(
+        project_name = "zstd",
+        project_desc = "zstd compression library",
+        project_url = "https://facebook.github.io/zstd",
+        version = "1.5.2",
+        sha256 = "f7de13462f7a82c29ab865820149e778cbfe01087b3a55b5332707abf9db4a6e",
+        strip_prefix = "zstd-{version}",
+        urls = ["https://github.com/facebook/zstd/archive/v{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = [
+            "envoy.compression.zstd.compressor",
+            "envoy.compression.zstd.decompressor",
+        ],
+        release_date = "2022-01-20",
+        cpe = "cpe:2.3:a:facebook:zstandard:*",
+    ),
     com_github_zlib_ng_zlib_ng = dict(
         project_name = "zlib-ng",
         project_desc = "zlib fork (higher performance)",
