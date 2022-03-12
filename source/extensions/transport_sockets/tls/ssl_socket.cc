@@ -1,6 +1,5 @@
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "context_impl.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
