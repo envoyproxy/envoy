@@ -1,5 +1,6 @@
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "context_impl.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -76,9 +77,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
-  if (ctx_->tlsKeyLogFile() != nullptr) {
-    SSL_set_ex_data(rawSsl(), Tls::sslSocketIndex(), static_cast<void*>(callbacks_));
-  }
+  SSL_set_ex_data(rawSsl(), ContextImpl::sslSocketIndex(), static_cast<void*>(callbacks_));
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
@@ -430,7 +429,6 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    ENVOY_LOG(debug, "Create ServerSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
                                        transport_socket_options, config_->createHandshaker());
   } else {

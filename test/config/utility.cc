@@ -1218,11 +1218,11 @@ void ConfigHelper::initializeTlsKeyLog(
   if (options.keylog_path_.empty()) {
     return;
   }
-  auto tls_keylog_path = tls_context.mutable_tls_keylog()->mutable_logfile_path();
-  *tls_keylog_path = TestEnvironment::temporaryPath(options.keylog_path_);
+  auto tls_keylog_path = tls_context.mutable_key_log()->mutable_path();
+  *tls_keylog_path = options.keylog_path_;
 
   if (options.keylog_local_filter_) {
-    auto tls_keylog_local = tls_context.mutable_tls_keylog()->mutable_local_address_range();
+    auto tls_keylog_local = tls_context.mutable_key_log()->mutable_local_address_range();
     auto new_element_local = tls_keylog_local->Add();
     if (options.keylog_local_negative_) {
       if (options.ip_version_ == Network::Address::IpVersion::v6) {
@@ -1249,7 +1249,7 @@ void ConfigHelper::initializeTlsKeyLog(
   }
 
   if (options.keylog_remote_filter_) {
-    auto tls_keylog_remote = tls_context.mutable_tls_keylog()->mutable_remote_address_range();
+    auto tls_keylog_remote = tls_context.mutable_key_log()->mutable_remote_address_range();
     auto new_element_remote = tls_keylog_remote->Add();
     if (options.keylog_remote_negative_) {
       if (options.ip_version_ == Network::Address::IpVersion::v6) {

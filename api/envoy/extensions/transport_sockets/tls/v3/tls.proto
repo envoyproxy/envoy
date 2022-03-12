@@ -129,7 +129,7 @@ message DownstreamTlsContext {
 // The key log file format is "format used by NSS for its SSLKEYLOGFILE debugging output" (text taken from openssl man page)
 message TlsKeyLog {
   // The path to save the TLS key log.
-  string logfile_path = 1 [(validate.rules).string = {min_len: 1}];
+  string path = 1 [(validate.rules).string = {min_len: 1}];
 
   // At least one of src or dst must be specified, or the config will be rejected as invalid.
 
@@ -319,5 +319,5 @@ message CommonTlsContext {
   config.core.v3.TypedExtensionConfig custom_handshaker = 13;
 
   // TLS key log configuration
-  TlsKeyLog tls_keylog = 15;
+  TlsKeyLog key_log = 15;
 }

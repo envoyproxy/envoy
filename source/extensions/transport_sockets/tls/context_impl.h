@@ -60,8 +60,6 @@ struct TlsContext {
   void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
-int sslSocketIndex();
-
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
@@ -81,6 +79,7 @@ public:
    */
   static int sslExtendedSocketInfoIndex();
 
+  static int sslSocketIndex();
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -91,9 +90,6 @@ public:
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
 
-  const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
-  const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
-  const AccessLog::AccessLogFileSharedPtr tlsKeyLogFile() const { return access_log_; };
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
@@ -140,7 +136,7 @@ protected:
   const Ssl::HandshakerCapabilities capabilities_;
   const Network::Address::IpList tls_keylog_local_;
   const Network::Address::IpList tls_keylog_remote_;
-  AccessLog::AccessLogFileSharedPtr access_log_;
+  AccessLog::AccessLogFileSharedPtr tls_keylog_file_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;

@@ -20,8 +20,7 @@ namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
-class ContextConfigImpl : public virtual Ssl::ContextConfig,
-                          public Logger::Loggable<Logger::Id::config> {
+class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }

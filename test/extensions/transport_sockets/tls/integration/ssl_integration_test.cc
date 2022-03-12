@@ -93,7 +93,9 @@ void SslIntegrationTestBase::checkStats() {
 
 class SslKeyLogTest : public SslIntegrationTest {
 public:
-  void setLogPath() { keylog_path_ = TestUtility::uniqueFilename(); }
+  void setLogPath() {
+    keylog_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  }
   void setLocalFilter() {
     keylog_local_ = true;
     keylog_remote_ = false;
@@ -138,8 +140,8 @@ public:
     keylog_multiple_ips_ = true;
   }
   void logCheck() {
-    EXPECT_TRUE(api_->fileSystem().fileExists(TestEnvironment::temporaryPath(keylog_path_)));
-    std::string log = waitForAccessLog(TestEnvironment::temporaryPath(keylog_path_));
+    EXPECT_TRUE(api_->fileSystem().fileExists(keylog_path_));
+    std::string log = waitForAccessLog(keylog_path_);
     if (server_tlsv1_3_) {
       /** The key log for TLS1.3 is as follows:
        * CLIENT_HANDSHAKE_TRAFFIC_SECRET
@@ -169,8 +171,8 @@ public:
     }
   }
   void negativeCheck() {
-    EXPECT_TRUE(api_->fileSystem().fileExists(TestEnvironment::temporaryPath(keylog_path_)));
-    auto size = api_->fileSystem().fileSize(TestEnvironment::temporaryPath(keylog_path_));
+    EXPECT_TRUE(api_->fileSystem().fileExists(keylog_path_));
+    auto size = api_->fileSystem().fileSize(keylog_path_);
     EXPECT_EQ(size, 0);
   }
 };

@@ -73,9 +73,6 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
-  MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
-  MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
-  MOCK_METHOD(const AccessLog::AccessLogFileSharedPtr, tlsKeyLogFile, (), (const));
 };
 
 class MockClientContextConfig : public ClientContextConfig {

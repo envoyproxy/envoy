@@ -340,7 +340,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (!config.tlsKeyLogPath().empty()) {
     ENVOY_LOG(debug, "Enable tls key log");
-    access_log_ = config.accessLogManager().createAccessLog(
+    tls_keylog_file_ = config.accessLogManager().createAccessLog(
         Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.tlsKeyLogPath()});
     for (auto& context : tls_contexts_) {
       SSL_CTX* ctx = context.ssl_ctx_.get();
@@ -353,7 +353,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(ssl != nullptr);
   auto callbacks =
-      static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, Tls::sslSocketIndex()));
+      static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, sslSocketIndex()));
   auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
   ASSERT(callbacks != nullptr);
   ASSERT(ctx != nullptr);
@@ -364,11 +364,11 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
       (ctx->tls_keylog_remote_.getIpListSize() == 0 ||
        ctx->tls_keylog_remote_.contains(
            *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
-    ctx->tlsKeyLogFile()->write(absl::StrCat(line, "\n"));
+    ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
   }
 }
 
-int sslSocketIndex() {
+int ContextImpl::sslSocketIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
     int ssl_socket_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
     RELEASE_ASSERT(ssl_socket_index >= 0, "");

@@ -113,8 +113,6 @@ public:
   virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
 };
 
-using ContextConfigPtr = std::unique_ptr<ContextConfig>;
-
 class ClientContextConfig : public virtual ContextConfig {
 public:
   /**
