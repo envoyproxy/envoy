@@ -4024,8 +4024,8 @@ envoy_cc_test_library(
         ":quic_test_tools_sent_packet_manager_peer_lib",
         ":quic_test_tools_simple_quic_framer_lib",
         ":quic_test_tools_stream_peer_lib",
-        ":quiche_common_test_tools_test_utils_lib",
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_test_tools_test_utils_lib",
         ":spdy_core_framer_lib",
     ],
 )
