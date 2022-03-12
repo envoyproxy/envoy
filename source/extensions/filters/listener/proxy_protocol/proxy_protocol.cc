@@ -66,7 +66,7 @@ size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   cb_ = &cb;
-  // waiting for data.
+  // Waiting for data.
   return Network::FilterStatus::StopIteration;
 }
 
