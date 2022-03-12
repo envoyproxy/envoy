@@ -26,8 +26,8 @@ with the following statistics:
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    global_cx_overflow, Counter, Total connections rejected due to enforcement of the global connection limit
    no_filter_chain_match, Counter, Total connections that didn't match any filter chain
-   downstream_peek_remote_close, Counter, Total connections closed by remote when peek data for listener filters
-   downstream_peek_error, Counter, Total numbers of error when peek data for listener filters
+   downstream_listener_filter_remote_close, Counter, Total connections closed by remote when peek data for listener filters
+   downstream_listener_filter_error, Counter, Total numbers of error when peek data for listener filters
 
 .. _config_listener_stats_tls:
 

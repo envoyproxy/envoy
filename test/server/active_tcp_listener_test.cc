@@ -184,7 +184,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
                                                      Network::IoSocketError::deleteIoError)))));
 
   file_event_callback(Event::FileReadyType::Read);
-  EXPECT_EQ(generic_active_listener_->stats_.downstream_peek_error_.value(), 1);
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_error_.value(), 1);
 }
 
 /**
@@ -268,7 +268,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
           ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   // emit the read event
   file_event_callback(Event::FileReadyType::Read);
-  EXPECT_EQ(generic_active_listener_->stats_.downstream_peek_remote_close_.value(), 1);
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_remote_close_.value(), 1);
 }
 
 TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout2) {

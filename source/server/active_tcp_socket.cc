@@ -79,8 +79,8 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
             socket_->ioHandle(), listener_.dispatcher(),
             [this](bool error) {
               socket_->ioHandle().close();
-              error ? listener_.stats_.downstream_peek_error_.inc()
-                    : listener_.stats_.downstream_peek_remote_close_.inc();
+              error ? listener_.stats_.downstream_listener_filter_error_.inc()
+                    : listener_.stats_.downstream_listener_filter_remote_close_.inc();
               continueFilterChain(false);
             },
             [this](Network::ListenerFilterBuffer& filter_buffer) {
