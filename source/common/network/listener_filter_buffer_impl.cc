@@ -36,7 +36,7 @@ void ListenerFilterBufferImpl::drain(uint64_t length) {
   ASSERT(length <= data_size_);
 
   uint64_t read_size = 0;
-  while (1) {
+  while (read_size < length) {
     auto result = io_handle_.recv(base_, length - read_size, 0);
     ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
 
@@ -45,14 +45,10 @@ void ListenerFilterBufferImpl::drain(uint64_t length) {
     ASSERT(result.ok());
 
     read_size += result.return_value_;
-    if (read_size < length) {
-      continue;
-    }
-    base_ += length;
-    data_size_ -= length;
-    buffer_size_ -= length;
-    break;
   }
+  base_ += length;
+  data_size_ -= length;
+  buffer_size_ -= length;
 }
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {
