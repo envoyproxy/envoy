@@ -136,10 +136,10 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
       cb_->socket().ioHandle().close();
       return Network::FilterStatus::StopIteration;
     case ParseState::Done:
-      // finish the inspect
+      // Finish the inspect.
       return Network::FilterStatus::Continue;
     case ParseState::Continue:
-      // do nothing but wait for the next event
+      // Do nothing but wait for the next event.
       return Network::FilterStatus::StopIteration;
     }
   }

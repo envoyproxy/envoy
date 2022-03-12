@@ -434,9 +434,8 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     for (; search_index_ < raw_slice.len_; search_index_++) {
       if (buf[search_index_] == '\n' && buf[search_index_ - 1] == '\r') {
         if (search_index_ == 1) {
-          // This could be the binary protocol. It cannot be the ascii protocol.
-          // reach here due to there is no enough data for v2 protocol signature.
-          // so waiting for more data.
+          // There is not enough data to determine if it contains the v2 protocol signature, so wait
+          // for more data.
           break;
         } else {
           header_version_ = V1;
