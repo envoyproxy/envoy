@@ -12,8 +12,9 @@
 namespace Envoy {
 namespace Network {
 
+class ListenerFilterBufferImpl;
 using ListenerFilterBufferOnCloseCb = std::function<void(bool)>;
-using ListenerFilterBufferOnDataCb = std::function<void(ListenerFilterBuffer&)>;
+using ListenerFilterBufferOnDataCb = std::function<void(ListenerFilterBufferImpl&)>;
 
 enum class PeekState {
   // Peek data status successful.
@@ -44,6 +45,8 @@ public:
   void reset() { io_handle_.resetFileEvents(); }
 
   void activateFileEvent(uint32_t events);
+  uint64_t capacity() const { return buffer_size_; }
+  void resetCapacity(uint64_t size);
 
 private:
   void onFileEvent(uint32_t events);

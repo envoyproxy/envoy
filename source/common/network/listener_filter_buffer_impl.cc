@@ -49,11 +49,12 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
   }
   base_ += length;
   data_size_ -= length;
-  buffer_size_ -= length;
   return true;
 }
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {
+  // Reset buffer base in case of draining changed base.
+  base_ = buffer_.get();
   const auto result = io_handle_.recv(base_, buffer_size_, MSG_PEEK);
   ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
 
@@ -75,6 +76,13 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
   ASSERT(data_size_ <= buffer_size_);
 
   return PeekState::Done;
+}
+
+void ListenerFilterBufferImpl::resetCapacity(uint64_t size) {
+  buffer_ = std::make_unique<uint8_t[]>(size);
+  base_ = buffer_.get();
+  buffer_size_ = size;
+  data_size_ = 0;
 }
 
 void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) { onFileEvent(events); }

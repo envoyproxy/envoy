@@ -38,7 +38,6 @@ constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNSPEC = 0;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET = 12;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET6 = 36;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNIX = 216;
-constexpr uint32_t PROXY_PROTO_V2_MAX_EXTENSION_LEN = 1 << 16;
 
 // Generates the v1 PROXY protocol header and adds it to the specified buffer
 void generateV1Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,

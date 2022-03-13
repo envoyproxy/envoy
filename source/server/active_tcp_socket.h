@@ -77,10 +77,6 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   // Network::ListenerFilterManager
   void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                        Network::ListenerFilterPtr&& filter) override {
-    // Update the listener filter max read bytes.
-    if (filter->maxReadBytes() > listener_filter_max_read_bytes_) {
-      listener_filter_max_read_bytes_ = filter->maxReadBytes();
-    }
     accept_filters_.emplace_back(
         std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
   }
@@ -99,6 +95,8 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
 
   StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
 
+  void createListenerFilterBuffer();
+
   // The owner of this ActiveTcpSocket.
   ActiveStreamListenerBase& listener_;
   Network::ConnectionSocketPtr socket_;
@@ -110,7 +108,6 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   bool connected_{false};
 
   Network::ListenerFilterBufferImplPtr listener_filter_buffer_;
-  uint64_t listener_filter_max_read_bytes_{0};
 };
 
 } // namespace Server

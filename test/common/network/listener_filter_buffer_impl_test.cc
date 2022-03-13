@@ -30,7 +30,7 @@ public:
             on_close_cb_(error);
           }
         },
-        [&](ListenerFilterBuffer& filter_buffer) {
+        [&](ListenerFilterBufferImpl& filter_buffer) {
           if (on_data_cb_) {
             on_data_cb_(filter_buffer);
           }
@@ -180,7 +180,7 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
   // Peek again
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
     EXPECT_EQ(MSG_PEEK, flags);
-    EXPECT_EQ(buffer_size_ - drained_size, length);
+    EXPECT_EQ(buffer_size_, length);
     char* buf = static_cast<char*>(buffer);
     for (uint64_t i = 0; i < length; i++) {
       buf[i] = 'b';
@@ -189,9 +189,59 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
   });
   on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
     auto raw_slice = filter_buffer.rawSlice();
-    EXPECT_EQ(buffer_size_ - drained_size, raw_slice.len_);
+    EXPECT_EQ(buffer_size_, raw_slice.len_);
     buf = static_cast<const char*>(raw_slice.mem_);
     for (uint64_t i = 0; i < raw_slice.len_; i++) {
+      EXPECT_EQ(buf[i], 'b');
+    }
+  };
+  file_event_callback_(Event::FileReadyType::Read);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ResetCapacity) {
+  initialize();
+
+  // Peek 256 bytes data.
+  EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
+    EXPECT_EQ(MSG_PEEK, flags);
+    EXPECT_EQ(buffer_size_, length);
+    char* buf = static_cast<char*>(buffer);
+    for (size_t i = 0; i < length / 2; i++) {
+      buf[i] = 'a';
+    }
+    return Api::IoCallUint64Result(length / 2, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  });
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    auto raw_buffer = filter_buffer.rawSlice();
+    EXPECT_EQ(buffer_size_ / 2, raw_buffer.len_);
+    const char* buf = static_cast<const char*>(raw_buffer.mem_);
+    for (uint64_t i = 0; i < raw_buffer.len_; i++) {
+      EXPECT_EQ(buf[i], 'a');
+    }
+  };
+  file_event_callback_(Event::FileReadyType::Read);
+
+  listener_buffer_->resetCapacity(1024);
+
+  EXPECT_EQ(1024, listener_buffer_->capacity());
+  EXPECT_EQ(0, listener_buffer_->rawSlice().len_);
+
+  // Peek 1024 bytes data.
+  EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
+    EXPECT_EQ(MSG_PEEK, flags);
+    EXPECT_EQ(1024, length);
+    char* buf = static_cast<char*>(buffer);
+    for (size_t i = 0; i < length; i++) {
+      buf[i] = 'b';
+    }
+    return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  });
+
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    auto raw_buffer = filter_buffer.rawSlice();
+    EXPECT_EQ(1024, raw_buffer.len_);
+    const char* buf = static_cast<const char*>(raw_buffer.mem_);
+    for (uint64_t i = 0; i < raw_buffer.len_; i++) {
       EXPECT_EQ(buf[i], 'b');
     }
   };

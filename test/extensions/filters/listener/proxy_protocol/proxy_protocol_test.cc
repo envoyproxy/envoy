@@ -1062,6 +1062,47 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
 
 const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
 
+TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0xff, 0xff, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // The TLV has 65520 size data.
+  constexpr uint8_t tlv_begin[] = {0x02, 0xff, 0xf0};
+  std::string tlv_data(65520, 'a');
+
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0x02);
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_begin, sizeof(tlv_begin));
+  write(tlv_data);
+
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(1, fields.size());
+
+  EXPECT_EQ(1, fields.count("PP2 type authority"));
+  auto value_s = fields.at("PP2 type authority").string_value();
+  EXPECT_EQ(tlv_data, value_s);
+
+  disconnect();
+}
+
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,

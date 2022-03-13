@@ -14,7 +14,6 @@
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_MAX_EXTENSION_LEN;
 
 namespace Envoy {
 namespace Extensions {
@@ -88,11 +87,11 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
-  size_t maxReadBytes() const override { return MAX_PROXY_PROTO_LEN_V2; }
+  size_t maxReadBytes() const override { return max_proxy_protocol_len_; }
 
 private:
   static const size_t MAX_PROXY_PROTO_LEN_V2 =
-      PROXY_PROTO_V2_HEADER_LEN + PROXY_PROTO_V2_ADDR_LEN_UNIX + PROXY_PROTO_V2_MAX_EXTENSION_LEN;
+      PROXY_PROTO_V2_HEADER_LEN + PROXY_PROTO_V2_ADDR_LEN_UNIX;
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
   void onRead();
@@ -126,6 +125,7 @@ private:
   ConfigSharedPtr config_;
 
   absl::optional<WireHeader> proxy_protocol_header_;
+  size_t max_proxy_protocol_len_{MAX_PROXY_PROTO_LEN_V2};
 };
 
 } // namespace ProxyProtocol

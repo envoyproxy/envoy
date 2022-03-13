@@ -93,6 +93,15 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
       return read_header_state;
     }
   }
+
+  // After parse the header, the extensions size is discovered. Then extend the buffer
+  // size to recevie the extensions.
+  if (proxy_protocol_header_.value().wholeHeaderLength() > max_proxy_protocol_len_) {
+    max_proxy_protocol_len_ = proxy_protocol_header_.value().wholeHeaderLength();
+    // The expected header size is changed, waiting for more data.
+    return ReadOrParseState::TryAgainLater;
+  }
+
   if (proxy_protocol_header_.has_value()) {
     const ReadOrParseState read_ext_state = readExtensions(buffer);
     if (read_ext_state != ReadOrParseState::Done) {
