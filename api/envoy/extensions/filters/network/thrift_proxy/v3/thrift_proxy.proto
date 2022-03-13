@@ -62,7 +62,8 @@ enum ProtocolType {
 }
 
 message Trds {
-  // Configuration source specifier. In case of *api_config_source* only aggregated *api_type* is supported.
+  // Configuration source specifier.
+  // In case of *api_config_source* only aggregated *api_type* is supported.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This allows to use different route

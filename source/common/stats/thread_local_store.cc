@@ -903,7 +903,7 @@ void ParentHistogramImpl::merge() {
   }
 }
 
-const std::string ParentHistogramImpl::quantileSummary() const {
+std::string ParentHistogramImpl::quantileSummary() const {
   if (used()) {
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
@@ -919,7 +919,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
   }
 }
 
-const std::string ParentHistogramImpl::bucketSummary() const {
+std::string ParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
     ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();

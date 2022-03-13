@@ -86,7 +86,7 @@ static_resources:
                                  Platform::null_device_path);
   }
 
-  void initialize() {
+  void initialize() override {
     setUpstreamCount(3);
 
     PayloadOptions options(TransportType::Framed, ProtocolType::Binary, DriverMode::Success,
