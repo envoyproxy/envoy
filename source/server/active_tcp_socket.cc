@@ -22,6 +22,7 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
 
 ActiveTcpSocket::~ActiveTcpSocket() {
   accept_filters_.clear();
+
   listener_.stats_.downstream_pre_cx_active_.dec();
   // If the underlying socket is no longer attached, it means that it has been transferred to
   // an active connection. In this case, the active connection will decrement the number
@@ -79,16 +80,20 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
             socket_->ioHandle(), listener_.dispatcher(),
             [this](bool error) {
               socket_->ioHandle().close();
-              error ? listener_.stats_.downstream_listener_filter_error_.inc()
-                    : listener_.stats_.downstream_listener_filter_remote_close_.inc();
+              if (error) {
+                listener_.stats_.downstream_listener_filter_error_.inc();
+              } else {
+                listener_.stats_.downstream_listener_filter_remote_close_.inc();
+              }
               continueFilterChain(false);
             },
             [this](Network::ListenerFilterBuffer& filter_buffer) {
-              ASSERT((*iter_)->maxReadBytes() > 0);
+              ASSERT((*iter_)->maxReadBytes() != 0);
               Network::FilterStatus status = (*iter_)->onData(filter_buffer);
               if (status == Network::FilterStatus::StopIteration) {
                 if (socket_->ioHandle().isOpen()) {
-                  // There is no more data when the buffer reaches the max read bytes.
+                  // The listener filter should not wait for more data when it has already received
+                  // all the data it requested.
                   ASSERT(filter_buffer.rawSlice().len_ < listener_filter_max_read_bytes_);
                 }
                 return;
@@ -111,14 +116,18 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           no_error = false;
           break;
         } else {
-          // When reach this branch, the maxReadBytes must greater than 0.
-          // the negative maxReadBytes is invalid.
-          ASSERT((*iter_)->maxReadBytes() > 0);
-          // There may already have data peeked due to previous filter.
+          // If the listener maxReadBytes() is 0, then it shouldn't return
+          // `FilterStatus::StopIteration` from `onAccept` to wait for more data.
+          ASSERT((*iter_)->maxReadBytes() != 0);
+          // There are two cases for activate event manually: One is
+          // the data is already available when connect, activate the read event to peek
+          // data from the socket . Another one is the data already
+          // peeked into the buffer when previous filter processing the data, then activate the read
+          // event to trigger the current filter callback to process the data.
           if (listener_filter_buffer_ != nullptr) {
             listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
           }
-          // waiting for more data
+          // Waiting for more data.
           return;
         }
       }

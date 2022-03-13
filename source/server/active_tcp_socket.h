@@ -77,7 +77,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   // Network::ListenerFilterManager
   void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                        Network::ListenerFilterPtr&& filter) override {
-    // update the listener filter max read bytes
+    // Update the listener filter max read bytes.
     if (filter->maxReadBytes() > listener_filter_max_read_bytes_) {
       listener_filter_max_read_bytes_ = filter->maxReadBytes();
     }
