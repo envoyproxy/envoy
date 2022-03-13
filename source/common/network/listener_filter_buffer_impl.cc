@@ -41,7 +41,7 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
     ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
 
     if (!result.ok()) {
-      // `IoErrorCode::Again` isn't proccessed here, since
+      // `IoErrorCode::Again` isn't processed here, since
       // the data already in the socket buffer.
       return false;
     }

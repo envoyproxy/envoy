@@ -213,9 +213,9 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
         manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{inspect_data_filter1});
         // Expect the `onData()` callback won't be called for this filter.
         manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{no_inspect_data_filter});
-        // Expect the ListenerFilterBuffer's capcacity will be increased for this filter.
+        // Expect the ListenerFilterBuffer's capacity will be increased for this filter.
         manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{inspect_data_filter2});
-        // Expect the ListenerFilterBuffer's capcacity won't be decreased.
+        // Expect the ListenerFilterBuffer's capacity won't be decreased.
         manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{inspect_data_filter3});
         return true;
       }));

@@ -95,7 +95,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   }
 
   // After parse the header, the extensions size is discovered. Then extend the buffer
-  // size to recevie the extensions.
+  // size to receive the extensions.
   if (proxy_protocol_header_.value().wholeHeaderLength() > max_proxy_protocol_len_) {
     max_proxy_protocol_len_ = proxy_protocol_header_.value().wholeHeaderLength();
     // The expected header size is changed, waiting for more data.
