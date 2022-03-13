@@ -1410,6 +1410,81 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+// There is no chance to have error for Windows since it emulate the drain
+// from a memory buffer.
+#ifndef WIN32
+TEST_P(ProxyProtocolTest, DrainError) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+        if (flags != MSG_PEEK) {
+          return Api::SysCallSizeResult{-1, 0};
+        } else {
+          const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+          return x;
+        }
+      }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
+  }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+
+  connect(false);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+
+  expectProxyProtoError();
+}
+#endif
+
 class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
                                   public Network::FilterChainManager,

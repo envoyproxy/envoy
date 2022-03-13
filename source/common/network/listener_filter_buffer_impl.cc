@@ -28,9 +28,9 @@ const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
   return slice;
 }
 
-void ListenerFilterBufferImpl::drain(uint64_t length) {
+bool ListenerFilterBufferImpl::drain(uint64_t length) {
   if (length == 0) {
-    return;
+    return true;
   }
 
   ASSERT(length <= data_size_);
@@ -40,15 +40,17 @@ void ListenerFilterBufferImpl::drain(uint64_t length) {
     auto result = io_handle_.recv(base_, length - read_size, 0);
     ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
 
-    // The socket buffer is expected to have the data. so the
-    // recv doesn't expected to fail.
-    ASSERT(result.ok());
-
+    if (!result.ok()) {
+      // `IoErrorCode::Again` isn't proccessed here, since
+      // the data already in the socket buffer.
+      return false;
+    }
     read_size += result.return_value_;
   }
   base_ += length;
   data_size_ -= length;
   buffer_size_ -= length;
+  return true;
 }
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {

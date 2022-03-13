@@ -24,8 +24,9 @@ public:
   /**
    * Drain the data from the beginning of the buffer.
    * @param length the length of data to drain.
+   * @return a bool indicate the drain is successful or not.
    */
-  virtual void drain(uint64_t length) PURE;
+  virtual bool drain(uint64_t length) PURE;
 };
 
 } // namespace Network

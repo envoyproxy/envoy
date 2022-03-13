@@ -130,7 +130,9 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
         proxy_protocol_header_.value().remote_address_);
   }
 
-  buffer.drain(proxy_protocol_header_.value().wholeHeaderLength());
+  if (!buffer.drain(proxy_protocol_header_.value().wholeHeaderLength())) {
+    return ReadOrParseState::Error;
+  }
   return ReadOrParseState::Done;
 }
 
