@@ -8,3 +8,18 @@ actions {
 actions {
   peek_from_socket: 5
 }
+actions {
+  reset_capacity: 20
+}
+actions {
+  peek_from_socket: 15
+}
+actions {
+  reset_capacity: 10
+}
+actions {
+  peek_from_socket: 5
+}
+actions {
+  drain: 5
+}

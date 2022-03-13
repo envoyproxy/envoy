@@ -11,6 +11,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByMove;
+using testing::Return;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -53,23 +55,26 @@ public:
 
       switch (input.actions(i).action_selector_case()) {
       case test::common::network::Action::kReadable: {
-        // If the available is 0, it means nothing to read, then skip it.
-        if (input.actions(i).readable() == 0) {
-          break;
-        }
-
         // Generate the available data, and ensure it is under the max_readable_size.
         auto append_data_size =
             input.actions(i).readable() % (max_readable_size - available_data_.size());
-        available_data_.insert(available_data_.end(), append_data_size, insert_value);
-        EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
-          EXPECT_EQ(MSG_PEEK, flags);
-          // The peek size will be reduced due to the drain.
-          EXPECT_EQ(max_bytes_read - drained_size_, length);
-          auto copy_size = std::min(length, available_data_.size());
-          ::memcpy(buffer, available_data_.data(), copy_size);
-          return Api::IoCallUint64Result(copy_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
-        });
+        // If the available is 0, then emulate an `EAGAIN`.
+        if (append_data_size == 0) {
+          EXPECT_CALL(io_handle_, recv)
+              .WillOnce(Return(ByMove(Api::IoCallUint64Result(
+                  0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                     IoSocketError::deleteIoError)))));
+        } else {
+          available_data_.insert(available_data_.end(), append_data_size, insert_value);
+          EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
+            EXPECT_EQ(MSG_PEEK, flags);
+            auto copy_size = std::min(length, available_data_.size());
+            ::memcpy(buffer, available_data_.data(), copy_size);
+            return Api::IoCallUint64Result(copy_size,
+                                           Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+          });
+          drained_size_ = 0;
+        }
         // Trigger the peek by event.
         file_event_callback_(Event::FileReadyType::Read);
         break;
@@ -91,6 +96,19 @@ public:
         listener_buffer->drain(drain_size);
         // Reuse the on_data callback to validate the buffer data.
         on_data_cb(*listener_buffer);
+        break;
+      }
+      case test::common::network::Action::kResetCapacity: {
+        auto capacity_size = input.actions(i).drain() % max_buffer_size;
+        if (capacity_size == 0) {
+          break;
+        }
+        listener_buffer->resetCapacity(capacity_size);
+        EXPECT_EQ(capacity_size, listener_buffer->capacity());
+        max_bytes_read = capacity_size;
+        drained_size_ = 0;
+        available_data_.clear();
+        EXPECT_EQ(listener_buffer->rawSlice().len_, 0);
         break;
       }
       default:

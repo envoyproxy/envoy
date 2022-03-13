@@ -54,6 +54,7 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {
   // Reset buffer base in case of draining changed base.
+  auto old_base = base_;
   base_ = buffer_.get();
   const auto result = io_handle_.recv(base_, buffer_size_, MSG_PEEK);
   ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
@@ -61,6 +62,7 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       ENVOY_LOG(trace, "recv return try again");
+      base_ = old_base;
       return PeekState::Again;
     }
     ENVOY_LOG(debug, "recv failed: {}: {}", result.err_->getErrorCode(),
