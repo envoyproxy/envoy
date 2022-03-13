@@ -386,3 +386,17 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "trds_integration_test",
+    srcs = ["trds_integration_test.cc"],
+    data = [
+        "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
+    ],
+    extension_names = ["envoy.filters.network.thrift_proxy"],
+    deps = [
+        ":integration_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+    ],
+)
