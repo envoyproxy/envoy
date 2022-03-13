@@ -1,14 +1,13 @@
 #pragma once
 
-
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/network/filter.h"
-#include "envoy/upstream/cluster_manager.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
@@ -16,8 +15,8 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -72,7 +71,8 @@ class UdpProxyFilterConfig {
 public:
   UdpProxyFilterConfig(Server::Configuration::ListenerFactoryContext& context,
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-      : cluster_manager_(context.clusterManager()), time_source_(context.timeSource()), cluster_(config.cluster()),
+      : cluster_manager_(context.clusterManager()), time_source_(context.timeSource()),
+        cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
@@ -153,6 +153,7 @@ class UdpProxyFilter : public Network::UdpListenerReadFilter,
 public:
   UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                  const UdpProxyFilterConfigSharedPtr& config);
+  ~UdpProxyFilter() override;
 
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
@@ -317,8 +318,6 @@ private:
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
     absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
         host_to_sessions_;
-    
-    std::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
   };
 
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
@@ -354,12 +353,16 @@ private:
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
   void onClusterRemoval(const std::string& cluster_name) override;
 
+  void fillStreamInfo();
+
   const UdpProxyFilterConfigSharedPtr config_;
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
   // Right now we support a single cluster to route to. It is highly likely in the future that
   // we will support additional routing options either using filter chain matching, weighting,
   // etc.
   absl::optional<ClusterInfoPtr> cluster_info_;
+
+  absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
 };
 
 } // namespace UdpProxy

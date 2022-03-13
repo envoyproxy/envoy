@@ -64,8 +64,7 @@ public:
     stream_info_.start_time_ = absl::ToChronoTime(abslStartTime);
     stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info_.response_code_ = 200;
-    auto empty_bytes_meter{
-        std::make_shared<StreamInfo::BytesMeter>()};
+    auto empty_bytes_meter{std::make_shared<StreamInfo::BytesMeter>()};
     stream_info_.setDownstreamBytesMeter(empty_bytes_meter);
     stream_info_.setUpstreamBytesMeter(empty_bytes_meter);
 
@@ -155,8 +154,7 @@ TEST_F(FileAccessLogTest, EmptyFormatForUdp) {
   path: "/foo"
   udp_proxy: true
 )",
-      "[2018-12-18T01:50:34.000Z] 0 0 0 0 0 0 0 0 0 0\n",
-      false);
+      "[2018-12-18T01:50:34.000Z] - 0 0 0 0 0 0 0 0 0 0\n", false);
 }
 
 TEST_F(FileAccessLogTest, LogFormatText) {

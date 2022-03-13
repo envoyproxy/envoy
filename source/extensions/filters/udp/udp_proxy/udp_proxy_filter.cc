@@ -14,6 +14,13 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
+
+  if (!config->accessLogs().empty()) {
+
+    udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(config->timeSource(), nullptr));
+    ASSERT(udp_sess_stats_.has_value());
+  }
+
   Upstream::ThreadLocalCluster* cluster =
       config->clusterManager().getThreadLocalCluster(config->cluster());
   if (cluster != nullptr) {
@@ -50,7 +57,7 @@ Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
     config_->stats().downstream_sess_no_route_.inc();
     return Network::FilterStatus::StopIteration;
   }
-  
+
   return cluster_info_.value()->onData(data);
 }
 
@@ -58,6 +65,42 @@ Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) 
   config_->stats().downstream_sess_rx_errors_.inc();
 
   return Network::FilterStatus::StopIteration;
+}
+
+UdpProxyFilter::~UdpProxyFilter() {
+  if (!config_->accessLogs().empty()) {
+
+    fillStreamInfo();
+
+    for (const auto& access_log : config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
+    }
+  }
+}
+
+void UdpProxyFilter::fillStreamInfo() {
+  udp_sess_stats_.value().addBytesSent(config_->stats().downstream_sess_tx_bytes_.value());
+  udp_sess_stats_.value().addBytesReceived(config_->stats().downstream_sess_rx_bytes_.value());
+
+  auto downstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  downstream_bytes_meter->addHeaderBytesSent(config_->stats().downstream_sess_tx_errors_.value());
+  downstream_bytes_meter->addHeaderBytesReceived(
+      config_->stats().downstream_sess_rx_errors_.value());
+  downstream_bytes_meter->addWireBytesSent(config_->stats().downstream_sess_tx_datagrams_.value());
+  downstream_bytes_meter->addWireBytesReceived(
+      config_->stats().downstream_sess_rx_datagrams_.value());
+  udp_sess_stats_.value().setDownstreamBytesMeter(downstream_bytes_meter);
+
+  auto upstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  upstream_bytes_meter->addHeaderBytesSent(config_->stats().downstream_sess_total_.value());
+  upstream_bytes_meter->addHeaderBytesReceived(config_->stats().idle_timeout_.value());
+  if (cluster_info_.has_value()) {
+    udp_sess_stats_.value().setRouteName(cluster_info_.value()->cluster_.info()->name());
+    upstream_bytes_meter->addWireBytesSent(
+        cluster_info_.value()->cluster_.info()->stats().upstream_cx_none_healthy_.value());
+  }
+  upstream_bytes_meter->addWireBytesReceived(config_->stats().downstream_sess_no_route_.value());
+  udp_sess_stats_.value().setUpstreamBytesMeter(upstream_bytes_meter);
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
@@ -80,13 +123,7 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                 host_to_sessions_.erase(host_sessions_it);
               }
             }
-          })) {
-            if(!filter_.config_->accessLogs().empty()){
-              udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(filter_.config_->timeSource(), nullptr));
-
-              ASSERT(udp_sess_stats_.has_value());
-            }
-          }
+          })) {}
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
@@ -95,30 +132,6 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
     removeSession(sessions_.begin()->get());
   }
   ASSERT(host_to_sessions_.empty());
-
-  if(!filter_.config_->accessLogs().empty()){
-
-    udp_sess_stats_.value().addBytesSent(filter_.config_->stats().downstream_sess_tx_bytes_.value());
-    udp_sess_stats_.value().addBytesReceived(filter_.config_->stats().downstream_sess_rx_bytes_.value());
-
-    auto downstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
-    downstream_bytes_meter->addHeaderBytesSent(filter_.config_->stats().downstream_sess_tx_errors_.value());
-    downstream_bytes_meter->addHeaderBytesReceived(filter_.config_->stats().downstream_sess_rx_errors_.value());
-    downstream_bytes_meter->addWireBytesSent(filter_.config_->stats().downstream_sess_tx_datagrams_.value());
-    downstream_bytes_meter->addWireBytesReceived(filter_.config_->stats().downstream_sess_rx_datagrams_.value());
-    udp_sess_stats_.value().setDownstreamBytesMeter(downstream_bytes_meter);
-
-    auto upstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
-    upstream_bytes_meter->addHeaderBytesSent(filter_.config_->stats().downstream_sess_total_.value());
-    upstream_bytes_meter->addHeaderBytesReceived(filter_.config_->stats().idle_timeout_.value());
-    upstream_bytes_meter->addWireBytesSent(cluster_.info()->stats().upstream_cx_none_healthy_.value());
-    upstream_bytes_meter->addWireBytesReceived(cluster_stats_.sess_rx_datagrams_dropped_.value());
-    udp_sess_stats_.value().setUpstreamBytesMeter(upstream_bytes_meter);
-    
-    for (const auto& access_log : filter_.config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
-    }
-  }
 }
 
 void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {

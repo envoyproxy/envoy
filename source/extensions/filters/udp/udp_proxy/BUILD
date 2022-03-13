@@ -38,8 +38,9 @@ envoy_cc_library(
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
