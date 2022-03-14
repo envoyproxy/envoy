@@ -33,6 +33,7 @@ RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
+RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
 RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
@@ -44,7 +45,6 @@ RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
-RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
 RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
@@ -53,6 +53,7 @@ RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_e
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
+RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
@@ -98,7 +99,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   if (absl::StartsWith(feature, "envoy.")) {
-    // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
+    // DO NOT ADD MORE FLAGS HERE. This function deprecated.
     if (feature == "envoy.http.headermap.lazy_map_min_size") {
       return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
     }
@@ -153,6 +154,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
   &FLAGS_envoy_reloadable_features_fix_added_trailers,
   &FLAGS_envoy_reloadable_features_handle_stream_reset_during_hcm_encoding,
+  &FLAGS_envoy_reloadable_features_http1_lazy_read_disable,
   &FLAGS_envoy_reloadable_features_http2_allow_capacity_increase_by_settings,
   &FLAGS_envoy_reloadable_features_http2_new_codec_wrapper,
   &FLAGS_envoy_reloadable_features_http2_use_oghttp2,
@@ -164,7 +166,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
   &FLAGS_envoy_reloadable_features_postpone_h3_client_connect_to_next_loop,
   &FLAGS_envoy_reloadable_features_proxy_102_103,
-  &FLAGS_envoy_reloadable_features_remove_legacy_json,
   &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
   &FLAGS_envoy_reloadable_features_skip_delay_close,
   &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,
@@ -173,6 +174,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_udp_listener_updates_filter_chain_in_place,
   &FLAGS_envoy_reloadable_features_unified_mux,
   &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
+  &FLAGS_envoy_reloadable_features_update_grpc_response_error_tag,
   &FLAGS_envoy_reloadable_features_use_dns_ttl,
   &FLAGS_envoy_reloadable_features_validate_connect,
   &FLAGS_envoy_restart_features_explicit_wildcard_resource,
@@ -190,29 +192,24 @@ void maybeSetRuntimeGuard(absl::string_view name, bool value) {
   absl::SetFlag(flag, value);
 }
 
-// TODO(alyssawilk) deprecate use of this
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
   if (!absl::StartsWith(name, "envoy.") && !absl::StartsWith(name, "re2.")) {
     return;
   }
 
-  bool set = false;
   // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
   if (name == "envoy.http.headermap.lazy_map_min_size") {
-    set = true;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
+      IS_ENVOY_BUG(absl::StrCat(
+          "The Envoy community is attempting to remove global integers. Given you use ", name,
+          " please immediately file an upstream issue to retain the functionality as it will "
+          "otherwise be removed following the usual deprecation cycle."));
+    }
     absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
   } else if (name == "re2.max_program_size.error_level") {
-    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
   } else if (name == "re2.max_program_size.warn_level") {
-    set = true;
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
-  }
-  if (set && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
-    IS_ENVOY_BUG(absl::StrCat(
-        "The Envoy community is attempting to remove global integers. Given you use ", name,
-        " please immediately file an upstream issue to retain the functionality as it will "
-        "otherwise be removed following the usual deprecation cycle."));
   }
 }
 
