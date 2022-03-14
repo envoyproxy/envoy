@@ -14,7 +14,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 

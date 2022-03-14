@@ -6,8 +6,6 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
 
-#include "source/common/network/cidr_range.h"
-
 #include "absl/types/optional.h"
 
 namespace Envoy {
