@@ -323,7 +323,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
     Http::GoAwayErrorCode error_code) {
   ENVOY_CONN_LOG(debug, "connection going away goaway_code={}, health_flags={}", *client_,
-                 error_code, HostUtility::healthFlagsToString(*host_));
+                 static_cast<int>(error_code), HostUtility::healthFlagsToString(*host_));
 
   if (request_in_flight_ && error_code == Http::GoAwayErrorCode::NoError) {
     // The server is starting a graceful shutdown. Allow the in flight request

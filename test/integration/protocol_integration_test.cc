@@ -1493,7 +1493,8 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     stat_name = "http3.dropped_headers_with_underscores";
     break;
   default:
-    RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
+    RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}",
+                                      static_cast<int>(downstream_protocol_)));
   };
   EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
 }
