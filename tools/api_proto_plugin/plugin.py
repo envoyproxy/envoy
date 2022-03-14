@@ -66,7 +66,8 @@ def plugin(output_descriptors):
             f = response.file.add()
             f.name = file_proto.name + od.output_suffix
             # Don't run API proto plugins on things like WKT types etc.
-            envoy_proto = file_proto.package.startswith('envoy.') or file_proto.package.startswith('xds.')
+            envoy_proto = file_proto.package.startswith('envoy.') or file_proto.package.startswith(
+                'xds.')
             if not envoy_proto:
                 continue
             if request.HasField("parameter") and od.want_params:

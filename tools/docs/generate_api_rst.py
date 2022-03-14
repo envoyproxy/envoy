@@ -48,7 +48,7 @@ def main():
             canonical = include_package(envoy_api_protos, rst_file_path, "contrib/envoy/")
         if canonical is None:
             canonical = include_package(envoy_api_protos, rst_file_path, "xds/")
-            root = "cncf"
+            root = "xds"
         if canonical is None:
             continue
 

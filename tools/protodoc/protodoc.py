@@ -431,9 +431,9 @@ def format_field_type(type_context, field):
         field: FieldDescriptor proto.
     Return: RST formatted field type.
     """
-    envoy_proto = (field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX)
-            or field.type_name.startswith(ENVOY_PREFIX)
-            or field.type_name.startswith(CNCF_PREFIX))
+    envoy_proto = (
+        field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX)
+        or field.type_name.startswith(ENVOY_PREFIX) or field.type_name.startswith(CNCF_PREFIX))
     if envoy_proto:
         type_name = normalize_field_type_name(field.type_name)
         if field.type == field.TYPE_MESSAGE:

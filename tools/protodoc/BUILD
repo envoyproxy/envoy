@@ -48,6 +48,6 @@ protodoc_rule(
 )
 
 protodoc_rule(
-    name = "cncf_protodoc",
-    deps = ["@envoy_api//:cncf_protos"],
+    name = "xds_protodoc",
+    deps = ["@envoy_api//:xds_protos"],
 )
