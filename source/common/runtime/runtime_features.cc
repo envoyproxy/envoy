@@ -31,6 +31,7 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
+RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
