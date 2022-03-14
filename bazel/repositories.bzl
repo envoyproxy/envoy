@@ -522,10 +522,6 @@ def _com_github_tencent_rapidjson():
         name = "com_github_tencent_rapidjson",
         build_file = "@envoy//bazel/external:rapidjson.BUILD",
     )
-    native.bind(
-        name = "rapidjson",
-        actual = "@com_github_tencent_rapidjson//:rapidjson",
-    )
 
 def _com_github_nlohmann_json():
     external_http_archive(
