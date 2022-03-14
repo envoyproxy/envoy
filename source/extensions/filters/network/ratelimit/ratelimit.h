@@ -56,6 +56,7 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
+  bool substitutionFormatterEnabled() const { return substitution_formatter_enabled_; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
@@ -64,6 +65,7 @@ private:
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
+  const bool substitution_formatter_enabled_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -99,8 +101,7 @@ public:
       RateLimit::Descriptor new_descriptor;
       for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
         std::string value = descriptorEntry.value_;
-        if (config_->runtime().snapshot().runtimeFeatureEnabled(
-                "envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip") &&
+        if (config_->substitutionFormatterEnabled() &&
             absl::StrContains(value, "envoy.downstream_ip")) {
           value =
               substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", stream_info);

@@ -97,16 +97,30 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
-  const std::string replace_ip_config = R"EOF(
-  domain: foo
-  descriptors:
-  - entries:
-    - key: remote_address
-      value: envoy.downstream_ip
-    - key: hello
-      value: world
-  stat_prefix: name
-  )EOF";
+  const std::string replace_ip_config_enabled = R"EOF(
+domain: foo
+descriptors:
+- entries:
+  - key: remote_address
+    value: envoy.downstream_ip
+  - key: hello
+    value: world
+stat_prefix: name
+substitution_formatter_enabled: true
+)EOF";
+
+
+  const std::string replace_ip_config_disabled = R"EOF(
+domain: foo
+descriptors:
+- entries:
+  - key: remote_address
+    value: envoy.downstream_ip
+  - key: hello
+    value: world
+stat_prefix: name
+substitution_formatter_enabled: false
+)EOF";
 
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -154,7 +168,7 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
       runtime_.snapshot_,
       runtimeFeatureEnabled("envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip"))
       .WillByDefault(Return(true));
-  setUpTest(replace_ip_config);
+  setUpTest(replace_ip_config_enabled);
 
   EXPECT_EQ("8.8.8.8",
             filter_->substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%",
@@ -211,7 +225,7 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
       runtime_.snapshot_,
       runtimeFeatureEnabled("envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip"))
       .WillByDefault(Return(false));
-  setUpTest(replace_ip_config);
+  setUpTest(replace_ip_config_disabled);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "envoy.downstream_ip"}, {"hello", "world"}}});

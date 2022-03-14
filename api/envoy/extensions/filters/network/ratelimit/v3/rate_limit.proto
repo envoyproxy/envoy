@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_network_filters_rate_limit>`.
 // [#extension: envoy.filters.network.ratelimit]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.rate_limit.v2.RateLimit";
@@ -51,4 +51,6 @@ message RateLimit {
   // success.
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 6
       [(validate.rules).message = {required: true}];
+
+  bool substitution_formatter_enabled = 7;
 }
