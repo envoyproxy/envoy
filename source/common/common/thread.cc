@@ -74,7 +74,7 @@ private:
   // thread.
   std::atomic<std::thread::id> main_thread_id_;
 
-  int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
+  int32_t main_thread_use_count_ ABSL_GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;
 
   std::atomic<uint32_t> skip_asserts_{};

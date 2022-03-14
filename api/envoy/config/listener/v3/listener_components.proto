@@ -4,7 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
