@@ -9,7 +9,7 @@ Thrift proxy
 Statistics
 ----------
 
-Every configured Thrift proxy filter has the following statistics:
+Every configured Thrift proxy filter emits the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
