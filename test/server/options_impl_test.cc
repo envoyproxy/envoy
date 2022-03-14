@@ -93,6 +93,7 @@ TEST_F(OptionsImplTest, All) {
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
       "--reject-unknown-dynamic-fields --base-id 5 "
       "--use-dynamic-base-id --base-id-path /foo/baz "
+      "--stats-tag foo:bar --stats-tag baz:bar "
       "--socket-path /foo/envoy_domain_socket --socket-mode 644");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
@@ -120,6 +121,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ("/foo/baz", options->baseIdPath());
   EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
   EXPECT_EQ(0644, options->socketMode());
+  EXPECT_EQ(2U, options->statsTags().size());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -181,6 +183,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setRejectUnknownFieldsDynamic(true);
   options->setSocketPath("/foo/envoy_domain_socket");
   options->setSocketMode(0644);
+  options->setStatsTags({{"foo", "bar"}});
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(true, options->useDynamicBaseId());
@@ -244,6 +247,8 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
   EXPECT_EQ(options->socketPath(), command_line_options->socket_path());
   EXPECT_EQ(options->socketMode(), command_line_options->socket_mode());
+  EXPECT_EQ(1U, command_line_options->stats_tag().size());
+  EXPECT_EQ("foo:bar", command_line_options->stats_tag(0));
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
@@ -257,6 +262,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(spdlog::level::warn, options->logLevel());
   EXPECT_EQ("@envoy_domain_socket", options->socketPath());
   EXPECT_EQ(0, options->socketMode());
+  EXPECT_EQ(0U, options->statsTags().size());
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
@@ -275,6 +281,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_FALSE(command_line_options->cpuset_threads());
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
   EXPECT_FALSE(command_line_options->reject_unknown_dynamic_fields());
+  EXPECT_EQ(0, options->statsTags().size());
 }
 
 // Validates that the server_info proto is in sync with the options.
@@ -292,8 +299,8 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 5. hot restart version - print the hot restart version and exit.
   const uint32_t options_not_in_proto = 5;
 
-  // There are two deprecated options: "max_stats" and "max_obj_name_len".
-  const uint32_t deprecated_options = 2;
+  // There are no deprecated options currently, add here as needed.
+  const uint32_t deprecated_options = 0;
 
   EXPECT_EQ(options->count() - options_not_in_proto,
             command_line_options->GetDescriptor()->field_count() - deprecated_options);
@@ -390,6 +397,38 @@ TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
 TEST_F(OptionsImplTest, AllowedLogLevels) {
   EXPECT_EQ("[trace][debug][info][warning|warn][error][critical][off]",
             OptionsImpl::allowedLogLevels());
+}
+
+TEST_F(OptionsImplTest, InvalidStatsTags) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo"), MalformedArgvException,
+                          "error: misformatted stats-tag 'foo'");
+}
+
+TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --stats-tag foo:b.ar"), MalformedArgvException,
+      "error: misformatted stats-tag 'foo:b.ar' contains invalid char in 'b.ar'");
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --stats-tag foo:b.a.r"), MalformedArgvException,
+      "error: misformatted stats-tag 'foo:b.a.r' contains invalid char in 'b.a.r'");
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f_o:bar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'f_o:bar' contains invalid char in 'f_o'");
+}
+
+TEST_F(OptionsImplTest, ValidStatsTagsCharacters) {
+  Stats::TagVector test_tags{
+      Stats::Tag{"foo", "bar"},
+      Stats::Tag{"foo", "b:ar"},
+      Stats::Tag{"foo", "b_-ar"},
+  };
+
+  for (const auto& tag : test_tags) {
+    std::unique_ptr<OptionsImpl> options =
+        createOptionsImpl(fmt::format("envoy --stats-tag {}:{}", tag.name_, tag.value_));
+    EXPECT_EQ(options->statsTags().size(), 1);
+    EXPECT_EQ(options->statsTags()[0].name_, tag.name_);
+    EXPECT_EQ(options->statsTags()[0].value_, tag.value_);
+  }
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.
@@ -581,78 +620,6 @@ public:
     return std::make_unique<ProtobufWkt::StringValue>();
   }
 };
-
-class TestTestingFactory : public TestingFactory {
-public:
-  std::string name() const override { return "test"; }
-};
-
-TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
-  TestTestFactory testTestFactory;
-  Registry::InjectFactoryCategory<TestFactory> testTestCategory(testTestFactory);
-  Registry::InjectFactory<TestFactory> testTestRegistration(testTestFactory, {"test-1", "test-2"});
-
-  TestTestingFactory testTestingFactory;
-  Registry::InjectFactoryCategory<TestingFactory> testTestingCategory(testTestingFactory);
-  Registry::InjectFactory<TestingFactory> testTestingRegistration(testTestingFactory,
-                                                                  {"test-1", "test-2"});
-
-  EXPECT_LOG_CONTAINS("warning", "failed to disable invalid extension name 'not.a.factory'",
-                      OptionsImpl::disableExtensions({"not.a.factory"}));
-
-  EXPECT_LOG_CONTAINS("warning", "failed to disable unknown extension 'no/such.factory'",
-                      OptionsImpl::disableExtensions({"no/such.factory"}));
-
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactoryByType("google.protobuf.StringValue"),
-            nullptr);
-
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
-
-  OptionsImpl::disableExtensions({"test/test", "testing/test-2"});
-
-  // Simulate the initial construction of the type mappings.
-  testTestRegistration.resetTypeMappings();
-  testTestingRegistration.resetTypeMappings();
-
-  // When we disable an extension, all its aliases should also be disabled.
-  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
-  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
-  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
-
-  // When we disable an extension, all its aliases should also be disabled.
-  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
-  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
-  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
-
-  // Typing map for TestingFactory should be constructed here after disabling
-  EXPECT_EQ(
-      Registry::FactoryRegistry<TestingFactory>::getFactoryByType("google.protobuf.StringValue"),
-      nullptr);
-}
-
-TEST(FactoryByTypeTest, EarlierVersionConfigType) {
-  envoy::config::filter::http::buffer::v2::Buffer v2_config;
-  auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
-      getFactoryByType(v2_config.GetDescriptor()->full_name());
-  EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
-
-  envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
-  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
-      getFactoryByType(v3_config.GetDescriptor()->full_name());
-  EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
-
-  ProtobufWkt::Any non_api_type;
-  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
-      getFactoryByType(non_api_type.GetDescriptor()->full_name());
-  EXPECT_EQ(factory, nullptr);
-}
 
 } // namespace
 } // namespace Envoy

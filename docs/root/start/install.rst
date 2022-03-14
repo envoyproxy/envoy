@@ -110,6 +110,31 @@ The following commands will pull and show the Envoy version of current images.
          $ docker pull envoyproxy/|envoy_distroless_docker_image|
          $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
 
+.. _install_contrib:
+
+Contrib images
+~~~~~~~~~~~~~~
+
+As described in `this document <https://docs.google.com/document/d/1yl7GOZK1TDm_7vxQvt8UQEAu07UQFru1uEKXM6ZZg_g/edit#>`_,
+the Envoy project allows extensions to enter the repository as "contrib" extensions. The requirements
+for such extensions are lower, and as such they are only available by default in special images.
+The `envoyproxy/envoy-contrib <https://hub.docker.com/r/envoyproxy/envoy-contrib/tags/>`_ image
+contains all contrib extensions on top of an Ubuntu base. The
+`envoyproxy/envoy-contrib-debug <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug/tags/>`_
+image contains all contrib extensions on top of an Ubuntu base as well as debug symbols. Throughout
+the documentation, extensions are clearly marked as being a contrib extension or a core extension.
+
+.. _install_tools:
+
+Tools images
+~~~~~~~~~~~~
+
+The Envoy project ships images for tools that are separate from the proxy binary but are useful
+in supporting systems such as CI, configuration generation pipelines, etc. Currently installed
+tools in `/usr/local/bin` include:
+
+* :ref:`Schema validator check tool <install_tools_schema_validator_check_tool>`
+
 .. _install_binaries:
 
 Pre-built Envoy Docker images
@@ -140,14 +165,14 @@ The following table shows the available Docker images
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
-   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
-     - Release binary with symbols stripped on top of a distroless base.
+   * - `envoyproxy/envoy-contrib <https://hub.docker.com/r/envoyproxy/envoy-contrib/tags/>`_
+     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
-     -
-   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
+   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
@@ -164,8 +189,26 @@ The following table shows the available Docker images
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
+   * - `envoyproxy/envoy-contrib-debug <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug/tags/>`_
+     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-tools <https://hub.docker.com/r/envoyproxy/envoy-tools/tags/>`_
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
    * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
      - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-contrib-dev <https://hub.docker.com/r/envoyproxy/envoy-contrib-dev/tags/>`_
+     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu Bionic base.
      -
      -
      - latest
@@ -176,14 +219,14 @@ The following table shows the available Docker images
      -
      - latest
      -
-   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
+   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
      -
      -
      - latest
-     -
-   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
-     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     - latest
+   * - `envoyproxy/envoy-contrib-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug-dev/tags/>`_
+     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu Bionic base.
      -
      -
      - latest
@@ -194,6 +237,12 @@ The following table shows the available Docker images
      -
      - latest
      -
+   * - `envoyproxy/envoy-tools-dev <https://hub.docker.com/r/envoyproxy/envoy-tools-dev/tags/>`_
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
    * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
      - Build image which includes tools for building multi-arch Envoy and containers.
      -
@@ -214,3 +263,6 @@ The following table shows the available Docker images
 
    The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for
    building Envoy and related containers. This image requires 4-5GB of available disk space to use.
+
+   All the docker images are available in Docker Hub, but `its rate limit policy <https://www.docker.com/increase-rate-limits>`_
+   doesn't apply to users since the "envoyproxy" namespace is allowlisted.

@@ -15,6 +15,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
@@ -63,6 +64,7 @@ public:
 
   ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
+  NiceMock<Runtime::MockLoader> runtime_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -289,9 +291,10 @@ public:
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket->addressProvider().localAddress(), source_address_,
+        socket->connectionInfoProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr);
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);
+    upstream_listener_ =
+        dispatcher_->createListener(std::move(socket), listener_callbacks_, runtime_, true, false);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
@@ -348,6 +351,7 @@ public:
 
 protected:
   Api::ApiPtr api_;
+  NiceMock<Runtime::MockLoader> runtime_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockTcpListenerCallbacks listener_callbacks_;

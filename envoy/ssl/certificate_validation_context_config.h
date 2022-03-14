@@ -7,6 +7,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "absl/types/optional.h"
@@ -14,6 +15,11 @@
 namespace Envoy {
 namespace Ssl {
 
+// SECURITY NOTE
+//
+// When adding or changing this interface, it is likely that a change is needed to
+// `DefaultCertValidator::updateDigestForSessionId` in
+// `source/extensions/transport_sockets/tls/cert_validator/default_validator.cc`.
 class CertificateValidationContextConfig {
 public:
   virtual ~CertificateValidationContextConfig() = default;
@@ -43,7 +49,7 @@ public:
   /**
    * @return The subject alt name matchers to be verified, if enabled.
    */
-  virtual const std::vector<envoy::type::matcher::v3::StringMatcher>&
+  virtual const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
   subjectAltNameMatchers() const PURE;
 
   /**
@@ -78,6 +84,11 @@ public:
    * @return a reference to the api object.
    */
   virtual Api::Api& api() const PURE;
+
+  /**
+   * @return whether to validate certificate chain with all CRL or not.
+   */
+  virtual bool onlyVerifyLeafCertificateCrl() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

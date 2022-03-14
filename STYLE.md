@@ -24,7 +24,7 @@
 # Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
-  additional error handing that cannot possibly happen in the case an exception is thrown.
+  additional error handling that cannot possibly happen in the case an exception is thrown.
 * Do use exceptions for:
   - Configuration ingestion error handling. Invalid configurations (dynamic and
     static) should throw meaningful `EnvoyException`s, the configuration
@@ -90,7 +90,7 @@
   NiceMock for mocks whose behavior is not the focus of a test.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
-  such as `GUARDED_BY`, should be used for shared state guarded by
+  such as `ABSL_GUARDED_BY`, should be used for shared state guarded by
   locks/mutexes.
 * Functions intended to be local to a cc file should be declared in an anonymous namespace,
   rather than using the 'static' keyword. Note that the

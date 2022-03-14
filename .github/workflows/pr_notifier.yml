@@ -7,11 +7,12 @@ jobs:
   pr_notifier:
     name: PR Notifier
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'envoyproxy'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
     - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: '3.8'
         architecture: 'x64'
@@ -20,6 +21,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r ./.github/actions/pr_notifier/requirements.txt
     - name: Notify about PRs
-      run: python ./.github/actions/pr_notifier/pr_notifier.py
+      run: python ./.github/actions/pr_notifier/pr_notifier.py --cron_job
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

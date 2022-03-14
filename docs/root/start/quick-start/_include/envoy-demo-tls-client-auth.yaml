@@ -34,8 +34,10 @@ static_resources:
             validation_context:
               trusted_ca:
                 filename: certs/cacert.pem
-              match_subject_alt_names:
-              - exact: proxy-postgres-frontend.example.com
+              match_typed_subject_alt_names:
+              - san_type: DNS
+                matcher:
+                  exact: proxy-postgres-frontend.example.com
             tls_certificates:
             - certificate_chain:
                 filename: certs/servercert.pem

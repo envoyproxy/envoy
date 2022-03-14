@@ -23,7 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
@@ -47,10 +47,13 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::AtMost;
 using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsEmpty;
 using testing::NiceMock;
+using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -148,6 +151,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
+    fake_stream_->startGrpcStream(false);
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
@@ -338,7 +342,7 @@ public:
                                                    stats_scope_, createGoogleGrpcConfig(), *api_,
                                                    google_grpc_stat_names_);
 #else
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
 #endif
   }
 
@@ -372,10 +376,13 @@ public:
     request_msg.set_name(HELLO_REQUEST);
 
     Tracing::MockSpan active_span;
-    EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
+    EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
                 setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+    EXPECT_CALL(*request->child_span_,
+                setTag(Eq(Tracing::Tags::get().UpstreamAddress), Not(IsEmpty())))
+        .Times(AtMost(1));
     EXPECT_CALL(*request->child_span_,
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));

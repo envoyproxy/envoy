@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Ratelimit L4 network filter
-# Public docs: docs/root/configuration/network_filters/rate_limit_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/rate_limit_filter
 
 envoy_extension_package()
 
@@ -16,12 +16,6 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    visibility = [
-        "//source/extensions:__subpackages__",
-        "//test/common/network:__pkg__",
-        "//test/extensions:__subpackages__",
-    ],
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",

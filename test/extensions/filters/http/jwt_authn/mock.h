@@ -29,13 +29,16 @@ class MockAuthenticator : public Authenticator {
 public:
   MOCK_METHOD(void, doVerify,
               (Http::HeaderMap & headers, Tracing::Span& parent_span,
-               std::vector<JwtLocationConstPtr>* tokens, SetPayloadCallback set_payload_cb,
+               std::vector<JwtLocationConstPtr>* tokens,
+               SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
-              std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
+              std::vector<JwtLocationConstPtr>&& tokens,
+              SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
               AuthenticatorCallback callback) override {
-    doVerify(headers, parent_span, &tokens, std::move(set_payload_cb), std::move(callback));
+    doVerify(headers, parent_span, &tokens, std::move(set_extracted_jwt_data_cb),
+             std::move(callback));
   }
 
   MOCK_METHOD(void, onDestroy, ());
@@ -43,7 +46,7 @@ public:
 
 class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
-  MOCK_METHOD(void, setPayload, (const ProtobufWkt::Struct& payload));
+  MOCK_METHOD(void, setExtractedData, (const ProtobufWkt::Struct& payload));
   MOCK_METHOD(void, onComplete, (const Status& status));
 };
 

@@ -32,15 +32,16 @@ public:
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
     if (populate_config) {
       proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
-      EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_))
+      EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
           .WillOnce(Return(alternate_protocols_cache_));
     }
     filter_config_ = std::make_shared<FilterConfig>(
         proto_config, alternate_protocols_cache_manager_factory_, simTime());
-    filter_ = std::make_unique<Filter>(filter_config_);
+    filter_ = std::make_unique<Filter>(filter_config_, dispatcher_);
     filter_->setEncoderFilterCallbacks(callbacks_);
   }
 
+  Event::MockDispatcher dispatcher_;
   Http::MockAlternateProtocolsCacheManagerFactory alternate_protocols_cache_manager_factory_;
   std::shared_ptr<Http::MockAlternateProtocolsCacheManager> alternate_protocols_cache_manager_;
   std::shared_ptr<Http::MockAlternateProtocolsCache> alternate_protocols_cache_;
@@ -103,9 +104,9 @@ TEST_F(FilterTest, ValidAltSvc) {
   std::string hostname = "host1";
   std::shared_ptr<Upstream::MockHostDescription> hd =
       std::make_shared<Upstream::MockHostDescription>();
-  StreamInfo::MockStreamInfo stream_info;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(testing::Return(hd));
+  stream_info.upstreamInfo()->setUpstreamHost(hd);
   EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
   EXPECT_CALL(*hd, address()).WillOnce(Return(address));
   EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));

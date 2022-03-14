@@ -1,7 +1,6 @@
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 
 using testing::_;
 using testing::Return;
@@ -104,7 +103,7 @@ void UberWriteFilterFuzzer::fuzz(
     case test::extensions::filters::network::WriteAction::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.dispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

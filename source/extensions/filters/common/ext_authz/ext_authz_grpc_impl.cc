@@ -17,13 +17,10 @@ namespace Common {
 namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version)
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
-      service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
-                                             "envoy.service.auth.v2.Authorization.Check")
-                          .getMethodDescriptorForVersion(transport_api_version)),
-      transport_api_version_(transport_api_version) {}
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.auth.v3.Authorization.Check")) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -43,8 +40,7 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
-  request_ = async_client_->send(service_method_, request, *this, parent_span, options,
-                                 transport_api_version_);
+  request_ = async_client_->send(service_method_, request, *this, parent_span, options);
 }
 
 void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,
@@ -61,23 +57,44 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
           authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
         }
       }
+      if (response->ok_response().query_parameters_to_set_size() > 0) {
+        for (const auto& query_parameter : response->ok_response().query_parameters_to_set()) {
+          authz_response->query_parameters_to_set.push_back(
+              std::pair(query_parameter.key(), query_parameter.value()));
+        }
+      }
+      if (response->ok_response().query_parameters_to_remove_size() > 0) {
+        for (const auto& key : response->ok_response().query_parameters_to_remove()) {
+          authz_response->query_parameters_to_remove.push_back(key);
+        }
+      }
+      // These two vectors hold header overrides of encoded response headers.
       if (response->ok_response().response_headers_to_add_size() > 0) {
         for (const auto& header : response->ok_response().response_headers_to_add()) {
-          authz_response->response_headers_to_add.emplace_back(
-              Http::LowerCaseString(header.header().key()), header.header().value());
+          if (header.append().value()) {
+            authz_response->response_headers_to_add.emplace_back(
+                Http::LowerCaseString(header.header().key()), header.header().value());
+          } else {
+            authz_response->response_headers_to_set.emplace_back(
+                Http::LowerCaseString(header.header().key()), header.header().value());
+          }
         }
       }
     }
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
+
+    // The default HTTP status code for denied response is 403 Forbidden.
+    authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
       toAuthzResponseHeader(authz_response, response->denied_response().headers());
-      authz_response->status_code =
-          static_cast<Http::Code>(response->denied_response().status().code());
+
+      const uint32_t status_code = response->denied_response().status().code();
+      if (status_code > 0) {
+        authz_response->status_code = static_cast<Http::Code>(status_code);
+      }
       authz_response->body = response->denied_response().body();
-    } else {
-      authz_response->status_code = Http::Code::Forbidden;
     }
   }
 

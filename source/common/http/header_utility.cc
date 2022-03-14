@@ -176,8 +176,6 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   case HeaderMatchType::StringMatch:
     match = header_data.string_match_->match(value);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return match != header_data.invert_match_;
@@ -199,6 +197,15 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
                                  header_value.size()) != 0;
+}
+
+bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_102_103") &&
+      (response_headers.Status()->value() == "102" ||
+       response_headers.Status()->value() == "103")) {
+    return true;
+  }
+  return response_headers.Status()->value() == "100";
 }
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
@@ -248,12 +255,6 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
                                                           absl::optional<uint32_t> listener_port) {
-  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strip_port_from_connect")) {
-    // According to RFC 2817 Connect method should have port part in host header.
-    // In this case we won't strip it even if configured to do so.
-    return absl::nullopt;
-  }
   const absl::string_view original_host = headers.getHostValue();
   const absl::string_view::size_type port_start = getPortStart(original_host);
   if (port_start == absl::string_view::npos) {
@@ -339,6 +340,18 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_connect")) {
+      if (headers.Path() && !headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
+      }
+      if (!headers.Path() && headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+      }
+    }
   } else {
     if (!headers.Path()) {
       // :path header must be present for non-CONNECT requests.
@@ -365,8 +378,7 @@ bool HeaderUtility::isRemovableHeader(absl::string_view header) {
 
 bool HeaderUtility::isModifiableHeader(absl::string_view header) {
   return (header.empty() || header[0] != ':') &&
-         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
-          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
 }
 
 HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
@@ -393,7 +405,7 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
 HeaderUtility::HeaderValidationResult
 HeaderUtility::validateContentLength(absl::string_view header_value,
                                      bool override_stream_error_on_invalid_http_message,
-                                     bool& should_close_connection) {
+                                     bool& should_close_connection, size_t& content_length_output) {
   should_close_connection = false;
   std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
   absl::optional<uint64_t> content_length;
@@ -418,7 +430,49 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
       return HeaderValidationResult::REJECT;
     }
   }
+  content_length_output = content_length.value();
   return HeaderValidationResult::ACCEPT;
+}
+
+std::vector<absl::string_view>
+HeaderUtility::parseCommaDelimitedHeader(absl::string_view header_value) {
+  std::vector<absl::string_view> values;
+  for (absl::string_view s : absl::StrSplit(header_value, ',')) {
+    absl::string_view token = absl::StripAsciiWhitespace(s);
+    if (token.empty()) {
+      continue;
+    }
+    values.emplace_back(token);
+  }
+  return values;
+}
+
+absl::string_view HeaderUtility::getSemicolonDelimitedAttribute(absl::string_view value) {
+  return absl::StripAsciiWhitespace(StringUtil::cropRight(value, ";"));
+}
+
+std::string HeaderUtility::addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
+                                                       absl::string_view encoding) {
+  // Append the content encoding only if it isn't already present in the
+  // accept_encoding header. If it is present with a q-value ("gzip;q=0.3"),
+  // remove the q-value to indicate that the content encoding setting that we
+  // add has max priority (i.e. q-value 1.0).
+  std::vector<absl::string_view> newContentEncodings;
+  std::vector<absl::string_view> contentEncodings =
+      Http::HeaderUtility::parseCommaDelimitedHeader(accept_encoding_header);
+  for (absl::string_view contentEncoding : contentEncodings) {
+    absl::string_view strippedEncoding =
+        Http::HeaderUtility::getSemicolonDelimitedAttribute(contentEncoding);
+    if (strippedEncoding != encoding) {
+      // Add back all content encodings back except for the content encoding that we want to
+      // add. For example, if content encoding is "gzip", this filters out encodings "gzip" and
+      // "gzip;q=0.6".
+      newContentEncodings.push_back(contentEncoding);
+    }
+  }
+  // Finally add a single instance of our content encoding.
+  newContentEncodings.push_back(encoding);
+  return absl::StrJoin(newContentEncodings, ",");
 }
 
 } // namespace Http

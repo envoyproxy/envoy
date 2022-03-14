@@ -215,10 +215,37 @@ void Router::onEvent(Network::ConnectionEvent event) {
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected");
   }
+}
+
+const Envoy::Router::MetadataMatchCriteria* Router::metadataMatchCriteria() {
+  // Have we been called before? If so, there's no need to recompute because
+  // by the time this method is called for the first time, route_entry_ should
+  // not change anymore
+  if (metadata_match_ != nullptr) {
+    return metadata_match_.get();
+  }
+
+  const Envoy::Router::MetadataMatchCriteria* route_criteria =
+      (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
+
+  // The request's metadata, if present, takes precedence over the route's.
+  const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it == request_metadata.end()) {
+    return route_criteria;
+  }
+
+  if (route_criteria != nullptr) {
+    metadata_match_ = route_criteria->mergeMatchCriteria(filter_it->second);
+  } else {
+    metadata_match_ = std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+  }
+  return metadata_match_.get();
 }
 
 const Network::Connection* Router::downstreamConnection() const {
@@ -388,8 +415,6 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
                                  upstream_host_->address()->asString())),
         false);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

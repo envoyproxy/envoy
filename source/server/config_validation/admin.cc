@@ -4,6 +4,10 @@ namespace Envoy {
 namespace Server {
 
 // Pretend that handler was added successfully.
+bool ValidationAdmin::addChunkedHandler(const std::string&, const std::string&, GenHandlerCb, bool,
+                                        bool) {
+  return true;
+}
 bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) {
   return true;
 }
@@ -18,18 +22,14 @@ void ValidationAdmin::startHttpListener(const std::list<AccessLog::InstanceShare
                                         const std::string&,
                                         Network::Address::InstanceConstSharedPtr,
                                         const Network::Socket::OptionsSharedPtr&,
-                                        Stats::ScopePtr&&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+                                        Stats::ScopeSharedPtr&&) {}
 
 Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::ResponseHeaderMap&,
                                     std::string&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
-void ValidationAdmin::addListenerToHandler(Network::ConnectionHandler*) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+void ValidationAdmin::addListenerToHandler(Network::ConnectionHandler*) {}
 
 } // namespace Server
 } // namespace Envoy

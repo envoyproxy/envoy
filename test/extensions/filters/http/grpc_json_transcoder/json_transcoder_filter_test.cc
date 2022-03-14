@@ -335,6 +335,79 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   EXPECT_FALSE(transcoder);
 }
 
+// By default, the transcoder will treat unregistered custom verb as part of path segment,
+// which can be captured in a wildcard.
+TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
+  JsonTranscoderConfig config(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", false),
+      *api_);
+
+  // It is matched to PostWildcard `POST /wildcard/{arg=**}`.
+  // ":unknown" was not treated as custom verb but as part of path segment,
+  // so it matches *.
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/wildcard/random:unknown"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+  EXPECT_EQ("bookstore.Bookstore.PostWildcard", method_info->descriptor_->full_name());
+}
+
+// By default, the transcoder will always try to match the registered custom
+// verbs.
+TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
+  JsonTranscoderConfig config(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", false),
+      *api_);
+
+  // Now, the `verb` is registered by PostCustomVerb `POST /foo/bar:verb`,
+  // so the transcoder will strictly match `verb`.
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/wildcard/random:verb"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_EQ(status.code(), StatusCode::kNotFound);
+  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:verb to a method.");
+  EXPECT_FALSE(transcoder);
+}
+
+// When `set_match_unregistered_custom_verb=true`, the transcoder will always
+// try to match the unregistered custom verbs like the registered ones.
+TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
+  auto proto_config =
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore", false);
+  proto_config.set_match_unregistered_custom_verb(true);
+  JsonTranscoderConfig config(proto_config, *api_);
+
+  // Even though the `unknown` is not registered, but as match_unregistered_custom_verb=true, the
+  // transcoder will strictly try to match it.
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/wildcard/random:unknown"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_EQ(status.code(), StatusCode::kNotFound);
+  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unknown to a method.");
+  EXPECT_FALSE(transcoder);
+}
+
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTest(
@@ -476,8 +549,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -544,8 +616,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -605,8 +676,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, forwarded_request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -669,8 +739,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -1245,8 +1314,7 @@ public:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
     Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_.encode100ContinueHeaders(continue_headers));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
   }
 
 private:

@@ -181,7 +181,7 @@ bool MainCommonBase::run() {
     PERF_DUMP();
     return true;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return false; // for gcc.
 }
 
 void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
@@ -225,6 +225,7 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
   // handling, such as running in a chroot jail.
   absl::InitializeSymbolizer(argv[0]);
 #endif
+  Thread::MainThread main_thread;
   std::unique_ptr<Envoy::MainCommon> main_common;
 
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE

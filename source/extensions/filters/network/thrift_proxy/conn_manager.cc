@@ -124,8 +124,6 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   case DirectResponse::ResponseType::Exception:
     stats_.response_exception_.inc();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -210,44 +208,19 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   return complete_;
 }
 
+FilterStatus ConnectionManager::ResponseDecoder::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
+  return ProtocolConverter::passthroughData(data);
+}
+
 FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
   metadata_->setSequenceId(parent_.original_sequence_id_);
 
-  first_reply_field_ =
-      (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
+  if (metadata->hasReplyType()) {
+    success_ = metadata->replyType() == ReplyType::Success;
+  }
   return ProtocolConverter::messageBegin(metadata);
-}
-
-FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view name,
-                                                            FieldType& field_type,
-                                                            int16_t& field_id) {
-  if (first_reply_field_) {
-    // Reply messages contain a struct where field 0 is the call result and fields 1+ are
-    // exceptions, if defined. At most one field may be set. Therefore, the very first field we
-    // encounter in a reply is either field 0 (success) or not (IDL exception returned).
-    // If first fieldType is FieldType::Stop then it is a void success and handled in messageEnd()
-    // because decoder state machine does not call decoder event callback fieldBegin on
-    // FieldType::Stop.
-    success_ = (field_id == 0);
-    first_reply_field_ = false;
-  }
-
-  return ProtocolConverter::fieldBegin(name, field_type, field_id);
-}
-
-FilterStatus ConnectionManager::ResponseDecoder::messageEnd() {
-  if (first_reply_field_) {
-    // When the response is thrift void type there is never a fieldBegin call on a success
-    // because the response struct has no fields and so the first field type is FieldType::Stop.
-    // The decoder state machine handles FieldType::Stop by going immediately to structEnd,
-    // skipping fieldBegin callback. Therefore if we are still waiting for the first reply field
-    // at end of message then it is a void success.
-    success_ = true;
-    first_reply_field_ = false;
-  }
-
-  return ProtocolConverter::messageEnd();
 }
 
 FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
@@ -275,14 +248,19 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
+  if (passthrough_) {
+    cm.stats_.response_passthrough_.inc();
+  }
 
   switch (metadata_->messageType()) {
   case MessageType::Reply:
     cm.stats_.response_reply_.inc();
-    if (success_.value_or(false)) {
-      cm.stats_.response_success_.inc();
-    } else {
-      cm.stats_.response_error_.inc();
+    if (success_) {
+      if (success_.value()) {
+        cm.stats_.response_success_.inc();
+      } else {
+        cm.stats_.response_error_.inc();
+      }
     }
 
     break;
@@ -319,46 +297,45 @@ void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderFilter* filter) {
   ASSERT(filter_action_ != nullptr);
 
-  if (!local_response_sent_) {
-    if (upgrade_handler_) {
-      // Divert events to the current protocol upgrade handler.
-      const FilterStatus status = filter_action_(upgrade_handler_.get());
-      filter_context_.reset();
+  if (local_response_sent_) {
+    filter_action_ = nullptr;
+    filter_context_.reset();
+    return FilterStatus::Continue;
+  }
+
+  if (upgrade_handler_) {
+    // Divert events to the current protocol upgrade handler.
+    const FilterStatus status = filter_action_(upgrade_handler_.get());
+    filter_context_.reset();
+    return status;
+  }
+
+  std::list<ActiveRpcDecoderFilterPtr>::iterator entry =
+      !filter ? decoder_filters_.begin() : std::next(filter->entry());
+  for (; entry != decoder_filters_.end(); entry++) {
+    const FilterStatus status = filter_action_((*entry)->handle_.get());
+    if (local_response_sent_) {
+      // The filter called sendLocalReply but _did not_ close the connection.
+      // We return FilterStatus::Continue irrespective of the current result,
+      // which is fine because subsequent calls to this method will skip
+      // filters anyway.
+      //
+      // Note: we need to return FilterStatus::Continue here, in order for decoding
+      // to proceed. This is important because as noted above, the connection remains
+      // open so we need to consume the remaining bytes.
+      break;
+    }
+
+    if (status != FilterStatus::Continue) {
+      // If we got FilterStatus::StopIteration and a local reply happened but
+      // local_response_sent_ was not set, the connection was closed.
+      //
+      // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
+      // dispatch() stops the processing.
+      //
+      // In other words, after a local reply closes the connection and StopIteration
+      // is returned we are done.
       return status;
-    }
-
-    std::list<ActiveRpcDecoderFilterPtr>::iterator entry;
-    if (!filter) {
-      entry = decoder_filters_.begin();
-    } else {
-      entry = std::next(filter->entry());
-    }
-
-    for (; entry != decoder_filters_.end(); entry++) {
-      const FilterStatus status = filter_action_((*entry)->handle_.get());
-      if (local_response_sent_) {
-        // The filter called sendLocalReply but _did not_ close the connection.
-        // We return FilterStatus::Continue irrespective of the current result,
-        // which is fine because subsequent calls to this method will skip
-        // filters anyway.
-        //
-        // Note: we need to return FilterStatus::Continue here, in order for decoding
-        // to proceed. This is important because as noted above, the connection remains
-        // open so we need to consume the remaining bytes.
-        break;
-      }
-
-      if (status != FilterStatus::Continue) {
-        // If we got FilterStatus::StopIteration and a local reply happened but
-        // local_response_sent_ was not set, the connection was closed.
-        //
-        // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
-        // dispatch() stops the processing.
-        //
-        // In other words, after a local reply closes the connection and StopIteration
-        // is returned we are done.
-        return status;
-      }
     }
   }
 
@@ -420,6 +397,10 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
     parent_.stats_.downstream_cx_max_requests_.inc();
   }
 
+  if (passthrough_) {
+    parent_.stats_.request_passthrough_.inc();
+  }
+
   bool destroy_rpc = false;
   switch (original_msg_type_) {
   case MessageType::Call:
@@ -459,6 +440,7 @@ bool ConnectionManager::ActiveRpc::passthroughSupported() const {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
   filter_context_ = &data;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);

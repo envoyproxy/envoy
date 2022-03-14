@@ -21,9 +21,15 @@ public:
 
   /**
    * Returns the host's currently resolved address. This address may change periodically due to
-   * async re-resolution.
+   * async re-resolution. This address may be null in the case of failed resolution.
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
+
+  /**
+   * Returns the host's currently resolved address. These addresses may change periodically due to
+   * async re-resolution.
+   */
+  virtual std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
 
   /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
@@ -197,6 +203,12 @@ public:
    * @return RAII handle for pending request circuit breaker if the request was allowed.
    */
   virtual Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() PURE;
+
+  /**
+   * Force a DNS refresh of all known hosts, ignoring any ongoing failure or success timers. This
+   * can be used in response to network changes which might alter DNS responses, for example.
+   */
+  virtual void forceRefreshHosts() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
@@ -215,6 +227,14 @@ public:
    */
   virtual DnsCacheSharedPtr
   getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
+
+  /**
+   * Look up an existing DNS cache by name.
+   * @param name supplies the cache name to look up. If a cache exists with the same name it
+   *             will be returned.
+   * @return pointer to the cache if it exists, nullptr otherwise.
+   */
+  virtual DnsCacheSharedPtr lookUpCacheByName(absl::string_view cache_name) PURE;
 };
 
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;

@@ -31,7 +31,7 @@ public:
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
-   * docs/root/configuration/access_log.rst#format-rules
+   * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
   static void parseCommandHeader(const std::string& token, const size_t start,
                                  std::string& main_header, std::string& alternative_header,
@@ -437,11 +437,16 @@ public:
     virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
+  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr()>;
 
   enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
 private:
   FieldExtractorPtr field_extractor_;
+
+  using FieldExtractorLookupTbl =
+      absl::flat_hash_map<absl::string_view, StreamInfoFormatter::FieldExtractorCreateFunc>;
+  static const FieldExtractorLookupTbl& getKnownFieldExtractors();
 };
 
 /**

@@ -88,6 +88,8 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override { return absl::nullopt; }
+  absl::optional<std::string> interfaceName() override { return absl::nullopt; }
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
   void onBelowLowWatermark() {
@@ -143,6 +145,8 @@ public:
     ASSERT(!peer_handle_);
     ASSERT(!write_shutdown_);
     peer_handle_ = writable_peer;
+    ENVOY_LOG(trace, "io handle {} set peer handle to {}.", static_cast<void*>(this),
+              static_cast<void*>(writable_peer));
   }
 
 private:

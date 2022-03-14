@@ -13,6 +13,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
+
 namespace Envoy {
 namespace Http {
 
@@ -91,21 +93,6 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
 TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
       {"localhost:443", "localhost"},
-  };
-  for (const auto& host_pair : host_headers) {
-    auto& host_header = hostHeaderEntry(host_pair.first, true);
-    HeaderUtility::stripPortFromHost(headers_, 443);
-    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
-  }
-}
-
-// Port's part from host header won't be removed if method is "connect"
-TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strip_port_from_connect", "false"}});
-  const std::vector<std::pair<std::string, std::string>> host_headers{
-      {"localhost:443", "localhost:443"},
   };
   for (const auto& host_pair : host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first, true);
@@ -886,23 +873,126 @@ TEST(ValidateHeaders, HeaderNameWithUnderscores) {
                 rejected));
 }
 
+TEST(ValidateHeaders, Connect) {
+  {
+    // Basic connect.
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "foo.com:80"}};
+    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+  {
+    // Extended connect.
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
+                                     {":authority", "foo.com:80"},
+                                     {":path", "/"},
+                                     {":protocol", "websocket"}};
+    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+  {
+    // Missing path.
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {":protocol", "websocket"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+  {
+    // Missing protocol.
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {":path", "/"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+}
+
 TEST(ValidateHeaders, ContentLength) {
   bool should_close_connection;
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
-            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
+  size_t content_length{0};
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::ACCEPT,
+      HeaderUtility::validateContentLength("1,1", true, should_close_connection, content_length));
+  EXPECT_FALSE(should_close_connection);
+  EXPECT_EQ(1, content_length);
+
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", true, should_close_connection, content_length));
   EXPECT_FALSE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
-  EXPECT_FALSE(should_close_connection);
-
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
+}
+
+TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
+  // Basic case
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one,two,three"),
+              ElementsAre("one", "two", "three"));
+
+  // Whitespace at the end or beginning of tokens
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one  ,two,three"),
+              ElementsAre("one", "two", "three"));
+
+  // Empty tokens are removed (from beginning, middle, and end of the string)
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader(", one,, two, three,,,"),
+              ElementsAre("one", "two", "three"));
+
+  // Whitespace is not removed from the middle of the tokens
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one, two, t  hree"),
+              ElementsAre("one", "two", "t  hree"));
+
+  // Semicolons are kept as part of the tokens
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one, two;foo, three"),
+              ElementsAre("one", "two;foo", "three"));
+
+  // Check that a single token is parsed regardless of commas
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("foo"), ElementsAre("foo"));
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader(",foo,"), ElementsAre("foo"));
+
+  // Empty string is handled
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader("").empty());
+
+  // Empty string is handled (whitespace)
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader("   ").empty());
+
+  // Empty string is handled (commas)
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader(",,,").empty());
+}
+
+TEST(ValidateHeaders, GetSemicolonDelimitedAttribute) {
+  // Basic case
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;bar=1"), "foo");
+
+  // Only attribute without semicolon
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo"), "foo");
+
+  // Only attribute with semicolon
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;"), "foo");
+
+  // Two semicolons, case 1
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;;"), "foo");
+
+  // Two semicolons, case 2
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute(";foo;"), "");
+}
+
+TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
+  // Add a new encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one,two", "three"), "one,two,three");
+
+  // Add an already existing encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one,two", "one"), "two,one");
+
+  // Preserve q-values for other tokens than the added encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one;q=0.3,two", "two"), "one;q=0.3,two");
+
+  // Remove q-values for the current encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one;q=0.3,two", "one"), "two,one");
+
+  // Add encoding to an empty header
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
 }
 
 } // namespace Http

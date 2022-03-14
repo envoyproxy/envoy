@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
@@ -16,7 +17,7 @@ quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
   quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
                                  ? quic::WRITE_STATUS_BLOCKED
                                  : quic::WRITE_STATUS_ERROR;
-  return {status, static_cast<int>(result.err_->getErrorCode())};
+  return {status, static_cast<int>(result.err_->getSystemErrorCode())};
 }
 
 } // namespace

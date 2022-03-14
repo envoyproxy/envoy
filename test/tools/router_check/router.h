@@ -12,7 +12,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/router/config_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/server/instance.h"
@@ -134,6 +134,9 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareRedirectCode(ToolConfig& tool_config, uint32_t expected);
+  bool compareRedirectCode(ToolConfig& tool_config,
+                           const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareRequestHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareResponseHeaderFields(ToolConfig& tool_config,
@@ -151,11 +154,13 @@ private:
    * @param expect_match negates the expectation if false.
    * @return bool if actual and expected match.
    */
-  bool compareResults(const std::string& actual, const std::string& expected,
-                      const std::string& test_type, const bool expect_match = true);
+  template <typename U, typename V>
+  bool compareResults(const U& actual, const V& expected, const std::string& test_type,
+                      const bool expect_match = true);
 
-  void reportFailure(const std::string& actual, const std::string& expected,
-                     const std::string& test_type, const bool expect_match = true);
+  template <typename U, typename V>
+  void reportFailure(const U& actual, const V& expected, const std::string& test_type,
+                     const bool expect_match = true);
 
   void printResults();
 

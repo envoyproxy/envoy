@@ -69,16 +69,6 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   cb(filter_callback);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(FaultFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.fault";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace
 } // namespace Fault
 } // namespace HttpFilters

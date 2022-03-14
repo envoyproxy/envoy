@@ -13,11 +13,13 @@ namespace Envoy {
 namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config, uint32_t worker_index)
+                                     Network::ListenerConfig& config, Runtime::Loader& runtime,
+                                     uint32_t worker_index)
     : OwnedActiveStreamListenerBase(parent, parent.dispatcher(),
                                     parent.dispatcher().createListener(
                                         config.listenSocketFactory().getListenSocket(worker_index),
-                                        *this, config.bindToPort()),
+                                        *this, runtime, config.bindToPort(),
+                                        config.ignoreGlobalConnLimit()),
                                     config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
@@ -25,7 +27,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
+                                     Network::ListenerConfig& config, Runtime::Loader&)
     : OwnedActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
@@ -69,9 +71,9 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    RELEASE_ASSERT(socket->connectionInfoProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(trace, "closing connection from {}: listener connection limit reached for {}",
-              socket->addressProvider().remoteAddress()->asString(), config_->name());
+              socket->connectionInfoProvider().remoteAddress()->asString(), config_->name());
     socket->close();
     stats_.downstream_cx_overflow_.inc();
     return;
@@ -135,8 +137,9 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
                                             dispatcher().timeSource(), std::move(stream_info));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
-                   active_connection->connection_->addressProvider().remoteAddress()->asString());
+    ENVOY_CONN_LOG(
+        debug, "new connection from {}", *active_connection->connection_,
+        active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }

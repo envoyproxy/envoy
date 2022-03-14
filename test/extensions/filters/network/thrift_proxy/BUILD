@@ -28,6 +28,7 @@ envoy_extension_cc_mock(
         "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_interface",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
     ],
 )
@@ -270,11 +271,13 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
+        "//source/extensions/filters/network/thrift_proxy/router:shadow_writer_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
     ],
 )
@@ -351,12 +354,33 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
+    shard_count = 4,
     deps = [
         ":integration_lib",
         ":utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "shadow_writer_test",
+    srcs = ["shadow_writer_test.cc"],
+    extension_names = ["envoy.filters.network.thrift_proxy"],
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:config",
+        "//source/extensions/filters/network/thrift_proxy/router:shadow_writer_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:printers_lib",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )

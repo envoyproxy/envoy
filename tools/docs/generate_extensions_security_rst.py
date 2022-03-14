@@ -8,7 +8,7 @@ import pathlib
 import sys
 import tarfile
 
-from tools.base import utils
+from envoy.base import utils
 
 
 def format_item(extension, metadata):
@@ -18,15 +18,23 @@ def format_item(extension, metadata):
         item = '* :ref:`%s <extension_%s>`' % (extension, extension)
     if metadata.get('status') == 'alpha':
         item += ' (alpha)'
+    if metadata.get('contrib', False):
+        item += ' (:ref:`contrib builds <install_contrib>` only)'
     return item
 
 
 def main():
     metadata_filepath = sys.argv[1]
-    output_filename = sys.argv[2]
+    contrib_metadata_filepath = sys.argv[2]
+    output_filename = sys.argv[3]
     generated_rst_dir = os.path.dirname(output_filename)
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
     extension_db = utils.from_yaml(metadata_filepath)
+
+    contrib_extension_db = utils.from_yaml(contrib_metadata_filepath)
+    for contrib_extension in contrib_extension_db.keys():
+        contrib_extension_db[contrib_extension]['contrib'] = True
+    extension_db.update(contrib_extension_db)
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
 

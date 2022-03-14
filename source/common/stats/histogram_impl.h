@@ -36,7 +36,7 @@ private:
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
-class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
+class HistogramStatisticsImpl final : public HistogramStatistics, NonCopyable {
 public:
   HistogramStatisticsImpl();
 
@@ -46,7 +46,7 @@ public:
    * will not be retained.
    */
   HistogramStatisticsImpl(
-      const histogram_t* histogram_ptr,
+      const histogram_t* histogram_ptr, Histogram::Unit unit = Histogram::Unit::Unspecified,
       ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
 
   static ConstSupportedBuckets& defaultSupportedBuckets();
@@ -60,6 +60,7 @@ public:
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
   ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+  std::vector<uint64_t> computeDisjointBuckets() const override;
   uint64_t sampleCount() const override { return sample_count_; }
   double sampleSum() const override { return sample_sum_; }
 
@@ -69,6 +70,7 @@ private:
   std::vector<uint64_t> computed_buckets_;
   uint64_t sample_count_;
   double sample_sum_;
+  const Histogram::Unit unit_;
 };
 
 class HistogramImplHelper : public MetricImpl<Histogram> {

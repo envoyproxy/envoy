@@ -51,18 +51,9 @@ using ::testing::SaveArg;
 } // namespace
 
 inline Config constructConfigFromYaml(const std::string& yaml,
-                                      Server::Configuration::FactoryContext& context,
-                                      bool avoid_boosting = true) {
+                                      Server::Configuration::FactoryContext& context) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
-  return Config(tcp_proxy, context);
-}
-
-inline Config constructConfigFromV3Yaml(const std::string& yaml,
-                                        Server::Configuration::FactoryContext& context,
-                                        bool avoid_boosting = true) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
 
@@ -71,11 +62,6 @@ public:
   TcpProxyTestBase() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
-        .WillByDefault(Invoke(
-            [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
-        .WillByDefault(ReturnPointee(&upstream_host_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
         .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
           upstream_cluster_ = cluster_info;
@@ -98,8 +84,7 @@ public:
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
     config.set_stat_prefix("name");
-    auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
-    route->set_cluster("fake_cluster");
+    config.set_cluster("fake_cluster");
     return config;
   }
 

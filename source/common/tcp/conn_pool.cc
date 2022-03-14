@@ -65,7 +65,7 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     connection_->readDisable(true);
   }
-  Envoy::ConnectionPool::ActiveClient::onEvent(event);
+  parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.
     // Consumers of connection pool connections assume they are receiving already connected

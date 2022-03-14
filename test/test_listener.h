@@ -20,7 +20,12 @@ namespace Envoy {
 // Note: nothing compute-intensive should be put in this class, as it will
 // be a tax paid by every test method in the codebase.
 class TestListener : public ::testing::EmptyTestEventListener {
+public:
+  TestListener(bool validate_singletons = true) : validate_singletons_(validate_singletons) {}
   void OnTestEnd(const ::testing::TestInfo& test_info) override;
+
+private:
+  bool validate_singletons_;
 };
 
 } // namespace Envoy

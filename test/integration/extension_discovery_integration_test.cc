@@ -129,8 +129,6 @@ public:
   void initialize() override {
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api",
-                                      "true");
 
     // Add an xDS cluster for extension config discovery.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -161,7 +159,7 @@ public:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
       listener_config_.set_name(listener_name_);
-      ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
+      ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
       bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
       auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
       lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -731,6 +729,61 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilte
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Validate that deleting listeners does not break active ECDS subscription.
+TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponse("foo", "1", denyPrivateConfig());
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  Http::TestRequestHeaderMapImpl banned_request_headers{
+      {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+  codec_client_->close();
+
+  // Rename the listener to force delete the first listener and wait for the deletion.
+  listener_config_.set_name("updated");
+  sendLdsResponse("updated");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+
+  // Verify ECDS is still applied on the new listener.
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+
+  // Update ECDS but keep the connection.
+  {
+    sendXdsResponse("foo", "2", allowAllConfig());
+    test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                   2);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  codec_client_->close();
 }
 
 } // namespace

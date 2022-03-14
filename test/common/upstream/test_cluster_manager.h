@@ -115,6 +115,7 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -175,10 +176,10 @@ public:
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                          Http::Context& http_context, Grpc::Context& grpc_context,
-                         Router::Context& router_context)
+                         Router::Context& router_context, Server::Instance& server)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                            main_thread_dispatcher, admin, validation_context, api, http_context,
-                           grpc_context, router_context) {}
+                           grpc_context, router_context, server) {}
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -187,23 +188,38 @@ public:
     }
     return clusters;
   }
+
+  OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+  }
+
+  void notifyExpiredDiscovery(absl::string_view name) {
+    ClusterManagerImpl::notifyExpiredDiscovery(name);
+  }
+
+  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name) {
+    return ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::move(thread_name));
+  }
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  MockedUpdatedClusterManagerImpl(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-      const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context)
+  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  ClusterManagerFactory& factory, Stats::Store& stats,
+                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                  const LocalInfo::LocalInfo& local_info,
+                                  AccessLog::AccessLogManager& log_manager,
+                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                                  ProtobufMessage::ValidationContext& validation_context,
+                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+                                  MockLocalHostsRemoved& local_hosts_removed,
+                                  Http::Context& http_context, Grpc::Context& grpc_context,
+                                  Router::Context& router_context, Server::Instance& server)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                                main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context, router_context),
+                               grpc_context, router_context, server),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -215,7 +231,7 @@ protected:
     }
   }
 
-  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
+  void postThreadLocalRemoveHosts(const Cluster&, const HostVector& hosts_removed) override {
     local_hosts_removed_.post(hosts_removed);
   }
 

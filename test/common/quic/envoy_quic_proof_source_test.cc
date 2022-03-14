@@ -58,7 +58,8 @@ public:
     ON_CALL(cert_validation_ctx_config_, certificateRevocationListPath())
         .WillByDefault(ReturnRef(path_string));
     const std::vector<std::string> empty_string_list;
-    const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers;
+    const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+        san_matchers;
     ON_CALL(cert_validation_ctx_config_, subjectAltNameMatchers())
         .WillByDefault(ReturnRef(san_matchers));
     ON_CALL(cert_validation_ctx_config_, verifyCertificateHashList())
@@ -72,9 +73,9 @@ public:
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
-  void
-  verifyCertsAndSignature(const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
-                          const std::string& payload, const std::string& signature) {
+  void verifyCertsAndSignature(
+      const quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>& chain,
+      const std::string& payload, const std::string& signature) {
     const std::string& leaf = chain->certs[0];
     std::unique_ptr<quic::CertificateView> cert_view =
         quic::CertificateView::ParseSingleCertificate(leaf);
@@ -85,11 +86,12 @@ public:
     EXPECT_TRUE(cert_view->VerifySignature(payload, signature, sign_alg));
 
     std::string error;
+    std::unique_ptr<quic::ProofVerifyDetails> verify_details;
     EXPECT_EQ(quic::QUIC_SUCCESS,
               verifier_->VerifyCertChain("www.example.org", 54321, chain->certs,
                                          /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
-                                         /*context=*/nullptr, &error,
-                                         /*details=*/nullptr, /*out_alert=*/nullptr,
+                                         /*context=*/nullptr, &error, &verify_details,
+                                         /*out_alert=*/nullptr,
                                          /*callback=*/nullptr))
         << error;
   }
@@ -100,6 +102,7 @@ private:
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
+  NiceMock<Ssl::MockContextManager> tls_context_manager_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
@@ -144,6 +147,7 @@ public:
         listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
     transport_socket_factory_->initialize();
+    EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
 
   void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key) {
@@ -151,9 +155,9 @@ public:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
         .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                    *connection_socket.addressProvider().localAddress());
+                    *connection_socket.connectionInfoProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                    *connection_socket.addressProvider().remoteAddress());
+                    *connection_socket.connectionInfoProvider().remoteAddress());
           EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
           EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
@@ -193,8 +197,9 @@ protected:
 
 TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {
   expectCertChainAndPrivateKey(expected_certs_, true);
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
-      proof_source_.GetCertChain(server_address_, client_address_, hostname_);
+  bool cert_matched_sni;
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> chain =
+      proof_source_.GetCertChain(server_address_, client_address_, hostname_, &cert_matched_sni);
   EXPECT_EQ(2, chain->certs.size());
 
   std::string error_details;
@@ -216,7 +221,9 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   EXPECT_CALL(listen_socket_, ioHandle()).Times(3);
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
-  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
+  bool cert_matched_sni;
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 
   // Cert not ready.
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
@@ -224,15 +231,16 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillOnce(ReturnRef(*transport_socket_factory_));
   EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(false));
-  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 
   // No certs in config.
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                  *connection_socket.addressProvider().localAddress());
+                  *connection_socket.connectionInfoProvider().localAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                  *connection_socket.addressProvider().remoteAddress());
+                  *connection_socket.connectionInfoProvider().remoteAddress());
         EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
         EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;
@@ -242,7 +250,8 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(true));
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{};
   EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillOnce(Return(tls_cert_configs));
-  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidCert) {
@@ -250,7 +259,9 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidCert) {
     invalid certificate
     -----END CERTIFICATE-----)"};
   expectCertChainAndPrivateKey(invalid_cert, false);
-  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
+  bool cert_matched_sni;
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidPublicKeyInCert) {
@@ -275,7 +286,9 @@ x96rVeUbRJ/qU4//nNM/XQa9vIAIcTZ0jFhmb0c3R4rmoqqC3vkSDwtaE5yuS5T4
 GUy+n0vQNB0cXGzgcGI=
 -----END CERTIFICATE-----)"};
   expectCertChainAndPrivateKey(cert_with_rsa_1024, false);
-  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
+  bool cert_matched_sni;
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {

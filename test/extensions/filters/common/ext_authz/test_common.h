@@ -16,6 +16,12 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const ResponsePtr& ptr, std::ostream* os);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const Response& response, std::ostream* os);
+
 struct KeyValueOption {
   std::string key;
   std::string value;
@@ -46,8 +52,12 @@ public:
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
   static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+  static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
+                                       const Http::Utility::QueryParamsVector& rhs);
   static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
                                         const std::vector<Http::LowerCaseString>& rhs);
+  static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
+                                              const std::vector<std::string>& rhs);
 };
 
 MATCHER_P(AuthzErrorResponse, status, "") {
@@ -95,23 +105,44 @@ MATCHER_P(AuthzOkResponse, response, "") {
   if (arg->status != response.status) {
     return false;
   }
-  // Compare headers_to_append.
+
   if (!TestCommon::compareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }
 
-  // Compare headers_to_add.
   if (!TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add)) {
     return false;
   }
 
-  // Compare response_headers_to_add.
   if (!TestCommon::compareHeaderVector(response.response_headers_to_add,
                                        arg->response_headers_to_add)) {
     return false;
   }
 
-  return TestCommon::compareVectorOfHeaderName(response.headers_to_remove, arg->headers_to_remove);
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_set,
+                                       arg->response_headers_to_set)) {
+    return false;
+  }
+
+  if (!TestCommon::compareQueryParamsVector(response.query_parameters_to_set,
+                                            arg->query_parameters_to_set)) {
+    return false;
+  }
+
+  if (!TestCommon::compareVectorOfUnorderedStrings(response.query_parameters_to_remove,
+                                                   arg->query_parameters_to_remove)) {
+    return false;
+  }
+
+  if (!TestCommon::compareVectorOfHeaderName(response.headers_to_remove, arg->headers_to_remove)) {
+    return false;
+  }
+
+  if (!TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata)) {
+    return false;
+  }
+
+  return true;
 }
 
 MATCHER_P(ContainsPairAsHeader, pair, "") {

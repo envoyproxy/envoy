@@ -15,7 +15,7 @@ FilterConfigImpl::FilterConfigImpl(
     envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
     : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
-      cm_(context.clusterManager()), time_source_(context.dispatcher().timeSource()) {
+      cm_(context.clusterManager()), time_source_(context.mainThreadDispatcher().timeSource()) {
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
@@ -50,8 +50,6 @@ FilterConfigImpl::FilterConfigImpl(
     case RequirementRule::RequirementTypeCase::REQUIREMENT_TYPE_NOT_SET:
       rule_pairs_.emplace_back(Matcher::create(rule), nullptr);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

@@ -70,8 +70,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 
 ## Cutting a release
 
-* We do releases every 3 months, at the end of each quarter, as described in the
-  [release schedule](RELEASES.md#release-schedule).
+* We do releases every 3 months, as described in the [release schedule](RELEASES.md#release-schedule).
 * Take a look at open issues tagged with the current release, by
   [searching](https://github.com/envoyproxy/envoy/issues) for
   "is:open is:issue milestone:[current milestone]" and either hold off until
@@ -98,7 +97,8 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
   from the tagged release, e.g. "release/v1.6". It will be used for the
   [stable releases](RELEASES.md#stable-releases).
-* Monitor the AZP tag build to make sure that the final docker images get pushed along with
+* Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
+  tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
@@ -140,7 +140,7 @@ New Features
 Deprecated
 ----------
 ```
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
+* Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
   to file tracking issues for runtime guarded code which can be removed.
 * Check source/common/runtime/runtime_features.cc and see if any runtime guards in
   disabled_runtime_features should be reassessed, and ping on the relevant issues.

@@ -17,3 +17,4 @@ Services
   ../config/tap/v3/*
   trace/v3/*
   extension/v3/*
+  ext_proc/v3/*

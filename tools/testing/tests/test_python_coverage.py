@@ -43,12 +43,20 @@ def test_coveragepytest_add_arguments():
     runner.add_arguments(parser)
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
-        == [[('cov_data',), {'help': 'Path to coverage data'}],
+        == [[('--verbosity', '-v'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'info',
+              'help': 'Application log level'}],
+            [('--log-level', '-l'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'warn',
+              'help': 'Log level for non-application logs'}],
+            [('cov_data',), {'help': 'Path to coverage data'}],
             [('cov_html',), {'help': 'Path to coverage html'}]])
 
 
 @pytest.mark.parametrize("cov_data", ["", "SOMEPATH"])
-def test_coverage_run(patches, cov_data):
+async def test_coverage_run(patches, cov_data):
     runner = python_coverage.CoverageRunner("path1", "path2", "path3")
     patched = patches(
         ("CoverageRunner.cov_data", dict(new_callable=PropertyMock)),
@@ -60,7 +68,7 @@ def test_coverage_run(patches, cov_data):
 
     with patched as (m_cov_data, m_extra_args, m_cov_args, m_cov_rc, m_main):
         m_cov_data.return_value = cov_data
-        assert runner.run() == m_main.return_value
+        assert await runner.run() == m_main.return_value
 
     if not cov_data:
         assert (

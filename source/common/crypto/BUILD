@@ -10,8 +10,17 @@ envoy_package()
 
 envoy_cc_library(
     name = "utility_lib",
+    srcs = [
+        "crypto_impl.cc",
+        "utility_impl.cc",
+    ],
     hdrs = [
+        "crypto_impl.h",
         "utility.h",
+        "utility_impl.h",
+    ],
+    external_deps = [
+        "ssl",
     ],
     deps = [
         "//envoy/buffer:buffer_interface",

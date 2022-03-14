@@ -10,6 +10,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -205,6 +206,33 @@ decompressor_library:
     expectDecompression(decompressor_ptr, end_with_data);
   }
 
+  void testAcceptEncodingFilter(bool legacy, const std::string& original_accept_encoding,
+                                const std::string& final_accept_encoding) {
+    TestScopedRuntime scoped_runtime;
+    if (legacy) {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
+
+    } else {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
+    }
+    setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  advertise_accept_encoding: true
+)EOF");
+    Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                         {"content-length", "256"}};
+    if (isRequestDirection()) {
+      headers_before_filter.addCopy("accept-encoding", original_accept_encoding);
+    }
+    decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
+                        final_accept_encoding);
+  }
+
   Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
   DecompressorFilterConfigSharedPtr config_;
   std::unique_ptr<DecompressorFilter> filter_;
@@ -299,6 +327,28 @@ request_direction_config:
                       "br,mock" /* expected_accept_encoding */);
 }
 
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnce) {
+  // Do not duplicate accept-encoding values. Remove extra accept-encoding values for the
+  // content-type we specify. Also remove q-values from our content-type (if not set, it defaults
+  // to 1.0). Test also whitespace in accept-encoding value string.
+  testAcceptEncodingFilter(false, "br,mock, mock\t,mock ;q=0.3", "br,mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnceLegacy) {
+  // legacy test to avoid a breaking change
+  testAcceptEncodingFilter(true, "br,mock, mock\t,mock ;q=0.3", "br,mock, mock\t,mock ;q=0.3,mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValue) {
+  // If the accept-encoding header had a q-value, it needs to be removed.
+  testAcceptEncodingFilter(false, "mock;q=0.6", "mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValueLegacy) {
+  // legacy test to avoid a breaking change
+  testAcceptEncodingFilter(true, "mock;q=0.6", "mock;q=0.6,mock");
+}
+
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {
   setUpFilter(R"EOF(
 decompressor_library:
@@ -388,6 +438,59 @@ response_direction_config:
     EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
     expectNoDecompression();
+  }
+}
+
+TEST_P(DecompressorFilterTest, DecompressionDisabledWhenNoTransformIsSet) {
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
+  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br , gzip "},
+                                                       {"content-length", "256"},
+                                                       {"cache-control", "no-transform"}};
+  std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+      doHeaders(headers_before_filter, false /* end_stream */);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))[0]
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
+  expectNoDecompression();
+}
+
+TEST_P(DecompressorFilterTest,
+       DecompressionEnabledWhenNoTransformAndIgnoreNoTransformHeaderAreSet) {
+  setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+response_direction_config:
+  common_config:
+    ignore_no_transform_header: true
+)EOF");
+
+  Http::TestRequestHeaderMapImpl headers_before_filter{
+      {"content-encoding", "mock"}, {"content-length", "256"}, {"cache-control", "no-transform"}};
+  if (isRequestDirection()) {
+    EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
+    std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
+        doHeaders(headers_before_filter, false /* end_stream */);
+
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+    EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
+    expectNoDecompression();
+  } else {
+    decompressionActive(headers_before_filter, true /* end_with_data */,
+                        absl::nullopt /* expected_content_encoding*/,
+                        "mock" /* expected_accept_encoding */);
   }
 }
 

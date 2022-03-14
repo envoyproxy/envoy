@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/message_impl.h"
@@ -9,6 +10,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -584,6 +586,71 @@ TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
         num_retries: 3
   )EOF";
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, config), EnvoyException);
+}
+
+TEST(DataSourceTest, WellKnownEnvironmentVariableTest) {
+  envoy::config::core::v3::DataSource config;
+
+  const std::string yaml = R"EOF(
+    environment_variable:
+      PATH
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kEnvironmentVariable,
+            config.specifier_case());
+  EXPECT_EQ(config.environment_variable(), "PATH");
+  Api::ApiPtr api = Api::createApiForTest();
+  const auto path_data = DataSource::read(config, false, *api);
+  EXPECT_FALSE(path_data.empty());
+}
+
+TEST(DataSourceTest, MissingEnvironmentVariableTest) {
+  envoy::config::core::v3::DataSource config;
+
+  const std::string yaml = R"EOF(
+    environment_variable:
+      ThisVariableDoesntExist
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kEnvironmentVariable,
+            config.specifier_case());
+  EXPECT_EQ(config.environment_variable(), "ThisVariableDoesntExist");
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableDoesntExist");
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableDoesntExist");
+}
+
+TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::setEnvVar("ThisVariableIsEmpty", "", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ThisVariableIsEmpty"); });
+
+  const std::string yaml = R"EOF(
+    environment_variable:
+      ThisVariableIsEmpty
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kEnvironmentVariable,
+            config.specifier_case());
+  EXPECT_EQ(config.environment_variable(), "ThisVariableIsEmpty");
+  Api::ApiPtr api = Api::createApiForTest();
+#ifdef WIN32
+  // Windows doesn't support empty environment variables.
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableIsEmpty");
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableIsEmpty");
+#else
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
+                            "DataSource cannot be empty");
+  const auto environment_variable = DataSource::read(config, true, *api);
+  EXPECT_TRUE(environment_variable.empty());
+#endif
 }
 
 } // namespace

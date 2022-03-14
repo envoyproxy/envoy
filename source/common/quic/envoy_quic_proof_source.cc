@@ -13,10 +13,13 @@
 namespace Envoy {
 namespace Quic {
 
-quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
+quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
                                    const quic::QuicSocketAddress& client_address,
-                                   const std::string& hostname) {
+                                   const std::string& hostname, bool* cert_matched_sni) {
+  // TODO(DavidSchinazi) parse the certificate to correctly fill in |cert_matched_sni|.
+  *cert_matched_sni = false;
+
   CertConfigWithFilterChain res =
       getTlsCertConfigAndFilterChain(server_address, client_address, hostname);
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
@@ -29,7 +32,7 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   std::stringstream pem_stream(chain_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
 
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
       new quic::ProofSource::Chain(chain));
   std::string error_details;
   bssl::UniquePtr<X509> cert = parseDERCertificate(cert_chain->certs[0], &error_details);
@@ -100,13 +103,15 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), server_address, client_address, hostname, "h3");
   const Network::FilterChain* filter_chain =
-      filter_chain_manager_.findFilterChain(*connection_socket);
+      filter_chain_manager_->findFilterChain(*connection_socket);
 
   if (filter_chain == nullptr) {
     listener_stats_.no_filter_chain_match_.inc();
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return {absl::nullopt, absl::nullopt};
   }
+  ENVOY_LOG(trace, "Got a matching cert chain {}", filter_chain->name());
+
   auto& transport_socket_factory =
       dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
 
@@ -120,6 +125,11 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   // TODO(danzh) Choose based on supported cipher suites in TLS1.3 CHLO and prefer EC
   // certs if supported.
   return {tls_cert_configs[0].get(), *filter_chain};
+}
+
+void EnvoyQuicProofSource::updateFilterChainManager(
+    Network::FilterChainManager& filter_chain_manager) {
+  filter_chain_manager_ = &filter_chain_manager;
 }
 
 } // namespace Quic

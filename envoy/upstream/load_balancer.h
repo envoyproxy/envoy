@@ -10,6 +10,11 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
+namespace Http {
+namespace ConnectionPool {
+class ConnectionLifetimeCallbacks;
+} // namespace ConnectionPool
+} // namespace Http
 namespace Upstream {
 
 /**
@@ -83,6 +88,22 @@ public:
    * Returns the transport socket options which should be applied on upstream connections
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
+
+  using OverrideHost = absl::string_view;
+  /**
+   * Returns the host the load balancer should select directly. If the expected host exists and
+   * the host can be selected directly, the load balancer can bypass the load balancing algorithm
+   * and return the corresponding host directly.
+   */
+  virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
+};
+
+/**
+ * Identifies a specific connection within a pool.
+ */
+struct SelectedPoolAndConnection {
+  Envoy::ConnectionPool::Instance& pool_;
+  const Network::Connection& connection_;
 };
 
 /**
@@ -107,6 +128,24 @@ public:
    * @param context supplies the context which is used in host selection.
    */
   virtual HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) PURE;
+
+  /**
+   * Returns connection lifetime callbacks that may be used to inform the load balancer of
+   * connection events. Load balancers which do not intend to track connection lifetime events
+   * will return nullopt.
+   * @return optional lifetime callbacks for this load balancer.
+   */
+  virtual OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() PURE;
+
+  /**
+   * Returns a specific pool and existing connection to be used for the specified host.
+   *
+   * @return selected pool and connection to be used, or nullopt if no selection is made,
+   *         for example if no matching connection is found.
+   */
+  virtual absl::optional<SelectedPoolAndConnection>
+  selectExistingConnection(LoadBalancerContext* context, const Host& host,
+                           std::vector<uint8_t>& hash_key) PURE;
 };
 
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
@@ -172,6 +211,27 @@ public:
 };
 
 using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
+
+/**
+ * Factory for (thread-aware) load balancers. To support a load balancing policy of
+ * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
+ * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
+ * it has a registered factory.
+ */
+class TypedLoadBalancerFactory : public Config::UntypedFactory {
+public:
+  ~TypedLoadBalancerFactory() override = default;
+
+  /**
+   * @return ThreadAwareLoadBalancerPtr a new thread-aware load balancer.
+   */
+  virtual ThreadAwareLoadBalancerPtr
+  create(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& stats_scope,
+         Runtime::Loader& runtime, Random::RandomGenerator& random,
+         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy& lb_policy) PURE;
+
+  std::string category() const override { return "envoy.load_balancers"; }
+};
 
 } // namespace Upstream
 } // namespace Envoy

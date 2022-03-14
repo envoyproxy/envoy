@@ -18,7 +18,7 @@ static_resources:
     - filters:
       - name: envoy.filters.network.sni_dynamic_forward_proxy
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
+          "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
           port_value: 443
           dns_cache_config:
             name: dynamic_forward_proxy_cache_config

@@ -27,8 +27,13 @@ void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster)
   }
 
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster.info()->name());
-  ASSERT(cluster_info_ == absl::nullopt || &cluster_info_.value().cluster_ != &cluster);
-  cluster_info_.emplace(*this, cluster);
+  ASSERT(cluster_info_ == absl::nullopt || &cluster_info_.value()->cluster_ != &cluster);
+
+  if (config_->usingPerPacketLoadBalancing()) {
+    cluster_info_.emplace(std::make_unique<PerPacketLoadBalancingClusterInfo>(*this, cluster));
+  } else {
+    cluster_info_.emplace(std::make_unique<StickySessionClusterInfo>(*this, cluster));
+  }
 }
 
 void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
@@ -40,23 +45,26 @@ void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
   cluster_info_.reset();
 }
 
-void UdpProxyFilter::onData(Network::UdpRecvData& data) {
+Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
   if (!cluster_info_.has_value()) {
     config_->stats().downstream_sess_no_route_.inc();
-    return;
+    return Network::FilterStatus::StopIteration;
   }
 
-  cluster_info_.value().onData(data);
+  return cluster_info_.value()->onData(data);
 }
 
-void UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) {
+Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) {
   config_->stats().downstream_sess_rx_errors_.inc();
+
+  return Network::FilterStatus::StopIteration;
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
-                                         Upstream::ThreadLocalCluster& cluster)
+                                         Upstream::ThreadLocalCluster& cluster,
+                                         SessionStorageType&& sessions)
     : filter_(filter), cluster_(cluster),
-      cluster_stats_(generateStats(cluster.info()->statsScope())),
+      cluster_stats_(generateStats(cluster.info()->statsScope())), sessions_(std::move(sessions)),
       member_update_cb_handle_(cluster.prioritySet().addMemberUpdateCb(
           [this](const Upstream::HostVector&, const Upstream::HostVector& hosts_removed) {
             for (const auto& host : hosts_removed) {
@@ -83,36 +91,84 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   ASSERT(host_to_sessions_.empty());
 }
 
-void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
+void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
+  // First remove from the host to sessions map.
+  ASSERT(host_to_sessions_[&session->host()].count(session) == 1);
+  auto host_sessions_it = host_to_sessions_.find(&session->host());
+  host_sessions_it->second.erase(session);
+  if (host_sessions_it->second.empty()) {
+    host_to_sessions_.erase(host_sessions_it);
+  }
+
+  // Now remove it from the primary map.
+  ASSERT(sessions_.count(session) == 1);
+  sessions_.erase(session);
+}
+
+UdpProxyFilter::ActiveSession*
+UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                           const Upstream::HostConstSharedPtr& optional_host) {
+  if (!cluster_.info()
+           ->resourceManager(Upstream::ResourcePriority::Default)
+           .connections()
+           .canCreate()) {
+    ENVOY_LOG(debug, "cannot create new connection.");
+    cluster_.info()->stats().upstream_cx_overflow_.inc();
+    return nullptr;
+  }
+
+  if (optional_host) {
+    return createSessionWithHost(std::move(addresses), optional_host);
+  }
+
+  auto host = chooseHost(addresses.peer_);
+  if (host == nullptr) {
+    ENVOY_LOG(debug, "cannot find any valid host.");
+    cluster_.info()->stats().upstream_cx_none_healthy_.inc();
+    return nullptr;
+  }
+  return createSessionWithHost(std::move(addresses), host);
+}
+
+UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithHost(
+    Network::UdpRecvData::LocalPeerAddresses&& addresses,
+    const Upstream::HostConstSharedPtr& host) {
+  ASSERT(host);
+  auto new_session = std::make_unique<ActiveSession>(*this, std::move(addresses), host);
+  auto new_session_ptr = new_session.get();
+  sessions_.emplace(std::move(new_session));
+  host_to_sessions_[host.get()].emplace(new_session_ptr);
+  return new_session_ptr;
+}
+
+Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
+    const Network::Address::InstanceConstSharedPtr& peer_address) const {
+  UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address);
+  Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
+  return host;
+}
+
+UdpProxyFilter::StickySessionClusterInfo::StickySessionClusterInfo(
+    UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster)
+    : ClusterInfo(filter, cluster,
+                  SessionStorageType(1, HeterogeneousActiveSessionHash(false),
+                                     HeterogeneousActiveSessionEqual(false))) {}
+
+Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::UdpRecvData& data) {
   const auto active_session_it = sessions_.find(data.addresses_);
   ActiveSession* active_session;
   if (active_session_it == sessions_.end()) {
-    if (!cluster_.info()
-             ->resourceManager(Upstream::ResourcePriority::Default)
-             .connections()
-             .canCreate()) {
-      cluster_.info()->stats().upstream_cx_overflow_.inc();
-      return;
+    active_session = createSession(std::move(data.addresses_));
+    if (active_session == nullptr) {
+      return Network::FilterStatus::StopIteration;
     }
-
-    UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
-    Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
-    if (host == nullptr) {
-      ENVOY_LOG(debug, "cannot find any valid host. failed to create a session.");
-      cluster_.info()->stats().upstream_cx_none_healthy_.inc();
-      return;
-    }
-
-    active_session = createSession(std::move(data.addresses_), host);
   } else {
     active_session = active_session_it->get();
     if (active_session->host().health() == Upstream::Host::Health::Unhealthy) {
       // If a host becomes unhealthy, we optimally would like to replace it with a new session
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
-
-      UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
-      Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
+      auto host = chooseHost(data.addresses_.peer_);
       if (host != nullptr && host->health() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
@@ -126,30 +182,44 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
   }
 
   active_session->write(*data.buffer_);
+
+  return Network::FilterStatus::StopIteration;
 }
 
-UdpProxyFilter::ActiveSession*
-UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                           const Upstream::HostConstSharedPtr& host) {
-  auto new_session = std::make_unique<ActiveSession>(*this, std::move(addresses), host);
-  auto new_session_ptr = new_session.get();
-  sessions_.emplace(std::move(new_session));
-  host_to_sessions_[host.get()].emplace(new_session_ptr);
-  return new_session_ptr;
-}
+UdpProxyFilter::PerPacketLoadBalancingClusterInfo::PerPacketLoadBalancingClusterInfo(
+    UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster)
+    : ClusterInfo(filter, cluster,
+                  SessionStorageType(1, HeterogeneousActiveSessionHash(true),
+                                     HeterogeneousActiveSessionEqual(true))) {}
 
-void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
-  // First remove from the host to sessions map.
-  ASSERT(host_to_sessions_[&session->host()].count(session) == 1);
-  auto host_sessions_it = host_to_sessions_.find(&session->host());
-  host_sessions_it->second.erase(session);
-  if (host_sessions_it->second.empty()) {
-    host_to_sessions_.erase(host_sessions_it);
+Network::FilterStatus
+UdpProxyFilter::PerPacketLoadBalancingClusterInfo::onData(Network::UdpRecvData& data) {
+  auto host = chooseHost(data.addresses_.peer_);
+  if (host == nullptr) {
+    ENVOY_LOG(debug, "cannot find any valid host.");
+    cluster_.info()->stats().upstream_cx_none_healthy_.inc();
+    return Network::FilterStatus::StopIteration;
   }
 
-  // Now remove it from the primary map.
-  ASSERT(sessions_.count(session) == 1);
-  sessions_.erase(session);
+  ENVOY_LOG(debug, "selected {} host as upstream.", host->address()->asStringView());
+
+  LocalPeerHostAddresses key{data.addresses_, *host};
+  const auto active_session_it = sessions_.find(key);
+  ActiveSession* active_session;
+  if (active_session_it == sessions_.end()) {
+    active_session = createSession(std::move(data.addresses_), host);
+    if (active_session == nullptr) {
+      return Network::FilterStatus::StopIteration;
+    }
+  } else {
+    active_session = active_session_it->get();
+    ENVOY_LOG(trace, "found already existing session on host {}.",
+              active_session->host().address()->asStringView());
+  }
+
+  active_session->write(*data.buffer_);
+
+  return Network::FilterStatus::StopIteration;
 }
 
 UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,

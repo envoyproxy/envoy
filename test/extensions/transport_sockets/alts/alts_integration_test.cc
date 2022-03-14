@@ -115,7 +115,7 @@ public:
       transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
 
-    config_helper_.addFilter(R"EOF(
+    config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
     typed_config:
       "@type": type.googleapis.com/google.protobuf.Empty

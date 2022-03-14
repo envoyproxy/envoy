@@ -8,7 +8,7 @@
 #include "absl/synchronization/mutex.h"
 
 // included to make code_format happy
-#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
+#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,16 +22,25 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     ResponseMetadata metadata_;
     std::string body_;
+    Http::ResponseTrailerMapPtr trailers_;
   };
 
   // Looks for a response that has been varied. Only called from lookup.
   Entry varyLookup(const LookupRequest& request,
                    const Http::ResponseHeaderMapPtr& response_headers);
 
+  // A list of headers that we do not want to update upon validation
+  // We skip these headers because either it's updated by other application logic
+  // or they are fall into categories defined in the IETF doc below
+  // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
+  static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate();
+
 public:
   // HttpCache
-  LookupContextPtr makeLookupContext(LookupRequest&& request) override;
-  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
+  LookupContextPtr makeLookupContext(LookupRequest&& request,
+                                     Http::StreamDecoderFilterCallbacks& callbacks) override;
+  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
+                                     Http::StreamEncoderFilterCallbacks& callbacks) override;
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata) override;
@@ -39,12 +48,14 @@ public:
 
   Entry lookup(const LookupRequest& request);
   void insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-              ResponseMetadata&& metadata, std::string&& body);
+              ResponseMetadata&& metadata, std::string&& body,
+              Http::ResponseTrailerMapPtr&& trailers);
 
   // Inserts a response that has been varied on certain headers.
   void varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
                   ResponseMetadata&& metadata, std::string&& body,
-                  const Http::RequestHeaderMap& request_vary_headers);
+                  const Http::RequestHeaderMap& request_headers,
+                  const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
 
   absl::Mutex mutex_;
   absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);

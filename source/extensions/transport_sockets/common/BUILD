@@ -16,5 +16,6 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/network:transport_socket_options_lib",
     ],
 )

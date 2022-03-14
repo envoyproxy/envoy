@@ -330,8 +330,16 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
   simulated_scheduler_.disableAlarm(*this);
 }
 
+void SimulatedTimeSystemHelper::maybeLogTimerWarning() {
+  if (++warning_logged_ == 1) {
+    ENVOY_LOG_MISC(warn, "Simulated timer enabled. Use advanceTimeWait or "
+                         "advanceTimeAsync functions to ensure it is called.");
+  }
+}
+
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
     const std::chrono::microseconds duration, const ScopeTrackedObject* /*scope*/) {
+  time_system_.maybeLogTimerWarning();
   simulated_scheduler_.enableAlarm(*this, duration);
 }
 

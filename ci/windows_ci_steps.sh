@@ -91,11 +91,13 @@ fi
 if [[ $BUILD_ENVOY_STATIC -eq 1 ]]; then
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
 
-  # Copy binary to delivery directory
+  # Copy binary and pdb to delivery directory
   cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
+  cp -f bazel-bin/source/exe/envoy-static.pdb "${ENVOY_DELIVERY_DIR}/envoy.pdb"
 
   # Copy for azp, creating a tar archive
   tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_DELIVERY_DIR}" envoy.exe
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary_debug.tar.gz -C "${ENVOY_DELIVERY_DIR}" envoy.exe envoy.pdb
 fi
 
 # Test invocations of known-working tests on Windows
@@ -103,7 +105,7 @@ if [[ $TEST_TARGETS == "//test/..." ]]; then
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" $TEST_TARGETS --test_tag_filters=-skip_on_windows,-fails_on_${FAIL_GROUP} --build_tests_only
 
   echo "running flaky test reporting script"
-  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
 
   # Build tests that are known flaky or failing to ensure no compilation regressions
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=fails_on_${FAIL_GROUP} --build_tests_only

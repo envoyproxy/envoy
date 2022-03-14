@@ -6,6 +6,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,19 +27,29 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::passthroughData(Buffer::
 }
 
 // MessageBegin -> StructBegin
+// MessageBegin -> ReplyPayload (reply received, get reply type)
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
   const auto total = buffer.length();
   if (!proto_.readMessageBegin(buffer, *metadata_)) {
     return {ProtocolState::WaitForData};
   }
 
+  body_start_ = total - buffer.length();
   stack_.clear();
   stack_.emplace_back(Frame(ProtocolState::MessageEnd));
+  // If a reply peek at the payload to see if success or error (IDL exception)
+  if (metadata_->hasMessageType() && metadata_->messageType() == MessageType::Reply) {
+    return {ProtocolState::ReplyPayload, FilterStatus::Continue};
+  }
 
+  return handleMessageBegin();
+}
+
+DecoderStateMachine::DecoderStatus DecoderStateMachine::handleMessageBegin() {
   const auto status = handler_.messageBegin(metadata_);
 
   if (callbacks_.passthroughEnabled()) {
-    body_bytes_ = metadata_->frameSize() - (total - buffer.length());
+    body_bytes_ = metadata_->frameSize() - body_start_;
     return {ProtocolState::PassthroughData, status};
   }
 
@@ -52,6 +63,17 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::messageEnd(Buffer::Insta
   }
 
   return {ProtocolState::Done, handler_.messageEnd()};
+}
+
+// ReplyPayload -> StructBegin
+DecoderStateMachine::DecoderStatus DecoderStateMachine::replyPayload(Buffer::Instance& buffer) {
+  ReplyType reply_type;
+  if (!proto_.peekReplyPayload(buffer, reply_type)) {
+    return {ProtocolState::WaitForData};
+  }
+
+  metadata_->setReplyType(reply_type);
+  return handleMessageBegin();
 }
 
 // StructBegin -> FieldBegin
@@ -318,6 +340,8 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
     return passthroughData(buffer);
   case ProtocolState::MessageBegin:
     return messageBegin(buffer);
+  case ProtocolState::ReplyPayload:
+    return replyPayload(buffer);
   case ProtocolState::StructBegin:
     return structBegin(buffer);
   case ProtocolState::StructEnd:
@@ -350,9 +374,14 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
     return setEnd(buffer);
   case ProtocolState::MessageEnd:
     return messageEnd(buffer);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case ProtocolState::StopIteration:
+    FALLTHRU;
+  case ProtocolState::WaitForData:
+    FALLTHRU;
+  case ProtocolState::Done:
+    PANIC("unexpected");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ProtocolState DecoderStateMachine::popReturnState() {

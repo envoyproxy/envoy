@@ -93,21 +93,6 @@ private:
 using SpanBufferPtr = std::unique_ptr<SpanBuffer>;
 
 /**
- * JsonV1Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
- * Zipkin v1 array.
- */
-class JsonV1Serializer : public Serializer {
-public:
-  JsonV1Serializer() = default;
-
-  /**
-   * Serialize list of Zipkin spans into Zipkin v1 JSON array.
-   * @return std::string serialized pending spans as Zipkin v1 JSON array.
-   */
-  std::string serialize(const std::vector<Span>& pending_spans) override;
-};
-
-/**
  * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
  * Zipkin v2 array.
  */

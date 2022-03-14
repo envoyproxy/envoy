@@ -8,6 +8,8 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/base_overload_integration_test.h"
+#include "test/integration/filters/tee_filter.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
@@ -21,14 +23,18 @@
 
 namespace Envoy {
 namespace {
+
+using testing::HasSubstr;
+
 std::string protocolTestParamsAndBoolToString(
-    const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
-  return fmt::format("{}_{}",
+    const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool, bool>>& params) {
+  return fmt::format("{}_{}_{}",
                      HttpProtocolIntegrationTest::protocolTestParamsToString(
                          ::testing::TestParamInfo<HttpProtocolTestParams>(std::get<0>(params.param),
                                                                           /*an_index=*/0)),
                      std::get<1>(params.param) ? "with_per_stream_buffer_accounting"
-                                               : "without_per_stream_buffer_accounting");
+                                               : "without_per_stream_buffer_accounting",
+                     std::get<2>(params.param) ? "WrappedHttp2" : "BareHttp2");
 }
 
 void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func) {
@@ -62,7 +68,7 @@ void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::funct
 
 class Http2BufferWatermarksTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+      public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool, bool>>,
       public HttpIntegrationTest {
 public:
   std::vector<IntegrationStreamDecoderPtr>
@@ -89,17 +95,27 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.test_only.per_stream_buffer_accounting",
-                                      streamBufferAccounting() ? "true" : "false");
+    if (streamBufferAccounting()) {
+      buffer_factory_ =
+          std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
+    } else {
+      buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+    }
+    const bool enable_new_wrapper = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
 
 protected:
-  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+  // For testing purposes, track >= 4096B accounts.
+  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_;
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
+  bool deferProcessingBackedUpStreams() {
+    return Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams);
+  }
 
   std::string printAccounts() {
     std::stringstream stream;
@@ -129,7 +145,7 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2BufferWatermarksTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 // We should create four buffers each billing the same downstream request's
@@ -201,8 +217,8 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
 
   // Makes us have Envoy's writes to upstream return EAGAIN
-  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -216,7 +232,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
   }
 
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   for (auto& response : responses) {
     ASSERT_TRUE(response->waitForEndStream());
@@ -234,12 +250,12 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   initialize();
 
   buffer_factory_->setExpectedAccountBalance(response_body_size, num_requests);
-  writev_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
   // start to accumulate in the transport socket buffer.
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setWriteReturnsEgain();
 
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
@@ -251,7 +267,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
   }
 
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   // Wait for streams to terminate.
   for (auto& response : responses) {
@@ -265,7 +281,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
 // up notifying the BufferMemoryAccount when the dtor of the downstream stream
 // occurs.
 class ProtocolsBufferWatermarksTest
-    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool, bool>>,
       public HttpIntegrationTest {
 public:
   ProtocolsBufferWatermarksTest()
@@ -274,15 +290,21 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.test_only.per_stream_buffer_accounting",
-                                      streamBufferAccounting() ? "true" : "false");
+    if (streamBufferAccounting()) {
+      buffer_factory_ =
+          std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
+    } else {
+      buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+    }
+    const bool enable_new_wrapper = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
 
 protected:
-  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_;
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 };
@@ -292,7 +314,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                          {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 TEST_P(ProtocolsBufferWatermarksTest, AccountShouldBeRegisteredAndUnregisteredOnce) {
@@ -393,6 +415,563 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
   } else {
     EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
   }
+}
+
+class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
+                                            public Envoy::BaseOverloadIntegrationTest {
+protected:
+  void initializeOverloadManagerInBootstrap(
+      const envoy::config::overload::v3::OverloadAction& overload_action) {
+    setupOverloadManagerConfig(overload_action);
+    overload_manager_config_.mutable_buffer_factory_config()
+        ->set_minimum_account_to_track_power_of_two(absl::bit_width(4096u));
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+  }
+};
+
+// Run the tests using HTTP2 only since its the only protocol that's fully
+// supported.
+// TODO(kbaichoo): Instantiate with H3 and H1 as well when their buffers are
+// bounded to accounts.
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2OverloadManagerIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Bool(), testing::Bool()),
+    protocolTestParamsAndBoolToString);
+
+TEST_P(Http2OverloadManagerIntegrationTest,
+       ResetsExpensiveStreamsWhenUpstreamBuffersTakeTooMuchSpaceAndOverloaded) {
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_high_memory_stream"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Makes us have Envoy's writes to upstream return EAGAIN
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto smallest_request_response = std::move(sendRequests(1, 4096, 4096)[0]);
+  auto medium_request_response = std::move(sendRequests(1, 4096 * 2, 4096)[0]);
+  auto largest_request_response = std::move(sendRequests(1, 4096 * 4, 4096)[0]);
+
+  // Wait for requests to come into Envoy.
+  EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(7 * 4096));
+
+  // Set the pressure so the overload action kicks in
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+
+  // Wait for the proxy to notice and take action for the overload by only
+  // resetting the largest stream.
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+    EXPECT_TRUE(largest_request_response->waitForReset());
+    EXPECT_TRUE(largest_request_response->reset());
+
+    ASSERT_FALSE(medium_request_response->complete());
+  }
+
+  // Increase resource pressure to reset the medium request
+  updateResource(0.96);
+
+  // Wait for the proxy to notice and take action for the overload.
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 2);
+    EXPECT_TRUE(medium_request_response->waitForReset());
+    EXPECT_TRUE(medium_request_response->reset());
+
+    ASSERT_FALSE(smallest_request_response->complete());
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+
+  // Resume writes to upstream, any request streams that survive can go through.
+  write_matcher_->setResumeWrites();
+
+  if (!streamBufferAccounting()) {
+    // If we're not doing the accounting, we didn't end up resetting these
+    // streams.
+    ASSERT_TRUE(largest_request_response->waitForEndStream());
+    ASSERT_TRUE(largest_request_response->complete());
+    EXPECT_EQ(largest_request_response->headers().getStatusValue(), "200");
+
+    ASSERT_TRUE(medium_request_response->waitForEndStream());
+    ASSERT_TRUE(medium_request_response->complete());
+    EXPECT_EQ(medium_request_response->headers().getStatusValue(), "200");
+  }
+
+  ASSERT_TRUE(smallest_request_response->waitForEndStream());
+  ASSERT_TRUE(smallest_request_response->complete());
+  EXPECT_EQ(smallest_request_response->headers().getStatusValue(), "200");
+}
+
+TEST_P(Http2OverloadManagerIntegrationTest,
+       ResetsExpensiveStreamsWhenDownstreamBuffersTakeTooMuchSpaceAndOverloaded) {
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_high_memory_stream"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Makes us have Envoy's writes to downstream return EAGAIN
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto smallest_response = std::move(sendRequests(1, 10, 4096)[0]);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_smallest_response = std::move(upstream_request_);
+
+  auto medium_response = std::move(sendRequests(1, 20, 4096 * 2)[0]);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_medium_response = std::move(upstream_request_);
+
+  auto largest_response = std::move(sendRequests(1, 30, 4096 * 4)[0]);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_largest_response = std::move(upstream_request_);
+
+  // Send the responses back, without yet ending the stream.
+  upstream_request_for_largest_response->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_for_largest_response->encodeData(4096 * 4, false);
+
+  upstream_request_for_medium_response->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_for_medium_response->encodeData(4096 * 2, false);
+
+  upstream_request_for_smallest_response->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_for_smallest_response->encodeData(4096, false);
+
+  // Wait for the responses to come back
+  EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(7 * 4096));
+
+  // Set the pressure so the overload action kills largest response
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+    ASSERT_TRUE(upstream_request_for_largest_response->waitForReset());
+  }
+
+  // Set the pressure so the overload action kills medium response
+  updateResource(0.96);
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 2);
+    ASSERT_TRUE(upstream_request_for_medium_response->waitForReset());
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+
+  // Resume writes to downstream, any responses that survive can go through.
+  write_matcher_->setResumeWrites();
+
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(largest_response->waitForReset());
+    EXPECT_TRUE(largest_response->reset());
+
+    EXPECT_TRUE(medium_response->waitForReset());
+    EXPECT_TRUE(medium_response->reset());
+
+  } else {
+    // If we're not doing the accounting, we didn't end up resetting these
+    // streams. Finish sending data.
+    upstream_request_for_largest_response->encodeData(100, true);
+    upstream_request_for_medium_response->encodeData(100, true);
+    ASSERT_TRUE(largest_response->waitForEndStream());
+    ASSERT_TRUE(largest_response->complete());
+    EXPECT_EQ(largest_response->headers().getStatusValue(), "200");
+
+    ASSERT_TRUE(medium_response->waitForEndStream());
+    ASSERT_TRUE(medium_response->complete());
+    EXPECT_EQ(medium_response->headers().getStatusValue(), "200");
+  }
+
+  // Have the smallest response finish.
+  upstream_request_for_smallest_response->encodeData(100, true);
+  ASSERT_TRUE(smallest_response->waitForEndStream());
+  ASSERT_TRUE(smallest_response->complete());
+  EXPECT_EQ(smallest_response->headers().getStatusValue(), "200");
+}
+
+TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  useAccessLog("%RESPONSE_CODE%");
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_high_memory_stream"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Set 10MiB receive window for the client.
+  const int downstream_window_size = 10 * 1024 * 1024;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(downstream_window_size);
+  http2_options.mutable_initial_connection_window_size()->set_value(downstream_window_size);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // Makes us have Envoy's writes to downstream return EAGAIN
+  write_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  // Send a request
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"content-length", "10"},
+  });
+  auto& encoder = encoder_decoder.first;
+  const std::string data(10, 'a');
+  codec_client_->sendData(encoder, data, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_response = std::move(upstream_request_);
+
+  // Send the responses back. It is larger than the downstream's receive window
+  // size. Thus, the codec will not end the stream, but the Envoy level stream
+  // should.
+  upstream_request_for_response->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                               false);
+  const int response_size = downstream_window_size + 1024; // Slightly over the window size.
+  upstream_request_for_response->encodeData(response_size, true);
+
+  if (streamBufferAccounting()) {
+    if (deferProcessingBackedUpStreams()) {
+      // Wait for an accumulation of data, as we cannot rely on the access log
+      // output since we're deferring the processing of the stream data.
+      EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(10 * 10 * 1024));
+
+    } else {
+      // Wait for access log to know the Envoy level stream has been deleted.
+      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
+    }
+  }
+
+  // Set the pressure so the overload action kills the response if doing stream
+  // accounting
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+
+  // Resume writes to downstream.
+  write_matcher_->setResumeWrites();
+
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(response->waitForReset());
+    EXPECT_TRUE(response->reset());
+  } else {
+    // If we're not doing the accounting, we didn't end up resetting the
+    // streams.
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(response->headers().getStatusValue(), "200");
+  }
+}
+
+class Http2DeferredProcessingIntegrationTest : public Http2BufferWatermarksTest {
+public:
+  Http2DeferredProcessingIntegrationTest() : registered_tee_factory_(tee_filter_factory_) {
+    config_helper_.prependFilter(R"EOF(
+      name: stream-tee-filter
+    )EOF");
+  }
+
+protected:
+  StreamTeeFilterConfig tee_filter_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>
+      registered_tee_factory_;
+};
+
+// We run with buffer accounting in order to verify the amount of data in the
+// system. Buffer accounting isn't necessary for deferring http2 processing.
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2DeferredProcessingIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Values(true), testing::Bool()),
+    protocolTestParamsAndBoolToString);
+
+TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
+  config_helper_.setBufferLimits(1000, 1000);
+  initialize();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+  codec_client_->sendData(request_encoder, 1000, false);
+  // Wait for an upstream request to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+
+  codec_client_->sendData(request_encoder, 1000, true);
+
+  // Verify codec received but is buffered as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(2000);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.request_body_.length(), 1000);
+  }));
+
+  // Allow draining to the upstream, and complete the stream.
+  write_matcher_->setResumeWrites();
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_TRUE(upstream_request->complete());
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 1);
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
+  config_helper_.setBufferLimits(1000, 1000);
+  initialize();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 1);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request->encodeData(1000, false);
+
+  // Wait for an upstream response to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+
+  upstream_request->encodeData(500, false);
+
+  // Verify codec received but is buffered as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(1500);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.response_body_.length(), 1000);
+  }));
+
+  // Allow draining to the downstream, and complete the stream.
+  write_matcher_->setResumeWrites();
+  response_decoder->waitForBodyData(1500);
+
+  upstream_request->encodeData(1, true);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_TRUE(upstream_request->complete());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 1);
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream) {
+  config_helper_.setBufferLimits(1000, 1000);
+  initialize();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 1);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request->encodeData(1000, false);
+
+  // Wait for an upstream response to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  upstream_request->encodeData(500, true);
+
+  // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(1500);
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.response_body_.length(), 1000);
+  }));
+
+  // Allow draining to the downstream.
+  write_matcher_->setResumeWrites();
+
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_TRUE(upstream_request->complete());
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 1);
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest,
+       ShouldCloseDeferredUpstreamOnStreamCloseIfLocalReply) {
+  config_helper_.setBufferLimits(9000, 9000);
+  initialize();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 1);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request->encodeData(9000, false);
+
+  // Wait for an upstream response to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+
+  auto close_if_over_9000 =
+      [](StreamTee& tee, Http::StreamEncoderFilterCallbacks* encoder_cbs)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    if (tee.response_body_.length() > 9000) {
+      encoder_cbs->sendLocalReply(Http::Code::InternalServerError, "Response size was over 9000!",
+                                  nullptr, absl::nullopt, "");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+    return Http::FilterDataStatus::Continue;
+  };
+
+  EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(0, close_if_over_9000));
+
+  upstream_request->encodeData(1, true);
+
+  // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(9001);
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.response_body_.length(), 9000);
+  }));
+
+  // Allow draining to the downstream, which should trigger a local reply.
+  write_matcher_->setResumeWrites();
+
+  ASSERT_TRUE(response_decoder->waitForReset());
+  ASSERT_TRUE(upstream_request->complete());
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 1);
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest,
+       ShouldCloseDeferredUpstreamOnStreamCloseIfResetByDownstream) {
+  config_helper_.setBufferLimits(1000, 1000);
+  initialize();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+  codec_client_->sendData(request_encoder, 100, true);
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request->encodeData(1000, false);
+
+  // Wait for an upstream response to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+
+  upstream_request->encodeData(500, true);
+  ASSERT_TRUE(upstream_request->complete());
+
+  // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(1500);
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.response_body_.length(), 1000);
+  }));
+
+  // Downstream sends a RST, we should clean up the buffered upstream.
+  codec_client_->sendReset(request_encoder);
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
+  // Resetting the upstream stream doesn't increment this count.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 0);
 }
 
 } // namespace Envoy

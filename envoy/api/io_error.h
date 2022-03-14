@@ -35,6 +35,8 @@ public:
     BadFd,
     // An existing connection was forcibly closed by the remote host.
     ConnectionReset,
+    // Network is unreachable due to network settings.
+    NetworkUnreachable,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
@@ -42,6 +44,7 @@ public:
 
   virtual IoErrorCode getErrorCode() const PURE;
   virtual std::string getErrorDetails() const PURE;
+  virtual int getSystemErrorCode() const PURE;
 };
 
 using IoErrorDeleterType = void (*)(IoError*);

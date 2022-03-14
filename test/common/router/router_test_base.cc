@@ -6,6 +6,7 @@ namespace Envoy {
 namespace Router {
 
 using ::testing::AnyNumber;
+using ::testing::Eq;
 using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
@@ -25,10 +26,10 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       host_address_);
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
   test_time_.setMonotonicTime(std::chrono::milliseconds(50));
@@ -36,6 +37,8 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   // Allow any number of (append|pop)TrackedObject calls for the dispatcher strict mock.
   EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
+  callbacks_.dispatcher_.delete_immediately_ = true;
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
@@ -50,9 +53,14 @@ void RouterTestBase::expectPerTryTimerCreate() {
   EXPECT_CALL(*per_try_timeout_, disableTimer());
 }
 
-void RouterTestBase::expectMaxStreamDurationTimerCreate() {
+void RouterTestBase::expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout) {
+  per_try_idle_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*per_try_idle_timeout_, enableTimer(timeout, _));
+}
+
+void RouterTestBase::expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec) {
   max_stream_duration_timer_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(_, _));
+  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(Eq(duration_msec), _));
   EXPECT_CALL(*max_stream_duration_timer_, disableTimer());
 }
 
@@ -123,7 +131,7 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
 
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -141,7 +149,7 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
                                                       int expected_count) {
   setIncludeAttemptCountInRequest(set_include_attempt_count_in_request);
 
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
@@ -172,15 +180,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder& decoder,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
-            return nullptr;
-          }));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
   Http::TestRequestHeaderMapImpl headers;
@@ -199,6 +199,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
       .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
       }));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(1U,
@@ -209,17 +210,9 @@ void RouterTestBase::sendRequest(bool end_stream) {
   if (end_stream) {
     EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_));
   }
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder& decoder,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            response_decoder_ = &decoder;
-            EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AtLeast(1));
-            EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AtLeast(1));
-            callbacks.onPoolReady(original_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
-            return nullptr;
-          }));
+  expectNewStreamWithImmediateEncoder(original_encoder_, &response_decoder_,
+                                      Http::Protocol::Http10);
+
   HttpTestUtility::addDefaultHeaders(default_request_headers_, false);
   router_.decodeHeaders(default_request_headers_, end_stream);
 }
@@ -286,15 +279,8 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder& decoder,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
-            return nullptr;
-          }));
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
   expectResponseTimerCreate();
 
   Http::TestRequestHeaderMapImpl headers;
@@ -314,6 +300,7 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
         EXPECT_FALSE(cluster_header.empty());
         EXPECT_EQ("fake_cluster", cluster_header[0]->value().getStringView());
       }));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -337,15 +324,8 @@ void RouterTestBase::testAppendUpstreamHost(
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder& decoder,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
-            return nullptr;
-          }));
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
   expectResponseTimerCreate();
 
   Http::TestRequestHeaderMapImpl headers;
@@ -371,6 +351,7 @@ void RouterTestBase::testAppendUpstreamHost(
         EXPECT_FALSE(host_address_header.empty());
         EXPECT_EQ("10.0.0.5:9211", host_address_header[0]->value().getStringView());
       }));
+  ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -401,6 +382,22 @@ void RouterTestBase::testDoNotForward(
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+void RouterTestBase::expectNewStreamWithImmediateEncoder(Http::RequestEncoder& encoder,
+                                                         Http::ResponseDecoder** response_decoder,
+                                                         Http::Protocol protocol) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([this, &encoder, response_decoder,
+                        protocol](Http::ResponseDecoder& decoder,
+                                  Http::ConnectionPool::Callbacks& callbacks,
+                                  const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
+        *response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                              upstream_stream_info_, protocol);
+        return nullptr;
+      }));
 }
 
 } // namespace Router

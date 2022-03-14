@@ -34,7 +34,14 @@ def should_message_newcontributor(action, issue_number):
 def send_newcontributor_message(sender):
   github.issue_create_comment(NEW_CONTRIBUTOR_MESSAGE % sender)
 
-def _pr(action, issue_number, sender, config, draft):
+def is_envoy_repo(repo_owner, repo_name):
+  return (
+    repo_owner == "envoyproxy"
+    and repo_name == "envoy")
+
+def _pr(action, issue_number, sender, config, draft, repo_owner, repo_name):
+  if not is_envoy_repo(repo_owner, repo_name):
+    return
   if should_message_newcontributor(action, issue_number):
     send_newcontributor_message(sender)
   if action == 'opened' and draft:

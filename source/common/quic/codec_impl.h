@@ -24,7 +24,7 @@ public:
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& /*data*/) override {
     // Bypassed. QUIC connection already hands all data to streams.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   Http::Protocol protocol() override { return Http::Protocol::Http3; }
   // Returns true if the session has data to send but queued in connection or
@@ -53,6 +53,8 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
+  EnvoyQuicServerSession& quicServerSession() { return quic_server_session_; }
+
 private:
   EnvoyQuicServerSession& quic_server_session_;
 };
@@ -70,8 +72,8 @@ public:
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;
 
   // Http::Connection
-  void goAway() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  void shutdownNotice() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void goAway() override;
+  void shutdownNotice() override {}
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 

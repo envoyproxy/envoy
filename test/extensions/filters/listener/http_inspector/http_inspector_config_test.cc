@@ -45,16 +45,6 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<HttpInspector::Filter*>(added_filter.get()), nullptr);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(HttpInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.http_inspector";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
-}
-
 } // namespace
 } // namespace HttpInspector
 } // namespace ListenerFilters

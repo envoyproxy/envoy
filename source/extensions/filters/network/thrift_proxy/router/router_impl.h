@@ -6,12 +6,11 @@
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/router/router.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/http/header_utility.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -28,6 +27,25 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
+class RequestMirrorPolicyImpl : public RequestMirrorPolicy {
+public:
+  RequestMirrorPolicyImpl(const std::string& cluster_name, const std::string& runtime_key,
+                          const envoy::type::v3::FractionalPercent& default_value)
+      : cluster_name_(cluster_name), runtime_key_(runtime_key), default_value_(default_value) {}
+
+  // Router::RequestMirrorPolicy
+  const std::string& clusterName() const override { return cluster_name_; }
+  bool enabled(Runtime::Loader& runtime) const override {
+    return runtime_key_.empty() ? true
+                                : runtime.snapshot().featureEnabled(runtime_key_, default_value_);
+  }
+
+private:
+  const std::string cluster_name_;
+  const std::string runtime_key_;
+  const envoy::type::v3::FractionalPercent default_value_;
+};
+
 class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
@@ -42,6 +60,9 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   bool stripServiceName() const override { return strip_service_name_; };
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
+  const std::vector<std::shared_ptr<RequestMirrorPolicy>>& requestMirrorPolicies() const override {
+    return mirror_policies_;
+  }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -75,6 +96,10 @@ private:
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
     const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
+    requestMirrorPolicies() const override {
+      return parent_.requestMirrorPolicies();
+    }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -100,6 +125,10 @@ private:
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
     const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
+    requestMirrorPolicies() const override {
+      return parent_.requestMirrorPolicies();
+    }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -109,6 +138,9 @@ private:
     const std::string cluster_name_;
   };
 
+  static std::vector<std::shared_ptr<RequestMirrorPolicy>> buildMirrorPolicies(
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteAction& route);
+
   const std::string cluster_name_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
@@ -117,6 +149,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const bool strip_service_name_;
   const Http::LowerCaseString cluster_header_;
+  const std::vector<std::shared_ptr<RequestMirrorPolicy>> mirror_policies_;
 };
 
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
@@ -183,9 +216,10 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public RequestOwner,
                public ThriftFilters::DecoderFilter {
 public:
-  Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         Stats::Scope& scope)
-      : RequestOwner(cluster_manager, stat_prefix, scope), passthrough_supported_(false) {}
+  Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
+         Runtime::Loader& runtime, ShadowWriter& shadow_writer)
+      : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
+        shadow_writer_(shadow_writer) {}
 
   ~Router() override = default;
 
@@ -204,20 +238,54 @@ public:
   void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
     callbacks_->sendLocalReply(response, end_stream);
   }
-  void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) override {
-    recordClusterResponseDuration(*cluster_, value, unit);
-  }
 
   // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus transportEnd() override;
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus messageEnd() override;
+  FilterStatus passthroughData(Buffer::Instance& data) override;
+  FilterStatus structBegin(absl::string_view name) override;
+  FilterStatus structEnd() override;
+  FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                          int16_t& field_id) override;
+  FilterStatus fieldEnd() override;
+  FilterStatus boolValue(bool& value) override;
+  FilterStatus byteValue(uint8_t& value) override;
+  FilterStatus int16Value(int16_t& value) override;
+  FilterStatus int32Value(int32_t& value) override;
+  FilterStatus int64Value(int64_t& value) override;
+  FilterStatus doubleValue(double& value) override;
+  FilterStatus stringValue(absl::string_view value) override;
+  FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) override;
+  FilterStatus mapEnd() override;
+  FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
+  FilterStatus listEnd() override;
+  FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
+  FilterStatus setEnd() override;
 
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    return route_entry_ ? route_entry_->metadataMatchCriteria() : nullptr;
+    const Envoy::Router::MetadataMatchCriteria* route_criteria =
+        (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
+
+    // Support getting metadata match criteria from thrift request.
+    const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+    if (filter_it == request_metadata.end()) {
+      return route_criteria;
+    }
+
+    if (route_criteria != nullptr) {
+      metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+    } else {
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
+
+    return metadata_match_criteria_.get();
   }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
@@ -233,12 +301,16 @@ private:
   std::unique_ptr<UpstreamResponseCallbacksImpl> upstream_response_callbacks_{};
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
 
   bool passthrough_supported_ : 1;
   uint64_t request_size_{};
+  Runtime::Loader& runtime_;
+  ShadowWriter& shadow_writer_;
+  std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_{};
 };
 
 } // namespace Router

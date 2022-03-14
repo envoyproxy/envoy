@@ -2,28 +2,17 @@
 
 #include <string>
 
+#include "envoy/network/filter.h"
+
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 #include "absl/strings/str_cat.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
+#include "openssl/ssl.h"
+#include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/core/crypto/proof_source.h"
 #include "quiche/quic/core/quic_versions.h"
-#include "quiche/quic/core/crypto/crypto_protocol.h"
-#include "quiche/quic/platform/api/quic_reference_counted.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "openssl/ssl.h"
-#include "envoy/network/filter.h"
-#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {
@@ -61,6 +50,7 @@ public:
                            const std::string& hostname, uint16_t signature_algorithm,
                            absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
+  absl::InlinedVector<uint16_t, 8> SupportedTlsSignatureAlgorithms() const override;
 
 protected:
   virtual void signPayload(const quic::QuicSocketAddress& server_address,

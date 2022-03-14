@@ -60,11 +60,29 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
+   * @param ja3Hash Connection ja3 fingerprint hash of the downstream connection.
+   */
+  virtual void setJA3Hash(absl::string_view ja3_hash) PURE;
+
+  /**
+   * @return Connection ja3 fingerprint hash of the downstream connection, if any.
+   */
+  virtual absl::string_view ja3Hash() const PURE;
+
+  /**
    *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
+
+  /**
+   * @return the current congestion window in bytes, or unset if not available or not
+   * congestion-controlled.
+   * @note some congestion controller's cwnd is measured in number of packets, in that case the
+   * return value is cwnd(in packets) times the connection's MSS.
+   */
+  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
 };
 
 using ConnectionSocketPtr = std::unique_ptr<ConnectionSocket>;

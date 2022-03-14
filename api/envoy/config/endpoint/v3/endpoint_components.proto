@@ -9,7 +9,6 @@ import "envoy/config/core/v3/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -17,6 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.endpoint.v3";
 option java_outer_classname = "EndpointComponentsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3;endpointv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Endpoints]
@@ -141,7 +141,7 @@ message LocalityLbEndpoints {
 
   // The group of endpoints belonging to the locality specified.
   // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be
-  // deprecated and replaced by *lb_endpoints_list*.]
+  // deprecated and replaced by *load_balancer_endpoints*.]
   repeated LbEndpoint lb_endpoints = 2;
 
   // [#not-implemented-hide:]
@@ -149,7 +149,7 @@ message LocalityLbEndpoints {
     // The group of endpoints belonging to the locality.
     // [#comment:TODO(adisuissa): Once LEDS is implemented the *lb_endpoints* field
     // needs to be deprecated.]
-    LbEndpointList lb_endpoints_list = 7;
+    LbEndpointList load_balancer_endpoints = 7;
 
     // LEDS Configuration for the current locality.
     LedsClusterLocalityConfig leds_cluster_locality_config = 8;

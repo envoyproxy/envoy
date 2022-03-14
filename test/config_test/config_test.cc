@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -85,21 +86,20 @@ public:
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
 
-    // TODO(snowp): There's no way to override runtime flags per example file (since we mock out the
-    // runtime loader), so temporarily enable this flag explicitly here until we flip the default.
-    // This should allow the existing configuration examples to continue working despite the feature
-    // being disabled by default.
-    ON_CALL(*snapshot_,
-            runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api"))
-        .WillByDefault(Return(true));
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
 
+    // For configuration/example tests we don't fail if WIP APIs are used.
+    EXPECT_CALL(server_.validation_context_.static_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
+    EXPECT_CALL(server_.validation_context_.dynamic_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
+
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap, options);
+    Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -107,7 +107,7 @@ public:
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
         server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
         server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager(), server_.options(), server_.quic_stat_names_);
+        server_.singletonManager(), server_.options(), server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -228,33 +228,5 @@ uint32_t run(const std::string& directory) {
   }
   return num_tested;
 }
-
-void loadVersionedBootstrapFile(const std::string& filename,
-                                envoy::config::bootstrap::v3::Bootstrap& bootstrap_message,
-                                absl::optional<uint32_t> bootstrap_version) {
-  Api::ApiPtr api = Api::createApiForTest();
-  OptionsImpl options(
-      Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
-  // Avoid contention issues with other tests over the hot restart domain socket.
-  options.setHotRestartDisabled(true);
-  if (bootstrap_version.has_value()) {
-    options.setBootstrapVersion(*bootstrap_version);
-  }
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap_message, options,
-                                            ProtobufMessage::getStrictValidationVisitor(), *api);
-}
-
-void loadBootstrapConfigProto(const envoy::config::bootstrap::v3::Bootstrap& in_proto,
-                              envoy::config::bootstrap::v3::Bootstrap& bootstrap_message) {
-  Api::ApiPtr api = Api::createApiForTest();
-  OptionsImpl options(
-      Envoy::Server::createTestOptionsImpl("", "", Network::Address::IpVersion::v6));
-  options.setConfigProto(in_proto);
-  // Avoid contention issues with other tests over the hot restart domain socket.
-  options.setHotRestartDisabled(true);
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap_message, options,
-                                            ProtobufMessage::getStrictValidationVisitor(), *api);
-}
-
 } // namespace ConfigTest
 } // namespace Envoy

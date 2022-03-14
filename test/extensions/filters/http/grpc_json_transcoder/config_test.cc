@@ -22,16 +22,6 @@ TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
                ProtoValidationException);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(GrpcJsonTranscoderFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.grpc_json_transcoder";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters

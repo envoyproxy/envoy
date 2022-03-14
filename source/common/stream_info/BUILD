@@ -38,7 +38,10 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/common:time_interface",
+        "//envoy/http:codes_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/http:default_server_string_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -47,5 +50,13 @@ envoy_cc_library(
     hdrs = ["uint32_accessor_impl.h"],
     deps = [
         "//envoy/stream_info:uint32_accessor_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_address_lib",
+    hdrs = ["upstream_address.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
     ],
 )

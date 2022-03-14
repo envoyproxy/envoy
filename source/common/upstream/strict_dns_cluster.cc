@@ -14,7 +14,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api, factory_context.dispatcher().timeSource()),
+                             added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
@@ -37,8 +37,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
 
       const std::string& url =
           fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
-                                                     locality_lb_endpoint, lb_endpoint));
+      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.mainThreadDispatcher(),
+                                                     url, locality_lb_endpoint, lb_endpoint));
     }
   }
   resolve_targets_ = std::move(resolve_targets);
@@ -117,42 +117,53 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           parent_.info_->stats().update_success_.inc();
 
-          HostMap updated_hosts;
           HostVector new_hosts;
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
           absl::flat_hash_set<std::string> all_new_hosts;
           for (const auto& resp : response) {
+            const auto& addrinfo = resp.addrInfo();
             // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
             // make a new address that has port in it. We need to both support IPv6 as well as
             // potentially move port handling into the DNS interface itself, which would work better
             // for SRV.
-            ASSERT(resp.address_ != nullptr);
+            ASSERT(addrinfo.address_ != nullptr);
+            auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
+            if (all_new_hosts.count(address->asString()) > 0) {
+              continue;
+            }
+
             new_hosts.emplace_back(new HostImpl(
-                parent_.info_, hostname_,
-                Network::Utility::getAddressWithPort(*(resp.address_), port_),
+                parent_.info_, hostname_, address,
                 // TODO(zyfjeff): Created through metadata shared pool
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
-            all_new_hosts.emplace(new_hosts.back()->address()->asString());
-            ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
+            all_new_hosts.emplace(address->asString());
+            ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }
 
           HostVector hosts_added;
           HostVector hosts_removed;
           if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                            updated_hosts, all_hosts_, all_new_hosts)) {
+                                            all_hosts_, all_new_hosts)) {
             ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
             ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
               return host->priority() == locality_lb_endpoints_.priority();
             }));
+
+            // Update host map for current resolve target.
+            for (const auto& host : hosts_removed) {
+              all_hosts_.erase(host->address()->asString());
+            }
+            for (const auto& host : hosts_added) {
+              all_hosts_.insert({host->address()->asString(), host});
+            }
+
             parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoints_.priority());
           } else {
             parent_.info_->stats().update_no_rebuild_.inc();
           }
-
-          all_hosts_ = std::move(updated_hosts);
 
           // reset failure backoff strategy because there was a success.
           parent_.failure_backoff_strategy_->reset();

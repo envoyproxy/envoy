@@ -6,8 +6,7 @@
 #include "envoy/local_info/local_info.h"
 
 #include "source/common/config/context_provider_impl.h"
-#include "source/common/config/version_converter.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace LocalInfo {

@@ -26,7 +26,7 @@ class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
     envoy::config::route::v3::RateLimit rate_limit;
-    TestUtility::loadFromYaml(yaml, rate_limit, false, true);
+    TestUtility::loadFromYaml(yaml, rate_limit);
     TestUtility::validate(rate_limit);
     rate_limit_entry_ = std::make_unique<Router::RateLimitPolicyEntryImpl>(
         rate_limit, ProtobufMessage::getStrictValidationVisitor());

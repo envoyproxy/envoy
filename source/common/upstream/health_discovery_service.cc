@@ -9,7 +9,6 @@
 #include "envoy/service/health/v3/hds.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -29,7 +28,6 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
 
 HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
-                         envoy::config::core::v3::ApiVersion transport_api_version,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                          ClusterInfoFactory& info_factory,
@@ -39,13 +37,10 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                          const Server::Options& options)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
-      service_method_(Grpc::VersionedMethods(
-                          "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck",
-                          "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")
-                          .getMethodDescriptorForVersion(transport_api_version)),
-      async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats),
-      ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck")),
+      async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
+      store_stats_(stats), ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), specifier_hash_(0),
       validation_visitor_(validation_visitor), api_(api), options_(options) {
@@ -87,8 +82,6 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
-  Config::VersionConverter::prepareMessageForGrpcWire(health_check_request_,
-                                                      transport_api_version_);
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
@@ -523,7 +516,7 @@ void HdsCluster::updateHosts(
                             hosts_added, hosts_removed, absl::nullopt);
 }
 
-ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+ClusterSharedPtr HdsCluster::create() { return nullptr; }
 
 ClusterInfoConstSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
@@ -576,9 +569,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
   }
 }
 
-void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {}
 
 } // namespace Upstream
 } // namespace Envoy

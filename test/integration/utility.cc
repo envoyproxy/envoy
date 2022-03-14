@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
@@ -16,7 +17,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -24,6 +24,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -75,7 +77,7 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
 }
 
 void BufferingStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 void BufferingStreamDecoder::onComplete() {
@@ -187,8 +189,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
   NiceMock<Random::MockRandomGenerator> random_generator;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
-                Filesystem::fileSystemForTest(), random_generator);
+                Filesystem::fileSystemForTest(), random_generator, bootstrap);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
 
@@ -212,10 +215,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
-  quic::QuicConfig config;
-  std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr, config, 0);
+  auto& quic_transport_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
+  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -225,7 +227,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
+      *persistent_info,
+      std::make_shared<quic::QuicCryptoClientConfig>(
+          std::make_unique<Quic::EnvoyQuicProofVerifier>(quic_transport_socket_factory.sslCtx()),
+          std::make_unique<quic::QuicClientSessionCache>()),
+      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
+                         static_cast<uint16_t>(addr->ip()->port())),
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

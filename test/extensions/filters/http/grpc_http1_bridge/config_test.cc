@@ -23,16 +23,6 @@ TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   cb(filter_callback);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(GrpcHttp1BridgeFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.grpc_http1_bridge";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters

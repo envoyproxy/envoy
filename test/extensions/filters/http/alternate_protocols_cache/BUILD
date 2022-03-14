@@ -33,11 +33,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
+        "//source/extensions/key_value/file_based:config_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/key_value/file_based/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

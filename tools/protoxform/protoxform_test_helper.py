@@ -134,8 +134,6 @@ if __name__ == "__main__":
     for target in sys.argv[2:]:
         path, filename = path_and_filename(target)
         messages += run(cmd, path, filename, 'active_or_frozen')
-        messages += run(cmd, path, filename, 'next_major_version_candidate')
-        messages += run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
 
     if len(messages) == 0:
         logging.warning("PASS")

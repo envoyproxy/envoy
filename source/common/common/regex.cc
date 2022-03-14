@@ -5,6 +5,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Regex {
@@ -17,42 +18,23 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
   }
 
   if (do_program_size_check) {
-    Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
-    if (runtime) {
-      Stats::Scope& root_scope = runtime->getRootScope();
+    const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
+    const uint32_t max_program_size_error_level =
+        Runtime::getInteger("re2.max_program_size.error_level", 100);
+    if (regex_program_size > max_program_size_error_level) {
+      throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                                       "{} set for the error level threshold. Increase "
+                                       "configured max program size if necessary.",
+                                       regex, regex_program_size, max_program_size_error_level));
+    }
 
-      const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
-      // TODO(perf): It would be more efficient to create the stats (program size histogram,
-      // warning counter) on startup and not with each regex match.
-      Stats::StatNameManagedStorage program_size_stat_name("re2.program_size",
-                                                           root_scope.symbolTable());
-      Stats::Histogram& program_size_stat = root_scope.histogramFromStatName(
-          program_size_stat_name.statName(), Stats::Histogram::Unit::Unspecified);
-      program_size_stat.recordValue(regex_program_size);
-
-      Stats::StatNameManagedStorage warn_count_stat_name("re2.exceeded_warn_level",
-                                                         root_scope.symbolTable());
-      Stats::Counter& warn_count = root_scope.counterFromStatName(warn_count_stat_name.statName());
-
-      const uint32_t max_program_size_error_level =
-          runtime->snapshot().getInteger("re2.max_program_size.error_level", 100);
-      if (regex_program_size > max_program_size_error_level) {
-        throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                         "{} set for the error level threshold. Increase "
-                                         "configured max program size if necessary.",
-                                         regex, regex_program_size, max_program_size_error_level));
-      }
-
-      const uint32_t max_program_size_warn_level =
-          runtime->snapshot().getInteger("re2.max_program_size.warn_level", UINT32_MAX);
-      if (regex_program_size > max_program_size_warn_level) {
-        warn_count.inc();
-        ENVOY_LOG_MISC(
-            warn,
-            "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
-            "level threshold. Increase configured max program size if necessary.",
-            regex, regex_program_size, max_program_size_warn_level);
-      }
+    const uint32_t max_program_size_warn_level =
+        Runtime::getInteger("re2.max_program_size.warn_level", UINT32_MAX);
+    if (regex_program_size > max_program_size_warn_level) {
+      ENVOY_LOG_MISC(warn,
+                     "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
+                     "level threshold. Increase configured max program size if necessary.",
+                     regex, regex_program_size, max_program_size_warn_level);
     }
   }
 }

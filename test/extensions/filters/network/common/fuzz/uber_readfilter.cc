@@ -1,7 +1,6 @@
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/network/address_impl.h"
 
 using testing::Return;
@@ -128,7 +127,7 @@ void UberFilterFuzzer::fuzz(
     case test::extensions::filters::network::Action::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.dispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

@@ -6,6 +6,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -47,6 +48,7 @@ public:
     virtual const std::string& logString() const PURE;
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
+    bool ignoreNoTransformHeader() const { return ignore_no_transform_header_; }
 
   private:
     static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -55,6 +57,7 @@ public:
 
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
+    const bool ignore_no_transform_header_;
   };
 
   class RequestDirectionConfig : public DirectionConfig {
@@ -165,8 +168,11 @@ private:
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                       Compression::Decompressor::DecompressorPtr& decompressor,
                       Http::StreamFilterCallbacks& callbacks, HeaderType& headers) {
-    if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
-        contentEncodingMatches(headers)) {
+    const bool should_decompress =
+        direction_config.decompressionEnabled() &&
+        (!hasCacheControlNoTransform(headers) || direction_config.ignoreNoTransformHeader()) &&
+        contentEncodingMatches(headers);
+    if (should_decompress) {
       direction_config.stats().decompressed_.inc();
       decompressor = config_->makeDecompressor();
 
@@ -174,11 +180,11 @@ private:
       headers.removeContentLength();
       modifyContentEncoding(headers);
 
-      ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
+      ENVOY_STREAM_LOG(trace, "do decompress {}: {}", callbacks, direction_config.logString(),
                        headers);
     } else {
       direction_config.stats().not_decompressed_.inc();
-      ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
+      ENVOY_STREAM_LOG(trace, "do not decompress {}: {}", callbacks, direction_config.logString(),
                        headers);
     }
 

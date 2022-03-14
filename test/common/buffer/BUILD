@@ -91,6 +91,7 @@ envoy_cc_test(
         "//test/integration:tracked_watermark_buffer_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:stream_reset_handler_mock",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -111,6 +112,8 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 

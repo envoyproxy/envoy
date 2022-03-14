@@ -244,6 +244,9 @@ stages:
       matrix:
         api:
           CI_TARGET: "bazel.api"
+        # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
+        # api_compat:
+        #  CI_TARGET: "bazel.api_compat"
         gcc:
           CI_TARGET: "bazel.gcc"
         clang_tidy:
@@ -296,9 +299,12 @@ stages:
   jobs:
   - job: docker
     displayName: "linux multiarch"
+    timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - bash: .azure-pipelines/cleanup.sh
+      displayName: "Removing tools from agent"
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -313,14 +319,36 @@ stages:
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
         artifactName: "bazel.release.arm64"
         itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
         downloadType: single
         targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
     - bash: |
         set -e
-        mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
-        mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        mkdir -p linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
+        rm $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+        rm $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz
+        mkdir -p linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
+        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz
+        rm $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz
         ci/docker_ci.sh
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -363,6 +391,15 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Generate docs"
 
+    - script: |
+        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+      displayName: "Upload Docs to GCS"
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+      condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+
     - task: InstallSSHKey@0
       inputs:
         hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
@@ -375,6 +412,7 @@ stages:
       workingDirectory: $(Build.SourcesDirectory)
       env:
         AZP_BRANCH: $(Build.SourceBranch)
+        NETLIFY_TRIGGER_URL: $(NetlifyTriggerURL)
 
 - stage: verify
   dependsOn: ["docker"]
@@ -387,8 +425,7 @@ stages:
       inputs:
         buildType: current
         artifactName: "docker"
-        itemPattern: "docker/envoy-docker-images.tar.xz"
-        downloadType: single
+        itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_examples
       env:
@@ -403,8 +440,7 @@ stages:
       inputs:
         buildType: current
         artifactName: "docker"
-        itemPattern: "docker/envoy-docker-images.tar.xz"
-        downloadType: single
+        itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_build_examples
       env:
@@ -436,7 +472,7 @@ stages:
         testRunTitle: "macOS"
       condition: always()
 
-    - script: ./ci/flaky_test/run_process_xml.sh
+    - script: bazel run //ci/flaky_test:process_xml
       displayName: "Process Test Results"
       env:
         TEST_TMPDIR: $(Build.SourcesDirectory)
@@ -451,7 +487,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: "windows-2019"
     steps:
     - task: Cache@2
       inputs:
@@ -483,46 +519,23 @@ stages:
         artifactName: windows.release
       condition: always()
 
-  - job: clang_cl
-    timeoutInMinutes: 120
-    pool:
-      vmImage: "windows-latest"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: '"windows.release" | ./WORKSPACE | **/*.bzl'
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-    - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
-      displayName: "Run Windows clang-cl CI"
-      env:
-        CI_TARGET: "windows"
-        ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
-        SLACK_TOKEN: $(SLACK_TOKEN)
-        REPO_URI: $(Build.Repository.Uri)
-        BUILD_URI: $(Build.BuildUri)
-        ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-clang-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-    - task: PublishTestResults@2
-      inputs:
-        testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
-        testRunTitle: "clang-cl"
-        searchFolder: $(Build.StagingDirectory)/tmp
-      condition: always()
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/envoy"
-        artifactName: windows.clang-cl
-      condition: always()
-
   - job: docker
+    strategy:
+      matrix:
+        windows2019:
+          imageName: 'windows-2019'
+          windowsBuildType: "windows"
+          windowsImageBase: "mcr.microsoft.com/windows/servercore"
+          windowsImageTag: "ltsc2019"
+        windows2022:
+          imageName: 'windows-2022'
+          windowsBuildType: "windows-ltsc2022"
+          windowsImageBase: "mcr.microsoft.com/windows/nanoserver"
+          windowsImageTag: "ltsc2022"
     dependsOn: ["release"]
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: $(imageName)
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -543,6 +556,9 @@ stages:
         AZP_SHA1: $(Build.SourceVersion)
         DOCKERHUB_USERNAME: $(DockerUsername)
         DOCKERHUB_PASSWORD: $(DockerPassword)
+        WINDOWS_BUILD_TYPE: $(windowsBuildType)
+        WINDOWS_IMAGE_BASE: $(windowsImageBase)
+        WINDOWS_IMAGE_TAG: $(windowsImageTag)
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"

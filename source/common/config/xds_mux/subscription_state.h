@@ -47,6 +47,9 @@ public:
   void clearDynamicContextChanged() { dynamic_context_changed_ = false; }
   bool dynamicContextChanged() const { return dynamic_context_changed_; }
 
+  void setControlPlaneIdentifier(const std::string& id) { control_plane_identifier_ = id; }
+  std::string& controlPlaneIdentifier() { return control_plane_identifier_; }
+
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   virtual bool subscriptionUpdatePending() const PURE;
 
@@ -111,6 +114,16 @@ protected:
   UntypedConfigUpdateCallbacks& callbacks_;
   Event::Dispatcher& dispatcher_;
   bool dynamic_context_changed_{};
+  std::string control_plane_identifier_{};
+};
+
+template <class T> class SubscriptionStateFactory {
+public:
+  virtual ~SubscriptionStateFactory() = default;
+  // Note that, outside of tests, we expect callbacks to always be a WatchMap.
+  virtual std::unique_ptr<T> makeSubscriptionState(const std::string& type_url,
+                                                   UntypedConfigUpdateCallbacks& callbacks,
+                                                   OpaqueResourceDecoder& resource_decoder) PURE;
 };
 
 } // namespace XdsMux

@@ -2,7 +2,7 @@
 
 External Processing
 ===================
-* :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3alpha.ExternalProcessor>`
+* :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
 * This filter should be configured with the name *envoy.filters.http.ext_proc*
 
 The external processing filter connects an external service, called an "external processor,"
@@ -12,9 +12,9 @@ and modifying the headers, body, and trailers of each message, or by returning a
 
 The protocol itself is based on a bidirectional gRPC stream. Envoy will send the
 external processor
-:ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingRequest>`
+:ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`
 messages, and the processor must reply with
-:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`
+:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`
 messages.
 
 Configuration options are provided to control which events are sent to the processor.
@@ -26,7 +26,7 @@ stream requests from the proxy.
 
 This filter is a work in progress. Most of the major bits of functionality
 are complete. The updated list of supported features and implementation status may
-be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3alpha.ExternalProcessor>`.
+be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
 
 Statistics
 ----------

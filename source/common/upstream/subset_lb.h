@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <functional>
 #include <map>
 #include <memory>
@@ -13,6 +14,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -30,15 +32,29 @@ public:
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+          round_robin_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 
 private:
   using HostPredicate = std::function<bool(const Host&)>;
@@ -162,6 +178,10 @@ private:
       return wrapped_->upstreamTransportSocketOptions();
     }
 
+    absl::optional<OverrideHost> overrideHostToSelect() const override {
+      return wrapped_->overrideHostToSelect();
+    }
+
   private:
     LoadBalancerContext* wrapped_;
     Router::MetadataMatchCriteriaConstPtr metadata_match_;
@@ -235,6 +255,7 @@ private:
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -268,9 +289,17 @@ private:
   absl::flat_hash_map<HashedValue, HostConstSharedPtr> single_host_per_subset_map_;
   Stats::Gauge* single_duplicate_stat_{};
 
+  // Cross priority host map for fast cross priority host searching. When the priority update
+  // callback is executed, the host map will also be updated.
+  HostMapConstSharedPtr cross_priority_host_map_;
+
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool list_as_any_;
+
+  TimeSource& time_source_;
+
+  const HostStatusSet override_host_status_{};
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

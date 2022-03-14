@@ -17,6 +17,7 @@
 
 #include "source/common/config/subscription_base.h"
 #include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/leds.h"
 #include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -50,7 +51,8 @@ private:
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
                               const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
-                              PriorityStateManager& priority_state_manager, HostMap& updated_hosts,
+                              PriorityStateManager& priority_state_manager,
+                              const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
 
@@ -58,6 +60,9 @@ private:
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
   void onAssignmentTimeout();
+
+  // Returns true iff all the LEDS based localities were updated.
+  bool validateAllLedsUpdated() const;
 
   class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
   public:
@@ -70,17 +75,34 @@ private:
     void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override;
 
   private:
+    void updateLocalityEndpoints(
+        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+        const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+        PriorityStateManager& priority_state_manager,
+        absl::flat_hash_set<std::string>& all_new_hosts);
+
     EdsClusterImpl& parent_;
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
   Config::SubscriptionPtr subscription_;
+  Server::Configuration::TransportSocketFactoryContextImpl factory_context_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
-  HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
+  using LedsConfigSet = absl::flat_hash_set<envoy::config::endpoint::v3::LedsClusterLocalityConfig,
+                                            MessageUtil, MessageUtil>;
+  using LedsConfigMap = absl::flat_hash_map<envoy::config::endpoint::v3::LedsClusterLocalityConfig,
+                                            LedsSubscriptionPtr, MessageUtil, MessageUtil>;
+  // Maps between a LEDS configuration (ConfigSource + collection name) to the locality endpoints
+  // data.
+  LedsConfigMap leds_localities_;
+  // TODO(adisuissa): Avoid saving the entire cluster load assignment, only the
+  // relevant parts of the config for each locality. Note that this field must
+  // be set when LEDS is used.
+  absl::optional<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;

@@ -1,3 +1,4 @@
+#include <memory>
 #include <vector>
 
 #include "envoy/server/filter_config.h"
@@ -129,6 +130,37 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [] { FAIL(); });
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                           [](Event::PostCb) { FAIL(); });
+  server.setSinkPredicates(std::make_unique<testing::NiceMock<Stats::MockSinkPredicates>>());
+  server.shutdown();
+}
+
+// A test to increase coverage of dummy methods (naively implemented methods
+// needed for interface implementation).
+TEST_P(ValidationServerTest, DummyMethodsTest) {
+  // Setup the server instance.
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+
+  // Execute dummy methods.
+  server.drainListeners();
+  server.failHealthcheck(true);
+  server.lifecycleNotifier();
+  server.secretManager();
+  EXPECT_FALSE(server.isShutdown());
+  EXPECT_FALSE(server.healthCheckFailed());
+  server.grpcContext();
+  EXPECT_FALSE(server.processContext().has_value());
+  server.timeSource();
+  server.mutexTracer();
+  server.flushStats();
+  server.statsConfig();
+  server.transportSocketFactoryContext();
+  server.shutdownAdmin();
   server.shutdown();
 }
 
