@@ -6,8 +6,8 @@ namespace {
 class MultiEnvoyTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-   config_helper_.addRuntimeOverride("envoy.disallow_global_stats", "true");
-   HttpProtocolIntegrationTest::initialize();
+    config_helper_.addRuntimeOverride("envoy.disallow_global_stats", "true");
+    HttpProtocolIntegrationTest::initialize();
   }
 
   ~MultiEnvoyTest() override { test_server_.reset(); }
