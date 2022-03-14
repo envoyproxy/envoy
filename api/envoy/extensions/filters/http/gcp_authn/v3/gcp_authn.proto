@@ -12,7 +12,6 @@ option java_outer_classname = "GcpAuthnProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/gcp_authn/v3;gcp_authnv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: GCP authentication]
 // GCP authentication :ref:`configuration overview <config_http_filters_gcp_authn>`.
