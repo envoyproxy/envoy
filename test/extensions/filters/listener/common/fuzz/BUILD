@@ -23,7 +23,9 @@ envoy_cc_test_library(
         ":listener_filter_fakes",
         ":listener_filter_fuzzer_proto_cc_proto",
         "//envoy/network:filter_interface",
+        "//source/common/network:connection_balancer_lib",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
