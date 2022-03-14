@@ -38,6 +38,7 @@ envoy_cc_library(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
+        "//source/extensions/filters/http/common:ratelimit_headers_lib",
     ],
 )
 
