@@ -1736,7 +1736,7 @@ TEST_F(ThriftRouterTest, UpstreamDraining) {
 
   Stats::MockStore cluster_scope;
   expectStatCalls(cluster_scope);
-  EXPECT_CALL(cluster_scope, counter("thrift.cx_drain_close")).Times(AtLeast(1));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
