@@ -510,7 +510,7 @@ void UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(info, "on pool failure {}", reason);
+  ENVOY_LOG(info, "on pool failure {}", static_cast<int>(reason));
   conn_state_ = ConnectionState::NotConnected;
   conn_pool_handle_ = nullptr;
 
