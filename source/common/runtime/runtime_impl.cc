@@ -378,6 +378,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) // FIXME
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kStructValue: {
