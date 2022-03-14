@@ -5380,8 +5380,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
 TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.conn_pool_delete_when_idle", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.conn_pool_delete_when_idle", "true"}});
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -5710,7 +5709,7 @@ TEST_F(PreconnectTest, PreconnectOff) {
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .Times(1)
@@ -5731,7 +5730,7 @@ TEST_F(PreconnectTest, PreconnectOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
 
   EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(2)
@@ -5758,7 +5757,7 @@ TEST_F(PreconnectTest, PreconnectHighHttp) {
       }));
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   // Expect preconnect to be called 3 times across the four hosts.
   EXPECT_EQ(3, http_preconnect);
 }
@@ -5800,7 +5799,7 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
       }));
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   // Expect preconnect to be called 3 times across the four hosts.
   EXPECT_EQ(3, http_preconnect);
 
@@ -5811,7 +5810,7 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
   http_preconnect = 0;
   http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   EXPECT_EQ(2, http_preconnect);
 }
 
@@ -5832,7 +5831,7 @@ TEST_F(PreconnectTest, PreconnectCappedByMaybePreconnect) {
       }));
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   // Expect preconnect to be called once and then preconnecting is stopped.
   EXPECT_EQ(1, http_preconnect_calls);
 }

@@ -148,7 +148,8 @@ public:
   virtual void setConnectionID(uint64_t id) PURE;
 
   /**
-   * @param enable whether to enable or disable setting interface name.
+   * @param enable whether to enable or disable setting interface name. While having an interface
+   *               name might be helpful for debugging, it might come at a performance cost.
    */
   virtual void enableSettingInterfaceName(const bool enable) PURE;
 

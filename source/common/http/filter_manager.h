@@ -118,7 +118,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
-  virtual bool has1xxheaders() PURE;
+  virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
   virtual void doData(bool end_stream) PURE;
@@ -226,7 +226,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
-  bool has1xxheaders() override { return false; }
+  bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
@@ -317,11 +317,11 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
       : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
 
   // ActiveStreamFilterBase
-  bool canContinue() override { return true; }
+  bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
-  bool has1xxheaders() override;
+  bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
@@ -907,7 +907,7 @@ public:
   /**
    * Whether remote processing has been marked as complete.
    */
-  bool remoteComplete() const { return state_.remote_complete_; }
+  bool remoteDecodeComplete() const { return state_.remote_decode_complete_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
@@ -1058,15 +1058,15 @@ private:
 
   struct State {
     State()
-        : remote_complete_(false), local_complete_(false), has_1xx_headers_(false),
-          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false) {}
-
+        : remote_encode_complete_(false), remote_decode_complete_(false), local_complete_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
 
-    bool remote_complete_ : 1;
+    bool remote_encode_complete_ : 1;
+    bool remote_decode_complete_ : 1;
     bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
                               // A filter can still stop the stream from being complete as seen
                               // by the codec.
