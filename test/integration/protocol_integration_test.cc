@@ -3655,6 +3655,5 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 }
-#endif
 
 } // namespace Envoy
