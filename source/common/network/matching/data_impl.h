@@ -24,8 +24,8 @@ private:
  */
 class UdpMatchingDataImpl : public UdpMatchingData {
 public:
-  explicit UdpMatchingDataImpl(const Address::InstanceConstSharedPtr& local_address,
-                               const Address::InstanceConstSharedPtr& remote_address)
+  UdpMatchingDataImpl(const Address::InstanceConstSharedPtr& local_address,
+                      const Address::InstanceConstSharedPtr& remote_address)
       : local_address_(local_address), remote_address_(remote_address) {}
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
