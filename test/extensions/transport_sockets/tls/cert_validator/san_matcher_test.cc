@@ -54,7 +54,7 @@ TEST(SanMatcherConfigTest, UnspecifiedSanType) {
       static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType>(
           static_cast<int>(123));
   san_matcher.set_san_type(san_type);
-  EXPECT_ENVOY_BUG(createStringSanMatcher(san_matcher), "unexpected san_type enum provided");
+  EXPECT_EQ(createStringSanMatcher(san_matcher), nullptr);
 }
 
 } // namespace Tls
