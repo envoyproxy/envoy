@@ -46,7 +46,6 @@ SanMatcherPtr createStringSanMatcher(
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED:
     PANIC("unhandled value");
   }
-  IS_ENVOY_BUG("unexpected san_type enum provided");
   return nullptr;
 }
 
