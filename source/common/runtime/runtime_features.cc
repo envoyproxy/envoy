@@ -23,6 +23,7 @@
 
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
+RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
@@ -140,6 +141,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_allow_multiple_dns_addresses,
   &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
   &FLAGS_envoy_reloadable_features_append_or_truncate,
+  &FLAGS_envoy_reloadable_features_append_to_accept_content_encoding_only_once,
   &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
   &FLAGS_envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3,
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
