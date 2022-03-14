@@ -202,8 +202,6 @@ message VirtualHost {
   // Specify a set of default request mirroring policies for every routes under this virtual host.
   // It takes precedence over the route config mirror policy entirely.
   // That is, policies are not merged, most internal non-empty one becomes the mirror policies.
-  // Inherit from the request_mirror_policies of its route config only if the field of request_mirror_policies
-  // in the virtual host level is not specified.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
 }
 
@@ -1116,8 +1114,6 @@ message RouteAction {
   // Specify a set of route request mirroring policies.
   // It takes precedence over the virtual host and route config mirror policy entirely.
   // That is, policies are not merged, most internal non-empty one becomes the mirror policies.
-  // Inherit from the request_mirror_policies of its virtual host only if the field of request_mirror_policies
-  // in the route action level is not specified.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
