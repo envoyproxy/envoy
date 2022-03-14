@@ -146,9 +146,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-    SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
-  }
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
