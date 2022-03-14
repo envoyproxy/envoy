@@ -298,9 +298,9 @@ proto_library(
     name = "all_protos",
     visibility = ["//visibility:public"],
     deps = [
-        ":xds_protos",
         ":v2_protos",
         ":v3_protos",
+        ":xds_protos",
     ],
 )
 

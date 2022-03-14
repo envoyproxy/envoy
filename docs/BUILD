@@ -197,10 +197,10 @@ pkg_tar(
     extension = "tar",
     deps = [
         ":api_rst",
-        ":xds_rst",
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
+        ":xds_rst",
     ],
 )
 
