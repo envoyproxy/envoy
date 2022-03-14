@@ -33,7 +33,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertFalse(builder.enableNetworkPathMonitor)
   }
 
-  @available(iOS 12, *)
   func testEnableNetworkPathMonitorSetsToValue() {
     let builder = EngineBuilder()
       .enableNetworkPathMonitor(true)

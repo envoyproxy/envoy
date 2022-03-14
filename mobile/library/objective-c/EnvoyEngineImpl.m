@@ -442,13 +442,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 #ifndef TARGET_OS_MAC
   if (enableNetworkPathMonitor) {
-    if (@available(iOS 12, *)) {
-      [EnvoyNetworkMonitor startPathMonitorIfNeeded];
-    } else {
-      NSLog(
-          @"[Envoy] Cannot use NWPathMonitor on iOS < 12. Falling back to `SCNetworkReachability`");
-      [EnvoyNetworkMonitor startReachabilityIfNeeded];
-    }
+    [EnvoyNetworkMonitor startPathMonitorIfNeeded];
   } else {
     [EnvoyNetworkMonitor startReachabilityIfNeeded];
   }
