@@ -35,7 +35,7 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], reposit
         name = name,
         data = data,
         deps = [test_lib_name],
-        minimum_os_version = "11.0",
+        minimum_os_version = "12.0",
         tags = tags,
     )
 
@@ -53,6 +53,6 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = []):
         name = name,
         data = data,
         deps = [test_lib_name],
-        minimum_os_version = "11.0",
+        minimum_os_version = "12.0",
         tags = tags,
     )

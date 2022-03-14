@@ -63,7 +63,7 @@ ios_static_framework(
     name = "ios_framework",
     hdrs = ["ios_lib_headers"],
     bundle_name = "Envoy",
-    minimum_os_version = "11.0",
+    minimum_os_version = "12.0",
     # Currently the framework is over 2GB, and is not worth caching
     tags = [
         "no-cache",

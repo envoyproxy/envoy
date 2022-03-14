@@ -325,7 +325,6 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  @available(iOS 12, *)
   public func enableNetworkPathMonitor(_ enableNetworkPathMonitor: Bool) -> Self {
     self.enableNetworkPathMonitor = enableNetworkPathMonitor
     return self
