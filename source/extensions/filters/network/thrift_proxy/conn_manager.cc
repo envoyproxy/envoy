@@ -232,18 +232,19 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
     metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
     metadata->headers().remove(Headers::get().Drain);
-  }
 
-  // Check if this host itself is draining.
-  //
-  // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
-  // should be set before the encodeFrame() call. It should be set at or after the messageBegin call
-  // so that the header is added after all upstream headers passed, due to messageBegin possibly not
-  // getting headers in transportBegin.
-  ConnectionManager& cm = parent_.parent_;
-  if (cm.drain_decision_.drainClose()) {
-    // TODO(rgs1): should the key value contain something useful? E.g.: minutes til drain is over?
-    metadata->headers().addReferenceKey(Headers::get().Drain, "true");
+    // Check if this host itself is draining.
+    //
+    // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
+    // should be set before the encodeFrame() call. It should be set at or after the messageBegin
+    // call so that the header is added after all upstream headers passed, due to messageBegin
+    // possibly not getting headers in transportBegin.
+    ConnectionManager& cm = parent_.parent_;
+    if (cm.drain_decision_.drainClose()) {
+      // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
+      // over)?
+      metadata->headers().addReferenceKey(Headers::get().Drain, "true");
+    }
   }
 
   return ProtocolConverter::messageBegin(metadata);

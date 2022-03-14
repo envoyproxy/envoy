@@ -339,6 +339,13 @@ public:
   }
 
   void testRequestResponse(bool draining = false) {
+    TestScopedRuntime scoped_runtime;
+
+    if (draining) {
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
+    }
+
     initializeFilter();
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
