@@ -762,11 +762,15 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   }
 
   response_encoder_->encodeHeaders(response_headers, false);
-  EXPECT_LOG_CONTAINS(
-      "debug",
-      "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], "
-      "value: [3]",
-      driveToCompletion());
+  if (http2_implementation_ == kOgHttp2) {
+    driveToCompletion();
+  } else {
+    EXPECT_LOG_CONTAINS(
+        "debug",
+        "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], "
+        "value: [3]",
+        driveToCompletion());
+  }
   EXPECT_FALSE(client_wrapper_->status_.ok());
   EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
