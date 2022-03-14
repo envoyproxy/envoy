@@ -45,7 +45,8 @@ class ProtoFormatVisitor(visitor.Visitor):
         existing_pkg_version_status = output_proto.options.Extensions[
             status_pb2.file_status].package_version_status
         empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
-        pkg_version_status_exempt = file_proto.name.startswith('envoy/annotations') or empty_file
+        pkg_version_status_exempt = (file_proto.name.startswith('envoy/annotations') or empty_file
+            or file_proto.name.startswith('xds'))
         # It's a format error not to set package_version_status.
         if existing_pkg_version_status == status_pb2.UNKNOWN and not pkg_version_status_exempt:
             raise ProtoXformError('package_version_status must be set in %s' % file_proto.name)
