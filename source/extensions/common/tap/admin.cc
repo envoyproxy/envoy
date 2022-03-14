@@ -44,7 +44,7 @@ AdminHandler::~AdminHandler() {
 
 Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                  Server::AdminStream& admin_stream) {
-  if (attached_request_) {
+  if (attached_request_ != nullptr) {
     // TODO(mattlklein123): Consider supporting concurrent admin /tap streams. Right now we support
     // a single stream as a simplification.
     return badRequest(response, "An attached /tap admin stream already exists. Detach it.");
@@ -80,7 +80,7 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
     }
     attached_request_.reset(); // remove ref to attached_request_
   });
-  attached_request_.reset(AttachedRequest::createAttachedRequest(this, tap_request, &admin_stream));
+  attached_request_ = AttachedRequest::createAttachedRequest(this, tap_request, &admin_stream);
   return Http::Code::OK;
 }
 
@@ -94,7 +94,7 @@ void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& co
   ASSERT(!config_id.empty());
   ASSERT(config_id_map_[config_id].count(&config) == 0);
   config_id_map_[config_id].insert(&config);
-  if (attached_request_ && attached_request_->id() == config_id) {
+  if (attached_request_ != nullptr && attached_request_->id() == config_id) {
     config.newTapConfig(attached_request_->config(), this);
   }
 }
@@ -110,8 +110,9 @@ void AdminHandler::unregisterConfig(ExtensionConfig& config) {
 }
 
 PerTapSinkHandlePtr
-AdminHandler::createPerTapSinkHandle(uint64_t,
+AdminHandler::createPerTapSinkHandle(uint64_t trace_id,
                                      envoy::config::tap::v3::OutputSink::OutputSinkTypeCase type) {
+  UNREFERENCED_PARAMETER(trace_id);
   using ProtoOutputSinkType = envoy::config::tap::v3::OutputSink::OutputSinkTypeCase;
 
   /**
@@ -130,9 +131,9 @@ AdminHandler::createPerTapSinkHandle(uint64_t,
   case ProtoOutputSinkType::kStreamingGrpc:
     PANIC("not implemented");
   case ProtoOutputSinkType::OUTPUT_SINK_TYPE_NOT_SET:
-  default:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM; // Required so that all paths return values
 }
 
 void AdminHandler::TraceBuffer::bufferTrace(
@@ -150,7 +151,7 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(TraceWrapperPtr&& trace,
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
   // Convert to a shared_ptr, so we can send it to the main thread.
   std::shared_ptr<envoy::data::tap::v3::TraceWrapper> shared_trace{std::move(trace)};
-  // Non owning pointer to the attached request, does not preserve lifetime unless in use
+  // Non owning pointer to the attached request, does not preserve lifetime unless in use.
   std::weak_ptr<AttachedRequest> weak_attached_request(parent_.attached_request_);
 
   // The handle can be destroyed before the cross thread post is complete. Thus, we capture a
@@ -217,21 +218,21 @@ AdminHandler::AttachedRequestBuffered::AttachedRequestBuffered(
     AdminHandler* admin_handler, const envoy::admin::v3::TapRequest& tap_request,
     Server::AdminStream* admin_stream)
     : AttachedRequest(admin_handler, tap_request, admin_stream) {
-  auto sink = tap_request.tap_config().output_config().sinks()[0];
+  const envoy::config::tap::v3::OutputSink &sink = tap_request.tap_config().output_config().sinks(0);
 
-  uint64_t max_buffered_traces = sink.buffered_admin().max_traces();
-  uint64_t timeout = PROTOBUF_GET_MS_OR_DEFAULT(sink.buffered_admin(), timeout, 0);
+  const uint64_t max_buffered_traces = sink.buffered_admin().max_traces();
+  const uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(sink.buffered_admin(), timeout, 0);
   trace_buffer_ = std::make_unique<TraceBuffer>(max_buffered_traces);
   // Start the countdown if provided an actual timeout
-  if (timeout > 0) {
+  if (timeout_ms > 0) {
     timer_ = dispatcher().createTimer(
         [this, admin_handler] { this->onTimeout(admin_handler->attached_request_); });
-    timer_->enableTimer(std::chrono::milliseconds(timeout));
+    timer_->enableTimer(std::chrono::milliseconds(timeout_ms));
   }
 }
 
 void AdminHandler::AttachedRequestBuffered::onTimeout(
-    std::weak_ptr<AttachedRequest> weak_attached_request) {
+    const std::weak_ptr<AttachedRequest> &weak_attached_request) {
   // Flush the buffer regardless of size
   dispatcher().post([weak_attached_request] {
     // Take temporary ownership - extend lifetime
@@ -260,7 +261,7 @@ void AdminHandler::AttachedRequestBuffered::onTimeout(
 }
 
 void AdminHandler::AttachedRequest::endStream() {
-  Buffer::OwnedImpl output_buffer(std::string(""));
+  Buffer::OwnedImpl output_buffer;
   stream()->getDecoderFilterCallbacks().encodeData(output_buffer, true);
 }
 
@@ -289,18 +290,18 @@ void AdminHandler::AttachedRequest::streamMsg(const Protobuf::Message& message, 
   stream()->getDecoderFilterCallbacks().encodeData(output_buffer, end_stream);
 }
 
-AdminHandler::AttachedRequest* AdminHandler::AttachedRequest::createAttachedRequest(
+std::shared_ptr<AdminHandler::AttachedRequest> AdminHandler::AttachedRequest::createAttachedRequest(
     AdminHandler* admin_handler, const envoy::admin::v3::TapRequest& tap_request,
     Server::AdminStream* admin_stream) {
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
 
-  auto sink = tap_request.tap_config().output_config().sinks()[0];
+  const ProtoOutputSink &sink = tap_request.tap_config().output_config().sinks(0);
 
   switch (sink.output_sink_type_case()) {
   case ProtoOutputSink::kBufferedAdmin:
-    return new AttachedRequestBuffered(admin_handler, tap_request, admin_stream);
+    return std::make_shared<AttachedRequestBuffered>(admin_handler, tap_request, admin_stream);
   default:
-    return new AttachedRequest(admin_handler, tap_request, admin_stream);
+    return std::make_shared<AttachedRequest>(admin_handler, tap_request, admin_stream);
   }
 }
 

@@ -64,7 +64,7 @@ public:
 
   // Extensions::Common::Tap::Sink
   PerTapSinkHandlePtr
-  createPerTapSinkHandle(uint64_t,
+  createPerTapSinkHandle(uint64_t trace_id,
                          envoy::config::tap::v3::OutputSink::OutputSinkTypeCase type) override;
 
 private:
@@ -78,8 +78,6 @@ private:
    */
   class TraceBuffer {
     using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
-    const size_t max_buf_size_; // Number of traces to buffer
-    absl::optional<std::vector<TraceWrapper>> buffer_;
 
   public:
     TraceBuffer(uint64_t max_buf_size)
@@ -110,6 +108,10 @@ private:
       buffer_.reset(); // set optional to empty
       return buffer;
     }
+
+  private:
+    const size_t max_buf_size_; // Number of traces to buffer
+    absl::optional<std::vector<TraceWrapper>> buffer_;
   };
 
   /**
@@ -117,11 +119,6 @@ private:
    * managing all data that has lifetime tied to the admin_stream.
    */
   class AttachedRequest {
-    const std::string config_id_;
-    const envoy::config::tap::v3::TapConfig config_;
-    const Server::AdminStream* admin_stream_;
-    Event::Dispatcher& main_thread_dispatcher_;
-
   public:
     AttachedRequest(AdminHandler* admin_handler, const envoy::admin::v3::TapRequest& tap_request,
                     Server::AdminStream* admin_stream);
@@ -135,7 +132,7 @@ private:
 
     // Factory method for AttachedRequests - uses protobuf input to determine the subtype of
     // AttachedRequest to create
-    static AttachedRequest* createAttachedRequest(AdminHandler* admin_handler,
+    static std::shared_ptr<AttachedRequest> createAttachedRequest(AdminHandler* admin_handler,
                                                   const envoy::admin::v3::TapRequest& tap_request,
                                                   Server::AdminStream* admin_stream);
 
@@ -153,18 +150,20 @@ private:
   protected:
     Event::Dispatcher& dispatcher() { return main_thread_dispatcher_; }
     const Server::AdminStream* stream() const { return admin_stream_; }
+
+  private:
+    const std::string config_id_;
+    const envoy::config::tap::v3::TapConfig config_;
+    const Server::AdminStream* admin_stream_;
+    Event::Dispatcher& main_thread_dispatcher_;
   };
 
   /**
    * AttachedRequest with additional data specific to the Buffered Sink type
    */
   class AttachedRequestBuffered : public AttachedRequest {
-    Event::TimerPtr timer_;
-    // Pointer to buffered traces, only exists if the sink type requires buffering multiple traces
-    std::unique_ptr<TraceBuffer> trace_buffer_;
-
     // Callback fired on timer expiry
-    void onTimeout(std::weak_ptr<AttachedRequest> attached_request);
+    void onTimeout(const std::weak_ptr<AttachedRequest> &attached_request);
 
   public:
     TraceBuffer* traceBuffer() const override { return trace_buffer_.get(); }
@@ -172,6 +171,11 @@ private:
     AttachedRequestBuffered(AdminHandler* admin_handler,
                             const envoy::admin::v3::TapRequest& tap_request,
                             Server::AdminStream* admin_stream);
+
+  private:
+    Event::TimerPtr timer_;
+    // Pointer to buffered traces, only exists if the sink type requires buffering multiple traces
+    std::unique_ptr<TraceBuffer> trace_buffer_;
   };
 
   struct AdminPerTapSinkHandle : public PerTapSinkHandle {

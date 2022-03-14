@@ -205,7 +205,7 @@ Buffering Data
 Buffering data in tap requests can be done at two levels of granularity - buffering individual traces (downstream request & upstream response bodies) or buffering a set of traces.
 Both levels of granularity have separate controls to limit the amount of data buffered.
 
-When buffering individual traces, Envoy will limit the amount of body data that is tapped to avoid OOM situations.
+When buffering individual traces, Envoy will limit the amount of body data that is tapped to avoid exhausting server memory.
 The default limit is 1KiB for both received (request) and transmitted (response) data. This is
 configurable via the :ref:`max_buffered_rx_bytes
 <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes>` and
@@ -219,7 +219,8 @@ This form of buffering is particularly useful for taps specifying a match config
 The post body using a buffered admin sink should specify ``max_traces`` which is the number of traces to buffer,
 and can optionally specify a ``timeout`` in seconds (Protobuf Duration), which is the maximum time the server
 should wait to accumulate ``max_traces`` before flushing the traces buffered so far to the client. Each individual
-buffered trace also adheres to the single trace buffer limits from above.
+buffered trace also adheres to the single trace buffer limits from above. This buffering behavior can also be implemented client side but
+requires non-trivial code for interpreting trace streams as they are not delimited.
 An example of a buffered admin tap configuration:
 
 .. code-block:: yaml
