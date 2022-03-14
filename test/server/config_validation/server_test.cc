@@ -169,7 +169,7 @@ TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
                             Network::Address::InstanceConstSharedPtr(), stats_store,
                             access_log_lock, component_factory_, Thread::threadFactoryForTest(),
                             Filesystem::fileSystemForTest());
-  EXPECT_TRUE(server.runtime().snapshot().getBoolean("test.runtime.loaded"));
+  EXPECT_TRUE(server.runtime().snapshot().getBoolean("test.runtime.loaded", false));
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [] { FAIL(); });
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                           [](Event::PostCb) { FAIL(); });

@@ -32,11 +32,10 @@ public:
     // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();
 
-    Runtime::LoaderPtr runtime_ptr = 
-        std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, config, local_info_, store_,
-                                              generator_, validation_visitor_, *api_);
+    Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
+        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
     // This will ignore values set in test, but just use flag defaults!
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.no_runtime_singleton") {
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.no_runtime_singleton")) {
       runtime_ = std::move(runtime_ptr);
     } else {
       runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
@@ -71,7 +70,7 @@ class TestDeprecatedV2Api : public TestScopedRuntime {
 public:
   TestDeprecatedV2Api() { allowDeprecatedV2(); }
   void allowDeprecatedV2() {
-    loader()->mergeValues({
+    loader().mergeValues({
         {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
         {"envoy.features.enable_all_deprecated_features", "true"},
     });

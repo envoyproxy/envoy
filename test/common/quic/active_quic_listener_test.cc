@@ -26,6 +26,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
@@ -116,8 +117,7 @@ protected:
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
-            Runtime::LoaderSingleton::get(), 0, connection_handler_, *dispatcher_,
-            listener_config_));
+            scoped_runtime_.loader(), 0, connection_handler_, *dispatcher_, listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
@@ -243,7 +243,6 @@ protected:
     }
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    Runtime::LoaderSingleton::clear();
   }
 
 protected:
@@ -271,6 +270,7 @@ protected:
                        handshake_timeout_);
   }
 
+  TestScopedRuntime scoped_runtime_;
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
   Api::ApiPtr api_;
@@ -444,14 +444,14 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
+  scoped_runtime_.mergeValues({{"quic.enabled", " false"}});
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
+  scoped_runtime_.mergeValues({{"quic.enabled", " true"}});
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
