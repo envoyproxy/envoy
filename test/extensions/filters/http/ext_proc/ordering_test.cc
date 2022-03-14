@@ -8,10 +8,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -916,6 +916,31 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
   Buffer::OwnedImpl req_body("Hello!");
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
+}
+
+TEST_F(FastFailOrderingTest,
+       GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunkWithDeferredProcessing) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+
+  initialize([](ExternalProcessor& cfg) {
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_header_mode(ProcessingMode::SKIP);
+    pm->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  });
+
+  sendRequestHeadersPost(false);
+
+  // Set the limit low so we transition over the queue limit and start sending
+  // the stream chunk.
+  Buffer::OwnedImpl req_body("Hello!");
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .WillRepeatedly(Return(req_body.length() / 2));
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, false));
 }
 
 // gRPC failure while opening stream with only request body enabled in streaming mode
