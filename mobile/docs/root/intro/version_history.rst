@@ -6,6 +6,9 @@ Pending Release
 
 Bugfixes:
 
+- Android: Fix `NoClassDefFoundError` errors when using `addDNSFallbackNameservers`
+  or `addH2RawDomains` with Android versions older than API level 24.
+
 Features:
 
 - API: added Envoy's response flags to final stream intel (:issue:`#2009 <2009>`)

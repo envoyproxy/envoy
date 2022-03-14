@@ -139,4 +139,36 @@ class EnvoyConfigurationTest {
       assertThat(e.message).contains("cannot enable both statsD and gRPC metrics sink")
     }
   }
+
+  @Test
+  fun `resolving multiple h2 raw domains`() {
+    val envoyConfiguration = EnvoyConfiguration(
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8"), true,
+      true, true, 222, 333, listOf("h2-raw.domain", "h2-raw.domain2"), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
+      TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
+      listOf(EnvoyNativeFilterConfig("filter_name", "test_config")), emptyList(), emptyMap()
+    )
+
+    val resolvedTemplate = envoyConfiguration.resolveTemplate(
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG
+    )
+
+    assertThat(resolvedTemplate).contains("&h2_raw_domains [\"h2-raw.domain\",\"h2-raw.domain2\"]")
+  }
+
+  @Test
+  fun `resolving multiple dns fallback nameservers`() {
+    val envoyConfiguration = EnvoyConfiguration(
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8", "1.1.1.1"), true,
+      true, true, 222, 333, listOf("h2-raw.domain", "h2-raw.domain2"), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
+      TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
+      listOf(EnvoyNativeFilterConfig("filter_name", "test_config")), emptyList(), emptyMap()
+    )
+
+    val resolvedTemplate = envoyConfiguration.resolveTemplate(
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG
+    )
+
+    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}},{\"socket_address\":{\"address\":\"1.1.1.1\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": true}")
+  }
 }
