@@ -37,10 +37,8 @@ public:
   MockRequestCallbacks() = default;
   ~MockRequestCallbacks() override = default;
 
-  void onComplete(ResponseStatus status, const Http::ResponseMessage* response) override {
-    onComplete_(status, response);
-  }
-  MOCK_METHOD(void, onComplete_, (ResponseStatus status, const Http::ResponseMessage* response));
+  void onComplete(const Http::ResponseMessage* response) override { onComplete_(response); }
+  MOCK_METHOD(void, onComplete_, (const Http::ResponseMessage* response));
 };
 
 } // namespace GcpAuthn

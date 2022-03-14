@@ -52,7 +52,6 @@ public:
                                    Envoy::Http::AsyncClient::Callbacks& callback,
                                    const Envoy::Http::AsyncClient::RequestOptions& options)
                                    -> Http::AsyncClient::Request* {
-          // TODO(tyxia) Re-visit
           message_.swap(message);
           client_callback_ = &callback;
           options_ = options;
@@ -100,7 +99,7 @@ TEST_F(GcpAuthnFilterTest, Success) {
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
 
-  EXPECT_CALL(request_callbacks_, onComplete_(ResponseStatus::OK, response.get()));
+  EXPECT_CALL(request_callbacks_, onComplete_(response.get()));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -119,7 +118,7 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
 
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
-  EXPECT_CALL(request_callbacks_, onComplete_(ResponseStatus::Error, nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
   createClient(no_cluster_config);
   client_->fetchToken(request_callbacks_);
 }
@@ -128,10 +127,9 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   setupMockObjects();
   // Create the client object.
   createClient();
-  EXPECT_CALL(request_callbacks_, onComplete_(ResponseStatus::Error, nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
   client_->fetchToken(request_callbacks_);
-  client_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
-  // client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
+  client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
 } // namespace

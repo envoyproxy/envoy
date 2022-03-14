@@ -18,15 +18,15 @@ using Http::FilterHeadersStatus;
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   state_ = State::Calling;
   client_->fetchToken(*this);
+  return Envoy::Http::FilterHeadersStatus::Continue;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopIteration;
 }
 
 // TODO(tyxia) the lifetime of response should be fine?
-void GcpAuthnFilter::onComplete(ResponseStatus, const Http::ResponseMessage* response) {
-  // TODO(tyxia) If failed, still complete?
-  // Do I still need ResponseStatus?
+void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
   state_ = State::Complete;
+  // Process the response if it is present (i.e., received the response successfully)
   if (response != nullptr) {
     // Decode JWT Token
     ::google::jwt_verify::Jwt jwt;
@@ -39,7 +39,6 @@ void GcpAuthnFilter::onComplete(ResponseStatus, const Http::ResponseMessage* res
 void GcpAuthnFilter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
-    // TODO(tyxia) Why this is inside
     client_->cancel();
   }
 }

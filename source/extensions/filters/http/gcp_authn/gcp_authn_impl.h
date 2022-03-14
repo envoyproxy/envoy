@@ -14,16 +14,6 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 /**
- * Possible async results for a fetchToken call.
- */
-enum class ResponseStatus {
-  //
-  OK,
-  // The gcp authentication service could not be queried.
-  Error,
-};
-
-/**
  * Async callbacks used during fetchToken() calls.
  */
 class RequestCallbacks {
@@ -33,10 +23,9 @@ public:
   /**
    * Called on completion of request.
    *
-   * @param status the status of the request.
    * @param response the pointer to the response message.
    */
-  virtual void onComplete(ResponseStatus status, const Http::ResponseMessage* response) PURE;
+  virtual void onComplete(const Http::ResponseMessage* response) PURE;
 };
 
 Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& server_url);
@@ -50,23 +39,11 @@ public:
       : config_(config), context_(context) {}
 
   // TODO(tyxia) Copy Move constructor
-  ~GcpAuthnClient() override {
-    if (active_request_) {
-      active_request_->cancel();
-      active_request_ = nullptr;
-    }
-  }
+  ~GcpAuthnClient() override { cancel(); }
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
-
   void fetchToken(RequestCallbacks& callbacks);
-
-  void cancel() {
-    if (active_request_) {
-      active_request_->cancel();
-      active_request_ = nullptr;
-    }
-  }
+  void cancel();
 
   // Http::AsyncClient::Callbacks implemented by this class.
   void onSuccess(const Http::AsyncClient::Request& request,
@@ -76,13 +53,6 @@ public:
 
 private:
   void onError();
-  // TODO(tyxia) Duplicated with cancel, delete
-  // void resetRequest() {
-  //   if (active_request_) {
-  //     active_request_->cancel();
-  //     active_request_ = nullptr;
-  //   }
-  // }
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config_;
   Server::Configuration::FactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};

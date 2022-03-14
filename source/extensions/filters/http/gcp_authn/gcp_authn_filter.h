@@ -35,13 +35,11 @@ public:
 
   void onDestroy() override;
 
-  void onComplete(ResponseStatus, const Http::ResponseMessage* response) override;
+  void onComplete(const Http::ResponseMessage* response) override;
+
   ~GcpAuthnFilter() override = default;
 
 private:
-  std::unique_ptr<GcpAuthnClient> CreateGcpAuthnClient() {
-    return std::make_unique<GcpAuthnClient>(*filter_config_, context_);
-  }
   FilterConfigProtoSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;

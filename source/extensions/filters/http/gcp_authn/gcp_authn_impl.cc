@@ -29,21 +29,22 @@ Http::RequestMessagePtr buildRequest(const std::string& method, const std::strin
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
 }
 
-// TODO(tyxia) Pass the return of buildRequest to the fetchToken??
 void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
-  ASSERT(callbacks_ == nullptr);
-  callbacks_ = &callbacks;
-  // Cancel the active request if it is present.
+  // Cancel any active requests.
   cancel();
 
-  const auto thread_local_cluster =
-      context_.clusterManager().getThreadLocalCluster(config_.http_uri().cluster());
+  ASSERT(callbacks_ == nullptr);
+  callbacks_ = &callbacks;
 
-  // Fail the request if the cluster is not configured.
+  const std::string cluster = config_.http_uri().cluster();
+  const std::string uri = config_.http_uri().uri();
+  const auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster);
+
+  // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
     ENVOY_LOG(error,
               "Failed to fetch the token [uri = {}]: [cluster = {}] is not found or configured.",
-              config_.http_uri().uri(), config_.http_uri().cluster());
+              uri, cluster);
     onError();
     return;
   }
@@ -65,7 +66,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
     options.setBufferBodyForRetry(true);
   }
 
-  Http::RequestMessagePtr request = buildRequest("GET", config_.http_uri().uri());
+  Http::RequestMessagePtr request = buildRequest("GET", uri);
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
 }
@@ -74,12 +75,13 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
                                Http::ResponseMessagePtr&& response) {
   try {
     const uint64_t status_code = Envoy::Http::Utility::getResponseStatus(response->headers());
-
+    active_request_ = nullptr;
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
-      callbacks_->onComplete(ResponseStatus::OK, response.get());
+      ASSERT(callbacks_ != nullptr);
+      callbacks_->onComplete(response.get());
       callbacks_ = nullptr;
     } else {
-      ENVOY_LOG(error, "Failed to get the response status: {}", status_code);
+      ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
       onError();
     }
   } catch (const Envoy::EnvoyException& e) {
@@ -91,21 +93,30 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
 
 void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
-
+  ENVOY_LOG(error, "{}: haha", __func__);
   if (reason == Http::AsyncClient::FailureReason::Reset) {
-    ENVOY_LOG(error, "Failed to fetch the token [uri = {}]: the stream has been reset",
+    ENVOY_LOG(error, "Request to [uri = {}] failed: stream has been reset",
               config_.http_uri().uri());
   } else {
-    ENVOY_LOG(debug, "Failed to fetch the token [uri = {}]: failed network error {}",
-              config_.http_uri().uri(), enumToInt(reason));
+    ENVOY_LOG(error, "Request to [uri = {}] failed: network error {}", config_.http_uri().uri(),
+              enumToInt(reason));
   }
-
+  active_request_ = nullptr;
   onError();
 }
 
+void GcpAuthnClient::cancel() {
+  if (active_request_) {
+    active_request_->cancel();
+    active_request_ = nullptr;
+  }
+}
+
 void GcpAuthnClient::onError() {
+  // Cancel if the request is active.
   cancel();
-  callbacks_->onComplete(ResponseStatus::Error, nullptr);
+  ASSERT(callbacks_ != nullptr);
+  callbacks_->onComplete(nullptr);
   callbacks_ = nullptr;
 }
 
