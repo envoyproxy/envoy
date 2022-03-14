@@ -12,11 +12,13 @@ namespace {
 // Static variable to count initialization pairs. For tests like
 // main_common_test, we need to count to avoid double initialization or
 // shutdown.
-std::atomic<uint32_t> process_wide_initialized;
+std::atomic<uint32_t>& processWideInitialized() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<uint32_t>);
+};
 } // namespace
 
 ProcessWide::ProcessWide() {
-  if (process_wide_initialized++ == 0) {
+  if (processWideInitialized()++ == 0) {
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
@@ -40,9 +42,9 @@ ProcessWide::ProcessWide() {
 }
 
 ProcessWide::~ProcessWide() {
-  ASSERT(process_wide_initialized > 0);
-  if (--process_wide_initialized == 0) {
-    process_wide_initialized = false;
+  ASSERT(processWideInitialized() > 0);
+  if (--processWideInitialized() == 0) {
+    processWideInitialized() = false;
     ares_library_cleanup();
   }
 }
