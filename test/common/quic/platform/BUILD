@@ -50,13 +50,13 @@ envoy_cc_test(
         "@com_github_google_quiche//:quic_core_error_codes_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",
-        "@com_github_google_quiche//:quic_platform_mem_slice_storage",
         "@com_github_google_quiche//:quic_platform_mock_log",
         "@com_github_google_quiche//:quic_platform_sleep",
         "@com_github_google_quiche//:quic_platform_system_event_loop",
         "@com_github_google_quiche//:quic_platform_test",
         "@com_github_google_quiche//:quic_platform_test_output",
         "@com_github_google_quiche//:quic_platform_thread",
+        "@com_github_google_quiche//:quiche_common_mem_slice_storage",
     ],
 )
 

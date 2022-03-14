@@ -430,7 +430,14 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  if (rc.return_value_ != 0) {
+    ENVOY_LOG_EVENT(debug, "cares_getiffaddrs_error",
+                    "dns resolution for {} could not obtain interface information with error={}",
+                    dns_name_, rc.errno_);
+    // Maintain no-op behavior if the system encountered an error while providing interface
+    // information.
+    return {true, true};
+  }
 
   DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces available_interfaces{false,
                                                                                        false};

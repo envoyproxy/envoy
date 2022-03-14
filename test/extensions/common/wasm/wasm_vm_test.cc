@@ -56,11 +56,11 @@ TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.inva
 TEST_F(BaseVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
-  EXPECT_TRUE(wasm_vm->runtime() == "null");
+  EXPECT_TRUE(wasm_vm->getEngineName() == "null");
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
-  EXPECT_EQ(wasm_vm->runtime(), "null");
+  EXPECT_EQ(wasm_vm->getEngineName(), "null");
   std::function<void()> f;
   EXPECT_FALSE(wasm_vm->integration()->getNullVmFunction("bad_function", false, 0, nullptr, &f));
 }
@@ -184,7 +184,7 @@ TEST_P(WasmVmTest, V8BadCode) { ASSERT_FALSE(init("bad code")); }
 
 TEST_P(WasmVmTest, V8Load) {
   ASSERT_TRUE(init());
-  EXPECT_TRUE(wasm_vm_->runtime() == "v8");
+  EXPECT_TRUE(wasm_vm_->getEngineName() == "v8");
   EXPECT_TRUE(wasm_vm_->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm_->clone() != nullptr);
 }

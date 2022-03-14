@@ -36,6 +36,19 @@ public:
     tls_.shutdownThread();
   }
 
+  // Set buckets for tests.
+  void setHistogramBucketSettings(const std::string& prefix, const std::vector<double>& buckets) {
+    envoy::config::metrics::v3::StatsConfig config;
+    auto& bucket_settings = *config.mutable_histogram_bucket_settings();
+
+    envoy::config::metrics::v3::HistogramBucketSettings setting;
+    setting.mutable_match()->set_prefix(prefix);
+    setting.mutable_buckets()->Add(buckets.begin(), buckets.end());
+
+    bucket_settings.Add(std::move(setting));
+    store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config));
+  }
+
   using CodeResponse = std::pair<Http::Code, std::string>;
 
   /**
@@ -120,7 +133,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
-  CodeResponse code_response(handlerStats(url));
+  const CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::NotFound, code_response.first);
   EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
 }
@@ -166,6 +179,304 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   EXPECT_EQ(expected, code_response.second);
 }
 
+TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
+  const std::string url = "/stats?histogram_buckets=cumulative";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
+            "B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) B30000(1,1) B60000(1,1) "
+            "B300000(1,1) B600000(1,1) B1.8e+06(1,1) B3.6e+06(1,1)\n",
+            code_response.second);
+}
+
+TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
+  const std::string url = "/stats?histogram_buckets=disjoint";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) "
+            "B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\nh2: No recorded values\n",
+            code_response.second);
+
+  code_response = handlerStats(url + "&usedonly");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ("h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) "
+            "B500(1,2) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+            code_response.second);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 300));
+  h2.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  code_response = handlerStats(url + "&usedonly&filter=h2");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
+            "B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+            code_response.second);
+}
+
+TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
+  const std::string url = "/stats?histogram_buckets=invalid_input";
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n",
+            code_response.second);
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJsonNoHistograms) {
+  const std::string url = "/stats?format=json&usedonly";
+
+  Stats::Counter& c1 = store_->counterFromString("c1");
+
+  c1.add(10);
+
+  store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_json = R"EOF({"stats": [{"name":"c1", "value":10}]})EOF";
+
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&histogram_buckets=cumulative");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&histogram_buckets=disjoint");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
+  const std::string url = "/stats?histogram_buckets=cumulative&format=json";
+  // Set h as prefix to match both histograms.
+  setHistogramBucketSettings("h", {1, 2, 3, 4});
+
+  Stats::Counter& c1 = store_->counterFromString("c1");
+
+  c1.add(10);
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
+
+  store_->mergeHistograms([]() -> void {});
+
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {"name":"c1", "value":10},
+        {
+            "histograms": [
+                {
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":3},
+                        {"upper_bound":4, "interval":1, "cumulative":3}
+                    ]
+                },
+                {
+                    "name": "h2", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":0},
+                        {"upper_bound":3, "interval":0, "cumulative":0},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&usedonly");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_used = R"EOF({
+    "stats": [
+        {"name":"c1", "value":10},
+        {
+            "histograms": [
+                {
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":3},
+                        {"upper_bound":4, "interval":1, "cumulative":3}
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&usedonly&filter=h1");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_used_and_filter = R"EOF({
+    "stats": [
+        {
+            "histograms": [
+                {
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":3},
+                        {"upper_bound":4, "interval":1, "cumulative":3}
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
+  const std::string url = "/stats?histogram_buckets=disjoint&format=json";
+  // Set h as prefix to match both histograms.
+  setHistogramBucketSettings("h", {1, 2, 3, 4});
+
+  Stats::Counter& c1 = store_->counterFromString("c1");
+
+  c1.add(10);
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
+  h1.recordValue(2);
+
+  store_->mergeHistograms([]() -> void {});
+
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {"name":"c1", "value":10},
+        {
+            "histograms": [
+                {
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
+                    ]
+                },
+                {
+                    "name": "h2", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":0},
+                        {"upper_bound":3, "interval":0, "cumulative":0},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&usedonly");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_used = R"EOF({
+    "stats": [
+        {"name":"c1", "value":10},
+        {
+            "histograms": [
+                {
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&usedonly&filter=h1");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_used_and_filter = R"EOF({
+    "stats": [
+        {
+            "histograms": [
+                {
+                    "name": "h1", "buckets": [
+                        {"upper_bound":1, "interval":0, "cumulative":0},
+                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":3, "interval":1, "cumulative":2},
+                        {"upper_bound":4, "interval":0, "cumulative":0}
+                    ]
+                }
+            ]
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
+}
+
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   const std::string url = "/stats?format=json";
 
@@ -185,7 +496,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  CodeResponse code_response = handlerStats(url);
+  const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
 
   const std::string expected_json_old = R"EOF({
@@ -709,7 +1020,7 @@ TEST_P(AdminStatsTest, SortedCountersAndGauges) {
   store_->counterFromString("s1");
   store_->gaugeFromString("s2", Stats::Gauge::ImportMode::Accumulate);
   for (const std::string& url : {"/stats", "/stats?format=json"}) {
-    CodeResponse code_response = handlerStats(url);
+    const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"s1", "s2", "s3", "s4"});
   }
@@ -722,7 +1033,7 @@ TEST_P(AdminStatsTest, SortedTextReadouts) {
   store_->textReadoutFromString("t1");
   store_->textReadoutFromString("t2");
   for (const std::string& url : {"/stats", "/stats?format=json"}) {
-    CodeResponse code_response = handlerStats(url);
+    const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"t1", "t2", "t3", "t4"});
   }
@@ -734,7 +1045,7 @@ TEST_P(AdminStatsTest, SortedHistograms) {
   store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
   for (const std::string& url : {"/stats", "/stats?format=json"}) {
-    CodeResponse code_response = handlerStats(url);
+    const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});
   }
@@ -799,8 +1110,17 @@ TEST_P(AdminInstanceTest, RecentLookups) {
   EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
   EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 
-  // We can't test RecentLookups in admin unit tests as it doesn't work with a
-  // fake symbol table. However we cover this solidly in integration tests.
+  EXPECT_EQ(Http::Code::OK,
+            admin_.request("/stats/recentlookups/enable", "POST", response_headers, body));
+  Stats::StatNamePool pool(server_.stats().symbolTable());
+  pool.add("alpha");
+  pool.add("beta");
+  pool.add("gamma");
+  pool.add("alpha");
+  pool.add("beta");
+  pool.add("alpha");
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
+  EXPECT_THAT(body, HasSubstr("       1 gamma\n       2 beta\n       3 alpha\n"));
 }
 
 class StatsHandlerPrometheusTest : public StatsHandlerTest {
@@ -838,7 +1158,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsHandlerPrometheusDefaultTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
-  std::string url = "/stats?format=prometheus";
+  const std::string url = "/stats?format=prometheus";
 
   createTestStats();
 
@@ -852,9 +1172,19 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 )EOF";
 
-  CodeResponse code_response = handlerStats(url);
+  const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_THAT(expected_response, code_response.second);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
+  const std::string url = "/stats?format=prometheus&filter=(+invalid)";
+
+  createTestStats();
+
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid regex"));
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest
@@ -870,7 +1200,7 @@ INSTANTIATE_TEST_SUITE_P(
                                      "/stats?format=prometheus&text_readouts=abc")));
 
 TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTextReadoutsTest) {
-  std::string url = std::get<1>(GetParam());
+  const std::string url = std::get<1>(GetParam());
 
   createTestStats();
 
@@ -887,7 +1217,7 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
-  CodeResponse code_response = handlerStats(url);
+  const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_response, code_response.second);
 }

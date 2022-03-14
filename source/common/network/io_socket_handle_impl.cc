@@ -576,6 +576,15 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
+absl::optional<uint64_t> IoSocketHandleImpl::congestionWindowInBytes() const {
+  Api::EnvoyTcpInfo info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.return_value_) {
+    return {};
+  }
+  return info.tcpi_snd_cwnd;
+}
+
 absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
   auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
   if (!os_syscalls_singleton.supportsGetifaddrs()) {

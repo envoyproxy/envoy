@@ -487,6 +487,21 @@ AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
   return AssertionSuccess();
 }
 
+AssertionResult FakeConnectionBase::waitForNoPost(milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!time_system_.waitFor(
+          lock_,
+          absl::Condition(
+              [](void* fake_connection) -> bool {
+                return static_cast<FakeConnectionBase*>(fake_connection)->pending_cbs_ == 0;
+              },
+              this),
+          timeout)) {
+    return AssertionFailure() << "Timed out waiting for ops on this connection";
+  }
+  return AssertionSuccess();
+}
+
 void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
   ++pending_cbs_;
   dispatcher_.post([this, cb]() {
