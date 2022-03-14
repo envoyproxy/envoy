@@ -195,8 +195,8 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // established.
   read_callbacks_->connection().readDisable(true);
   getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
-  getStreamInfo().setUpstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
   config_->stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
