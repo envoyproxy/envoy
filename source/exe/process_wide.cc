@@ -42,9 +42,10 @@ ProcessWide::ProcessWide() {
 }
 
 ProcessWide::~ProcessWide() {
-  ASSERT(processWideInitialized() > 0);
-  if (--processWideInitialized() == 0) {
-    processWideInitialized() = false;
+  auto& process_wide_initialized = processWideInitialized();
+  ASSERT(process_wide_initialized > 0);
+  if (--process_wide_initialized == 0) {
+    process_wide_initialized = false;
     ares_library_cleanup();
   }
 }
