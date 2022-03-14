@@ -30,6 +30,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "config_validator_interface",
+    hdrs = ["config_validator.h"],
+    deps = [
+        "//envoy/server:instance_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "context_provider_interface",
     hdrs = ["context_provider.h"],
     deps = [

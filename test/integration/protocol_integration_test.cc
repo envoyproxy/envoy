@@ -1127,7 +1127,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   EXPECT_EQ(512U, response->body().size());
 }
 
-// Very similar set-up to testRetry but with a 16k request the request will not
+// Very similar set-up to testRetry but with a 65k request the request will not
 // be buffered and the 503 will be returned to the user.
 TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
@@ -1493,7 +1493,8 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     stat_name = "http3.dropped_headers_with_underscores";
     break;
   default:
-    RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
+    RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}",
+                                      static_cast<int>(downstream_protocol_)));
   };
   EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
 }

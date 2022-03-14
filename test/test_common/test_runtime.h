@@ -43,12 +43,8 @@ public:
     loader().mergeValues(values);
   }
 
-  ~TestScopedRuntime() {
-    Runtime::RuntimeFeatures features;
-    features.restoreDefaults();
-  }
-
 protected:
+  absl::FlagSaver saver_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
