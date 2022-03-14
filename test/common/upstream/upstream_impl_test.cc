@@ -525,10 +525,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   // Test per host connection limits: as it's set to 1, the host can create connections initially.
   auto& host = cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0];
-  EXPECT_TRUE(host->canCreate(ResourcePriority::Default));
+  EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
   // If one connection exists to that host, canCreate will fail.
   host->stats().cx_active_.inc();
-  EXPECT_FALSE(host->canCreate(ResourcePriority::Default));
+  EXPECT_FALSE(host->canCreateConnection(ResourcePriority::Default));
 }
 
 // Verifies that host removal works correctly when hosts are being health checked

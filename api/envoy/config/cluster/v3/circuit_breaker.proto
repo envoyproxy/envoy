@@ -109,7 +109,8 @@ message CircuitBreakers {
   // Optional per-host limits which apply to each individual host in a cluster.
   //
   // .. note::
-  //  currently only the max_connections field is supported for per-host limits.
+  //  currently only the :ref:`max_connections
+  //  <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connections>` field is supported for per-host limits.
   //
   // If multiple per-host :ref:`Thresholds<envoy_v3_api_msg_config.cluster.v3.CircuitBreakers.Thresholds>`
   // are defined with the same :ref:`RoutingPriority<envoy_v3_api_enum_config.core.v3.RoutingPriority>`,

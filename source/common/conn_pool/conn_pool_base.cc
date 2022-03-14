@@ -132,7 +132,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     return ConnectionResult::ShouldNotConnect;
   }
 
-  const bool can_create_connection = host_->canCreate(priority_);
+  const bool can_create_connection = host_->canCreateConnection(priority_);
 
   if (!can_create_connection) {
     host_->cluster().stats().upstream_cx_overflow_.inc();

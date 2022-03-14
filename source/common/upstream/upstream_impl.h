@@ -137,7 +137,7 @@ public:
     return *null_health_checker;
   }
 
-  bool canCreate(Upstream::ResourcePriority priority) const override {
+  bool canCreateConnection(Upstream::ResourcePriority priority) const override {
     if (stats().cx_active_.value() >= cluster().resourceManager(priority).maxConnectionsPerHost()) {
       return false;
     }

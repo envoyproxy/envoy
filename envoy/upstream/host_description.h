@@ -122,7 +122,7 @@ public:
    * @return true if the cluster can create a connection for this priority, false otherwise.
    * @param priority the priority the connection would have.
    */
-  virtual bool canCreate(Upstream::ResourcePriority priority) const PURE;
+  virtual bool canCreateConnection(Upstream::ResourcePriority priority) const PURE;
 
   /**
    * @return the host's outlier detection monitor.
