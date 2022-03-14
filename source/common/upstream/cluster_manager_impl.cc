@@ -1104,7 +1104,7 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
-  if (!http_async_client_) {
+  if (http_async_client_ == nullptr) {
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_,
         parent_.parent_.local_info_, parent_.parent_, parent_.parent_.runtime_,
