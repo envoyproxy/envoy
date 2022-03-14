@@ -12,10 +12,10 @@ namespace {
 // Static variable to count initialization pairs. For tests like
 // main_common_test, we need to count to avoid double initialization or
 // shutdown.
-uint32_t process_wide_initialized;
+std::atomic<uint32_t> process_wide_initialized;
 } // namespace
 
-ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
+ProcessWide::ProcessWide() {
   if (process_wide_initialized++ == 0) {
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
@@ -45,7 +45,6 @@ ProcessWide::~ProcessWide() {
     process_wide_initialized = false;
     ares_library_cleanup();
   }
-  ASSERT(process_wide_initialized == initialization_depth_);
 }
 
 } // namespace Envoy
