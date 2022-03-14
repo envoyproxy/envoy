@@ -138,7 +138,7 @@ public:
   }
 
   bool canCreate(Upstream::ResourcePriority priority) const override {
-    if (stats().cx_active_.value() > cluster().resourceManager(priority).maxConnectionsPerHost()) {
+    if (stats().cx_active_.value() >= cluster().resourceManager(priority).maxConnectionsPerHost()) {
       return false;
     }
     return cluster().resourceManager(priority).connections().canCreate();

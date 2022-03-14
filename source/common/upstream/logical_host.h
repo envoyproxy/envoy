@@ -95,7 +95,7 @@ public:
   }
   const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
   bool canCreate(Upstream::ResourcePriority priority) const override {
-    if (stats().cx_active_.value() > cluster().resourceManager(priority).maxConnectionsPerHost()) {
+    if (stats().cx_active_.value() >= cluster().resourceManager(priority).maxConnectionsPerHost()) {
       return false;
     }
 

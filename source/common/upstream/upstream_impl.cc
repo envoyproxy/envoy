@@ -1437,6 +1437,12 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
       [priority](const envoy::config::cluster::v3::CircuitBreakers::Thresholds& threshold) {
         return threshold.priority() == priority;
       });
+  const auto& per_host_thresholds = config.circuit_breakers().per_host_thresholds();
+  const auto per_host_it = std::find_if(
+      per_host_thresholds.cbegin(), per_host_thresholds.cend(),
+      [priority](const envoy::config::cluster::v3::CircuitBreakers::Thresholds& threshold) {
+        return threshold.priority() == priority;
+      });
 
   absl::optional<double> budget_percent;
   absl::optional<uint32_t> min_retry_concurrency;
@@ -1449,9 +1455,17 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     track_remaining = it->track_remaining();
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
-    max_connections_per_host =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, per_host_connection_limits, max_connections_per_host);
     std::tie(budget_percent, min_retry_concurrency) = ClusterInfoImpl::getRetryBudgetParams(*it);
+  }
+  if (per_host_it != per_host_thresholds.cend()) {
+    if (per_host_it->has_max_pending_requests() || per_host_it->has_max_requests() ||
+        per_host_it->has_max_retries() || per_host_it->has_max_connection_pools() ||
+        per_host_it->has_retry_budget()) {
+      throw EnvoyException("Unsupported field in per_host_thresholds");
+    }
+    if (per_host_it->has_max_connections()) {
+      max_connections_per_host = per_host_it->max_connections().value();
+    }
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
