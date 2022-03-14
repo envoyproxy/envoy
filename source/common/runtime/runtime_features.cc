@@ -23,6 +23,7 @@
 
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
+RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
@@ -45,7 +46,6 @@ RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
-RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_json);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
 RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_connection);
@@ -143,6 +143,7 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_allow_multiple_dns_addresses,
   &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
   &FLAGS_envoy_reloadable_features_append_or_truncate,
+  &FLAGS_envoy_reloadable_features_append_to_accept_content_encoding_only_once,
   &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
   &FLAGS_envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3,
   &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
@@ -165,7 +166,6 @@ constexpr absl::Flag<bool>* runtime_features[] = {
   &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
   &FLAGS_envoy_reloadable_features_postpone_h3_client_connect_to_next_loop,
   &FLAGS_envoy_reloadable_features_proxy_102_103,
-  &FLAGS_envoy_reloadable_features_remove_legacy_json,
   &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
   &FLAGS_envoy_reloadable_features_skip_delay_close,
   &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,

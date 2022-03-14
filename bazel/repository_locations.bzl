@@ -64,11 +64,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "1162be3669036d2c09359a95d39ff65fc6608f39",
-        sha256 = "8f5ac011a443649a27a7b82bc447de4f564f9cb5b6812d87c3bc1b1e74d2055f",
+        version = "f3a70cf47bd91d8f6ab080e4da361cc7f8e6f24d",
+        sha256 = "f18224874887fae1f897fa582fb7aad34fc7604cadb1d3fe92527eabdb8af513",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2022-01-28",
+        release_date = "2022-03-11",
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -401,12 +401,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Benchmark",
         project_desc = "Library to benchmark code snippets",
         project_url = "https://github.com/google/benchmark",
-        version = "1.5.1",
-        sha256 = "23082937d1663a53b90cb5b61df4bcc312f6dee7018da78ba00dd6bd669dfef2",
+        version = "1.6.1",
+        sha256 = "6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4",
         strip_prefix = "benchmark-{version}",
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2020-06-09",
+        release_date = "2022-01-10",
     ),
     com_github_libevent_libevent = dict(
         project_name = "libevent",
@@ -537,9 +537,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "a2faafbc402394df0fa94602df4b5e4befd734aad6bb55dfef46f62fcaf1090b",
         strip_prefix = "rapidjson-{version}",
         urls = ["https://github.com/Tencent/rapidjson/archive/{version}.tar.gz"],
-        # We're mostly using com_google_protobuf for JSON, but there are some extensions and hard to
-        # disentangle uses on the dataplane, e.g. header_formatter, Squash filter.
-        use_category = ["controlplane", "dataplane_core"],
+        use_category = ["observability_ext"],
+        # Rapidjson is used in the external dependency of zipkin tracer.
+        extensions = ["envoy.tracers.zipkin", "envoy.tracers.opencensus"],
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),

@@ -363,12 +363,17 @@ message Cluster {
     // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
     //
     // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
-    // `new_weight = weight * time_factor ^ (1 / aggression)`,
+    // `new_weight = weight * max(min_weight_percent, time_factor ^ (1 / aggression))`,
     // where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
     //
     // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
     // Once host exits slow start, time_factor and aggression no longer affect its weight.
     core.v3.RuntimeDouble aggression = 2;
+
+    // Configures the minimum percentage of origin weight that avoids too small new weight,
+    // which may cause endpoints in slow start mode receive no traffic in slow start window.
+    // If not specified, the default is 10%.
+    type.v3.Percent min_weight_percent = 3;
   }
 
   // Specific configuration for the RoundRobin load balancing policy.
