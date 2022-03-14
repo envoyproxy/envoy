@@ -421,6 +421,8 @@ def _com_github_zlib_ng_zlib_ng():
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
+# Boost in general is not approved for Envoy use, and the header-only
+# dependency is only for the Hyperscan contrib package.
 def _org_boost():
     external_http_archive(
         name = "org_boost",
