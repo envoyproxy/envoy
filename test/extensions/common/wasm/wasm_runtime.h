@@ -1,19 +1,6 @@
 #pragma once
 
 #include "gtest/gtest.h"
-#include "include/proxy-wasm/wasm.h"
-
-namespace proxy_wasm {
-
-// gcc 9 is unable to resolve overloads of gtest built-in value printers for proxy_wasm::WasmResult
-// most likely because it is `enum class`.
-// As a workaround add custom printer to solve this problem. This change should work fine for clang
-// or cl compilers as well.
-inline void PrintTo(const proxy_wasm::WasmResult& result, std::ostream* os) {
-  *os << static_cast<uint32_t>(result); // whatever needed to print bar to os
-}
-
-} // namespace proxy_wasm
 
 namespace Envoy {
 namespace Extensions {

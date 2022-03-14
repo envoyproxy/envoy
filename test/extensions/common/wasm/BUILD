@@ -95,6 +95,5 @@ envoy_cc_test_library(
         "//source/extensions/wasm_runtime/wamr:config",
         "//source/extensions/wasm_runtime/wasmtime:config",
         "//source/extensions/wasm_runtime/wavm:config",
-        "@proxy_wasm_cpp_host//:headers",
     ],
 )
