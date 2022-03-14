@@ -73,9 +73,9 @@ public:
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
-  void
-  verifyCertsAndSignature(const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
-                          const std::string& payload, const std::string& signature) {
+  void verifyCertsAndSignature(
+      const quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>& chain,
+      const std::string& payload, const std::string& signature) {
     const std::string& leaf = chain->certs[0];
     std::unique_ptr<quic::CertificateView> cert_view =
         quic::CertificateView::ParseSingleCertificate(leaf);
@@ -198,7 +198,7 @@ protected:
 TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {
   expectCertChainAndPrivateKey(expected_certs_, true);
   bool cert_matched_sni;
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> chain =
       proof_source_.GetCertChain(server_address_, client_address_, hostname_, &cert_matched_sni);
   EXPECT_EQ(2, chain->certs.size());
 

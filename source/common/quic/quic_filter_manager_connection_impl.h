@@ -5,6 +5,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/http3/codec_stats.h"
