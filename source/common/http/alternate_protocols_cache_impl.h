@@ -65,11 +65,13 @@ public:
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
   void setSrtt(const Origin& origin, std::chrono::microseconds srtt) override;
+  std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
+  void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 

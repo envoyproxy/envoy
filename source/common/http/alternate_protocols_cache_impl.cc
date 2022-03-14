@@ -104,22 +104,26 @@ AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
     TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store, size_t max_entries)
-    : time_source_(time_source), key_value_store_(std::move(key_value_store)),
-      max_entries_(max_entries > 0 ? max_entries : 1024) {
-  if (key_value_store_) {
-    KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
+    : time_source_(time_source), max_entries_(max_entries > 0 ? max_entries : 1024) {
+  if (key_value_store) {
+    KeyValueStore::ConstIterateCb load_protocols = [this](const std::string& key,
+                                                          const std::string& value) {
       absl::optional<OriginData> origin_data = originDataFromString(value, time_source_, true);
       absl::optional<Origin> origin = stringToOrigin(key);
       if (origin_data.has_value() && origin.has_value()) {
+        // We deferred transfering ownership into key_value_store_ prior, so
+        // that we won't end up doing redundant updates to the store while
+        // iterating.
         setAlternativesImpl(origin.value(), origin_data.value().protocols);
-        setSrtt(origin.value(), origin_data.value().srtt);
+        setSrttImpl(origin.value(), origin_data.value().srtt);
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
       }
       return KeyValueStore::Iterate::Continue;
     };
-    key_value_store_->iterate(load);
+    key_value_store->iterate(load_protocols);
+    key_value_store_ = std::move(key_value_store);
   }
 }
 
@@ -136,6 +140,11 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
 }
 
 void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
+  setSrttImpl(origin, srtt);
+}
+
+void AlternateProtocolsCacheImpl::setSrttImpl(const Origin& origin,
+                                              std::chrono::microseconds srtt) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
     return;
@@ -145,6 +154,14 @@ void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::mic
     key_value_store_->addOrUpdate(originToString(origin),
                                   originDataToStringForCache(entry_it->second.protocols, srtt));
   }
+}
+
+std::chrono::microseconds AlternateProtocolsCacheImpl::getSrtt(const Origin& origin) const {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return std::chrono::microseconds(0);
+  }
+  return entry_it->second.srtt;
 }
 
 void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,

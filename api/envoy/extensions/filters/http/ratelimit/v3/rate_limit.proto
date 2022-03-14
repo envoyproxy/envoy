@@ -29,6 +29,8 @@ message RateLimit {
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
 
   // Defines the version of the standard to use for X-RateLimit headers.
+  //
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
   enum XRateLimitHeadersRFCVersion {
     // X-RateLimit headers disabled.
     OFF = 0;
@@ -100,6 +102,8 @@ message RateLimit {
   // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
   //
   // Disabled by default.
+  //
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
       [(validate.rules).enum = {defined_only: true}];
 

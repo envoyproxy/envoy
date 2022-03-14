@@ -63,8 +63,11 @@ do
       echo -ne "  Checking format for $i - "
       "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
 
-      echo "  Checking spelling for $i"
-      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
+      # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
+      # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
+      # out.
+      # echo "  Checking spelling for $i"
+      # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
     done
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
