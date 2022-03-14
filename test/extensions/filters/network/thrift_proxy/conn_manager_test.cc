@@ -392,6 +392,7 @@ public:
     EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
     EXPECT_EQ(1U, store_.counter("test.response_success").value());
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
+    EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;

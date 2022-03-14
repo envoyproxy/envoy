@@ -244,6 +244,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
       // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
       // over)?
       metadata->headers().addReferenceKey(Headers::get().Drain, "true");
+      parent_.parent_.stats_.downstream_response_drain_close_.inc();
     }
   }
 
