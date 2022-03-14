@@ -61,6 +61,8 @@ without further review.
   * Wasm
 * Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
   * Thrift
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * HTTP/3
 
 # Envoy security team
 
