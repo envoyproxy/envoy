@@ -224,12 +224,11 @@ TEST_F(FilterStateImplTest, ErrorAccessingReadOnlyAsMutable) {
   // Accessing read only data as mutable should throw error
   filter_state().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
                          FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
-  EXPECT_THROW_WITH_MESSAGE(
-      filter_state().getDataMutable<TestStoredTypeTracking>("test_name"), EnvoyException,
-      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-  EXPECT_THROW_WITH_MESSAGE(
-      filter_state().getDataSharedMutableGeneric("test_name"), EnvoyException,
-      "FilterState::getDataSharedMutableGeneric tried to access immutable data as mutable.");
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataMutable<TestStoredTypeTracking>("test_name"),
+                            EnvoyException,
+                            "FilterState tried to access immutable data as mutable.");
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getDataSharedMutableGeneric("test_name"), EnvoyException,
+                            "FilterState tried to access immutable data as mutable.");
 }
 
 namespace {
@@ -288,15 +287,13 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
-  EXPECT_THROW_WITH_MESSAGE(
-      new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
-      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_THROW_WITH_MESSAGE(new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
+                            "FilterState tried to access immutable data as mutable.");
 
   EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4")->access());
 
-  EXPECT_THROW_WITH_MESSAGE(
-      new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
-      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_THROW_WITH_MESSAGE(new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
+                            "FilterState tried to access immutable data as mutable.");
 
   EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
@@ -323,9 +320,8 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_4"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
-  EXPECT_THROW_WITH_MESSAGE(
-      new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
-      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_THROW_WITH_MESSAGE(new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
+                            "FilterState tried to access immutable data as mutable.");
   EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
 
