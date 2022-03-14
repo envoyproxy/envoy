@@ -873,6 +873,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
       dispatching_(false), raised_goaway_(false), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
+  // The oghttp2 library can only be used with the wrapper API enabled.
+  ASSERT(!use_oghttp2_library_ || use_new_codec_wrapper_);
+
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(http2_options.connection_keepalive(), interval, 0));
