@@ -3,14 +3,39 @@
 set -euo pipefail
 
 readonly bazelisk_version="1.10.1"
+
 if [[ $OSTYPE == darwin* ]]; then
-  # TODO: Support M1 once https://github.com/envoyproxy/envoy/issues/16482
-  readonly bazel_platform="darwin-amd64"
-  readonly bazel_version_sha="e485bbf84532d02a60b0eb23c702610b5408df3a199087a4f2b5e0995bbf2d5a"
+  readonly bazel_os="darwin"
 else
-  readonly bazel_platform="linux-amd64"
-  readonly bazel_version_sha="4cb534c52cdd47a6223d4596d530e7c9c785438ab3b0a49ff347e991c210b2cd"
+  readonly bazel_os="linux"
 fi
+
+readonly raw_arch="$(uname -m)"
+if [[ "$raw_arch" == "aarch64" || "$raw_arch" == "arm64" ]]; then
+  readonly bazel_arch="arm64"
+else
+  readonly bazel_arch="amd64"
+fi
+
+bazel_platform="$bazel_os-$bazel_arch"
+case "$bazel_platform" in
+  darwin-arm64)
+    readonly bazel_version_sha="c22d48601466d9d3b043ccd74051f2f4230f9b9f4509f097017c97303aa88d13"
+    ;;
+  darwin-amd64)
+    readonly bazel_version_sha="e485bbf84532d02a60b0eb23c702610b5408df3a199087a4f2b5e0995bbf2d5a"
+    ;;
+  linux-arm64)
+    readonly bazel_version_sha="c1de6860dd4f8d5e2ec270097bd46d6a211b971a0b8b38559784bd051ea950a1"
+    ;;
+  linux-amd64)
+    readonly bazel_version_sha="4cb534c52cdd47a6223d4596d530e7c9c785438ab3b0a49ff347e991c210b2cd"
+    ;;
+
+  *)
+    echo "Unsupported platform $OSTYPE $raw_arch" >&2
+    exit 1
+esac
 
 readonly bazel_version_url="https://github.com/bazelbuild/bazelisk/releases/download/v$bazelisk_version/bazelisk-$bazel_platform"
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
