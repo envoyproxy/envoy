@@ -3665,7 +3665,13 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
         ->mutable_upstream_connection_options()
         ->set_set_local_interface_name_on_upstream_connections(true);
   });
+#ifdef WIN32
+  EXPECT_THROW_WITH_MESSAGE(initialize(), Envoy::EnvoyException,
+                            "set_local_interface_name_on_upstream_connections_ cannot be set to "
+                            "true on Windows platforms");
+#else
   initialize();
+#endif
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -3682,9 +3688,6 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 
   // Make sure that the local interface name was populated due to runtime override.
   // TODO: h3 upstreams don't have local interface name
-#ifdef WIN32
-  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
-#else
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
   } else {
