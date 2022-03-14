@@ -164,8 +164,7 @@ protected:
 private:
   friend class Http3ConnPoolImplPeer;
 
-  // Store quic helpers which can be shared between connections and must live
-  // beyond the lifetime of individual connections.
+  // Latches Quic helpers shared across the cluster
   Quic::PersistentQuicInfoImpl& quic_info_;
   // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
