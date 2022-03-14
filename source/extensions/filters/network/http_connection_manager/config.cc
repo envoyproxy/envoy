@@ -657,7 +657,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config())));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

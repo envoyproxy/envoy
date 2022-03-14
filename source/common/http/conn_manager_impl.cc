@@ -768,6 +768,7 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
+  // See below for more information on this early return block.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")) {
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
