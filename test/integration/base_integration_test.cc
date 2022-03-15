@@ -272,10 +272,8 @@ void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
   }
 }
 
-
 absl::optional<uint64_t> BaseIntegrationTest::waitForNextUpstreamConnection(
-    const std::vector<uint64_t>& upstream_indices,
-    FakeRawConnectionPtr& fake_upstream_connection,
+    const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
     std::chrono::milliseconds connection_wait_timeout) {
   AssertionResult result = AssertionFailure();
   int upstream_index = 0;
@@ -284,9 +282,8 @@ absl::optional<uint64_t> BaseIntegrationTest::waitForNextUpstreamConnection(
   // received.
   while (!result) {
     upstream_index = upstream_index % upstream_indices.size();
-    result =
-        fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
-            fake_upstream_connection, std::chrono::milliseconds(5));
+    result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
+        fake_upstream_connection, std::chrono::milliseconds(5));
     if (result) {
       return upstream_index;
     } else if (!bound.withinBound()) {

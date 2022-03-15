@@ -70,20 +70,18 @@ void TcpProxyIntegrationTest::initialize() {
 }
 
 void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
-  useListenerAccessLog(
-      "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
-      "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-      "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-      "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
+  useListenerAccessLog("DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
+                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+                       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
 }
 
 // Using a set of T, test a consumer function for a true AssertionResult, or
 // timeout.
 template <typename T>
-inline absl::optional<uint64_t> waitForFunction(
-    std::vector<T>& connection_list,
-    std::chrono::milliseconds connection_wait_timeout,
-    std::function<AssertionResult(T&)>& func) {
+inline absl::optional<uint64_t> waitForFunction(std::vector<T>& connection_list,
+                                                std::chrono::milliseconds connection_wait_timeout,
+                                                std::function<AssertionResult(T&)>& func) {
   AssertionResult result = AssertionFailure();
   int upstream_index = 0;
   Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
@@ -199,12 +197,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnectBytesMeter) {
   EXPECT_EQ("world", tcp_client->data());
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=5 "
-                                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=5 "
-                                       "UPSTREAM_WIRE_BYTES_SENT=5 "
-                                       "UPSTREAM_WIRE_BYTES_RECEIVED=5"
-                                       "\r?.*")));
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=5 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=5 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=5 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=5"
+                                                   "\r?.*")));
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -227,12 +224,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
   tcp_client->waitForDisconnect();
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=5 "
-                                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=10 "
-                                       "UPSTREAM_WIRE_BYTES_SENT=10 "
-                                       "UPSTREAM_WIRE_BYTES_RECEIVED=5"
-                                       "\r?.*")));
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=5 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=10 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=10 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=5"
+                                                   "\r?.*")));
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
@@ -486,15 +482,14 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 //  %DOWNSTREAM_WIRE_BYTES_SENT%, %DOWNSTREAM_WIRE_BYTES_RECEIVED%,
 //  %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED%
 TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
-  useListenerAccessLog(
-      "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
-      "upstreamhost=%UPSTREAM_HOST% "
-      "downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
-      "sent=%BYTES_SENT% received=%BYTES_RECEIVED% "
-      "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
-      "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-      "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-      "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
+  useListenerAccessLog("upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
+                       "upstreamhost=%UPSTREAM_HOST% "
+                       "downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
+                       "sent=%BYTES_SENT% received=%BYTES_RECEIVED% "
+                       "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
+                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+                       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -510,7 +505,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  // Guarantee client is done writing to the log
+  // Guarantee client is done writing to the log.
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
 
@@ -531,33 +526,26 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format(
-                  "upstreamlocal={0} upstreamhost={0} downstream={1} "
-                  "sent=5 received=0 "
-                  "DOWNSTREAM_WIRE_BYTES_SENT=5 "
-                  "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-                  "UPSTREAM_WIRE_BYTES_SENT=0 "
-                  "UPSTREAM_WIRE_BYTES_RECEIVED=5"
-                  "\r?.*",
-                  ip_port_regex, ip_regex)));
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1} "
+                                       "sent=5 received=0 "
+                                       "DOWNSTREAM_WIRE_BYTES_SENT=5 "
+                                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+                                       "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                       "UPSTREAM_WIRE_BYTES_RECEIVED=5"
+                                       "\r?.*",
+                                       ip_port_regex, ip_regex)));
 }
 
 // Test that no bytes are metered for a connection with no upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
   setupByteMeterAccessLog();
   fake_upstreams_count_ = 0;
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* cluster =
-            bootstrap.mutable_static_resources()->mutable_clusters(0);
-        auto* lb_endpoint = cluster->mutable_load_assignment()
-                                ->mutable_endpoints(0)
-                                ->mutable_lb_endpoints(0);
-        lb_endpoint->mutable_endpoint()
-            ->mutable_address()
-            ->mutable_socket_address()
-            ->set_port_value(1);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
   config_helper_.skipPortUsageValidation();
   enableHalfClose(false);
   initialize();
@@ -567,12 +555,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
 
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=0 "
-                                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-                                       "UPSTREAM_WIRE_BYTES_SENT=0 "
-                                       "UPSTREAM_WIRE_BYTES_RECEIVED=0"
-                                       "\r?.*")));
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=0 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=0"
+                                                   "\r?.*")));
 }
 
 // Make sure no bytes are logged when no data is sent.
@@ -582,19 +569,17 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   auto tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(
-      fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->close());
 
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=0 "
-                                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-                                       "UPSTREAM_WIRE_BYTES_SENT=0 "
-                                       "UPSTREAM_WIRE_BYTES_RECEIVED=0"
-                                       "\r?.*")));
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=0 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=0"
+                                                   "\r?.*")));
 }
 
 // Test Byte Metering across multiple upstream/downstream connections
@@ -604,19 +589,16 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
   const int upstream_count = 3;
 
   enableHalfClose(false);
-  config_helper_.addConfigModifier(
-      [this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        auto* cluster =
-            bootstrap.mutable_static_resources()->mutable_clusters(0);
-        auto* load_assignment = cluster->mutable_load_assignment();
-        load_assignment->clear_endpoints();
-        for (int i = 0; i < upstream_count; ++i) {
-          auto locality = load_assignment->add_endpoints();
-          locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
-              ConfigHelper::buildEndpoint(
-                  Network::Test::getLoopbackAddressString(version_)));
-        }
-      });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < upstream_count; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
 
   setUpstreamCount(upstream_count);
   initialize();
@@ -631,16 +613,16 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
     waitForNextUpstreamConnection(std::vector<uint64_t>(indicies), fake_connections[i]);
   }
 
-  ASSERT_TRUE(clients[0]->write("hello"));  // send initial client data
+  ASSERT_TRUE(clients[0]->write("hello")); // send initial client data
   ASSERT_TRUE(fake_connections[0]->waitForData(5));
 
-  ASSERT_TRUE(fake_connections[0]->write("squack"));  // send upstream data
+  ASSERT_TRUE(fake_connections[0]->write("squack")); // send upstream data
   ASSERT_TRUE(clients[0]->waitForData(6));
 
-  ASSERT_TRUE(clients[0]->write("hey"));  // send more client data
+  ASSERT_TRUE(clients[0]->write("hey")); // send more client data
   ASSERT_TRUE(fake_connections[0]->waitForData(8));
 
-  ASSERT_TRUE(fake_connections[2]->write("bye"));  // send data from 3rd client
+  ASSERT_TRUE(fake_connections[2]->write("bye")); // send data from 3rd client
   ASSERT_TRUE(clients[2]->waitForData(3));
 
   for (int i = 0; i < client_count; ++i) {
@@ -659,8 +641,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
       "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=3 "};
   auto log_result = waitForAccessLog(listener_access_log_name_);
   for (int i = 0; i < client_count; ++i) {
-    EXPECT_THAT(log_result,
-                MatchesRegex(fmt::format(".*{}.*", logs[i])));
+    EXPECT_THAT(log_result, MatchesRegex(fmt::format(".*{}.*", logs[i])));
   }
 }
 
