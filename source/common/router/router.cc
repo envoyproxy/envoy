@@ -1045,10 +1045,17 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
 
   callbacks_->streamInfo().setResponseFlag(
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+  // Grab the const ref to call the const method of StreamInfo.
+  const auto& stream_info = callbacks_->streamInfo();
+  const bool downstream_decode_complete =
+      stream_info.downstreamTiming().has_value() &&
+      stream_info.downstreamTiming().value().get().lastDownstreamRxByteReceived().has_value();
+
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
   callbacks_->sendLocalReply(
-      Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
-      absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+      Http::Utility::maybeRequestTimeoutCode(downstream_decode_complete),
+      "upstream max stream duration reached", modify_headers_, absl::nullopt,
+      StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
