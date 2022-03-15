@@ -59,7 +59,8 @@ MockClusterInfo::MockClusterInfo()
           cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
-          circuit_breakers_stats_, absl::nullopt, absl::nullopt)),
+          std::numeric_limits<uint64_t>::max(), circuit_breakers_stats_, absl::nullopt,
+          absl::nullopt)),
       stats_scope_(stats_store_.createScope("test_scope")) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(5001)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));

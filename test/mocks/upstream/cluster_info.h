@@ -72,18 +72,19 @@ public:
   ~MockClusterInfo() override;
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
-                            uint64_t conn_pool) {
+                            uint64_t conn_pool, uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
-        absl::nullopt, absl::nullopt);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
+        circuit_breakers_stats_, absl::nullopt, absl::nullopt);
   }
 
   void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
                                            uint64_t rq_retry, uint64_t conn_pool,
-                                           double budget_percent, uint32_t min_retry_concurrency) {
+                                           double budget_percent, uint32_t min_retry_concurrency,
+                                           uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
-        budget_percent, min_retry_concurrency);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
+        circuit_breakers_stats_, budget_percent, min_retry_concurrency);
   }
 
   // Upstream::ClusterInfo
