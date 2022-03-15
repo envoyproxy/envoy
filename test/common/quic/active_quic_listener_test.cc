@@ -11,7 +11,7 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_clock.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"

@@ -159,18 +159,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_clock_lib",
-    srcs = ["envoy_quic_clock.cc"],
-    hdrs = ["envoy_quic_clock.h"],
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//envoy/event:dispatcher_interface",
-        "@com_github_google_quiche//:quic_core_clock_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "quiche_common_platform_mem_slice_impl_lib",
     srcs = [
         "quiche_mem_slice_impl.cc",
