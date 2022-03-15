@@ -4,7 +4,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quic_logging_impl.h"
+#include "source/common/quic/platform/quiche_logging_impl.h"
 
 #include <atomic>
 #include <cstdlib>

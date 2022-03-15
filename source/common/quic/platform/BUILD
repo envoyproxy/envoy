@@ -52,12 +52,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = [
-        "quic_logging_impl.cc",
         "quiche_bug_tracker_impl.cc",
+        "quiche_logging_impl.cc",
     ],
     hdrs = [
-        "quic_logging_impl.h",
         "quiche_bug_tracker_impl.h",
+        "quiche_logging_impl.h",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
