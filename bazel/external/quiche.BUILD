@@ -1092,14 +1092,42 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform",
+    name = "quic_platform_hostname_utils",
     srcs = [
         "quiche/quic/platform/api/quic_hostname_utils.cc",
-        "quiche/quic/platform/api/quic_mutex.cc",
     ],
     hdrs = [
         "quiche/quic/platform/api/quic_hostname_utils.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        "@envoy//source/common/quic/platform:quic_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_mutex",
+    srcs = [
+    ],
+    hdrs = [
         "quiche/quic/platform/api/quic_mutex.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_mutex",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_platform",
+    srcs = [
+    ],
+    hdrs = [
     ],
     repository = "@envoy",
     tags = ["nofips"],
@@ -1107,6 +1135,8 @@ envoy_cc_library(
     deps = [
         ":quic_core_time_lib",
         ":quic_platform_base",
+        ":quic_platform_hostname_utils",
+        ":quic_platform_mutex",
         "@envoy//source/common/quic/platform:quic_platform_impl_lib",
     ],
 )
@@ -1136,6 +1166,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_export",
         ":quiche_common_buffer_allocator_lib",
+	":quiche_common_platform_testvalue",
         ":quiche_common_lib",
         ":quiche_common_platform_default_quiche_platform_impl_export_lib",
         "@envoy//source/common/quic/platform:quic_platform_base_impl_lib",
@@ -1249,6 +1280,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_test",
+	":quiche_common_platform_mutex",
         "@envoy//test/common/quic/platform:quiche_common_platform_test_impl_lib",
     ],
 )
@@ -4169,6 +4201,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_mutex",
+    hdrs = [
+        "quiche/common/platform/api/quiche_mutex.h",
+    ],
+    srcs = [
+        "quiche/common/platform/api/quiche_mutex.cc",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quic_platform_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_testvalue",
+    hdrs = [
+        "quiche/common/platform/api/quiche_testvalue.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform",
     hdrs = [
         "quiche/common/platform/api/quiche_bug_tracker.h",
@@ -4207,12 +4269,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_lib",
     srcs = [
-        "quiche/common/platform/default/quiche_platform_impl/quic_mutex_impl.cc",
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.cc",
     ],
     hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quic_mutex_impl.h",
-        "quiche/common/platform/default/quiche_platform_impl/quic_testvalue_impl.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_testvalue_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_reference_counted_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.h",
     ],
