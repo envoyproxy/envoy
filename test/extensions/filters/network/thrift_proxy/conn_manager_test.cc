@@ -10,6 +10,7 @@
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/header_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/rds_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -38,8 +39,10 @@ class TestConfigImpl : public ConfigImpl {
 public:
   TestConfigImpl(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config,
                  Server::Configuration::MockFactoryContext& context,
+                 Router::RouteConfigProviderManager& route_config_provider_manager,
                  ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
-      : ConfigImpl(proto_config, context), decoder_filter_(decoder_filter), stats_(stats) {}
+      : ConfigImpl(proto_config, context, route_config_provider_manager),
+        decoder_filter_(decoder_filter), stats_(stats) {}
 
   // ConfigImpl
   ThriftFilterStats& stats() override { return stats_; }
@@ -71,7 +74,10 @@ public:
 
 class ThriftConnectionManagerTest : public testing::Test {
 public:
-  ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
+  ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
+    route_config_provider_manager_ =
+        std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
+  }
   ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
@@ -97,7 +103,8 @@ public:
 
     decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
 
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_, decoder_filter_, stats_);
+    config_ = std::make_unique<TestConfigImpl>(
+        proto_config_, context_, *route_config_provider_manager_, decoder_filter_, stats_);
     if (custom_transport_) {
       config_->transport_ = custom_transport_;
     }
@@ -344,6 +351,7 @@ public:
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
+  std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
   std::unique_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
