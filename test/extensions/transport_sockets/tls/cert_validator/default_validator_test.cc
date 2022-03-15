@@ -189,29 +189,23 @@ TEST(DefaultCertValidatorTest, NoSanInCert) {
 
 class MockCertificateValidationContextConfig : public Ssl::CertificateValidationContextConfig {
 public:
-  MockCertificateValidationContextConfig(){};
-  const std::string& caCert() const override { return std::move(std::string()); }
-  const std::string& caCertPath() const override { return std::move(std::string()); }
-  const std::string& certificateRevocationList() const override { return std::move(std::string()); }
-  const std::string& certificateRevocationListPath() const override {
-    return std::move(std::string());
-  }
-  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
-  subjectAltNameMatchers() const override {
+  MockCertificateValidationContextConfig() {
     auto matcher = envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher();
     matcher.set_san_type(
         static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType>(
             123));
-    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers = {
-        matcher};
-    return std::move(matchers);
+    matchers_.emplace_back(matcher);
+  };
+  const std::string& caCert() const override { return s_; }
+  const std::string& caCertPath() const override { return s_; }
+  const std::string& certificateRevocationList() const override { return s_; }
+  const std::string& certificateRevocationListPath() const override { return s_; }
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return matchers_;
   }
-  const std::vector<std::string>& verifyCertificateHashList() const override {
-    return std::move(std::vector<std::string>());
-  }
-  const std::vector<std::string>& verifyCertificateSpkiList() const override {
-    return std::move(std::vector<std::string>());
-  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return strs_; }
   bool allowExpiredCertificate() const override { return false; }
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
@@ -220,6 +214,10 @@ public:
               customValidatorConfig, (), (const override));
   MOCK_METHOD(Api::Api&, api, (), (const override));
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
+private:
+  std::string s_;
+  std::vector<std::string> strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers_;
 };
 
 TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
