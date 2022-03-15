@@ -42,7 +42,8 @@ public:
     using std::pair<std::string, envoy::type::v3::TokenBucket>::pair;
 
     // Add absl::Hash support.
-    template <typename H> friend H AbslHashValue(H h, const Key& key) {
+    template <typename H>
+    friend H AbslHashValue(H h, const Key& key) { // NOLINT(readability-identifier-naming)
       return H::combine(std::move(h), key.first, MessageUtil::hash(key.second));
     }
 
