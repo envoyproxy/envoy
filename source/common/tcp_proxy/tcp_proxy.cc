@@ -191,8 +191,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   read_callbacks_->connection().enableHalfClose(true);
 
   // Check that we are generating only the byte meters we need.
-  // The Upstream should already exist and the Downstream should be unset.
-  ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
+  // The Downstream should be unset.
   ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
 
   // Need to disable reads so that we don't write to an upstream that might fail
@@ -200,6 +199,9 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // established.
   read_callbacks_->connection().readDisable(true);
   getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
+  if (getStreamInfo().getUpstreamBytesMeter() == nullptr) {
+    getStreamInfo().setUpstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
+  }
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
   config_->stats().downstream_cx_total_.inc();
