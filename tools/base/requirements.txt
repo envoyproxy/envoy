@@ -695,9 +695,9 @@ pyparsing==2.4.7 \
 pyreadline==2.1 \
     --hash=sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1
     # via -r requirements.in
-pytest==7.0.1 \
-    --hash=sha256:9ce3ff477af913ecf6321fe337b93a2c0dcf2a0a1439c43f5452112c1e4280db \
-    --hash=sha256:e30905a0c131d3d94b89624a1cc5afec3e0ba2fbdb151867d8e0ebd49850f171
+pytest==7.1.0 \
+    --hash=sha256:b555252a95bbb2a37a97b5ac2eb050c436f7989993565f5e0c9128fcaacadd0e \
+    --hash=sha256:f1089d218cfcc63a212c42896f1b7fbf096874d045e1988186861a1a87d27b47
     # via
     #   -r requirements.in
     #   pytest-asyncio
