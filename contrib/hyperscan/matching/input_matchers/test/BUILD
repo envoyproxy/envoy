@@ -22,14 +22,9 @@ envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     deps = [
+        "//contrib/hyperscan/matching/input_matchers/source:config",
         "//test/test_common:utility_lib",
-    ] + select({
-        "//bazel:linux_x86_64": [
-            "//contrib/hyperscan/matching/input_matchers/source:hyperscan_lib",
-        ],
-        "//conditions:default": [
-        ],
-    }),
+    ],
 )
 
 envoy_cc_benchmark_binary(
