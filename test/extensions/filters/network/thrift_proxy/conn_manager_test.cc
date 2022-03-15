@@ -352,6 +352,7 @@ public:
     if (draining) {
       scoped_runtime.mergeValues(
           {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
+      EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     }
 
     initializeFilter();
@@ -366,8 +367,6 @@ public:
     EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
     writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
-
-    EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(draining));
 
     FramedTransportImpl transport;
     BinaryProtocolImpl proto;
