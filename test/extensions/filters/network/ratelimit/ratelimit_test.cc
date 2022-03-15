@@ -113,7 +113,6 @@ stat_prefix: name
 dynamic_downstream_ip: true
 )EOF";
 
-
   const std::string replace_ip_config_disabled = R"EOF(
 domain: foo
 descriptors:
@@ -170,9 +169,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
   InSequence s;
   setUpTest(replace_ip_config_enabled);
 
-  EXPECT_EQ("8.8.8.8",
-            filter_->formatValue("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
-                                                 filter_callbacks_.connection_.streamInfo()));
+  EXPECT_EQ("8.8.8.8", filter_->formatValue("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
+                                            filter_callbacks_.connection_.streamInfo()));
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
@@ -224,7 +222,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
   setUpTest(replace_ip_config_disabled);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
-  expected_descriptors.push_back({{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"}, {"hello", "world"}}});
+  expected_descriptors.push_back(
+      {{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"}, {"hello", "world"}}});
 
   std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
                                                         filter_->descriptors().end()};
@@ -241,11 +240,11 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
     }
   }
 
-  EXPECT_CALL(*client_,
-              limit(_, "foo",
-                    testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                        {{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"}, {"hello", "world"}}}}),
-                    testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"},
+                                    {"hello", "world"}}}}),
+                              testing::A<Tracing::Span&>(), _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
