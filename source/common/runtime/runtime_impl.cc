@@ -55,13 +55,16 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     }
-    if (it.second.uint_value_.has_value()) {
-      maybeSetDeprecatedInts(it.first, it.second.uint_value_.value());
-    }
   }
 #ifdef ENVOY_ENABLE_QUIC
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 #endif
+  // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
+  for (const auto& it : flag_map) {
+    if (it.second.uint_value_.has_value()) {
+      maybeSetDeprecatedInts(it.first, it.second.uint_value_.value());
+    }
+  }
 }
 
 } // namespace

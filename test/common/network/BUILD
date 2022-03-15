@@ -188,6 +188,7 @@ envoy_cc_test(
     srcs = ["raw_buffer_socket_test.cc"],
     deps = [
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//test/test_common:network_utility_lib",
     ],
 )

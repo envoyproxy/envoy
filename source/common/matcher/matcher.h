@@ -202,14 +202,16 @@ private:
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
     auto data_input = createDataInput(matcher.matcher_tree().input());
+    auto on_no_match = createOnMatch(matcher.on_no_match());
+
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
-      return createMapMatcher<ExactMapMatcher>(matcher, matcher.matcher_tree().exact_match_map(),
-                                               data_input);
+      return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(),
+                                               on_no_match, data_input);
     }
     case MatcherType::MatcherTree::kPrefixMatchMap: {
-      return createMapMatcher<PrefixMapMatcher>(matcher, matcher.matcher_tree().prefix_match_map(),
-                                                data_input);
+      return createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
+                                                on_no_match, data_input);
     }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
@@ -220,15 +222,16 @@ private:
           matcher.matcher_tree().custom_match().typed_config(),
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
-                                                  *this);
+                                                  on_no_match, *this);
     }
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  template <template <class> class MapMatcherType, class MatcherType, class MapType>
-  MatchTreeFactoryCb<DataType> createMapMatcher(const MatcherType& matcher, const MapType& map,
-                                                DataInputFactoryCb<DataType> data_input) {
+  template <template <class> class MapMatcherType, class MapType>
+  MatchTreeFactoryCb<DataType>
+  createMapMatcher(const MapType& map, absl::optional<OnMatchFactoryCb<DataType>>& on_no_match,
+                   DataInputFactoryCb<DataType> data_input) {
     std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
     match_children.reserve(map.map().size());
 
@@ -236,8 +239,6 @@ private:
       match_children.push_back(
           std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
     }
-
-    auto on_no_match = createOnMatch(matcher.on_no_match());
 
     return [match_children, data_input, on_no_match]() {
       auto multimap_matcher = std::make_unique<MapMatcherType<DataType>>(
