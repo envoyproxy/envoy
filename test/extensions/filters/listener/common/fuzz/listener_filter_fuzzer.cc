@@ -1,5 +1,7 @@
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
