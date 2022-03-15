@@ -50,7 +50,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_logging_impl_lib",
+    name = "quiche_platform_logging_impl_lib",
     srcs = [
         "quiche_bug_tracker_impl.cc",
         "quiche_logging_impl.cc",
@@ -184,24 +184,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_platform_logging_impl_lib",
         ":quiche_flags_impl_lib",
+        ":quiche_platform_logging_impl_lib",
         "//source/common/buffer:buffer_lib",
         "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "quiche_common_platform_logging_impl_lib",
-    hdrs = [
-        "quiche_logging_impl.h",
-    ],
-    external_deps = [
-        "abseil_hash",
-        "abseil_node_hash_map",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform_logging_impl_lib",
     ],
 )
