@@ -844,7 +844,7 @@ actions:
               testing::ContainerEq(local_descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, HeaderValueMatch) {
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorKey) {
   const std::string yaml = R"EOF(
 actions:
 - header_value_match:
