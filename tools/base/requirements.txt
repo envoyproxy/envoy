@@ -410,9 +410,9 @@ gitdb==4.0.7 \
     --hash=sha256:6c4cc71933456991da20917998acbe6cf4fb41eeaab7d6d67fbc05ecd4c865b0 \
     --hash=sha256:96bf5c08b157a666fec41129e6d327235284cca4c81e92109260f353ba138005
     # via gitpython
-gitpython==3.1.26 \
-    --hash=sha256:26ac35c212d1f7b16036361ca5cff3ec66e11753a0d677fb6c48fa4e1a9dd8d6 \
-    --hash=sha256:fc8868f63a2e6d268fb25f481995ba185a85a66fcad126f039323ff6635669ee
+gitpython==3.1.27 \
+    --hash=sha256:1c885ce809e8ba2d88a29befeb385fcea06338d3640712b59ca623c220bb5704 \
+    --hash=sha256:5b68b000463593e05ff2b261acff0ff0972df8ab1b70d3cdbd41b546c8b8fc3d
     # via -r requirements.in
 humanfriendly==9.2 \
     --hash=sha256:332da98c24cc150efcc91b5508b19115209272bfdf4b0764a56795932f854271 \
