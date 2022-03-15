@@ -9,10 +9,18 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "map_matcher_lib",
+    hdrs = ["map_matcher.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "exact_map_matcher_lib",
     hdrs = ["exact_map_matcher.h"],
     deps = [
-        "//envoy/matcher:matcher_interface",
+        ":map_matcher_lib",
     ],
 )
 
@@ -20,7 +28,7 @@ envoy_cc_library(
     name = "prefix_map_matcher_lib",
     hdrs = ["prefix_map_matcher.h"],
     deps = [
-        "//envoy/matcher:matcher_interface",
+        ":map_matcher_lib",
         "//source/common/common:utility_lib",
     ],
 )

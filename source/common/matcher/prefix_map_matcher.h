@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/matcher/matcher.h"
-
 #include "source/common/common/utility.h"
+#include "source/common/matcher/map_matcher.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -11,49 +10,28 @@ namespace Matcher {
  * Implementation of a trie match tree which resolves to the OnMatch with the longest matching
  * prefix.
  */
-template <class DataType>
-class PrefixMapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
+template <class DataType> class PrefixMapMatcher : public MapMatcher<DataType> {
 public:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
                    absl::optional<OnMatch<DataType>> on_no_match)
-      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {}
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match)) {}
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
-    const auto input = data_input_->get(data);
-    ENVOY_LOG(trace, "Attempting to match {}", input);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
-      return {MatchState::UnableToMatch, absl::nullopt};
-    }
-
-    if (!input.data_) {
-      return {MatchState::MatchComplete, on_no_match_};
-    }
-
-    const auto result = children_.findLongestPrefix((*input.data_).c_str());
-    if (result) {
-      if (result->matcher_) {
-        return result->matcher_->match(data);
-      } else {
-        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
-      }
-    } else if (input.data_availability_ ==
-               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      // It's possible that we were attempting a lookup with a partial value, so delay matching
-      // until we know that we actually failed.
-      return {MatchState::UnableToMatch, absl::nullopt};
-    }
-
-    return {MatchState::MatchComplete, on_no_match_};
+  void addChild(std::string value, OnMatch<DataType>&& on_match) override {
+    children_.add(value, std::make_shared<OnMatch<DataType>>(std::move(on_match)));
   }
 
-  void addChild(std::string value, OnMatch<DataType>&& on_match) {
-    children_.add(value, std::make_shared<OnMatch<DataType>>(std::move(on_match)));
+protected:
+  absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
+    const auto result = children_.findLongestPrefix(data.c_str());
+    if (result) {
+      return *result;
+    }
+
+    return absl::nullopt;
   }
 
 private:
   TrieLookupTable<std::shared_ptr<OnMatch<DataType>>> children_;
-  const DataInputPtr<DataType> data_input_;
-  const absl::optional<OnMatch<DataType>> on_no_match_;
 };
 
 } // namespace Matcher
