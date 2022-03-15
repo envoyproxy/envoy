@@ -43,14 +43,14 @@ public:
     SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>::ScopedLookup lookup(
         jwt_lru_cache_.get(), token);
     if (lookup.found()) {
-      ::google::jwt_verify::Jwt* found_jwt = lookup.value();
+      ::google::jwt_verify::Jwt* const found_jwt = lookup.value();
       ASSERT(found_jwt != nullptr);
-      if (found_jwt->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
+      if (found_jwt->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) !=
           ::google::jwt_verify::Status::JwtExpired) {
+        return found_jwt;
+      } else {
         jwt_lru_cache_->remove(token);
-        found_jwt = nullptr;
       }
-      return found_jwt;
     }
     return nullptr;
   }
