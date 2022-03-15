@@ -206,12 +206,12 @@ private:
 
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
-      return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(),
-                                               on_no_match, data_input);
+      return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(), data_input,
+                                               on_no_match);
     }
     case MatcherType::MatcherTree::kPrefixMatchMap: {
       return createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
-                                                on_no_match, data_input);
+                                                data_input, on_no_match);
     }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
@@ -230,8 +230,8 @@ private:
 
   template <template <class> class MapMatcherType, class MapType>
   MatchTreeFactoryCb<DataType>
-  createMapMatcher(const MapType& map, absl::optional<OnMatchFactoryCb<DataType>>& on_no_match,
-                   DataInputFactoryCb<DataType> data_input) {
+  createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
+                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match) {
     std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
     match_children.reserve(map.map().size());
 
