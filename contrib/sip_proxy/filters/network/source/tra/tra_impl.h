@@ -42,18 +42,15 @@ class GrpcClientImpl : public Client,
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GrpcClientImpl() override {
-    if (request_ != nullptr) {
-      cancel();
-    }
-    stream_.resetStream();
-  }
+  ~GrpcClientImpl() override;
 
   // Extensions::NetworkFilters::SipProxy::TrafficRoutingAssistant::Client
   void setRequestCallbacks(RequestCallbacks& callbacks) override;
   void cancel() override;
 
   void closeStream() override;
+
+  void resetStream() override;
 
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,

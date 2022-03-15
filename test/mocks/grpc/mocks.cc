@@ -17,7 +17,13 @@ MockAsyncClient::MockAsyncClient() {
 }
 MockAsyncClient::~MockAsyncClient() = default;
 
-MockAsyncRequest::MockAsyncRequest() = default;
+//MockAsyncRequest::MockAsyncRequest() = default;
+MockAsyncRequest::MockAsyncRequest() {
+	ON_CALL(*this, cancel()).WillByDefault(Invoke([&]() -> void {
+std::cout << "DDD1 Grpc::MockAsyncRequest cancel()================\n";
+// Do nothing
+}));
+}
 MockAsyncRequest::~MockAsyncRequest() = default;
 
 MockAsyncStream::MockAsyncStream() = default;

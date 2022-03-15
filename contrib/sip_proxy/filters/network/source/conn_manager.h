@@ -65,13 +65,13 @@ public:
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
 
-  void updateTrafficRoutingAssistant(const std::string& type, const std::string& key,
+  virtual void updateTrafficRoutingAssistant(const std::string& type, const std::string& key,
                                      const std::string& val);
-  QueryStatus retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+  virtual QueryStatus retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
                                               SipFilters::DecoderFilterCallbacks& activetrans,
                                               std::string& host);
-  void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key);
-  void subscribeTrafficRoutingAssistant(const std::string& type);
+  virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key);
+  virtual void subscribeTrafficRoutingAssistant(const std::string& type);
   void complete(const TrafficRoutingAssistant::ResponseType& type, const std::string& message_type,
                 const absl::any& resp) override;
   void
@@ -115,9 +115,9 @@ public:
 
   std::shared_ptr<SipSettings> settings() const override { return config_.settings(); }
 
-  void continueHanding(const std::string& key);
-  void continueHanding(MessageMetadataSharedPtr metadata,
-                       DecoderEventHandler& decoder_event_handler);
+  void continueHandling(const std::string& key);
+  void continueHandling(MessageMetadataSharedPtr metadata,
+                        DecoderEventHandler& decoder_event_handler);
   std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() { return this->tra_handler_; }
 
   // PendingListHandler
@@ -200,7 +200,7 @@ private:
     }
     void onReset() override { return parent_.onReset(); }
 
-    void continueHanding(const std::string& key) override { return parent_.continueHanding(key); }
+    void continueHandling(const std::string& key) override { return parent_.continueHandling(key); }
     MessageMetadataSharedPtr metadata() override { return parent_.metadata(); }
 
     // PendingListHandler
@@ -295,7 +295,7 @@ private:
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       return parent_.tra_handler_;
     }
-    void continueHanding(const std::string& key) override { return parent_.continueHanding(key); }
+    void continueHandling(const std::string& key) override { return parent_.continueHandling(key); }
 
     // Sip::FilterChainFactoryCallbacks
     void addDecoderFilter(SipFilters::DecoderFilterSharedPtr filter) override {
@@ -311,6 +311,10 @@ private:
     void createFilterChain();
     void onError(const std::string& what);
     MessageMetadataSharedPtr metadata() override { return metadata_; }
+    bool localResponseSent() { return local_response_sent_; }
+    void setLocalResponseSent(bool local_response_sent) {
+      local_response_sent_ = local_response_sent;
+    }
 
     ConnectionManager& parent_;
     Stats::TimespanPtr request_timer_;

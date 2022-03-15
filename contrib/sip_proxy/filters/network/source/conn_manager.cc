@@ -106,7 +106,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
               (*traffic_routing_assistant_map_)[message_type].emplace(item);
               metadata->setDestination(item.second);
-              return parent_.continueHanding(metadata, decoder_event_handler);
+              return parent_.continueHandling(metadata, decoder_event_handler);
             });
       }
 
@@ -115,7 +115,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
             metadata->nextAffinity();
-            parent_.continueHanding(metadata, decoder_event_handler);
+            parent_.continueHandling(metadata, decoder_event_handler);
           });
     }
 
@@ -182,16 +182,16 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManager::continueHanding(const std::string& key) {
+void ConnectionManager::continueHandling(const std::string& key) {
   onResponseHandleForPendingList(
       "connection_pending", key,
       [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-        continueHanding(metadata, decoder_event_handler);
+        continueHandling(metadata, decoder_event_handler);
       });
 }
 
-void ConnectionManager::continueHanding(MessageMetadataSharedPtr metadata,
-                                        DecoderEventHandler& decoder_event_handler) {
+void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
+                                         DecoderEventHandler& decoder_event_handler) {
   try {
     decoder_->restore(metadata, decoder_event_handler);
     decoder_->onData(request_buffer_, true);
@@ -213,6 +213,13 @@ void ConnectionManager::dispatch() {
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
+
+    std::string&& k = std::string(decoder_->metadata()->transactionId().value());
+    if (transactions_.find(k) != transactions_.end()) {
+      transactions_[k]->setLocalResponseSent(true);
+    }
+
+    decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
@@ -393,6 +400,11 @@ FilterStatus ConnectionManager::ActiveTrans::applyDecoderFilters(ActiveTransDeco
 }
 
 FilterStatus ConnectionManager::ActiveTrans::transportBegin(MessageMetadataSharedPtr metadata) {
+  if (local_response_sent_ && metadata->methodType() == MethodType::Ack) {
+    ENVOY_LOG(debug, "Ack for local 503 message, return directly");
+    return FilterStatus::StopIteration;
+  }
+
   metadata_ = metadata;
   filter_context_ = metadata;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {

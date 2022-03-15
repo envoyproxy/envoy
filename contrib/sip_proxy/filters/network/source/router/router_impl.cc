@@ -45,13 +45,10 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   absl::string_view header = "";
   // Default is route
   HeaderType type = HeaderType::Route;
+  absl::string_view domain = "";
 
   if (domain_.empty()) {
     return nullptr;
-  }
-  if (domain_ == "*") {
-    ENVOY_LOG(trace, "Route matched with domain: {}", domain_);
-    return clusterEntry(metadata);
   }
 
   ENVOY_LOG(trace, "Do Route match with header: {}, parameter: {} and domain: {}", header_,
@@ -65,14 +62,13 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   }
 
   // get header
-  header = absl::get<VectorHeader>(metadata.msgHeaderList()[type])[0];
-
-  if (header.empty()) {
+  if (absl::get<VectorHeader>(metadata.msgHeaderList()[type]).empty()) {
     if (type == HeaderType::Route) {
       // No Route, r-uri is used
-      header = absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::TopLine])[0];
-      ENVOY_LOG(debug, "No route, r-uri {} is used ", header);
-      if (header.empty()) {
+      if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::TopLine]).empty()) {
+        header = absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::TopLine])[0];
+        ENVOY_LOG(debug, "No route, r-uri {} is used ", header);
+      } else {
         ENVOY_LOG(debug, "r-uri is empty");
         return nullptr;
       }
@@ -80,8 +76,17 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
       ENVOY_LOG(debug, "header {} is empty", header_);
       return nullptr;
     }
+  } else {
+    header = absl::get<VectorHeader>(metadata.msgHeaderList()[type])[0];
   }
-  auto domain = metadata.getDomainFromHeaderParameter(header, parameter_);
+
+  if (domain_ == "*") {
+    ENVOY_LOG(trace, "Route matched with domain: {}", domain_);
+    return clusterEntry(metadata);
+  }
+
+  domain = metadata.getDomainFromHeaderParameter(header, parameter_);
+
   if (domain_ == domain) {
     ENVOY_LOG(trace, "Route matched with header: {}, parameter: {} and domain: {}", header_,
               parameter_, domain_);
@@ -245,13 +250,13 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   const std::string& cluster_name = route_entry_->clusterName();
 
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
-  thread_local_cluster_ = cluster;
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
     stats_.unknown_cluster_.inc();
     throw AppException(AppExceptionType::InternalError,
                        fmt::format("unknown cluster '{}'", cluster_name));
   }
+  thread_local_cluster_ = cluster;
 
   cluster_ = cluster->info();
   ENVOY_STREAM_LOG(debug, "cluster '{}' matched", *callbacks_, cluster_name);
@@ -275,17 +280,16 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
                                        bool& lb_ret) {
   auto conn_pool = thread_local_cluster_->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
+    stats_.no_healthy_upstream_.inc();
     if (dest.empty()) {
-      stats_.no_healthy_upstream_.inc();
-      if (dest.empty()) {
-        throw AppException(AppExceptionType::InternalError,
-                           fmt::format("envoy no healthy upstream endpoint during load balance"));
-      } else {
-        throw AppException(AppExceptionType::InternalError,
-                           fmt::format("envoy no healthy upstream endpoint during affinity"));
-      }
+      throw AppException(AppExceptionType::InternalError,
+                         fmt::format("envoy no healthy upstream endpoint during load balance"));
+      return FilterStatus::StopIteration;
+    } else {
+      throw AppException(AppExceptionType::InternalError,
+                         fmt::format("envoy no healthy upstream endpoint during affinity"));
+      return FilterStatus::StopIteration;
     }
-    return FilterStatus::StopIteration;
   }
 
   Upstream::HostDescriptionConstSharedPtr host = conn_pool->host();
@@ -314,7 +318,8 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
                                           callbacks_, upstream_request_);
     }
   } else {
-    upstream_request_ = std::make_shared<UpstreamRequest>(*conn_pool, transaction_info);
+    upstream_request_ = std::make_shared<UpstreamRequest>(
+        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
     upstream_request_->setDecoderFilterCallbacks(*callbacks_);
     upstream_request_->setMetadata(metadata);
     transaction_info->insertUpstreamRequest(host->address()->ip()->addressAsString(),
@@ -390,7 +395,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       }
       ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
       // Continue: continue to messageEnd, StopIteration: continue to next affinity
-      if (FilterStatus::StopIteration == upstream_request->start()) {
+      if (FilterStatus::StopIteration == upstream_request_->start()) {
         // Defer to handle in upstream request onPoolReady or onPoolFailure
         ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
         return FilterStatus::StopIteration;
@@ -456,7 +461,7 @@ const Network::Connection* Router::downstreamConnection() const {
 
 void Router::cleanup() { upstream_request_.reset(); }
 
-UpstreamRequest::UpstreamRequest(Upstream::TcpPoolData& pool,
+UpstreamRequest::UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool,
                                  std::shared_ptr<TransactionInfo> transaction_info)
     : conn_pool_(pool), transaction_info_(transaction_info) {}
 
@@ -473,21 +478,21 @@ FilterStatus UpstreamRequest::start() {
   }
 
   if (conn_state_ == ConnectionState::Connecting) {
-    callbacks_->pushIntoPendingList("connection_pending", conn_pool_.host()->address()->asString(),
+    callbacks_->pushIntoPendingList("connection_pending", conn_pool_->host()->address()->asString(),
                                     *callbacks_, []() {});
     return FilterStatus::StopIteration;
   } else if (conn_state_ == ConnectionState::Connected) {
     return FilterStatus::Continue;
   }
 
-  ENVOY_LOG(trace, "start connecting {}", conn_pool_.host()->address()->asString());
+  ENVOY_LOG(trace, "start connecting {}", conn_pool_->host()->address()->asString());
   conn_state_ = ConnectionState::Connecting;
 
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
-    callbacks_->pushIntoPendingList("connection_pending", conn_pool_.host()->address()->asString(),
+    callbacks_->pushIntoPendingList("connection_pending", conn_pool_->host()->address()->asString(),
                                     *callbacks_, []() {});
     return FilterStatus::StopIteration;
   }
@@ -532,7 +537,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
     metadata_->setState(State::HandleAffinity);
 
     if (callbacks_) {
-      callbacks_->continueHanding(host->address()->asString());
+      callbacks_->continueHandling(host->address()->asString());
     }
   }
 
@@ -556,7 +561,7 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_
 
   if (continue_handling) {
     if (callbacks_) {
-      callbacks_->continueHanding(host->address()->asString());
+      callbacks_->continueHandling(host->address()->asString());
     }
   }
 }

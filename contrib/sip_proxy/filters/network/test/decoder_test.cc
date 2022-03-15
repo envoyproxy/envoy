@@ -1,5 +1,3 @@
-#include <cstdio>
-
 #include "source/common/buffer/buffer_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -156,21 +154,19 @@ TEST_F(SipDecoderTest, DecodeINVITE) {
       "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
       "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
-      "Route: "
-      "<sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
-      "local:5060>\x0d\x0a"
-      "Record-Route: "
-      "<sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
-      "local:5060>\x0d\x0a"
-      "Service-Route: "
-      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri=sip:scsf-cfed."
-      "cncs.svc.cluster.local:5060>\x0d\x0a"
+      "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060>\x0d\x0a"
+      "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060>\x0d\x0a"
+      "Service-Route: <sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri=sip:scsf-cfed.cncs.svc.cluster.local:5060>\x0d\x0a"
+      "Path: "
+      "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
+      "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
       "P-Charging-Vector: orig-ioi=ims.com;term-ioi= ims.com\x0d\x0a"
       "P-Charging-Vector: orig-ioi=ims1.com;term-ioi= ims1.com\x0d\x0a"
       "P-Charging-Function-Addresses: ccf=0.0.0.0\x0d\x0a"
+      "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
 
@@ -203,6 +199,7 @@ TEST_F(SipDecoderTest, DecodeRegister) {
       "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
       "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
       "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "Service-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "Authorization: Digest username=\"tc05sub1@cncs.nokialab.com\", realm=\"cncs.nokialab.com\", "
       "nonce=\"436dbd0f60a52adc2DPadc43f91c774b51ac4cad614258c43cf9df\", algorithm=MD5, "
@@ -216,6 +213,7 @@ TEST_F(SipDecoderTest, DecodeRegister) {
       "nonce=\"436dbd0f60a52adc2DPadc43f91c774b51ac4cad614258c43cf9df\", algorithm=MD5, "
       "uri=\"sip:10.30.29.47\", response=\"c4f3c2fccdca9c5febc66d4226b5afae\", nc=01201201, "
       "cnonce=\"123456\", qop=auth, opaque=\"127.0.0.1\x0d\x0a"
+      "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "\x0d\x0a";
 
   buffer_.add(SIP_REGISTER_FULL);
@@ -284,6 +282,7 @@ TEST_F(SipDecoderTest, DecodeGeneral) {
       "Path: "
       "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
       "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
+      "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
@@ -311,6 +310,7 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
       "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "CSeq: 2 SUBSCRIBE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+      "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "Event: feature-status-exchange\x0d\x0a"
@@ -370,6 +370,7 @@ TEST_F(SipDecoderTest, DecodeFAILURE4XX) {
       "realm=\"cncs.nokialab.com\",nonce="
       "\"436dbd0f60a52adc2DPadc43f91c774b51ac4cad614258c43cf9df\",algorithm=MD5,qop=\"auth\","
       "opaque=\"127.0.0.1\x0d\x0a"
+      "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "Content-Length: 0\x0d\x0a"
       "\x0d\x0a";
   buffer_.add(SIP_FAILURE4XX_FULL);
@@ -548,6 +549,7 @@ TEST_F(SipDecoderTest, DecodeNOTIFY) {
       "Path: "
       "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
       "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
+      "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";

@@ -347,7 +347,7 @@ class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public std::enable_shared_from_this<UpstreamRequest>,
                         public Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamRequest(Upstream::TcpPoolData& pool_data,
+  UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool_data,
                   std::shared_ptr<TransactionInfo> transaction_info);
   ~UpstreamRequest() override;
   FilterStatus start();
@@ -388,7 +388,7 @@ public:
   std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
 
 private:
-  Upstream::TcpPoolData& conn_pool_;
+  std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
