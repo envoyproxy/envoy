@@ -750,3 +750,73 @@ envoy.http.stateful_session.cookie:
   - envoy.http.stateful_session
   security_posture: unknown
   status: alpha
+request-headers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+request-trailers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+response-headers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+response-trailers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+destination-ip:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+destination-port:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+source-ip:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+source-port:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+direct-source-ip:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+source-type:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+server-name:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+transport-protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+application-protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+trie-matcher:
+  categories:
+  - envoy.matching.network.custom_matchers
+  security_posture: unknown
+  status: alpha

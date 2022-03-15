@@ -15,7 +15,9 @@ from envoy.base import utils
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
-    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic")
+    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic", "request-headers",
+    "request-trailers", "response-headers", "response-trailers", "destination-ip", "destination-port",
+    "source-ip", "source-port", "direct-source-ip", "source-type", "server-name", "transport-protocol", "application-protocol")
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -53,7 +55,8 @@ EXTENSION_CATEGORIES = (
     "envoy.sip_proxy.filters", "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
     "envoy.wasm.runtime", "envoy.common.key_value", "envoy.network.dns_resolver",
-    "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session")
+    "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session",
+    "envoy.matching.http.input", "envoy.matching.network.input", "envoy.matching.network.custom_matchers")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
