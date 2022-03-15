@@ -61,22 +61,26 @@ FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
 }
 
 FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view data_name) {
+  return getDataSharedMutableGeneric(data_name).get();
+}
+
+std::shared_ptr<FilterState::Object>
+FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
   const auto& it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
     if (parent_) {
-      return parent_->getDataMutableGeneric(data_name);
+      return parent_->getDataSharedMutableGeneric(data_name);
     }
     return nullptr;
   }
 
   FilterStateImpl::FilterObject* current = it->second.get();
   if (current->state_type_ == FilterState::StateType::ReadOnly) {
-    throw EnvoyException(
-        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+    throw EnvoyException("FilterState tried to access immutable data as mutable.");
   }
 
-  return current->data_.get();
+  return current->data_;
 }
 
 bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const {
