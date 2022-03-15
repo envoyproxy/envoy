@@ -65,7 +65,7 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
       base_ = old_base;
       return PeekState::Again;
     }
-    ENVOY_LOG(debug, "recv failed: {}: {}", result.err_->getErrorCode(),
+    ENVOY_LOG(debug, "recv failed: {}: {}", static_cast<int>(result.err_->getErrorCode()),
               result.err_->getErrorDetails());
     return PeekState::Error;
   }
