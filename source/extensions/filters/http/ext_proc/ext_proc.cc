@@ -151,7 +151,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   }
 
   const auto status = onHeaders(decoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "decodeHeaders returning {}", status);
+  ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
   return status;
 }
 
@@ -358,7 +358,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "decodeData({}): end_stream = {}", data.length(), end_stream);
   const auto status = onData(decoding_state_, data, end_stream);
-  ENVOY_LOG(trace, "decodeData returning {}", status);
+  ENVOY_LOG(trace, "decodeData returning {}", static_cast<int>(status));
   return status;
 }
 
@@ -412,7 +412,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_LOG(trace, "decodeTrailers");
   const auto status = onTrailers(decoding_state_, trailers);
-  ENVOY_LOG(trace, "encodeTrailers returning {}", status);
+  ENVOY_LOG(trace, "encodeTrailers returning {}", static_cast<int>(status));
   return status;
 }
 
@@ -428,21 +428,21 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   }
 
   const auto status = onHeaders(encoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "encodeHeaders returns {}", status);
+  ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
   return status;
 }
 
 FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
   const auto status = onData(encoding_state_, data, end_stream);
-  ENVOY_LOG(trace, "encodeData returning {}", status);
+  ENVOY_LOG(trace, "encodeData returning {}", static_cast<int>(status));
   return status;
 }
 
 FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   ENVOY_LOG(trace, "encodeTrailers");
   const auto status = onTrailers(encoding_state_, trailers);
-  ENVOY_LOG(trace, "encodeTrailers returning {}", status);
+  ENVOY_LOG(trace, "encodeTrailers returning {}", static_cast<int>(status));
   return status;
 }
 
