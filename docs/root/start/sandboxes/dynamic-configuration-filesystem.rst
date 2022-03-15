@@ -92,7 +92,7 @@ from ``service1`` to ``service2``:
    :linenos:
    :lines: 6-13
    :lineno-start: 6
-   :emphasize-lines: 8
+   :emphasize-lines: 7
 
 You can do this using ``sed`` inside the container:
 
