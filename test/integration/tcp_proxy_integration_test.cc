@@ -73,44 +73,7 @@ void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
   useListenerAccessLog("DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                        "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
-}
-
-// Using a set of T, test a consumer function for a true AssertionResult, or
-// timeout.
-template <typename T>
-inline absl::optional<uint64_t> waitForFunction(std::vector<T>& connection_list,
-                                                std::chrono::milliseconds connection_wait_timeout,
-                                                std::function<AssertionResult(T&)>& func) {
-  AssertionResult result = AssertionFailure();
-  int upstream_index = 0;
-  Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
-  // Loop over the upstreams until the call times out or an upstream request is
-  // received.
-  while (!result) {
-    upstream_index = upstream_index % connection_list.size();
-    result = func(connection_list[upstream_index]);
-    if (result) {
-      return upstream_index;
-    } else if (!bound.withinBound()) {
-      RELEASE_ASSERT(0, "Timed out waiting for new connection.");
-      break;
-    }
-    ++upstream_index;
-  }
-  RELEASE_ASSERT(result, result.message());
-  return {};
-}
-
-// Wait until the log file is populated, and read from it.
-// Access logs only get flushed to disk periodically,
-// so poll until the log is non-empty
-template <typename T> inline std::string waitForLog(T& api, const std::string& access_log_path) {
-  std::string log_result;
-  do {
-    log_result = api->fileSystem().fileReadToEnd(access_log_path);
-  } while (log_result.empty());
-  return log_result;
+                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,
@@ -489,7 +452,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                        "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                        "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
+                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -634,11 +597,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<absl::string_view> logs = {
       "DOWNSTREAM_WIRE_BYTES_SENT=6 DOWNSTREAM_WIRE_BYTES_RECEIVED=8 "
-      "UPSTREAM_WIRE_BYTES_SENT=8 UPSTREAM_WIRE_BYTES_RECEIVED=6 ",
+      "UPSTREAM_WIRE_BYTES_SENT=8 UPSTREAM_WIRE_BYTES_RECEIVED=6",
       "DOWNSTREAM_WIRE_BYTES_SENT=0 DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=0 ",
+      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=0",
       "DOWNSTREAM_WIRE_BYTES_SENT=3 DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=3 "};
+      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=3"};
   auto log_result = waitForAccessLog(listener_access_log_name_);
   for (int i = 0; i < client_count; ++i) {
     EXPECT_THAT(log_result, MatchesRegex(fmt::format(".*{}.*", logs[i])));
