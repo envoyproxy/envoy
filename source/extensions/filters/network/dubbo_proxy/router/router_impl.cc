@@ -127,7 +127,7 @@ FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, Context
   }
 
   ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
-                   metadata->responseStatus());
+                   static_cast<int>(metadata->responseStatus()));
 
   switch (metadata->responseStatus()) {
   case ResponseStatus::Ok:
