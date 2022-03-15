@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "socket_interface_swap.h"
+
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
@@ -2071,6 +2073,78 @@ TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+}
+
+// Ordering of inheritance is important here, SocketInterfaceSwap must be
+// destroyed after HttpProtocolIntegrationTest.
+class SocketSwappableMultiplexedIntegrationTest : public SocketInterfaceSwap,
+                                                  public HttpProtocolIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SocketSwappableMultiplexedIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpDownstreamConnectionClose) {
+  config_helper_.setBufferLimits(1000, 1000);
+  autonomous_upstream_ = false;
+  initialize();
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+
+  waitForNextUpstreamRequest();
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1000, false);
+
+  // We should trigger pause at least once, and eventually have at least 1k
+  // bytes buffered.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForGaugeGe("http.config_test.downstream_cx_tx_bytes_buffered", 1000);
+
+  // Close downstream, check cleanup.
+  codec_client_->close();
+
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_tx_bytes_buffered", 0);
+}
+
+TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClose) {
+  config_helper_.setBufferLimits(1000, 1000);
+  autonomous_upstream_ = false;
+  initialize();
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+  codec_client_->sendData(request_encoder, 1000, false);
+
+  // We should trigger pause at least once, and eventually have at least 1k
+  // bytes buffered.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
+  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 1000);
+
+  // Close upstream, check cleanup.
+  fake_upstreams_[0].reset();
+
+  ASSERT_TRUE(response_decoder->waitForReset());
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
 }
 
 } // namespace Envoy
