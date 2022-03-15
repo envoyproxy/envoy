@@ -82,6 +82,12 @@ ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
 namespace Envoy {
 namespace Runtime {
 
+bool hasRuntimePrefix(absl::string_view feature) {
+  return (absl::StartsWith(feature, "envoy.reloadable_features.") &&
+          !absl::StartsWith(feature, "envoy.reloadable_features.FLAGS_quic")) ||
+         absl::StartsWith(feature, "envoy.restart_features.");
+}
+
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
