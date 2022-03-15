@@ -1104,15 +1104,15 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
-  if (http_async_client_ == nullptr) {
-    http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
+  if (lazy_http_async_client_ == nullptr) {
+    lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_,
         parent_.parent_.local_info_, parent_.parent_, parent_.parent_.runtime_,
         parent_.parent_.random_,
         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
         parent_.parent_.http_context_, parent_.parent_.router_context_);
   }
-  return *http_async_client_;
+  return *lazy_http_async_client_;
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
