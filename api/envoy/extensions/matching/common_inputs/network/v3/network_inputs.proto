@@ -36,7 +36,7 @@ message SourcePortInput {
 // will only be different from the source IP address when using a listener
 // filter that overrides the source address, such as the :ref:`Proxy Protocol
 // listener filter <config_listener_filters_proxy_protocol>`).
-// [#extension: direct-source-port]
+// [#extension: direct-source-ip]
 message DirectSourceIPInput {
 }
 
