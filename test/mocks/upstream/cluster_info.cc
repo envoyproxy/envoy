@@ -62,7 +62,7 @@ MockClusterInfo::MockClusterInfo()
           std::numeric_limits<uint64_t>::max(), circuit_breakers_stats_, absl::nullopt,
           absl::nullopt)),
       stats_scope_(stats_store_.createScope("test_scope")) {
-  ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
+  ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(5001)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));

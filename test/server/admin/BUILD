@@ -63,6 +63,7 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:stats_handler_lib",
+        "//source/server/admin:utils_lib",
         "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",

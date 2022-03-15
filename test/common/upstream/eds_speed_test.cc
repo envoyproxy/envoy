@@ -19,6 +19,7 @@
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -44,20 +45,21 @@ public:
       : state_(state), use_unified_mux_(use_unified_mux),
         type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(stats_)),
-        api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()) {
+        api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
+        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
     TestDeprecatedV2Api::allowDeprecatedV2();
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, stats_, {}, local_info_, true));
+          random_, stats_, {}, local_info_, true, std::move(config_validators_)));
     } else {
       grpc_mux_.reset(new Config::GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, stats_, {}, true));
+          random_, stats_, {}, true, std::move(config_validators_)));
     }
     resetCluster(R"EOF(
       name: name
@@ -176,6 +178,7 @@ public:
   Api::ApiPtr api_;
   Server::MockOptions options_;
   Grpc::MockAsyncClient* async_client_;
+  Config::CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;

@@ -42,7 +42,7 @@ HTTP3 upstream
 
 HTTP/3 upstream support is implemented, but is missing some key features. The code is now covered by Envoy's
 security policy, and is fine to use in production environments the network is under the deployer's control
-(e.g. will not randomly black-hole connections). It is not reccomended for use on the open internet
+(e.g. will not randomly black-hole connections). It is not recommended for use on the open internet
 until blackhole detection and fail-over to TCP is implemented. There are also a number of major latency
 improvements underway such as upstream support for 0-rtt handshakes: see open issues for upstream HTTP/3
 `here <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_

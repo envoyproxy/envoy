@@ -46,7 +46,11 @@ class SipConnectionManagerTest : public testing::Test {
 public:
   SipConnectionManagerTest()
       : stats_(SipFilterStats::generateStats("test.", store_)),
-        transaction_infos_(std::make_shared<Router::TransactionInfos>()) {}
+        transaction_infos_(std::make_shared<Router::TransactionInfos>()) {
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(factory_context_));
+    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
+  }
   ~SipConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
@@ -440,6 +444,8 @@ settings:
     decoder->onReset();
   }
 
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<SipFilters::MockDecoderFilter> decoder_filter_;
   Stats::TestUtil::TestStore store_;

@@ -6,6 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/rds/config.h"
 #include "envoy/router/router.h"
 #include "envoy/tcp/conn_pool.h"
 
@@ -85,10 +86,8 @@ using RouteConstSharedPtr = std::shared_ptr<const Route>;
 /**
  * The router configuration.
  */
-class Config {
+class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming Thrift request transport and/or protocol data, determine the target
    * route for the request.
