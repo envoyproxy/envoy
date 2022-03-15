@@ -18,6 +18,20 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "matcher_test",
+    srcs = ["matcher_test.cc"],
+    deps = [
+        "//test/test_common:utility_lib",
+    ] + select({
+        "//bazel:linux_x86_64": [
+            "//contrib/hyperscan/matching/input_matchers/source:hyperscan_lib",
+        ],
+        "//conditions:default": [
+        ],
+    }),
+)
+
 envoy_cc_benchmark_binary(
     name = "hyperscan_speed_test",
     srcs = ["hyperscan_speed_test.cc"],
