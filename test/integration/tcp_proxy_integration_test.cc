@@ -69,8 +69,8 @@ void TcpProxyIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
 }
 
-inline void setupByteMeterAccessLog(BaseIntegrationTest* base) {
-  base->useListenerAccessLog(
+void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
+  useListenerAccessLog(
       "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
@@ -183,7 +183,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnectBytesMeter) {
-  setupByteMeterAccessLog(this);
+  setupByteMeterAccessLog();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(tcp_client->write("hello"));
@@ -197,7 +197,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnectBytesMeter) {
   tcp_client->close();
 
   EXPECT_EQ("world", tcp_client->data());
-  tcp_client.reset();
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(log_result,
@@ -211,7 +210,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnectBytesMeter) {
 // Test proxying data in both directions, and that all data is flushed properly
 // when the client disconnects.
 TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
-  setupByteMeterAccessLog(this);
+  setupByteMeterAccessLog();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(tcp_client->write("hello"));
@@ -226,7 +225,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
-  tcp_client.reset();
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(log_result,
@@ -513,7 +511,6 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Guarantee client is done writing to the log
-  tcp_client.reset();
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
 
@@ -547,7 +544,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
 
 // Test that no bytes are metered for a connection with no upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
-  setupByteMeterAccessLog(this);
+  setupByteMeterAccessLog();
   fake_upstreams_count_ = 0;
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -568,7 +565,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
   ASSERT_TRUE(tcp_client->write("bonjour"));
   tcp_client->waitForDisconnect();
 
-  tcp_client.reset();
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(log_result,
@@ -581,7 +577,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
 
 // Make sure no bytes are logged when no data is sent.
 TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
-  setupByteMeterAccessLog(this);
+  setupByteMeterAccessLog();
   initialize();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -591,7 +587,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->close());
 
-  tcp_client.reset();
   test_server_.reset();
   auto log_result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(log_result,
@@ -604,14 +599,13 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
 
 // Test Byte Metering across multiple upstream/downstream connections
 TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
-  setupByteMeterAccessLog(this);
-  int client_count = 3;
-  int upstream_count = 3;
+  setupByteMeterAccessLog();
+  const int client_count = 3;
+  const int upstream_count = 3;
 
   enableHalfClose(false);
   config_helper_.addConfigModifier(
-      [this,
-       &upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      [this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         auto* cluster =
             bootstrap.mutable_static_resources()->mutable_clusters(0);
         auto* load_assignment = cluster->mutable_load_assignment();
@@ -627,12 +621,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
   setUpstreamCount(upstream_count);
   initialize();
 
-  u_long client_count_long = client_count;
-  u_long upstream_count_long = upstream_count;
-
-  std::vector<IntegrationTcpClientPtr> clients{client_count_long};
-  std::vector<FakeRawConnectionPtr> fake_connections{upstream_count_long};
-  auto ms = std::chrono::milliseconds(5);
+  std::vector<IntegrationTcpClientPtr> clients{client_count};
+  std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
+  const auto ms = std::chrono::milliseconds(5);
 
   int upstream_index = 0;
   for (int i = 0; i < client_count; ++i) {
@@ -662,7 +653,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
     ASSERT_TRUE(fake_connections[i]->close());
     clients[i]->close();
     ASSERT_TRUE(fake_connections[i]->waitForDisconnect());
-    clients[i].reset();
   }
   test_server_.reset();
 
