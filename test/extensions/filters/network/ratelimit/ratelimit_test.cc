@@ -55,6 +55,10 @@ public:
         new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(downstream_direct_remote);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setDirectRemoteAddressForTest(downstream_direct_remote);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(downstream_direct_remote);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -102,11 +106,11 @@ domain: foo
 descriptors:
 - entries:
   - key: remote_address
-    value: envoy.downstream_ip
+    value: DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
   - key: hello
     value: world
 stat_prefix: name
-substitution_formatter_enabled: true
+dynamic_downstream_ip: true
 )EOF";
 
 
@@ -115,11 +119,11 @@ domain: foo
 descriptors:
 - entries:
   - key: remote_address
-    value: envoy.downstream_ip
+    value: DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
   - key: hello
     value: world
 stat_prefix: name
-substitution_formatter_enabled: false
+dynamic_downstream_ip: false
 )EOF";
 
   Stats::TestUtil::TestStore stats_store_;
@@ -164,14 +168,10 @@ TEST_F(RateLimitFilterTest, OK) {
 
 TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
   InSequence s;
-  ON_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip"))
-      .WillByDefault(Return(true));
   setUpTest(replace_ip_config_enabled);
 
   EXPECT_EQ("8.8.8.8",
-            filter_->substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%",
+            filter_->formatValue("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
                                                  filter_callbacks_.connection_.streamInfo()));
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
@@ -221,14 +221,10 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
 
 TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
   InSequence s;
-  ON_CALL(
-      runtime_.snapshot_,
-      runtimeFeatureEnabled("envoy.reloadable_features.network.rate_limit.dynamic_downstream_ip"))
-      .WillByDefault(Return(false));
   setUpTest(replace_ip_config_disabled);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
-  expected_descriptors.push_back({{{"remote_address", "envoy.downstream_ip"}, {"hello", "world"}}});
+  expected_descriptors.push_back({{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"}, {"hello", "world"}}});
 
   std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
                                                         filter_->descriptors().end()};
@@ -248,7 +244,7 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
   EXPECT_CALL(*client_,
               limit(_, "foo",
                     testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                        {{{"remote_address", "envoy.downstream_ip"}, {"hello", "world"}}}}),
+                        {{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"}, {"hello", "world"}}}}),
                     testing::A<Tracing::Span&>(), _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {

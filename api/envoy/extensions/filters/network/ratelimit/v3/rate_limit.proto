@@ -52,5 +52,7 @@ message RateLimit {
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 6
       [(validate.rules).message = {required: true}];
 
-  bool substitution_formatter_enabled = 7;
+  // Enables substitution formatting on the value DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
+  // Defaults to false
+  bool dynamic_downstream_ip = 7;
 }

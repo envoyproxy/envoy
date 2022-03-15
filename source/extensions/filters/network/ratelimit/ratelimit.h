@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <regex>
 #include <string>
@@ -56,7 +57,7 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
-  bool substitutionFormatterEnabled() const { return substitution_formatter_enabled_; }
+  bool dynamicDownstreamIp() const { return dynamic_downstream_ip_; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
@@ -65,7 +66,7 @@ private:
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
-  const bool substitution_formatter_enabled_;
+  const bool dynamic_downstream_ip_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -101,10 +102,10 @@ public:
       RateLimit::Descriptor new_descriptor;
       for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
         std::string value = descriptorEntry.value_;
-        if (config_->substitutionFormatterEnabled() &&
-            absl::StrContains(value, "envoy.downstream_ip")) {
-          value =
-              substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", stream_info);
+        if (config_->dynamicDownstreamIp() && absl::StrContains(descriptorEntry.value_, "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT")) {
+          // value =
+          //     substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", stream_info);
+            value = formatValue(value, stream_info);
         }
         new_descriptor.entries_.push_back({descriptorEntry.key_, value});
       }
@@ -113,14 +114,26 @@ public:
     filter_descriptors_ = dynamicDescriptors;
   }
 
-  std::string substitutionFormattedString(std::string format, StreamInfo::StreamInfo& stream_info) {
-    std::string body;
+  // std::string substitutionFormattedString(std::string format, StreamInfo::StreamInfo& stream_info) {
+  //   std::string body;
 
-    Formatter::FormatterImpl formatter(format, false);
+  //   Formatter::FormatterImpl formatter(format, false);
 
-    return formatter.format(*Http::RequestHeaderMapImpl::create(),
-                            *Http::ResponseHeaderMapImpl::create(),
-                            *Http::ResponseTrailerMapImpl::create(), stream_info, body);
+  //   return formatter.format(*Http::RequestHeaderMapImpl::create(),
+  //                           *Http::ResponseHeaderMapImpl::create(),
+  //                           *Http::ResponseTrailerMapImpl::create(), stream_info, body);
+  // }
+
+  std::string formatValue(std::string body, StreamInfo::StreamInfo& stream_info) {
+    Http::RequestHeaderMapPtr request_headers = Http::RequestHeaderMapImpl::create();
+    Http::ResponseHeaderMapPtr response_headers = Http::ResponseHeaderMapImpl::create();
+    Http::ResponseTrailerMapPtr response_trailers = Http::ResponseTrailerMapImpl::create();
+
+    Formatter::FormatterImpl formatter("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+
+    std::string value = formatter.format(*request_headers.get(), *response_headers.get(),
+                                         *response_trailers.get(), stream_info, body);
+    return value;
   }
 
   // Network::ConnectionCallbacks
