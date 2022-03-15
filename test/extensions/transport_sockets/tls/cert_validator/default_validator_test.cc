@@ -214,6 +214,7 @@ public:
               customValidatorConfig, (), (const override));
   MOCK_METHOD(Api::Api&, api, (), (const override));
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
+
 private:
   std::string s_;
   std::vector<std::string> strs_;
