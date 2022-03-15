@@ -185,6 +185,11 @@ def github_url(text, type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
+    if type_context.name.startswith(CNCF_PREFIX[1:]):
+        return format_external_link(
+            text,
+            f"https://github.com/cncf/xds/blob/main/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
+        )
     return f":repo:`{text} <api/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
 
 

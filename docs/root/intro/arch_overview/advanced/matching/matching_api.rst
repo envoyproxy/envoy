@@ -28,7 +28,7 @@ applicable only in HTTP contexts, e.g. for matching HTTP requests.
 HTTP Input Functions
 ********************
 
-These input functions are available for matching HTTP requests.
+These input functions are available for matching HTTP requests:
 
 * :ref:`Request header value <extension_request-headers>`.
 * :ref:`Request trailer value <extension_request-trailers>`.
@@ -40,7 +40,7 @@ These input functions are available for matching HTTP requests.
 Network Input Functions
 ***********************
 
-These input functions are available for matching TCP connections.
+These input functions are available for matching TCP connections:
 
 * :ref:`Destination IP <extension_destination-ip>`.
 * :ref:`Destination port <extension_destination-port>`.
@@ -51,6 +51,13 @@ These input functions are available for matching TCP connections.
 * :ref:`Server name <extension_server-name>`.
 * :ref:`Transport protocol <extension_transport-protocol>`.
 * :ref:`Application protocol <extension_application-protocol>`.
+
+Common Input Functons
+*********************
+
+These input functions are available in any context:
+
+* :ref:`Environment variable <extension_envoy.matching.common_inputs.environment_variable>`.
 
 Matching Algorithms
 *******************
