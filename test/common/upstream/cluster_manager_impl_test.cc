@@ -5643,6 +5643,34 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
                             EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
 
+#ifdef WIN32
+TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWin32) {
+  const std::string yaml = fmt::format(R"EOF(
+ static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    upstream_connection_options:
+      set_local_interface_name_on_upstream_connections: true
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 5678
+  )EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "set_local_interface_name_on_upstream_connections_ cannot be set to "
+                            "true on Windows platforms");
+}
+#endif
+
 class PreconnectTest : public ClusterManagerImplTest {
 public:
   void initialize(float ratio) {

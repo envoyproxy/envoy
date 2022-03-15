@@ -3653,6 +3653,8 @@ TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
 }
 
+// WIN32 fails configuration and terminates the server.
+#ifndef WIN32
 TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
@@ -3666,13 +3668,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
         ->mutable_upstream_connection_options()
         ->set_set_local_interface_name_on_upstream_connections(true);
   });
-#ifdef WIN32
-  EXPECT_THROW_WITH_MESSAGE(initialize(), Envoy::EnvoyException,
-                            "set_local_interface_name_on_upstream_connections_ cannot be set to "
-                            "true on Windows platforms");
-#else
   initialize();
-#endif
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -3695,6 +3691,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
     EXPECT_FALSE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
   }
 }
+#endif
 
 #ifdef NDEBUG
 // These tests send invalid request and response header names which violate ASSERT while creating
