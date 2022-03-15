@@ -4,6 +4,8 @@ on:
   push:
     paths:
     - 'source/common/**'
+    branches-ignore:
+    - 'dependabot/**'
   pull_request:
 
 jobs:
