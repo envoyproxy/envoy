@@ -124,7 +124,8 @@ protected:
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers, "POST");
+    HttpTestUtility::addDefaultHeaders(headers);
+    headers.setMethod("POST");
     if (modify_headers) {
       (*modify_headers)(headers);
     }
