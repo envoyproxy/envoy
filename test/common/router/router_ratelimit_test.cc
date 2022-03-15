@@ -844,6 +844,29 @@ actions:
               testing::ContainerEq(local_descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_key: fake_key
+    descriptor_value: fake_value
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(local_descriptors_));
+}
+
 TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchNoMatch) {
   const std::string yaml = R"EOF(
 actions:
