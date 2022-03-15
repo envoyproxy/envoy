@@ -902,6 +902,7 @@ oauth
 observability
 ocagent
 offsetof
+oghttp2
 oneof
 oneway
 opcode
