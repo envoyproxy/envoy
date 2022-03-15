@@ -314,7 +314,7 @@ TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
       name: fake_listener
       address:
         socket_address:
-          address: 127.0.0.1
+          address: "::"
           port_value: 0
       filter_chains:
         - filters:
