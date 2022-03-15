@@ -21,8 +21,6 @@ namespace GcpAuthn {
 namespace {
 
 using envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
-using Http::MockAsyncClient;
-using Http::TestRequestHeaderMapImpl;
 using Server::Configuration::MockFactoryContext;
 using testing::_;
 using testing::Invoke;
@@ -130,6 +128,16 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
   client_->fetchToken(request_callbacks_);
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
+}
+
+TEST_F(GcpAuthnFilterTest, FilterIsDestoryed) {
+  GcpAuthnFilterConfig config;
+  TestUtility::loadFromYaml(DefaultConfig, config);
+  auto filter = std::make_shared<GcpAuthnFilter>(config, context_);
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  EXPECT_EQ(filter->decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
+  filter->onDestroy();
 }
 
 } // namespace
