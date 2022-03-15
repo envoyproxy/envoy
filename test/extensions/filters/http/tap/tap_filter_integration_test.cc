@@ -577,7 +577,7 @@ tap_config:
 // Verify handling of timeout expiry
 TEST_P(TapIntegrationTest, AdminBufferedTapTimeout) {
   using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
-  const int num_req = 4;   // # of requests to buffer before responding
+  const int num_req = 4;    // # of requests to buffer before responding
   const int timeout = 1000; // milliseconds
 
   initializeFilter(admin_filter_config_);

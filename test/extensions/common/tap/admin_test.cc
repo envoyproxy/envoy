@@ -16,13 +16,13 @@ namespace Tap {
 namespace {
 
 using ::testing::_;
+using ::testing::AtLeast;
+using ::testing::Between;
 using ::testing::DoAll;
 using ::testing::Return;
-using ::testing::SaveArg;
-using ::testing::AtLeast;
 using ::testing::ReturnRef;
+using ::testing::SaveArg;
 using ::testing::StrictMock;
-using ::testing::Between;
 
 class MockExtensionConfig : public ExtensionConfig {
 public:
@@ -156,10 +156,12 @@ TEST_F(AdminHandlerTest, BufferedTapWrites) {
   EXPECT_EQ(Http::Code::OK, cb_("/tap", response_headers_, response_, strict_admin_stream));
 
   StrictMock<Http::MockStreamDecoderFilterCallbacks> mockDecoderCallbacks;
-  ON_CALL(strict_admin_stream, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(mockDecoderCallbacks));
+  ON_CALL(strict_admin_stream, getDecoderFilterCallbacks())
+      .WillByDefault(ReturnRef(mockDecoderCallbacks));
 
   EXPECT_CALL(strict_admin_stream, getDecoderFilterCallbacks());
-  StrictMock<Http::MockStreamDecoderFilterCallbacks>& sink = strict_admin_stream.getDecoderFilterCallbacks();
+  StrictMock<Http::MockStreamDecoderFilterCallbacks>& sink =
+      strict_admin_stream.getDecoderFilterCallbacks();
 
   // Called once for each buffered item, but can be called for other purposes, no need to be strict
   EXPECT_CALL(strict_admin_stream, getDecoderFilterCallbacks()).Times(AtLeast(traces));
@@ -167,7 +169,8 @@ TEST_F(AdminHandlerTest, BufferedTapWrites) {
   EXPECT_CALL(sink, encodeData(_, _)).Times(Between(traces, traces + 1));
 
   // Direct access to the handle is required so we can submit traces directly
-  PerTapSinkHandlePtr sinkHandle = handler_->createPerTapSinkHandle(0, ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin);
+  PerTapSinkHandlePtr sinkHandle =
+      handler_->createPerTapSinkHandle(0, ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin);
   // Send more traces than are needed to fill the buffer - extra traces should be discarded
   for (int i = 0; i < traces * 2; i++) {
     EXPECT_CALL(main_thread_dispatcher_, post(_));

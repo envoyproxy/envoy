@@ -218,7 +218,8 @@ AdminHandler::AttachedRequestBuffered::AttachedRequestBuffered(
     AdminHandler* admin_handler, const envoy::admin::v3::TapRequest& tap_request,
     Server::AdminStream* admin_stream)
     : AttachedRequest(admin_handler, tap_request, admin_stream) {
-  const envoy::config::tap::v3::OutputSink &sink = tap_request.tap_config().output_config().sinks(0);
+  const envoy::config::tap::v3::OutputSink& sink =
+      tap_request.tap_config().output_config().sinks(0);
 
   const uint64_t max_buffered_traces = sink.buffered_admin().max_traces();
   const uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(sink.buffered_admin(), timeout, 0);
@@ -232,7 +233,7 @@ AdminHandler::AttachedRequestBuffered::AttachedRequestBuffered(
 }
 
 void AdminHandler::AttachedRequestBuffered::onTimeout(
-    const std::weak_ptr<AttachedRequest> &weak_attached_request) {
+    const std::weak_ptr<AttachedRequest>& weak_attached_request) {
   // Flush the buffer regardless of size
   dispatcher().post([weak_attached_request] {
     // Take temporary ownership - extend lifetime
@@ -295,7 +296,7 @@ std::shared_ptr<AdminHandler::AttachedRequest> AdminHandler::AttachedRequest::cr
     Server::AdminStream* admin_stream) {
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
 
-  const ProtoOutputSink &sink = tap_request.tap_config().output_config().sinks(0);
+  const ProtoOutputSink& sink = tap_request.tap_config().output_config().sinks(0);
 
   switch (sink.output_sink_type_case()) {
   case ProtoOutputSink::kBufferedAdmin:

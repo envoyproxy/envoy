@@ -132,9 +132,10 @@ private:
 
     // Factory method for AttachedRequests - uses protobuf input to determine the subtype of
     // AttachedRequest to create
-    static std::shared_ptr<AttachedRequest> createAttachedRequest(AdminHandler* admin_handler,
-                                                  const envoy::admin::v3::TapRequest& tap_request,
-                                                  Server::AdminStream* admin_stream);
+    static std::shared_ptr<AttachedRequest>
+    createAttachedRequest(AdminHandler* admin_handler,
+                          const envoy::admin::v3::TapRequest& tap_request,
+                          Server::AdminStream* admin_stream);
 
     // --------- Accessors ---------
     // Get a pointer to the internal trace buffer. This method only applies for
@@ -163,7 +164,7 @@ private:
    */
   class AttachedRequestBuffered : public AttachedRequest {
     // Callback fired on timer expiry
-    void onTimeout(const std::weak_ptr<AttachedRequest> &attached_request);
+    void onTimeout(const std::weak_ptr<AttachedRequest>& attached_request);
 
   public:
     TraceBuffer* traceBuffer() const override { return trace_buffer_.get(); }
