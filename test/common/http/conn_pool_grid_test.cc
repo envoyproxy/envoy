@@ -89,7 +89,7 @@ public:
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
 
-  bool isHttp3Confirmed() const { return http3_status_tracker_.isHttp3Confirmed(); }
+  bool isHttp3Confirmed() const { return http3_status_tracker_->isHttp3Confirmed(); }
 
   StreamInfo::MockStreamInfo* info_;
   NiceMock<MockRequestEncoder>* encoder_;
@@ -106,7 +106,8 @@ class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testin
 public:
   ConnectivityGridTest()
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
+        alternate_protocols_(
+            std::make_shared<AlternateProtocolsCacheImpl>(dispatcher_, nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {}
 
   void initialize() {
@@ -126,13 +127,13 @@ public:
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10);
+    return std::make_shared<AlternateProtocolsCacheImpl>(dispatcher_, nullptr, 10);
   }
 
   void addHttp3AlternateProtocol(absl::optional<std::chrono::microseconds> rtt = {}) {
     AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
     std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-        {"h3", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+        {"h3", "", origin.port_, dispatcher_.timeSource().monotonicTime() + Seconds(5)}};
     alternate_protocols_->setAlternatives(origin, protocols);
     if (rtt.has_value()) {
       alternate_protocols_->setSrtt(origin, rtt.value());

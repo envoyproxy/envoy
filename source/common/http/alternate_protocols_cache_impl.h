@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -27,15 +28,18 @@ namespace Http {
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
-  AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store,
+  AlternateProtocolsCacheImpl(Event::Dispatcher& dispatcher, std::unique_ptr<KeyValueStore>&& store,
                               size_t max_entries);
   ~AlternateProtocolsCacheImpl() override;
 
-  // Captures the data tracked per origin; the alternate protocols supported,
-  // and last smoothed round trip time, if available.
+  // Captures the data tracked per origin;,
   struct OriginData {
+    // The alternate protocols supported.
     std::vector<AlternateProtocol> protocols;
+    // The last smoothed round trip time, if available.
     std::chrono::microseconds srtt;
+    // The last connectivity status of HTTP/3, if available.
+    std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker;
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
@@ -68,12 +72,17 @@ public:
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
+  std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>
+  acquireHttp3StatusTracker(const Origin& origin) override;
+  void storeHttp3StatusTracker(
+      const Origin& origin,
+      std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker) override;
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
   // Time source used to check expiration of entries.
-  TimeSource& time_source_;
+  Event::Dispatcher& dispatcher_;
 
   struct OriginHash {
     size_t operator()(const Origin& origin) const {

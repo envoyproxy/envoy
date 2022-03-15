@@ -87,6 +87,20 @@ public:
     MonotonicTime expiration_;
   };
 
+  class Http3StatusTracker {
+  public:
+    virtual ~Http3StatusTracker() = default;
+
+    // Returns true if HTTP/3 is broken.
+    virtual bool isHttp3Broken() const PURE;
+    // Returns true if HTTP/3 is confirmed to be working.
+    virtual bool isHttp3Confirmed() const PURE;
+    // Marks HTTP/3 broken for a period of time, subject to backoff.
+    virtual void markHttp3Broken() PURE;
+    // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.
+    virtual void markHttp3Confirmed() PURE;
+  };
+
   virtual ~AlternateProtocolsCache() = default;
 
   /**
@@ -128,6 +142,21 @@ public:
    * @return the number if entries in the map.
    */
   virtual size_t size() const PURE;
+
+  /**
+   * Transfer the ownership of HTTP/3 status tracker, if there is one, to the caller.
+   * @param origin The origin to get HTTP/3 status for.
+   * @return the status tracker if there is one. Otherwise, nullptr.
+   */
+  virtual std::unique_ptr<Http3StatusTracker> acquireHttp3StatusTracker(const Origin& origin) PURE;
+  /**
+   * Transfer the ownership of HTTP/3 status tracker to the cache if the origin exists in the cache.
+   * Otherwise this is a no-op
+   * @param origin The origin to store HTTP/3 status for.
+   * @param h3_status_tracker the status tracker to be stored.
+   */
+  virtual void storeHttp3StatusTracker(const Origin& origin,
+                                       std::unique_ptr<Http3StatusTracker> h3_status_tracker) PURE;
 };
 
 using AlternateProtocolsCacheSharedPtr = std::shared_ptr<AlternateProtocolsCache>;
