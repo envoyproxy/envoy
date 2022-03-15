@@ -75,6 +75,12 @@ public:
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
+  absl::optional<uint64_t> waitForNextUpstreamConnection(
+      const std::vector<uint64_t>& upstream_indices,
+      FakeRawConnectionPtr& fake_upstream_connection,
+      std::chrono::milliseconds connection_wait_timeout =
+          TestUtility::DefaultTimeout);
+
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,

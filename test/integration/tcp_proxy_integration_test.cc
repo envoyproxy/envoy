@@ -74,7 +74,7 @@ void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
       "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-      "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%\n");
+      "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
 }
 
 // Using a set of T, test a consumer function for a true AssertionResult, or
@@ -204,7 +204,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnectBytesMeter) {
                                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=5 "
                                        "UPSTREAM_WIRE_BYTES_SENT=5 "
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
-                                       "\r?\n.*")));
+                                       "\r?.*")));
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -232,7 +232,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
                                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=10 "
                                        "UPSTREAM_WIRE_BYTES_SENT=10 "
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
-                                       "\r?\n.*")));
+                                       "\r?.*")));
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
@@ -494,7 +494,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
       "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-      "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%\n");
+      "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED% ");
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -538,7 +538,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
                   "UPSTREAM_WIRE_BYTES_SENT=0 "
                   "UPSTREAM_WIRE_BYTES_RECEIVED=5"
-                  "\r?\n.*",
+                  "\r?.*",
                   ip_port_regex, ip_regex)));
 }
 
@@ -572,7 +572,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
                                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
                                        "UPSTREAM_WIRE_BYTES_SENT=0 "
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=0"
-                                       "\r?\n.*")));
+                                       "\r?.*")));
 }
 
 // Make sure no bytes are logged when no data is sent.
@@ -594,7 +594,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
                                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
                                        "UPSTREAM_WIRE_BYTES_SENT=0 "
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=0"
-                                       "\r?\n.*")));
+                                       "\r?.*")));
 }
 
 // Test Byte Metering across multiple upstream/downstream connections
@@ -623,18 +623,12 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<IntegrationTcpClientPtr> clients{client_count};
   std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
-  const auto ms = std::chrono::milliseconds(5);
+  auto indicies = std::vector<uint64_t>(upstream_count);
+  std::iota(indicies.begin(), indicies.end(), 0);
 
-  int upstream_index = 0;
   for (int i = 0; i < client_count; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    auto fake_connection = &(fake_connections[upstream_index]);
-    std::function<AssertionResult(std::unique_ptr<FakeUpstream>&)> func =
-        [&fake_connection, ms](std::unique_ptr<FakeUpstream>& fake_upstream) {
-          return fake_upstream->waitForRawConnection(*fake_connection, ms);
-        };
-    waitForFunction(fake_upstreams_, TestUtility::DefaultTimeout, func);
-    ++upstream_index;
+    waitForNextUpstreamConnection(std::vector<uint64_t>(indicies), fake_connections[i]);
   }
 
   ASSERT_TRUE(clients[0]->write("hello"));  // send initial client data
@@ -658,15 +652,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<absl::string_view> logs = {
       "DOWNSTREAM_WIRE_BYTES_SENT=6 DOWNSTREAM_WIRE_BYTES_RECEIVED=8 "
-      "UPSTREAM_WIRE_BYTES_SENT=8 UPSTREAM_WIRE_BYTES_RECEIVED=6",
+      "UPSTREAM_WIRE_BYTES_SENT=8 UPSTREAM_WIRE_BYTES_RECEIVED=6 ",
       "DOWNSTREAM_WIRE_BYTES_SENT=0 DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=0",
+      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=0 ",
       "DOWNSTREAM_WIRE_BYTES_SENT=3 DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=3"};
+      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=3 "};
   auto log_result = waitForAccessLog(listener_access_log_name_);
   for (int i = 0; i < client_count; ++i) {
     EXPECT_THAT(log_result,
-                MatchesRegex(fmt::format("([\n\r]|.)*{}([\n\r]|.)*", logs[i])));
+                MatchesRegex(fmt::format(".*{}.*", logs[i])));
   }
 }
 
@@ -1483,30 +1477,6 @@ public:
     }
   }
 
-  absl::optional<uint64_t>
-  waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
-                                std::chrono::milliseconds connection_wait_timeout,
-                                FakeRawConnectionPtr& fake_upstream_connection) {
-    AssertionResult result = AssertionFailure();
-    int upstream_index = 0;
-    Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
-    // Loop over the upstreams until the call times out or an upstream request is received.
-    while (!result) {
-      upstream_index = upstream_index % upstream_indices.size();
-      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
-          fake_upstream_connection, std::chrono::milliseconds(5));
-      if (result) {
-        return upstream_index;
-      } else if (!bound.withinBound()) {
-        RELEASE_ASSERT(0, "Timed out waiting for new connection.");
-        break;
-      }
-      ++upstream_index;
-    }
-    RELEASE_ASSERT(result, result.message());
-    return {};
-  }
-
   void globalPreconnect() {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1603,13 +1573,13 @@ void MysqlIntegrationTest::testPreconnect() {
     // Start a new request.
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
     waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
-                                  TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+                                  fake_connections[upstream_index]);
     ++upstream_index;
 
     // For every other connection, an extra connection should be preconnected.
     if (i % 2 == 0) {
       waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
-                                    TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+                                    fake_connections[upstream_index]);
       ++upstream_index;
     }
   }
