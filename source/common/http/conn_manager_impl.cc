@@ -761,10 +761,9 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")) {
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(
-        Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
-        "stream timeout", nullptr, absl::nullopt,
-        StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
+    sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+                   "stream timeout", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
     return;
   }
 
@@ -793,8 +792,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()), "request timeout",
-                 nullptr, absl::nullopt,
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+                 "request timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
