@@ -3614,13 +3614,16 @@ virtual_hosts:
   EXPECT_EQ("foo", boz_shadow_policies[1]->runtimeKey());
 }
 
+// Test if the higher level mirror policies are properly applied when routes
+// don't have one and not applied when they do.
+// In this test case, request_mirror_policies is set in route config level.
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesRouteConfiguration) {
   const std::string yaml = R"EOF(
 name: RequestMirrorPoliciesRouteConfiguration
 request_mirror_policies:
   - cluster: rc_cluster
 virtual_hosts:
-- name: www2
+- name: www
   request_mirror_policies:
     - cluster: vh_cluster
   domains:
@@ -3631,12 +3634,12 @@ virtual_hosts:
     route:
       request_mirror_policies:
         - cluster: route_cluster
-      cluster: www2
+      cluster: www
   - match:
       prefix: "/bar"
     route:
-      cluster: www2
-- name: www3
+      cluster: www
+- name: www2
   domains:
   - www2.lyft.com
   routes:
@@ -3653,7 +3656,7 @@ virtual_hosts:
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters(
-      {"www2", "www3", "rc_cluster", "vh_cluster", "route_cluster"}, {});
+      {"www", "www2", "rc_cluster", "vh_cluster", "route_cluster"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   const auto& rc_vh_route_shadow_policies =
@@ -3677,12 +3680,14 @@ virtual_hosts:
   EXPECT_EQ("rc_cluster", rc_policies[0]->cluster());
 }
 
-
+// Test if the higher level mirror policies are properly applied when routes
+// don't have one and not applied when they do.
+// In this test case, request_mirror_policies is *not* set in route config level.
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesVirtualHost) {
   const std::string yaml = R"EOF(
 name: RequestMirrorPoliciesVirtualHost
 virtual_hosts:
-- name: www2
+- name: www
   request_mirror_policies:
     - cluster: vh_cluster
   domains:
@@ -3693,12 +3698,12 @@ virtual_hosts:
     route:
       request_mirror_policies:
         - cluster: route_cluster
-      cluster: www2
+      cluster: www
   - match:
       prefix: "/bar"
     route:
-      cluster: www2
-- name: www3
+      cluster: www
+- name: www2
   domains:
   - www2.lyft.com
   routes:
@@ -3715,27 +3720,27 @@ virtual_hosts:
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters(
-      {"www2", "www3", "vh_cluster", "route_cluster"}, {});
+      {"www", "www2", "vh_cluster", "route_cluster"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   const auto& vh_route_shadow_policies =
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
-  EXPECT_EQ(1, rc_vh_route_shadow_policies.size());
-  EXPECT_EQ("route_cluster", rc_vh_route_shadow_policies[0]->cluster());
+  EXPECT_EQ(1, vh_route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", vh_route_shadow_policies[0]->cluster());
 
   const auto& vh_shadow_policies =
       config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
-  EXPECT_EQ(1, rc_vh_shadow_policies.size());
-  EXPECT_EQ("vh_cluster", rc_vh_shadow_policies[0]->cluster());
+  EXPECT_EQ(1, vh_shadow_policies.size());
+  EXPECT_EQ("vh_cluster", vh_shadow_policies[0]->cluster());
 
   const auto& route_shadow_policies =
       config.route(genHeaders("www2.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
   EXPECT_EQ(1, route_shadow_policies.size());
-  EXPECT_EQ("route_cluster", rc_route_shadow_policies[0]->cluster());
+  EXPECT_EQ("route_cluster", route_shadow_policies[0]->cluster());
 
-  const auto& rc_policies =
+  const auto& no_policies =
       config.route(genHeaders("www2.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
-  EXPECT_TRUE(policies.empty());
+  EXPECT_TRUE(no_policies.empty());
 }
 
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
