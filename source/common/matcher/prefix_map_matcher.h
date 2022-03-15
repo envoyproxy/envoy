@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Matcher {
 
 /**
- * Implementation of a trie match tree that provides lookup of prefix values,
- * with one longest prefix OnMatch per result.
+ * Implementation of a trie match tree which resolves to the OnMatch with the longest matching
+ * prefix.
  */
 template <class DataType>
 class PrefixMapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
