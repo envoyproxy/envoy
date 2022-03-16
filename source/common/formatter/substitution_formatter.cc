@@ -4,6 +4,8 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -365,6 +367,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
+  static constexpr absl::string_view ENVIRONMENT_TOKEN{"ENVIRONMENT("};
 
   if (absl::StartsWith(token, "REQ(")) {
     std::string main_header, alternative_header;
@@ -425,6 +428,17 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
 
     return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
+
+  } else if (absl::StartsWith(token, ENVIRONMENT_TOKEN)) {
+    std::string key;
+    absl::optional<size_t> max_length;
+    const size_t start = ENVIRONMENT_TOKEN.size();
+    parseCommand(token, start, '?', max_length, key);
+
+    if (key.empty()) {
+      throw EnvoyException("Empty environment name is not allowed.");
+    }
+    return std::make_unique<EnvironmentFormatter>(key);
   } else if (absl::StartsWith(token, "START_TIME")) {
     return std::make_unique<StartTimeFormatter>(token);
   } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
@@ -1643,6 +1657,32 @@ ProtobufWkt::Value SystemTimeFormatter::formatValue(
     absl::string_view local_reply_body) const {
   return ValueUtil::optionalStringValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+}
+
+EnvironmentFormatter::EnvironmentFormatter(const std::string& key) {
+  ASSERT(!key.empty());
+
+  const char* env_value = std::getenv(key.c_str());
+  if (env_value != nullptr) {
+    str_.set_string_value(std::string(env_value));
+    return;
+  }
+  str_.set_string_value(DefaultUnspecifiedValueString);
+}
+
+absl::optional<std::string> EnvironmentFormatter::format(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo&,
+                                                         absl::string_view) const {
+  return str_.string_value();
+}
+ProtobufWkt::Value EnvironmentFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                     const Http::ResponseHeaderMap&,
+                                                     const Http::ResponseTrailerMap&,
+                                                     const StreamInfo::StreamInfo&,
+                                                     absl::string_view) const {
+  return str_;
 }
 
 } // namespace Formatter
