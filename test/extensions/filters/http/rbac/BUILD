@@ -48,10 +48,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "rbac_filter_integration_test",
-    srcs = ["rbac_filter_integration_test.cc"],
-    extension_names = ["envoy.filters.http.rbac"],
     # add size param to deal with timeout problem
     size = "large",
+    srcs = ["rbac_filter_integration_test.cc"],
+    extension_names = ["envoy.filters.http.rbac"],
     shard_count = 2,
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
