@@ -323,14 +323,14 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
       iter->second->listener_->listener() != nullptr) {
     details = *iter->second;
   }
-}
-return (details.has_value())
-           ? Network::BalancedConnectionHandlerOptRef(
-                 ActiveTcpListenerOptRef(
-                     absl::get<std::reference_wrapper<ActiveTcpListener>>(details->typed_listener_))
-                     .value()
-                     .get())
-           : absl::nullopt;
+
+  return (details.has_value())
+             ? Network::BalancedConnectionHandlerOptRef(
+                   ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(
+                                               details->typed_listener_))
+                       .value()
+                       .get())
+             : absl::nullopt;
 }
 
 } // namespace Server
