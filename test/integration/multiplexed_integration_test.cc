@@ -998,7 +998,7 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
         response.append(data.toString());
       });
   connection->run();
-  if (GetParam().http2_implementation == kOgHttp2) {
+  if (GetParam().http2_implementation == OGHTTP2) {
     EXPECT_THAT(response, HasSubstr("ParseError"));
   } else {
     EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -1329,7 +1329,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseAfterBadFrame) {
       });
 
   connection->run();
-  if (GetParam().http2_implementation == kOgHttp2) {
+  if (GetParam().http2_implementation == OGHTTP2) {
     EXPECT_THAT(response, HasSubstr("ParseError"));
   } else {
     EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -1362,7 +1362,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
       });
 
   connection->run();
-  if (GetParam().http2_implementation == kOgHttp2) {
+  if (GetParam().http2_implementation == OGHTTP2) {
     EXPECT_THAT(response, HasSubstr("ParseError"));
   } else {
     EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
@@ -2037,7 +2037,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
-  } else if (GetParam().http2_implementation == kOgHttp2) {
+  } else if (GetParam().http2_implementation == OGHTTP2) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.remote_reset"));
   } else {

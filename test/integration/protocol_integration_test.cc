@@ -768,7 +768,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   // The two requests are sent with https scheme rather than http for QUIC downstream.
   const size_t quic_https_extra_bytes = (downstreamProtocol() == Http::CodecType::HTTP3 ? 2u : 0u);
   const size_t http2_header_bytes_received =
-      (GetParam().http2_implementation == kOgHttp2) ? 24 : 27;
+      (GetParam().http2_implementation == OGHTTP2) ? 24 : 27;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(2550 + quic_https_extra_bytes, 635, 414 + quic_https_extra_bytes, 54),
       BytesCountExpectation(2262, 548, 184, http2_header_bytes_received),
@@ -3259,7 +3259,7 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  const size_t wire_bytes_received = (GetParam().http2_implementation == kOgHttp2) ? 10 : 13;
+  const size_t wire_bytes_received = (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(251, 38, 219, 18),
       BytesCountExpectation(168, wire_bytes_received, 168, wire_bytes_received),
@@ -3286,7 +3286,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  const size_t header_bytes_received = (GetParam().http2_implementation == kOgHttp2) ? 10 : 13;
+  const size_t header_bytes_received = (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(371, 158, 228, 27),
                                      BytesCountExpectation(277, 122, 168, header_bytes_received),
                                      BytesCountExpectation(256, 109, 153, 3));
@@ -3355,7 +3355,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
   auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
   const size_t http2_header_bytes_received =
-      (GetParam().http2_implementation == kOgHttp2) ? 10 : 13;
+      (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(298, 158, 156, 27),
       BytesCountExpectation(223, 122, 114, http2_header_bytes_received),
@@ -3366,7 +3366,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
   auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
 
-  const size_t http2_header_bytes_sent = (GetParam().http2_implementation == kOgHttp2) ? 54 : 58;
+  const size_t http2_header_bytes_sent = (GetParam().http2_implementation == OGHTTP2) ? 54 : 58;
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
                                      BytesCountExpectation(167, 119, http2_header_bytes_sent, 10),
                                      BytesCountExpectation(114, 108, 11, 3), 1);
@@ -3386,7 +3386,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
   testTrailers(10, 20, true, true);
 
   const size_t http2_trailer_bytes_received =
-      (GetParam().http2_implementation == kOgHttp2) ? 49 : 52;
+      (GetParam().http2_implementation == OGHTTP2) ? 49 : 52;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(248, 120, 196, 67),
       BytesCountExpectation(172, 81, 154, http2_trailer_bytes_received),
@@ -3466,7 +3466,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
   const size_t http2_header_bytes_received =
-      (GetParam().http2_implementation == kOgHttp2) ? 10 : 13;
+      (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(159, 47, 128, 27),
       BytesCountExpectation(113, http2_header_bytes_received, 113, http2_header_bytes_received),

@@ -208,7 +208,7 @@ protected:
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
-    const http2::adapter::OgHttp2Adapter::Options& og_options() { return og_options_; }
+    const http2::adapter::OgHttp2Adapter::Options& ogOptions() { return og_options_; }
 
   protected:
     nghttp2_option* options_;

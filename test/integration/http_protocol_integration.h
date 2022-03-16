@@ -6,7 +6,7 @@
 
 namespace Envoy {
 
-enum Http2Implementation { kBareHttp2, kWrappedHttp2, kOgHttp2 };
+enum Http2Implementation { BARE_HTTP2, WRAPPED_HTTP2, OGHTTP2 };
 
 struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
@@ -58,16 +58,16 @@ public:
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
     switch (GetParam().http2_implementation) {
-    case kBareHttp2:
+    case BARE_HTTP2:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "false");
       break;
-    case kWrappedHttp2:
+    case WRAPPED_HTTP2:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "true");
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
       break;
-    case kOgHttp2:
+    case OGHTTP2:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "true");
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");

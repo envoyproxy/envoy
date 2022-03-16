@@ -2040,7 +2040,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (use_new_codec_wrapper_) {
     if (use_oghttp2_library_) {
       adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
-                                              client_http2_options.og_options());
+                                              client_http2_options.ogOptions());
     } else {
       adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
                                               client_http2_options.options());
@@ -2147,7 +2147,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
     if (use_oghttp2_library_) {
-      adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.og_options());
+      adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
     } else {
       adapter_ =
           http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor_, h2_options.options());
