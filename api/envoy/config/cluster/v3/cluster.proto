@@ -1177,6 +1177,11 @@ message UpstreamConnectionOptions {
 
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.v3.TcpKeepalive tcp_keepalive = 1;
+
+  // If enabled, associates the interface name of the local address with the upstream connection.
+  // This can be used by extensions during processing of requests. The association mechanism is
+  // implementation specific. Defaults to false due to performance concerns.
+  bool set_local_interface_name_on_upstream_connections = 2;
 }
 
 message TrackClusterStats {

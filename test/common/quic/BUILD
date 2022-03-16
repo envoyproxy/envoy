@@ -352,7 +352,9 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_transport_socket_factory_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

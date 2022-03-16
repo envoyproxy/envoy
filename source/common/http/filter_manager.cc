@@ -915,7 +915,6 @@ void FilterManager::sendLocalReply(
   }
 
   stream_info_.setResponseCodeDetails(details);
-
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
