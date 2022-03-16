@@ -928,7 +928,7 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", result.errno_));
+    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
