@@ -313,23 +313,24 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
-  std::string addr_str =
-      address.ip()->version() == Network::Address::IpVersion::v4
-          ? Network::Utility::getIpv4AnyAddress(address.ip()->port())->asString()
-          : Network::Utility::getIpv6AnyAddress(address.ip()->port())->asString();
+
+  std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
+                             ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
+                             : Network::Address::Ipv6Instance(address.ip()->port()).asString();
 
   auto iter = tcp_listener_map_by_address_.find(addr_str);
-  if (iter != tcp_listener_map_by_address_.end()) {
+  if (iter != tcp_listener_map_by_address_.end() &&
+      iter->second->listener_->listener() != nullptr) {
     details = *iter->second;
   }
-
-  return (details.has_value())
-             ? Network::BalancedConnectionHandlerOptRef(
-                   ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(
-                                               details->typed_listener_))
-                       .value()
-                       .get())
-             : absl::nullopt;
+}
+return (details.has_value())
+           ? Network::BalancedConnectionHandlerOptRef(
+                 ActiveTcpListenerOptRef(
+                     absl::get<std::reference_wrapper<ActiveTcpListener>>(details->typed_listener_))
+                     .value()
+                     .get())
+           : absl::nullopt;
 }
 
 } // namespace Server
