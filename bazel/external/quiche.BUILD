@@ -4197,7 +4197,6 @@ envoy_cc_library(
     srcs = [
         "quiche/common/platform/api/quiche_mutex.cc",
         "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
-
     ],
     hdrs = [
         "quiche/common/platform/api/quiche_mutex.h",
