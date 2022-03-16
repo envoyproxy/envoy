@@ -81,6 +81,13 @@ static_resources:
         - endpoint:
             address:
               socket_address: { address: 127.0.0.1, port_value: \(remotePort) }
+layered_runtime:
+  layers:
+    - name: static_layer_0
+      static_layer:
+        envoy:
+          reloadable_features:
+            override_request_timeout_by_gateway_timeout: false
 """
 
     class IdleTimeoutValidationFilter: AsyncResponseFilter, ResponseFilter {
