@@ -74,7 +74,6 @@ envoy_cc_library(
         "quic_client_stats_impl.h",
         "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
-        "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
         "quic_stream_buffer_allocator_impl.h",
