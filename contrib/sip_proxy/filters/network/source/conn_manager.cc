@@ -34,8 +34,8 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(const std::st
                                                                    const std::string& val) {
   if ((*traffic_routing_assistant_map_)[type][key] != val) {
     (*traffic_routing_assistant_map_)[type].emplace(std::make_pair(key, val));
-    if (tra_client_) {
-      tra_client_->updateTrafficRoutingAssistant(
+    if (traClient()) {
+      traClient()->updateTrafficRoutingAssistant(
           type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)},
           Tracing::NullSpan::instance(), stream_info_);
     }
@@ -53,8 +53,8 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
 
   if (activetrans.metadata()->queryMap()[type]) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
-      if (tra_client_) {
-        tra_client_->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
+      if (traClient()) {
+        traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
                                                      stream_info_);
       }
     });
@@ -68,15 +68,15 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
 void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(const std::string& type,
                                                                    const std::string& key) {
   (*traffic_routing_assistant_map_)[type].erase(key);
-  if (tra_client_) {
-    tra_client_->deleteTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
+  if (traClient()) {
+    traClient()->deleteTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
                                                stream_info_);
   }
 }
 
 void TrafficRoutingAssistantHandler::subscribeTrafficRoutingAssistant(const std::string& type) {
-  if (tra_client_) {
-    tra_client_->subscribeTrafficRoutingAssistant(type, Tracing::NullSpan::instance(),
+  if (traClient()) {
+    traClient()->subscribeTrafficRoutingAssistant(type, Tracing::NullSpan::instance(),
                                                   stream_info_);
   }
 }

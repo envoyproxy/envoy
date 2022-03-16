@@ -25,8 +25,8 @@ GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client
     : async_client_(async_client), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() {
-    cancel();
-    resetStream();
+  cancel();
+  resetStream();
 }
 
 void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {
@@ -37,8 +37,8 @@ void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {
 void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   if (request_) {
-  	request_->cancel();
-	request_ = nullptr;
+    request_->cancel();
+    request_ = nullptr;
   }
   // callbacks_ = nullptr;
 }

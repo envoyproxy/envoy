@@ -66,10 +66,11 @@ public:
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
 
   virtual void updateTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                     const std::string& val);
-  virtual QueryStatus retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                              SipFilters::DecoderFilterCallbacks& activetrans,
-                                              std::string& host);
+                                             const std::string& val);
+  virtual QueryStatus
+  retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                  SipFilters::DecoderFilterCallbacks& activetrans,
+                                  std::string& host);
   virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key);
   virtual void subscribeTrafficRoutingAssistant(const std::string& type);
   void complete(const TrafficRoutingAssistant::ResponseType& type, const std::string& message_type,
@@ -79,6 +80,8 @@ public:
                   customized_affinity);
 
 private:
+  virtual TrafficRoutingAssistant::ClientPtr& traClient() { return tra_client_; }
+
   ConnectionManager& parent_;
   std::shared_ptr<TrafficRoutingAssistantMap> traffic_routing_assistant_map_;
   TrafficRoutingAssistant::ClientPtr tra_client_;

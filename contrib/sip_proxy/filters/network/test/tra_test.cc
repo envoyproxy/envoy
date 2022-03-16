@@ -1,7 +1,6 @@
 #include <chrono>
 #include <memory>
 
-#include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
 #include "source/common/buffer/buffer_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -9,6 +8,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 
+#include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
@@ -34,23 +34,6 @@ class SipTraTest : public testing::Test {
 public:
   SipTraTest() : async_stream_(std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>()) {}
   ~SipTraTest() override { delete (filter_); }
-
-  TrafficRoutingAssistant::ClientPtr traMockClient(const std::chrono::milliseconds timeout,
-                                                   Grpc::MockAsyncStream* stream) {
-
-    async_client_ = std::make_shared<Grpc::MockAsyncClient>();
-    EXPECT_CALL(*(async_client_.get()), sendRaw(_, _, _, _, _, _))
-        .WillRepeatedly(testing::Return(nullptr));
-//    EXPECT_CALL(*stream, sendMessageRaw_(_, _))
-//        .WillRepeatedly(Invoke([&](Buffer::InstancePtr& request, bool end_stream) -> void {
-//          UNREFERENCED_PARAMETER(request);
-//          UNREFERENCED_PARAMETER(end_stream);
-//        }));
-
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillRepeatedly(testing::Return(stream));
-    return std::make_unique<SipProxy::TrafficRoutingAssistant::MockGrpcClientImpl>(async_client_,
-                                                                                   timeout);
-  }
 
   void initTraHandler() {
     std::string sip_proxy_yaml = R"EOF(
@@ -94,50 +77,29 @@ public:
 
     tra_handler_ = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandlerDeep>>(
         *filter_, sip_proxy_config_.settings().tra_service_config(), context_, stream_info);
-
-    tra_client_ = traMockClient(std::chrono::milliseconds(2000), async_stream_.get());
-    EXPECT_CALL(*tra_handler_, traClient()).WillRepeatedly(ReturnRef(tra_client_));
   }
 
   void initGrpcClient() {
+    initTraHandler();
     async_request_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncRequest>>();
     async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
     async_client_ = std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
         .WillRepeatedly(testing::Return(async_request_.get()));
-    //            Invoke([&](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-    //                       Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-    //                       //const Http::AsyncClient::RequestOptions&) { return
-    //                       async_request_.get(); })); const Http::AsyncClient::RequestOptions&) {
-    //                       return async_request_.get(); }));
-    //    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-    //        .WillRepeatedly(
-    //            Invoke([&](absl::string_view, absl::string_view,
-    //                       Grpc::RawAsyncStreamCallbacks &,
-    //                       const Http::AsyncClient::StreamOptions&) { return async_stream_.get();
-    //                       }));
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
         .WillRepeatedly(testing::Return(async_stream_.get()));
-    // EXPECT_CALL(*async_request_, cancel()).WillRepeatedly(Invoke([&]() -> void {
-    //   // Do nothing
-    // }));
-
-    // EXPECT_CALL(*async_stream_, sendMessageRaw_(_, _))
-    //     .WillRepeatedly(Invoke([&](Buffer::InstancePtr& request, bool end_stream) -> void {
-    //       UNREFERENCED_PARAMETER(request);
-    //       UNREFERENCED_PARAMETER(end_stream);
-    //     }));
-
-    // EXPECT_CALL(*async_stream_, resetStream()).WillRepeatedly(Invoke([&]() -> void {}));
 
     grpc_client_ = std::make_unique<TrafficRoutingAssistant::MockGrpcClientImpl>(
         async_client_, std::chrono::milliseconds(2000));
-
-    // grpc_client_->setRequestCallbacks(*tra_handler_);
+    grpc_client_->setRequestCallbacks(*tra_handler_);
   }
 
-  std::shared_ptr<Grpc::MockAsyncClient> async_client_;
-  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> tra_handler_;
+  void initTraClient() {
+    initGrpcClient();
+    tra_client_ = std::move(grpc_client_);
+    EXPECT_CALL(*tra_handler_, traClient()).WillRepeatedly(ReturnRef(tra_client_));
+  }
+
   NiceMock<MockConnectionManager>* filter_{};
   NiceMock<MockTimeSystem> time_source_;
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy sip_proxy_config_;
@@ -146,21 +108,24 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore store_;
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig tra_config_;
-  TrafficRoutingAssistant::ClientPtr tra_client_;
-  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncStream>> async_stream_;
   NiceMock<SipFilters::MockDecoderFilterCallbacks> callbacks_;
-  std::unique_ptr<TrafficRoutingAssistant::GrpcClientImpl> grpc_client_;
-  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
   Tracing::MockSpan span_;
+
+  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
+  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncStream>> async_stream_;
+  std::unique_ptr<TrafficRoutingAssistant::MockGrpcClientImpl> grpc_client_;
+  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> tra_handler_;
+  std::shared_ptr<Grpc::MockAsyncClient> async_client_;
+  TrafficRoutingAssistant::ClientPtr tra_client_;
 };
 
 TEST_F(SipTraTest, TraUpdate) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->updateTrafficRoutingAssistant("lskpmc", "S1F1", "10.0.0.1");
 }
 
 TEST_F(SipTraTest, TraRetrieveContinue) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->updateTrafficRoutingAssistant("lskpmc", "S1F1", "10.0.0.1");
 
   std::string host = "10.0.0.1";
@@ -169,7 +134,7 @@ TEST_F(SipTraTest, TraRetrieveContinue) {
 }
 
 TEST_F(SipTraTest, TraRetrievePending) {
-  initTraHandler();
+  initTraClient();
   StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
   MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
   metadata->addQuery("lskpmc", true);
@@ -180,7 +145,7 @@ TEST_F(SipTraTest, TraRetrievePending) {
 }
 
 TEST_F(SipTraTest, TraRetrieveStop) {
-  initTraHandler();
+  initTraClient();
   StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
   MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
   metadata->addQuery("lskpmc", false);
@@ -191,22 +156,22 @@ TEST_F(SipTraTest, TraRetrieveStop) {
 }
 
 TEST_F(SipTraTest, TraCompleteUpdateRsp) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->complete(TrafficRoutingAssistant::ResponseType::UpdateResp, "", "");
 }
 
 TEST_F(SipTraTest, TraCompleteCreateRsp) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->complete(TrafficRoutingAssistant::ResponseType::CreateResp, "", "");
 }
 
 TEST_F(SipTraTest, TraCompleteDeleteRsp) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->complete(TrafficRoutingAssistant::ResponseType::DeleteResp, "", "");
 }
 
 TEST_F(SipTraTest, TraCompleteRetrieveRsp) {
-  initTraHandler();
+  initTraClient();
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::RetrieveResponse
       retrive_response_config;
   std::string retrieveRsp_yaml = R"EOF(
@@ -219,7 +184,7 @@ TEST_F(SipTraTest, TraCompleteRetrieveRsp) {
 }
 
 TEST_F(SipTraTest, TraCompleteSubscribeRsp) {
-  initTraHandler();
+  initTraClient();
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::SubscribeResponse
       subscribe_response_config;
   std::string subscribeRsp_yaml = R"EOF(
@@ -232,7 +197,7 @@ TEST_F(SipTraTest, TraCompleteSubscribeRsp) {
 }
 
 TEST_F(SipTraTest, TraDoSubscribe) {
-  initTraHandler();
+  initTraClient();
   envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity affinity_config;
   std::string affinity_yaml = R"EOF(
            entries:
@@ -249,12 +214,12 @@ TEST_F(SipTraTest, TraDoSubscribe) {
 }
 
 TEST_F(SipTraTest, TraDelete) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->deleteTrafficRoutingAssistant("lskpmc", "S1F1");
 }
 
 TEST_F(SipTraTest, TraSubscribe) {
-  initTraHandler();
+  initTraClient();
   tra_handler_->subscribeTrafficRoutingAssistant("lskpmc");
 }
 
@@ -277,8 +242,6 @@ TEST_F(SipTraTest, GrpcClientCloseStream) {
 
 TEST_F(SipTraTest, GrpcClientOnSuccessRetrieveRsp) {
   initGrpcClient();
-  initTraHandler();
-  grpc_client_->setRequestCallbacks(*tra_handler_);
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse
       service_response_config;
@@ -300,8 +263,6 @@ TEST_F(SipTraTest, GrpcClientOnSuccessRetrieveRsp) {
 
 TEST_F(SipTraTest, GrpcClientOnSuccessCreateRsp) {
   initGrpcClient();
-  initTraHandler();
-  grpc_client_->setRequestCallbacks(*tra_handler_);
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse
       service_response_config;
@@ -325,8 +286,6 @@ TEST_F(SipTraTest, GrpcClientOnSuccessCreateRsp) {
 
 TEST_F(SipTraTest, GrpcClientOnSuccessUpdateRsp) {
   initGrpcClient();
-  initTraHandler();
-  grpc_client_->setRequestCallbacks(*tra_handler_);
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse
       service_response_config;
@@ -350,8 +309,6 @@ TEST_F(SipTraTest, GrpcClientOnSuccessUpdateRsp) {
 
 TEST_F(SipTraTest, GrpcClientOnSuccessDeleteRsp) {
   initGrpcClient();
-  initTraHandler();
-  grpc_client_->setRequestCallbacks(*tra_handler_);
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse
       service_response_config;
@@ -375,8 +332,6 @@ TEST_F(SipTraTest, GrpcClientOnSuccessDeleteRsp) {
 
 TEST_F(SipTraTest, GrpcClientOnReceiveMessage) {
   initGrpcClient();
-  initTraHandler();
-  grpc_client_->setRequestCallbacks(*tra_handler_);
 
   std::unique_ptr<envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>
       response = std::make_unique<

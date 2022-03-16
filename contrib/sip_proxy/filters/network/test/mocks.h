@@ -1,22 +1,23 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/router/router.h"
 
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/mocks/grpc/mocks.h"
 
+#include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 #include "contrib/sip_proxy/filters/network/source/conn_state.h"
+#include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "contrib/sip_proxy/filters/network/source/filters/factory_base.h"
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
-#include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
-#include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "gmock/gmock.h"
-#include <memory>
 
 using testing::NiceMock;
 
@@ -246,7 +247,7 @@ public:
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
       : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {}
-  MOCK_METHOD(TrafficRoutingAssistant::ClientPtr&, traClient, ());
+  MOCK_METHOD(TrafficRoutingAssistant::ClientPtr&, traClient, (), (override));
 };
 
 } // namespace SipProxy
