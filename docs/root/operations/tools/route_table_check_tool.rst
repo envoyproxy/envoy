@@ -65,7 +65,7 @@ Output
     locations ats cluster_name
     Test_6
 
-  If an ``-output-path`` option is specified, then a ``ValidationResult`` proto message with the test results is written to a file.
+  If an ``--output-path`` option is specified, then a ``ValidationResult`` proto message with the test results is written to a file.
   If the ``--only-show-failures`` flag is provided, only the failed test cases are written to a file.
 
 Building
