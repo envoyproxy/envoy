@@ -62,7 +62,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message OAuth2Config {
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
