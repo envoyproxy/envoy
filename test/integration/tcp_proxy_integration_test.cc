@@ -499,32 +499,6 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        ip_port_regex, ip_regex)));
 }
 
-// Test that no bytes are metered for a connection with no upstream.
-TEST_P(TcpProxyIntegrationTest, TcpProxyNoUpstreamDataBytesMeter) {
-  setupByteMeterAccessLog();
-  fake_upstreams_count_ = 0;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    auto* lb_endpoint =
-        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
-    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
-  });
-  config_helper_.skipPortUsageValidation();
-  enableHalfClose(false);
-  initialize();
-  auto tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("bonjour"));
-  tcp_client->waitForDisconnect();
-
-  test_server_.reset();
-  auto log_result = waitForAccessLog(listener_access_log_name_);
-  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=0 "
-                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
-                                                   "UPSTREAM_WIRE_BYTES_SENT=0 "
-                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=0"
-                                                   "\r?.*")));
-}
-
 // Make sure no bytes are logged when no data is sent.
 TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
   setupByteMeterAccessLog();
