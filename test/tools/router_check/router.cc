@@ -257,11 +257,6 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tests_.emplace_back(test_name, std::vector<std::string>{});
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
-    envoy::RouterCheckToolSchema::ValidationItemResult test_result;
-    test_result.set_test_name(test_name);
-
-    envoy::RouterCheckToolSchema::ValidationFailure validation_failure;
-
     using CheckerFunc =
         std::function<bool(ToolConfig&, const envoy::RouterCheckToolSchema::ValidationAssert&,
                            envoy::RouterCheckToolSchema::ValidationFailure&)>;
@@ -277,9 +272,12 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
     finalizeHeaders(tool_config, stream_info);
+
     // Call appropriate function for each match case.
     bool test_failed = false;
-
+    envoy::RouterCheckToolSchema::ValidationItemResult test_result;
+    test_result.set_test_name(test_name);
+    envoy::RouterCheckToolSchema::ValidationFailure validation_failure;
     for (const auto& test : checkers) {
       if (!test(tool_config, validate, validation_failure)) {
         test_failed = true;
@@ -535,11 +533,9 @@ bool RouterCheckTool::matchHeaderField(
 
   header_match_failure.mutable_header_matcher()->CopyFrom(header);
   const Http::LowerCaseString header_key(header.name());
-  std::string header_value = "";
-  if (header_map.has(header_key)) {
-    header_value = ::toString(header_map.get(header_key));
-  }
-  header_match_failure.mutable_actual_header_value()->set_value(header_value);
+  auto header_value = header_map.get(header_key);
+  header_match_failure.mutable_actual_header_value()->set_value(
+      header_value.empty() ? "" : ::toString(header_value));
 
   // Test failed. Decide on what to log.
   std::string actual, expected;
@@ -555,14 +551,14 @@ bool RouterCheckTool::matchHeaderField(
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
     if (header.string_match().match_pattern_case() ==
         envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
-      actual = header.name() + ": " + ::toString(header_map.get(header_key));
+      actual = header.name() + ": " + ::toString(header_value);
       expected = header.name() + ": " + header.string_match().exact();
       reportFailure(actual, expected, match_test_type, !header.invert_match());
       break;
     }
     FALLTHRU;
   default:
-    actual = header.name() + ": " + ::toString(header_map.get(header_key));
+    actual = header.name() + ": " + ::toString(header_value);
     tests_.back().second.emplace_back("actual: [" + actual + "], test type: " + match_test_type);
     break;
   }

@@ -23,7 +23,8 @@ Usage
       must reflect its file type (for instance, .json for JSON and .yaml for YAML).
 
     -o <string>,  --output-path <string>
-      Path to a file where to write test results in binary proto. The validation result schema is found in
+      Path to a file where to write test results as binary proto. If the file already exists,
+      an attempt to overwrite it will be made. The validation result schema is found in
       :repo:`proto3 <test/tools/router_check/validation.proto>`.
 
     -d,  --details

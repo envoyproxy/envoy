@@ -1,14 +1,12 @@
 // NOLINT(namespace-envoy)
 #include <iostream>
-#include <memory>
 #include <string>
 #include <vector>
 
-#include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
-#include "source/common/protobuf/utility.h"
 #include "source/exe/platform_impl.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 #include "test/tools/router_check/router.h"
 #include "test/tools/router_check/validation.pb.h"
@@ -21,25 +19,6 @@ bool hasFailures(
     }
   }
   return false;
-}
-
-void writeOutput(const envoy::RouterCheckToolSchema::ValidationResult& result,
-                 const std::string& filepath) {
-  auto stats = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
-  auto api = Envoy::Api::createApiForTest(*stats);
-  static constexpr Envoy::Filesystem::FlagSet DefaultFlags{
-      1 << Envoy::Filesystem::File::Operation::Write |
-      1 << Envoy::Filesystem::File::Operation::Create};
-  Envoy::Filesystem::FilePathAndType file_info{Envoy::Filesystem::DestinationType::File, filepath};
-  auto file = api->fileSystem().createFile(file_info);
-  if (!file || !file->open(DefaultFlags).return_value_) {
-    throw Envoy::EnvoyException(fmt::format("Failed to open file for write {}", filepath));
-  }
-  const auto& write_result = file->write(result.SerializeAsString());
-  if (!write_result.ok()) {
-    throw Envoy::EnvoyException(fmt::format("Failed to write output to file {}, error: {}",
-                                            filepath, write_result.err_->getErrorDetails()));
-  }
 }
 
 int main(int argc, char* argv[]) {
@@ -68,7 +47,8 @@ int main(int argc, char* argv[]) {
     if (!options.outputPath().empty()) {
       envoy::RouterCheckToolSchema::ValidationResult result;
       *result.mutable_test_results() = {test_results.begin(), test_results.end()};
-      writeOutput(result, options.outputPath());
+      Envoy::TestEnvironment::writeStringToFileForTest(
+          options.outputPath(), result.SerializeAsString(), /*fully_qualified_path=*/true);
     }
     // Test fails if routes do not match what is expected
     if (hasFailures(test_results)) {
