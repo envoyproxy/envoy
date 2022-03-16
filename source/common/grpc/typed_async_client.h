@@ -39,6 +39,7 @@ public:
     Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
+  void resetStream() { stream_->resetStream(); }
   bool isAboveWriteBufferHighWatermark() const {
     return stream_->isAboveWriteBufferHighWatermark();
   }
