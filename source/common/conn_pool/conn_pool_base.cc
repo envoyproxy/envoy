@@ -433,7 +433,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       client.connect_timer_.reset();
     }
     decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
-
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.
@@ -450,7 +449,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
-      // Purge pending streams only if this is not a 0-RTT handshake failure.
       ConnectionPool::PoolFailureReason reason;
       if (client.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;
@@ -510,10 +508,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   case Network::ConnectionEvent::Connected: {
-    if (client.connect_timer_) {
-      client.connect_timer_->disableTimer();
-      client.connect_timer_.reset();
-    }
+    ASSERT(client.connect_timer_ != nullptr);
+    client.connect_timer_->disableTimer();
+    client.connect_timer_.reset();
 
     ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
     connecting_stream_capacity_ -= client.currentUnusedCapacity();
