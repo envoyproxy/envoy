@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.thrift_proxy.v3;
 
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -59,7 +61,18 @@ enum ProtocolType {
   TWITTER = 4;
 }
 
-// [#next-free-field: 8]
+message Trds {
+  // Configuration source specifier.
+  // In case of *api_config_source* only aggregated *api_type* is supported.
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the route configuration. This allows to use different route
+  // configurations. Tells which route configuration should be fetched from the configuration source.
+  // Leave unspecified is also valid and means the unnamed route configuration.
+  string route_config_name = 2;
+}
+
+// [#next-free-field: 9]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy";
@@ -76,7 +89,12 @@ message ThriftProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
-  RouteConfiguration route_config = 4;
+  // It is invalid to define both *route_config* and *trds*.
+  RouteConfiguration route_config = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
+
+  // Use xDS to fetch the route configuration. It is invalid to define both *route_config* and *trds*.
+  Trds trds = 8 [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 
   // A list of individual Thrift filters that make up the filter chain for requests made to the
   // Thrift proxy. Order matters as the filters are processed sequentially. For backwards
