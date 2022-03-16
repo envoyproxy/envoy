@@ -23,10 +23,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The syntax is not compatible with the default RE2 regex matcher. Depending on configured expressions,
 // swapping regex matcher may cause match rules to no longer be valid.
 message Hyperscan {
-  // [#next-free-field: 14]
+  // [#next-free-field: 11]
   message Regex {
-    reserved 6, 10, 11;
-
     // The regex expression.
     //
     // The expression must represent only the pattern to be matched, with no delimiters or flags.
@@ -54,30 +52,30 @@ message Hyperscan {
     // This option instructs the compiler to allow expressions that can match against empty buffers,
     // such as `.?`, `.*`, `(a|)`. Since Hyperscan can return every possible match for an expression,
     // such expressions generally execute very slowly.
-    bool allow_empty = 7;
+    bool allow_empty = 6;
 
     // Treat the pattern as a sequence of UTF-8 characters.
-    bool utf8 = 8;
+    bool utf8 = 7;
 
     // Use Unicode properties for character classes.
     //
     // This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
     // interpretations, for character mnemonics like `\w` and `\s` as well as the POSIX character
     // classes. It is only meaningful in conjunction with `utf8`.
-    bool ucp = 9;
+    bool ucp = 8;
 
     // Logical combination.
     //
     // This option instructs Hyperscan to parse this expression as logical combination syntax.
     // Logical constraints consist of operands, operators and parentheses. The operands are
     // expression indices, and operators can be `!`, `&` or `|`.
-    bool combination = 12;
+    bool combination = 9;
 
     // Don’t do any match reporting.
     //
     // This option instructs Hyperscan to ignore match reporting for this expression. It is
     // designed to be used on the sub-expressions in logical combinations.
-    bool quiet = 13;
+    bool quiet = 10;
   }
 
   // Specifies a set of regex expressions that the input should match on.
