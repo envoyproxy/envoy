@@ -1,6 +1,7 @@
 #include <bitset>
 #include <chrono>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/callback.h"
@@ -36,6 +37,7 @@ using testing::Eq;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -386,6 +388,50 @@ protected:
     slot_2[2].asArray().swap(primary_2);
     slot_2[3].type(NetworkFilters::Common::Redis::RespType::Array);
     slot_2[3].asArray().swap(replica_2);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots(2);
+    slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[0].asArray().swap(slot_1);
+    slots[1].type(NetworkFilters::Common::Redis::RespType::Array);
+    slots[1].asArray().swap(slot_2);
+
+    NetworkFilters::Common::Redis::RespValuePtr response(
+        new NetworkFilters::Common::Redis::RespValue());
+    response->type(NetworkFilters::Common::Redis::RespType::Array);
+    response->asArray().swap(slots);
+    return response;
+  }
+
+  NetworkFilters::Common::Redis::RespValuePtr
+  twoSlotsPrimariesHostnames(const std::string& primary1, const std::string& primary2,
+                             int64_t port) const {
+    std::vector<NetworkFilters::Common::Redis::RespValue> primary_1(2);
+    primary_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    primary_1[0].asString() = primary1;
+    primary_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    primary_1[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> primary_2(2);
+    primary_2[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    primary_2[0].asString() = primary2;
+    primary_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    primary_2[1].asInteger() = port;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(3);
+    slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[0].asInteger() = 0;
+    slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_1[1].asInteger() = 9999;
+    slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_1[2].asArray().swap(primary_1);
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_2(3);
+    slot_2[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_2[0].asInteger() = 10000;
+    slot_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+    slot_2[1].asInteger() = 16383;
+    slot_2[2].type(NetworkFilters::Common::Redis::RespType::Array);
+    slot_2[2].asArray().swap(primary_2);
 
     std::vector<NetworkFilters::Common::Redis::RespValue> slots(2);
     slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
@@ -775,6 +821,38 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.1.1", "replica.org", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+}
+
+TEST_F(RedisClusterTest, AddressAsHostnameParallelResolution) {
+  // This test specifically ensures that DNS resolution of different hostnames running parallel
+  // works as expected.
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  Network::DnsResolver::ResolveCb primary1_resolve_cb;
+  Network::DnsResolver::ResolveCb primary2_resolve_cb;
+  EXPECT_CALL(*dns_resolver_, resolve("primary1.com", Network::DnsLookupFamily::V4Only, _))
+      .WillOnce(DoAll(SaveArg<2>(&primary1_resolve_cb), Return(&dns_resolver_->active_query_)));
+  EXPECT_CALL(*dns_resolver_, resolve("primary2.com", Network::DnsLookupFamily::V4Only, _))
+      .WillOnce(DoAll(SaveArg<2>(&primary2_resolve_cb), Return(&dns_resolver_->active_query_)));
+
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+  expectClusterSlotResponse(twoSlotsPrimariesHostnames("primary1.com", "primary2.com", 22120));
+  primary1_resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+                      TestUtility::makeDnsResponse(std::list<std::string>{"127.0.1.1"}));
+  primary2_resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+                      TestUtility::makeDnsResponse(std::list<std::string>{"127.0.1.2"}));
+  expectHealthyHosts(std::list<std::string>({
+      "127.0.1.1:22120",
+      "127.0.1.2:22120",
+  }));
   EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
 }
 

@@ -14,10 +14,10 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -907,7 +907,6 @@ private:
     requested_advance_ = absl::ZeroDuration();
   }
 
-  TestScopedRuntime scoped_runtime_;
   absl::Duration requested_advance_ = absl::ZeroDuration();
   std::vector<std::function<void()>> check_callbacks_;
   bool in_event_loop_{};

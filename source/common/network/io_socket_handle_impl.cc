@@ -576,6 +576,15 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
+absl::optional<uint64_t> IoSocketHandleImpl::congestionWindowInBytes() const {
+  Api::EnvoyTcpInfo info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.return_value_) {
+    return {};
+  }
+  return info.tcpi_snd_cwnd;
+}
+
 absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
   auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
   if (!os_syscalls_singleton.supportsGetifaddrs()) {
@@ -612,7 +621,8 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
         interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
         break;
       default:
-        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}",
+                                     static_cast<int>(socket_address->ip()->version())));
       }
 
       if (socket_address_value == interface_address_value) {

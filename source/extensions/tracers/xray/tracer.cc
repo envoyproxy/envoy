@@ -71,7 +71,9 @@ void Span::finishSpan() {
   s.set_error(clientError());
   s.set_fault(serverError());
   s.set_throttle(isThrottled());
-
+  if (type() == Subsegment) {
+    s.set_type(std::string(Subsegment));
+  }
   auto* aws = s.mutable_aws()->mutable_fields();
   for (const auto& field : aws_metadata_) {
     aws->insert({field.first, field.second});
@@ -108,13 +110,14 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
                                   Envoy::SystemTime start_time) {
   auto child_span = std::make_unique<XRay::Span>(time_source_, random_, broker_);
-  child_span->setName(name());
+  child_span->setName(operation_name);
   child_span->setOperation(operation_name);
   child_span->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
   child_span->setStartTime(start_time);
   child_span->setParentId(id());
   child_span->setTraceId(traceId());
   child_span->setSampled(sampled());
+  child_span->setType(Subsegment);
   return child_span;
 }
 
