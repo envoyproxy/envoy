@@ -26,6 +26,11 @@ Span::Span(const Tracing::Config& config, const std::string& name, SystemTime st
            Envoy::TimeSource& time_source, Tracer& parent_tracer)
     : parent_tracer_(parent_tracer), time_source_(time_source) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
+  if (config.operationName() == Tracing::OperationName::Egress) {
+    span_.set_kind(::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  } else {
+    span_.set_kind(::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
+  }
   span_.set_name(name);
   span_.set_start_time_unix_nano(std::chrono::nanoseconds(start_time.time_since_epoch()).count());
 }

@@ -35,7 +35,6 @@ envoy_cc_library(
         "span_context_extractor.h",
         "tracer.h",
     ],
-    copts = ["-Wno-unused-parameter"],
     deps = [
         ":grpc_trace_exporter",
         "//envoy/thread_local:thread_local_interface",
