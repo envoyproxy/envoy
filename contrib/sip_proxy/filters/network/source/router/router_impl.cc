@@ -284,11 +284,9 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     if (dest.empty()) {
       throw AppException(AppExceptionType::InternalError,
                          fmt::format("envoy no healthy upstream endpoint during load balance"));
-      return FilterStatus::StopIteration;
     } else {
       throw AppException(AppExceptionType::InternalError,
                          fmt::format("envoy no healthy upstream endpoint during affinity"));
-      return FilterStatus::StopIteration;
     }
   }
 

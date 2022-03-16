@@ -400,8 +400,8 @@ FilterStatus ConnectionManager::ActiveTrans::applyDecoderFilters(ActiveTransDeco
 }
 
 FilterStatus ConnectionManager::ActiveTrans::transportBegin(MessageMetadataSharedPtr metadata) {
-  if (local_response_sent_ && metadata->methodType() == MethodType::Ack) {
-    ENVOY_LOG(debug, "Ack for local 503 message, return directly");
+  if (local_response_sent_) {
+    ENVOY_LOG(debug, "Message after local 503 message, return directly");
     return FilterStatus::StopIteration;
   }
 
