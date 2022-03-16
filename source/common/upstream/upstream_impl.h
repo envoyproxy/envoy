@@ -736,6 +736,9 @@ public:
     return connection_pool_per_downstream_connection_;
   }
   bool warmHosts() const override { return warm_hosts_; }
+  bool setLocalInterfaceNameOnUpstreamConnections() const override {
+    return set_local_interface_name_on_upstream_connections_;
+  }
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
     return http_protocol_options_->upstream_http_protocol_options_;
@@ -829,6 +832,7 @@ private:
   const bool drain_connections_on_host_removal_;
   const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
+  const bool set_local_interface_name_on_upstream_connections_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;

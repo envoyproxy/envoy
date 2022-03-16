@@ -1002,6 +1002,11 @@ public:
   virtual bool warmHosts() const PURE;
 
   /**
+   * @return true if this cluster is configured to set local interface name on upstream connections.
+   */
+  virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
+
+  /**
    * @return eds cluster service_name of the cluster.
    */
   virtual absl::optional<std::string> edsServiceName() const PURE;
