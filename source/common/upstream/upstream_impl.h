@@ -483,7 +483,11 @@ public:
   // From PrioritySet
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const override {
-    return member_update_cb_helper_.add(callback);
+    if (member_update_cb_helper_ == nullptr) {
+      member_update_cb_helper_ =
+          std::make_unique<Common::CallbackManager<const HostVector&, const HostVector&>>();
+    }
+    return member_update_cb_helper_->add(callback);
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addPriorityUpdateCb(PriorityUpdateCb callback) const override {
@@ -518,7 +522,9 @@ protected:
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+    if (member_update_cb_helper_ != nullptr) {
+      member_update_cb_helper_->runCallbacks(hosts_added, hosts_removed);
+    }
   }
   virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                            const HostVector& hosts_removed) {
@@ -537,7 +543,8 @@ private:
   // because host_sets_ is directly returned so we avoid translation.
   std::vector<Common::CallbackHandlePtr> host_sets_priority_update_cbs_;
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
+  mutable std::unique_ptr<Common::CallbackManager<const HostVector&, const HostVector&>>
+      member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
   bool batch_update_ : 1;
