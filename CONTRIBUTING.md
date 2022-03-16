@@ -238,7 +238,7 @@ temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema
 * The above rules may be waived for PRs which only update docs or comments, or trivial changes to
   tests and tools (where trivial is decided by the maintainer in question).
 * In general, we should also attempt to make sure that at least one of the approvals is *from an
-  organization different from the PR author.* E.g., if Lyft authors a PR, at least one party
+  organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
