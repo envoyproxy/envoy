@@ -127,7 +127,7 @@ FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, Context
   }
 
   ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
-                   metadata->responseStatus());
+                   static_cast<int>(metadata->responseStatus()));
 
   switch (metadata->responseStatus()) {
   case ResponseStatus::Ok:
@@ -415,8 +415,6 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
                                  upstream_host_->address()->asString())),
         false);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

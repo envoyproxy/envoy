@@ -40,7 +40,7 @@ public:
                            public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks);
+                     ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
@@ -127,6 +127,8 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
+    // Latch the passed-in stream options.
+    const Instance::StreamOptions stream_options_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -137,7 +139,7 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -146,7 +148,8 @@ public:
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
@@ -230,6 +233,7 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  Http::PersistentQuicInfo& quic_info_;
 };
 
 } // namespace Http

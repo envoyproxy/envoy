@@ -157,38 +157,37 @@ void BaseIntegrationTest::createUpstreams() {
   }
 }
 
-void BaseIntegrationTest::createEnvoy() {
-  std::vector<uint32_t> ports;
-  for (auto& upstream : fake_upstreams_) {
-    if (upstream->localAddress()->ip()) {
-      ports.push_back(upstream->localAddress()->ip()->port());
-    }
-  }
-
-  if (use_lds_) {
+std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_helper,
+                                                         std::vector<uint32_t>& ports,
+                                                         bool use_lds) {
+  if (use_lds) {
     ENVOY_LOG_MISC(debug, "Setting up file-based LDS");
     // Before finalization, set up a real lds path, replacing the default /dev/null
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-    config_helper_.addConfigModifier(
+    config_helper.addConfigModifier(
         [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_resource_api_version(
               envoy::config::core::v3::V3);
-          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
+          bootstrap.mutable_dynamic_resources()
+              ->mutable_lds_config()
+              ->mutable_path_config_source()
+              ->set_path(lds_path);
         });
   }
 
   // Note that finalize assumes that every fake_upstream_ must correspond to a bootstrap config
   // static entry. So, if you want to manually create a fake upstream without specifying it in the
   // config, you will need to do so *after* initialize() (which calls this function) is done.
-  config_helper_.finalize(ports);
+  config_helper.finalize(ports);
 
-  envoy::config::bootstrap::v3::Bootstrap bootstrap = config_helper_.bootstrap();
-  if (use_lds_) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap = config_helper.bootstrap();
+  if (use_lds) {
     // After the config has been finalized, write the final listener config to the lds file.
-    const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
+    const std::string lds_path =
+        config_helper.bootstrap().dynamic_resources().lds_config().path_config_source().path();
     envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
-    for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
+    for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
@@ -204,6 +203,18 @@ void BaseIntegrationTest::createEnvoy() {
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
+  return bootstrap_path;
+}
+
+void BaseIntegrationTest::createEnvoy() {
+  std::vector<uint32_t> ports;
+  for (auto& upstream : fake_upstreams_) {
+    if (upstream->localAddress()->ip()) {
+      ports.push_back(upstream->localAddress()->ip()->port());
+    }
+  }
+
+  const std::string bootstrap_path = finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
@@ -291,12 +302,13 @@ void BaseIntegrationTest::setUpstreamAddress(
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
-void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
+void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names,
+                                                  IntegrationTestServerPtr& test_server) {
   bool listeners_ready = false;
   absl::Mutex l;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
-  test_server_->server().dispatcher().post([this, &listeners, &listeners_ready, &l]() {
-    listeners = test_server_->server().listenerManager().listeners();
+  test_server->server().dispatcher().post([&listeners, &listeners_ready, &l, &test_server]() {
+    listeners = test_server->server().listenerManager().listeners();
     l.Lock();
     listeners_ready = true;
     l.Unlock();
@@ -314,7 +326,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
     }
   }
   const auto admin_addr =
-      test_server_->server().admin().socket().connectionInfoProvider().localAddress();
+      test_server->server().admin().socket().connectionInfoProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
     registerPort("admin", admin_addr->ip()->port());
   }
@@ -330,8 +342,15 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
+  createGeneratedApiTestServer(bootstrap_path, port_names, validator_config, allow_lds_rejection,
+                               test_server_);
+}
 
-  test_server_ = IntegrationTestServer::create(
+void BaseIntegrationTest::createGeneratedApiTestServer(
+    const std::string& bootstrap_path, const std::vector<std::string>& port_names,
+    Server::FieldValidationConfig validator_config, bool allow_lds_rejection,
+    IntegrationTestServerPtr& test_server) {
+  test_server = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
       deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
       validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
@@ -346,27 +365,27 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     Event::TestTimeSystem::RealTimeBound bound(2 * TestUtility::DefaultTimeout);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
-    for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
-                                 rejected_counter = test_server_->counter(rejected);
+    for (Stats::CounterSharedPtr success_counter = test_server->counter(success),
+                                 rejected_counter = test_server->counter(rejected);
          (success_counter == nullptr ||
           success_counter->value() <
               concurrency_ * config_helper_.bootstrap().static_resources().listeners_size()) &&
          (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
-         success_counter = test_server_->counter(success),
-                                 rejected_counter = test_server_->counter(rejected)) {
+         success_counter = test_server->counter(success),
+                                 rejected_counter = test_server->counter(rejected)) {
       if (!bound.withinBound()) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
       if (!allow_lds_rejection) {
         RELEASE_ASSERT(rejected_counter == nullptr || rejected_counter->value() == 0,
                        absl::StrCat("Lds update failed. Details\n",
-                                    getListenerDetails(test_server_->server())));
+                                    getListenerDetails(test_server->server())));
       }
       // TODO(mattklein123): Switch to events and waitFor().
       time_system_.realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
     }
 
-    registerTestServerPorts(port_names);
+    registerTestServerPorts(port_names, test_server);
   }
 }
 

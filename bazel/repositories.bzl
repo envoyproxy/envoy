@@ -78,7 +78,7 @@ def _envoy_repo_impl(repository_ctx):
 
     """
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
-    version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
+    version = repository_ctx.read(repo_path.get_child("VERSION.txt")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
@@ -199,13 +199,13 @@ def envoy_dependencies(skip_targets = []):
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
     _org_brotli()
+    _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
-    external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
     external_http_archive("com_github_google_flatbuffers")
@@ -522,10 +522,6 @@ def _com_github_tencent_rapidjson():
         name = "com_github_tencent_rapidjson",
         build_file = "@envoy//bazel/external:rapidjson.BUILD",
     )
-    native.bind(
-        name = "rapidjson",
-        actual = "@com_github_tencent_rapidjson//:rapidjson",
-    )
 
 def _com_github_nlohmann_json():
     external_http_archive(
@@ -538,13 +534,9 @@ def _com_github_nlohmann_json():
     )
 
 def _com_github_nodejs_http_parser():
-    external_http_archive(
-        name = "com_github_nodejs_http_parser",
-        build_file = "@envoy//bazel/external:http-parser.BUILD",
-    )
     native.bind(
         name = "http_parser",
-        actual = "@com_github_nodejs_http_parser//:http_parser",
+        actual = "@envoy//bazel/external/http_parser",
     )
 
 def _com_github_alibaba_hessian2_codec():
@@ -689,6 +681,10 @@ def _com_google_absl():
         name = "abseil_status",
         actual = "@com_google_absl//absl/status",
     )
+    native.bind(
+        name = "abseil_cleanup",
+        actual = "@com_google_absl//absl/cleanup:cleanup",
+    )
 
 def _com_google_protobuf():
     external_http_archive(
@@ -773,7 +769,7 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        # Patch curl 7.74.0 due to CMake's problematic implementation of policy `CMP0091`
+        # Patch curl 7.74.0 and later due to CMake's problematic implementation of policy `CMP0091`
         # and introduction of libidn2 dependency which is inconsistently available and must
         # not be a dynamic dependency on linux.
         # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
@@ -906,11 +902,6 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
-        name = "re2",
-        actual = "@com_googlesource_code_re2//:re2",
-    )
-
-    native.bind(
         name = "upb_lib_descriptor",
         actual = "@upb//:descriptor_upb_proto",
     )
@@ -928,6 +919,14 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "upb_json_lib",
         actual = "@upb//:json",
+    )
+
+def _re2():
+    external_http_archive("com_googlesource_code_re2")
+
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
 
 def _upb():
@@ -1062,6 +1061,13 @@ def _com_github_wasm_c_api():
     )
     native.bind(
         name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+    # This isn't needed in builds with a single Wasm engine, but "bazel query"
+    # complains about a missing dependency, so point it at the regular target.
+    native.bind(
+        name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 

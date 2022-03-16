@@ -30,11 +30,24 @@ envoy_cc_test_library(
         "//source/common/event:libevent_lib",
         "//source/exe:process_wide_lib",
         "//source/server:backtrace_lib",
-        "//test/common/runtime:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:printers_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_listener_lib",
+    srcs = [
+        "test_listener.cc",
+    ],
+    hdrs = ["test_listener.h"],
+    deps = [
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//test/test_common:global_lib",
     ],
 )
 
