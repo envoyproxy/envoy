@@ -15,6 +15,8 @@ SINGLETON_MANAGER_REGISTRATION(shared_local_ratelimit);
 LocalRateLimiterImplSharedPtr SharedRateLimitSingleton::get(
     const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
     std::function<LocalRateLimiterImplSharedPtr()> create_fn) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
   if (proto_config.share_key().empty()) {
     // If there is no key, never share.
     return create_fn();
