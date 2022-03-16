@@ -181,6 +181,7 @@ public:
 
   ~QuicLogEmitter();
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   QuicLogEmitter& SetPerror() {
     is_perror_ = true;
     return *this;
@@ -258,12 +259,14 @@ public:
   virtual ~QuicLogSink() = default;
 
   // Called when |message| is emitted at |level|.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void Log(QuicLogLevel level, const std::string& message) = 0;
 };
 
 // Only one QuicLogSink can capture log at a time. SetLogSink causes future logs
 // to be captured by the |new_sink|.
 // Return the previous sink.
+// NOLINTNEXTLINE(readability-identifier-naming)
 QuicLogSink* SetLogSink(QuicLogSink* new_sink);
 
 } // namespace quic
