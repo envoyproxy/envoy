@@ -272,7 +272,7 @@ void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
   }
 }
 
-absl::optional<uint64_t> BaseIntegrationTest::waitForNextUpstreamConnection(
+absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
     const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
     std::chrono::milliseconds connection_wait_timeout) {
   AssertionResult result = AssertionFailure();

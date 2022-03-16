@@ -62,6 +62,8 @@ public:
   void setup(uint32_t connections, bool set_redirect_records,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
     configure(config);
+    filter_callbacks_.connection_.stream_info_.setUpstreamBytesMeter(
+        std::make_shared<StreamInfo::BytesMeter>());
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {

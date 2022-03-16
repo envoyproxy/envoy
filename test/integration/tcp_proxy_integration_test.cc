@@ -542,12 +542,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<IntegrationTcpClientPtr> clients{client_count};
   std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
-  auto indicies = std::vector<uint64_t>(upstream_count);
-  std::iota(indicies.begin(), indicies.end(), 0);
+  auto indicies = std::vector<uint64_t>({0, 1, 2});
 
   for (int i = 0; i < client_count; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextUpstreamConnection(std::vector<uint64_t>(indicies), fake_connections[i]);
+    waitForNextRawUpstreamConnection(indicies, fake_connections[i]);
   }
 
   ASSERT_TRUE(clients[0]->write("hello")); // send initial client data
@@ -1490,14 +1489,14 @@ void MysqlIntegrationTest::testPreconnect() {
   for (int i = 0; i < num_clients; ++i) {
     // Start a new request.
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
-                                  fake_connections[upstream_index]);
+    waitForNextRawUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                     fake_connections[upstream_index]);
     ++upstream_index;
 
     // For every other connection, an extra connection should be preconnected.
     if (i % 2 == 0) {
-      waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
-                                    fake_connections[upstream_index]);
+      waitForNextRawUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                       fake_connections[upstream_index]);
       ++upstream_index;
     }
   }
