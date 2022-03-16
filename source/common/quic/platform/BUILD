@@ -141,22 +141,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_mutex_impl_lib",
-    hdrs = [
-        "quiche_mutex_impl.h",
-    ],
-    external_deps = [
-        "abseil_synchronization",
-        "quiche_quic_platform_base",
-    ],
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@com_github_google_quiche//:quic_platform_export",
-    ],
-)
-
-envoy_cc_library(
     name = "quic_platform_udp_socket_impl_lib",
     hdrs = select({
         "//bazel:linux": ["quic_udp_socket_platform_impl.h"],

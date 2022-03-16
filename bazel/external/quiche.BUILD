@@ -1272,7 +1272,6 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":quiche_common_platform_mutex",
         ":quiche_common_platform_test",
         "@envoy//test/common/quic/platform:quiche_common_platform_test_impl_lib",
     ],
@@ -4197,16 +4196,18 @@ envoy_cc_library(
     name = "quiche_common_platform_mutex",
     srcs = [
         "quiche/common/platform/api/quiche_mutex.cc",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
+
     ],
     hdrs = [
         "quiche/common/platform/api/quiche_mutex.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quic_platform_mutex_impl_lib",
     ],
 )
 
