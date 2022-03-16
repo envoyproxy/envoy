@@ -183,7 +183,7 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
 quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
   quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
   config.early_data_enabled = position_.has_value()
-                                  ? static_cast<const QuicServerTransportSocketFactory&>(
+                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
                                         position_->filter_chain_.transportSocketFactory())
                                         .earlyDataEnabled()
                                   : true;
