@@ -85,8 +85,8 @@ public:
 
   ~TestActiveTcpClient() override { parent().onConnDestroyed(); }
   void clearCallbacks() override {
-    if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
-        state() == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
+    if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy ||
+        state() == Envoy::ConnectionPool::ActiveClient::State::Draining) {
       parent().onConnReleased(*this);
     }
     ActiveTcpClient::clearCallbacks();
@@ -323,6 +323,7 @@ public:
 
   void prepareConn() {
     connection_ = new StrictMock<Network::MockClientConnection>();
+    EXPECT_CALL(*connection_, connectionInfoSetter());
     EXPECT_CALL(*connection_, transportFailureReason()).Times(AtLeast(0));
     EXPECT_CALL(*connection_, setBufferLimits(0));
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));

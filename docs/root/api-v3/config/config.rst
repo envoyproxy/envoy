@@ -36,4 +36,5 @@ Extensions
   formatter/formatter
   contrib/contrib
   rbac/matchers
+  config_validators/config_validators
   expr/custom_cel_vocabulary

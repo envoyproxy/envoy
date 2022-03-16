@@ -1,0 +1,74 @@
+# http://google3/cloud/cluster/network/courier/translation/cloud_config.proto
+# New Gateway SWG fields described at go/clh-protos-for-swg
+# New Security Policy resource described at go/swg:security-policy-clh-protos
+#
+# This fragment message is the output of GICS Hermes and the input to Deputy RCTH.
+# Deputy RCTH will then translate this config into the various xDS resources.
+
+CloudConfigFragment {
+  id {
+    project_id: 123456789
+    organization_id: 111111111
+    environment: PROD
+    feature: REGIONAL_SWG  # SWG fragment type
+  }
+  regional_resources {
+    region_name: "us-central1"
+    resources {
+      forwarding_config_resource {
+        forwarding_config {
+          id: "FORWARDING_CONFIG/1234.fr-good/80/6"
+          project_id: 123456789
+          organization_id: 111111111
+          vnid: 9999
+          ip_config {
+            ip: "10.1.1.1"
+            protocol: TCP
+            port_range {
+              first_port: 80
+            }
+          }
+          # target: dynamic forward proxy
+        }
+      }
+    }
+  }
+  ccfe_resources {
+    gateway_resource {  # field added in cl/424953909
+      gateway {
+        name: "name_of_resource"
+        description: "this is my gateway"
+        vnid: 9999
+        type: SECURE_WEB_GATEWAY
+        addresses: "10.1.1.1"
+        ports: 80
+        scope: ""  # TODO
+        swg_config {
+          certificate_urls: "fully_qualified_certificate_url"
+          security_policy: "fully_qualified_security_policy_url"
+          id: "globally_unique_swg_id"
+        }
+      }
+    }
+    security_policy_resource {  # field to be added
+      security_policy {
+        name: "sample-policy"
+        rules {
+          name: "allow-myspace"
+          enabled: true
+          priority: 10
+          description: "this rule allows access to MySpace"
+          matcher {
+            # TODO
+          }
+          basic_profile: ALLOW
+        }
+      }
+    }
+    url_list_policy_resource {  # field to be added
+      url_list_policy {
+        # TODO
+      }
+    }
+  }
+}

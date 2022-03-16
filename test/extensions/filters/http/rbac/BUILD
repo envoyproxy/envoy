@@ -52,6 +52,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.rbac"],
     # add size param to deal with timeout problem
     size = "large",
+    shard_count = 2,
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

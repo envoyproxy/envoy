@@ -27,6 +27,12 @@ EXTENSIONS = {
     "envoy.compression.brotli.decompressor": "//source/extensions/compression/brotli/decompressor:config",
 
     #
+    # Config validators
+    #
+
+    "envoy.config.validators.minimum_clusters":         "//source/extensions/config/validators/minimum_clusters:config",
+
+    #
     # gRPC Credentials Plugins
     #
     "envoy.grpc_credentials.file_based_metadata": "//source/extensions/grpc_credentials/file_based_metadata:config",
