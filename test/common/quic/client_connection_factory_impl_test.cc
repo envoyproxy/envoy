@@ -52,9 +52,7 @@ protected:
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
-        std::make_unique<quic::QuicClientSessionCache>());
+    crypto_config_ = factory_->getCryptoConfig();
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {
@@ -108,9 +106,9 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
 
-  EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
-
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+
+  EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());

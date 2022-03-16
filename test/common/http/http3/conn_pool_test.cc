@@ -57,13 +57,15 @@ public:
     Network::TransportSocketOptionsConstSharedPtr transport_options;
     pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
                              options, transport_options, state_, quic_stat_names_, {}, store_,
-                             makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
+                             makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
+                             quic_info_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Quic::PersistentQuicInfoImpl quic_info_{dispatcher_, 45};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
@@ -105,7 +107,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, store_,
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
 }
@@ -129,10 +131,11 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, store_,
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_));
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
+  EXPECT_CALL(context_.store_.counter_, inc());
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(pool->newStream(decoder, callbacks,
                             {/*can_send_early_data_=*/false,
@@ -141,7 +144,6 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
-  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
 
   MockResponseDecoder decoder;
@@ -175,7 +177,6 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
     return;
   }
 
-  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
 
   MockResponseDecoder decoder;
@@ -206,7 +207,6 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
           "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
     return;
   }
-  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
 
   MockResponseDecoder decoder;

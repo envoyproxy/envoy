@@ -81,7 +81,8 @@ public:
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state) override;
+                   TimeSource& time_source, ClusterConnectivityState& state,
+                   Http::PersistentQuicInfoPtr& quic_info) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
@@ -532,6 +533,9 @@ private:
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientPtr lazy_http_async_client_;
+      // Stores QUICHE specific objects which live through out the life time of the cluster and can
+      // be shared across its hosts.
+      Http::PersistentQuicInfoPtr quic_info_;
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;

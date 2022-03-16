@@ -187,7 +187,7 @@ public:
             (host.empty() ? transport_socket_factory_->clientContextConfig().serverNameIndication()
                           : host),
             static_cast<uint16_t>(port), false},
-        crypto_config_, &push_promise_index_, *dispatcher_,
+        transport_socket_factory_->getCryptoConfig(), &push_promise_index_, *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
@@ -259,9 +259,6 @@ public:
     // Latch quic_transport_socket_factory_ which is instantiated in initialize().
     transport_socket_factory_ =
         static_cast<QuicClientTransportSocketFactory*>(quic_transport_socket_factory_.get());
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(transport_socket_factory_->sslCtx()),
-        std::make_unique<quic::QuicClientSessionCache>());
     registerTestServerPorts({"http"});
 
     ASSERT(&transport_socket_factory_->clientContextConfig());
@@ -355,7 +352,6 @@ protected:
   TestEnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   bool validation_failure_on_path_response_{false};
 };
 

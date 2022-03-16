@@ -1,9 +1,5 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
-#include "source/common/quic/quic_transport_socket_factory.h"
-
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
-
 namespace Envoy {
 namespace Quic {
 
@@ -46,21 +42,22 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
       info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
 
+  // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
+  quic::QuicConfig config = info_impl->quic_config_;
   // Update config with latest srtt, if available.
   if (rtt_cache.has_value()) {
     Http::AlternateProtocolsCache::Origin origin("https", server_id.host(), server_id.port());
     std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
     if (rtt.count() != 0) {
-      info_impl->quic_config_.SetInitialRoundTripTimeUsToSend(rtt.count());
+      config.SetInitialRoundTripTimeUsToSend(rtt.count());
     }
   }
 
   // QUICHE client session always use the 1st version to start handshake.
   return std::make_unique<EnvoyQuicClientSession>(
-      info_impl->quic_config_, quic_versions, std::move(connection), server_id,
-      std::move(crypto_config), &info_impl->push_promise_index_, dispatcher,
-      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache,
-      scope);
+      config, quic_versions, std::move(connection), server_id, std::move(crypto_config),
+      &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
+      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope);
 }
 
 } // namespace Quic
