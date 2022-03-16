@@ -4,36 +4,34 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 
-#include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/verify.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-using ::google::jwt_verify::Status;
 using Http::FilterHeadersStatus;
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   state_ = State::Calling;
+  initiating_call_ = true;
   client_->fetchToken(*this);
-  return Envoy::Http::FilterHeadersStatus::Continue;
+  initiating_call_ = false;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopIteration;
 }
 
-// TODO(tyxia) the lifetime of response should be fine?
-void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
+void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  decoder_callbacks_ = &callbacks;
+}
+
+void GcpAuthnFilter::onComplete(const Http::ResponseMessage*) {
   state_ = State::Complete;
-  // Process the response if it is present (i.e., received the response successfully)
-  if (response != nullptr) {
-    // Decode JWT Token
-    ::google::jwt_verify::Jwt jwt;
-    Status status = jwt.parseFromString(response->bodyAsString());
-    if (status == Status::Ok) {
-    }
+  if (!initiating_call_) {
+    ENVOY_LOG(error, "continue decoding");
+    decoder_callbacks_->continueDecoding();
   }
+
+  // TODO(tyxia) Decode jwt token to get the exp time for cache.
 }
 
 void GcpAuthnFilter::onDestroy() {

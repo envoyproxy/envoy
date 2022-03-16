@@ -512,7 +512,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jwt_verify_lib-{version}",
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.filters.http.jwt_authn", "envoy.filters.http.gcp_authn"],
+        extensions = ["envoy.filters.http.jwt_authn"],
         release_date = "2021-03-05",
         cpe = "N/A",
     ),

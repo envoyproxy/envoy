@@ -34,8 +34,8 @@ public:
                                           bool end_stream) override;
 
   void onDestroy() override;
-
   void onComplete(const Http::ResponseMessage* response) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   ~GcpAuthnFilter() override = default;
 
@@ -43,7 +43,9 @@ private:
   FilterConfigProtoSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
 
+  bool initiating_call_{};
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
   // it or has completed.

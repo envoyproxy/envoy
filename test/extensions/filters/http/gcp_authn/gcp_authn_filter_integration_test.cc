@@ -52,29 +52,6 @@ public:
     });
   }
 
-  void initiateClientConnection() {
-    // Create a client aimed at Envoy’s default HTTP port.
-    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-    Http::TestRequestHeaderMapImpl headers{
-        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-    response_ = codec_client_->makeHeaderOnlyRequest(headers);
-  }
-
-  void waitForTokenResponse() {
-    AssertionResult result =
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, token_request_);
-    RELEASE_ASSERT(result, result.message());
-    result = token_request_->waitForEndStream(*dispatcher_);
-    RELEASE_ASSERT(result, result.message());
-
-    // Http::TestResponseHeaderMapImpl response_headers{{":status", status}};
-    // jwks_request_->encodeHeaders(response_headers, false);
-    // Buffer::OwnedImpl response_data1(jwks_body);
-    // jwks_request_->encodeData(response_data1, true);
-  }
-
   void sendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices) {
     // Create a client aimed at Envoy’s default HTTP port.
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -105,11 +82,10 @@ private:
   IntegrationStreamDecoderPtr response_;
   FakeHttpConnectionPtr fake_gcp_authn_connection_{};
   FakeStreamPtr token_request_{};
-  // TODO(tyxia) How do i know which uri address should I send
   const std::string default_config_ = R"EOF(
     http_uri:
       uri: "gcp_authn:9000"
-      cluster: gcp_aut
+      cluster: gcp_authn
       timeout:
         seconds: 5
   )EOF";
@@ -122,10 +98,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 
 TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initialize();
-  // // TODO(tyxia) index0 passed but index 1 failed
   sendRequestAndValidateResponse({0});
-  // initiateClientConnection();
-  // waitForTokenResponse();
 }
 
 } // namespace
