@@ -764,6 +764,7 @@ intra
 ints
 invariance
 invariant
+invariants
 invoker
 iovec
 iovecs

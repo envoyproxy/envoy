@@ -52,6 +52,8 @@ TEST_F(IntervalTreeTest, Basic) {
   checkAll(10);
   setup({{1, 5}, {3, 8}});
   checkAll(10);
+  setup({{0, 5}, {0, 5}});
+  checkAll(10);
 }
 
 TEST_F(IntervalTreeTest, Nested) {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/matcher/matcher.h"
-#include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/matcher/matcher.h"
@@ -31,9 +30,9 @@ using ::Envoy::Matcher::OnMatchFactoryCb;
 template <class DataType> class RangeMatcher : public MatchTree<DataType> {
 public:
   RangeMatcher(
-      DataInputPtr<DataType>&& data_input,
+      DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
       const std::shared_ptr<Network::IntervalTree::IntervalTree<OnMatch<DataType>, int32_t>>& tree)
-      : data_input_(std::move(data_input)), tree_(tree) {}
+      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), tree_(tree) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
@@ -41,11 +40,11 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
     if (!input.data_) {
-      return {MatchState::MatchComplete, absl::nullopt};
+      return {MatchState::MatchComplete, on_no_match_};
     }
     int32_t port;
     if (!absl::SimpleAtoi(*input.data_, &port)) {
-      return {MatchState::MatchComplete, absl::nullopt};
+      return {MatchState::MatchComplete, on_no_match_};
     }
     auto values = tree_->getData(port);
     for (const auto on_match : values) {
@@ -60,11 +59,12 @@ public:
         return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr}};
       }
     }
-    return {MatchState::MatchComplete, absl::nullopt};
+    return {MatchState::MatchComplete, on_no_match_};
   }
 
 private:
   const DataInputPtr<DataType> data_input_;
+  const absl::optional<OnMatch<DataType>> on_no_match_;
   std::shared_ptr<Network::IntervalTree::IntervalTree<OnMatch<DataType>, int32_t>> tree_;
 };
 
@@ -75,28 +75,25 @@ public:
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
+                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) override {
     const auto& typed_config =
         MessageUtil::downcastAndValidate<const xds::type::matcher::v3::Int32RangeMatcher&>(
             config, factory_context.messageValidationVisitor());
-    std::vector<OnMatchFactoryCb<DataType>> match_children;
-    match_children.reserve(typed_config.range_matchers().size());
-    for (const auto& range_matcher : typed_config.range_matchers()) {
-      match_children.push_back(*on_match_factory.createOnMatch(range_matcher.on_match()));
-    }
     std::vector<std::tuple<OnMatch<DataType>, int32_t, int32_t>> data;
-    data.reserve(match_children.size());
-    size_t i = 0;
+    data.reserve(typed_config.range_matchers().size());
     for (const auto& range_matcher : typed_config.range_matchers()) {
-      auto on_match = match_children[i++]();
+      auto on_match = on_match_factory.createOnMatch(range_matcher.on_match()).value()();
       for (const auto& range : range_matcher.ranges()) {
         data.emplace_back(on_match, range.start(), range.end());
       }
     }
     auto tree =
         std::make_shared<Network::IntervalTree::IntervalTree<OnMatch<DataType>, int32_t>>(data);
-    return [data_input, tree]() {
-      return std::make_unique<RangeMatcher<DataType>>(data_input(), tree);
+    return [data_input, tree, on_no_match]() {
+      return std::make_unique<RangeMatcher<DataType>>(
+          data_input(), on_no_match ? absl::make_optional(on_no_match.value()()) : absl::nullopt,
+          tree);
     };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -104,8 +101,6 @@ public:
   }
   std::string name() const override { return "range-matcher"; }
 };
-
-class NetworkRangeMatcherFactory : public RangeMatcherFactoryBase<Network::MatchingData> {};
 
 } // namespace Matcher
 } // namespace Common

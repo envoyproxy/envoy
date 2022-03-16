@@ -133,6 +133,117 @@ matcher_tree:
   }
 }
 
+TEST_F(RangeMatcherTest, NestedMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: range_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.Int32RangeMatcher
+      range_matchers:
+      - ranges:
+        - start: 0
+          end: 1000
+        on_match:
+          matcher:
+            matcher_tree:
+              input:
+                name: nested
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+              custom_match:
+                name: range_matcher
+                typed_config:
+                  "@type": type.googleapis.com/xds.type.matcher.v3.Int32RangeMatcher
+                  range_matchers:
+                  - ranges:
+                    - start: 0
+                      end: 100
+                    on_match:
+                      action:
+                        name: test_action
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.StringValue
+                          value: foo
+      - ranges:
+        - start: 0
+          end: 20000
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: bar
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputFactory("input", "80");
+    auto nested = TestDataInputFactory("nested", "80");
+    validateMatch("foo");
+  }
+  {
+    auto input = TestDataInputFactory("input", "100");
+    auto nested = TestDataInputFactory("nested", "100");
+    validateMatch("bar");
+  }
+  {
+    auto input = TestDataInputFactory("input", "100");
+    auto nested = TestDataInputFactory(
+        "nested", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    validateUnableToMatch();
+  }
+}
+
+TEST_F(RangeMatcherTest, OnNoMatch) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: range_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.Int32RangeMatcher
+      range_matchers:
+      - ranges:
+        - start: 0
+          end: 1000
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: bar
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputFactory("input", "80");
+    validateMatch("foo");
+  }
+  {
+    auto input = TestDataInputFactory("input", "1000");
+    validateMatch("bar");
+  }
+  {
+    auto input = TestDataInputFactory(
+        "input", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    validateUnableToMatch();
+  }
+}
+
 } // namespace
 } // namespace Matcher
 } // namespace Common

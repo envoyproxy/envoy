@@ -73,8 +73,8 @@ private:
   /**
    * Nodes in the tree satisfy the following invariants:
    * * Intervals in the node contain the median value.
-   * * Intervals in the left sub tree have the end less or equal to the median value.
-   * * Intervals in the right sub tree have the start greater than the median value.
+   * * Intervals in the left sub tree have the end point less or equal to the median value.
+   * * Intervals in the right sub tree have the start point greater than the median value.
    * * Intervals in the node are linked from the lowest start in the ascending order.
    * * Intervals in the node are linked from the highest end in the descending order.
    **/
