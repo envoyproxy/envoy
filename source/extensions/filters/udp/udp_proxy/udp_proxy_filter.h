@@ -85,6 +85,7 @@ public:
           "is not running with the CAP_NET_ADMIN capability.");
     }
 
+    access_logs_.reserve(config.access_log_size());
     for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
       access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
     }
