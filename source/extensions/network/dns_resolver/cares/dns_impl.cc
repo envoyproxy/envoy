@@ -233,7 +233,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 void DnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
-                  pending_response_.status_);
+                  static_cast<int>(pending_response_.status_));
 
   if (!cancelled_) {
     // Use a raw try here because it is used in both main thread and filter.
@@ -260,7 +260,7 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
                     "dns resolution callback for {} not issued. Cancelled with reason={}",
-                    dns_name_, cancel_reason_);
+                    dns_name_, static_cast<int>(cancel_reason_));
   }
   if (owned_) {
     delete this;

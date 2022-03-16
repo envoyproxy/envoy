@@ -169,11 +169,12 @@ void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
 }
 
 std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
+IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
+                                     bool header_only_request) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false).IgnoreError();
+  encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }
@@ -360,8 +361,9 @@ void HttpIntegrationTest::initialize() {
   registerTestServerPorts({"http"}, test_server_);
 
   // Needs to outlive all QUIC connections.
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
-      std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher_, 0);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

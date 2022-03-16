@@ -114,6 +114,7 @@ public:
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
+  const Upstream::ClusterManager* clusterManager() const override { return cluster_manager_.get(); }
   StatsConfig& statsConfig() override { return *stats_config_; }
   const Watchdog& mainThreadWatchdogConfig() const override { return *main_thread_watchdog_; }
   const Watchdog& workerWatchdogConfig() const override { return *worker_watchdog_; }

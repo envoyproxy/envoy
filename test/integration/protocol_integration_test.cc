@@ -1127,7 +1127,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   EXPECT_EQ(512U, response->body().size());
 }
 
-// Very similar set-up to testRetry but with a 16k request the request will not
+// Very similar set-up to testRetry but with a 65k request the request will not
 // be buffered and the 503 will be returned to the user.
 TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
@@ -1493,7 +1493,8 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     stat_name = "http3.dropped_headers_with_underscores";
     break;
   default:
-    RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
+    RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}",
+                                      static_cast<int>(downstream_protocol_)));
   };
   EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
 }
@@ -2563,6 +2564,66 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
   ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("408", response->headers().getStatusValue());
+}
+
+// Test that when request timeout and the request is completed, the gateway timeout (504) is
+// returned as response code instead of request timeout (408).
+TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotComplete) {
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+
+  autonomous_upstream_ = false;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The request is not header only. Envoy is expecting more data to end the request.
+  auto encoder_decoder =
+      codec_client_->startRequest(default_request_headers_, /*header_only_request=*/true);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+}
+
+// Test case above except disabling runtime guard "override_request_timeout_by_gateway_timeout".
+// Verify the old behavior is reverted by disabling the runtime guard.
+TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotCompleteRuntimeDisabled) {
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.override_request_timeout_by_gateway_timeout", "false");
+  autonomous_upstream_ = false;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The request is not header only. Envoy is expecting more data to end the request.
+  auto encoder_decoder =
+      codec_client_->startRequest(default_request_headers_, /*header_only_request=*/true);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("408", response->headers().getStatusValue());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {

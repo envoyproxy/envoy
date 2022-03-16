@@ -415,7 +415,7 @@ void ConnectionImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::raiseEvent(ConnectionEvent event) {
-  ENVOY_CONN_LOG(trace, "raising connection event {}", *this, event);
+  ENVOY_CONN_LOG(trace, "raising connection event {}", *this, static_cast<int>(event));
   ConnectionImplBase::raiseConnectionEvent(event);
   // We may have pending data in the write buffer on transport handshake
   // completion, which may also have completed in the context of onReadReady(),
@@ -598,7 +598,8 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 void ConnectionImpl::onReadReady() {
-  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this, dispatch_buffered_data_);
+  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this,
+                 static_cast<int>(dispatch_buffered_data_));
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
@@ -905,8 +906,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
-  const Api::SysCallIntResult result =
-      socket_->connect(socket_->connectionInfoProvider().remoteAddress());
+  const Api::SysCallIntResult result = transport_socket_->connect(*socket_);
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
@@ -928,7 +928,7 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", result.errno_));
+    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

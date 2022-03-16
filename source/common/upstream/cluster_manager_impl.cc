@@ -21,6 +21,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
@@ -266,7 +267,8 @@ ClusterManagerImpl::ClusterManagerImpl(
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-    Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context)
+    Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+    const Server::Instance& server)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
@@ -285,7 +287,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api) {
+                            validation_context.dynamicValidationVisitor(), api, server) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -337,6 +339,11 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After here, we just have a GrpcMux interface held in ads_mux_, which hides
   // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
+    Config::CustomConfigValidatorsPtr custom_config_validators =
+        std::make_unique<Config::CustomConfigValidatorsImpl>(
+            validation_context.dynamicValidationVisitor(), server,
+            dyn_resources.ads_config().config_validators());
+
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -351,7 +358,8 @@ ClusterManagerImpl::ClusterManagerImpl(
                 "DeltaAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-            dyn_resources.ads_config().set_node_on_first_message_only());
+            dyn_resources.ads_config().set_node_on_first_message_only(),
+            std::move(custom_config_validators));
       } else {
         ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -361,7 +369,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
             random_, stats_,
-            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            std::move(custom_config_validators));
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -376,7 +385,8 @@ ClusterManagerImpl::ClusterManagerImpl(
                 "StreamAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
+            std::move(custom_config_validators));
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
@@ -388,7 +398,8 @@ ClusterManagerImpl::ClusterManagerImpl(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
+            std::move(custom_config_validators));
       }
     }
   } else {
@@ -1104,7 +1115,15 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
-  return http_async_client_;
+  if (lazy_http_async_client_ == nullptr) {
+    lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
+        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_,
+        parent_.parent_.local_info_, parent_.parent_, parent_.parent_.runtime_,
+        parent_.parent_.random_,
+        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
+        parent_.parent_.http_context_, parent_.parent_.router_context_);
+  }
+  return *lazy_http_async_client_;
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
@@ -1483,12 +1502,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
-      http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
-                         parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
-                         parent.parent_.random_,
-                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
-                         parent_.parent_.http_context_, parent_.parent_.router_context_) {
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1807,7 +1821,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
   return ClusterManagerPtr{new ClusterManagerImpl(
       bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
       context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
-      http_context_, grpc_context_, router_context_)};
+      http_context_, grpc_context_, router_context_, server_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

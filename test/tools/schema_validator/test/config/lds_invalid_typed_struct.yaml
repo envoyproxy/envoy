@@ -1,0 +1,16 @@
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+  name: ingress_https
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 10000
+  filter_chains:
+  - use_proxy_proto: true
+    filters:
+    - name: envoy.filters.network.http_connection_manager
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: blah
+        value:
