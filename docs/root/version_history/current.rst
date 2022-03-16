@@ -13,6 +13,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_log: log all header values in the grpc access log.
+* build: ``VERSION`` and ``API_VERSION`` have been renamed to ``VERSION.txt`` and ``API_VERSION.txt`` respectively to avoid conflicts with the C++ ``<version>`` header.
 * config: warning messages for protobuf unknown fields now contain ancestors for easier troubleshooting.
 * decompressor: decompressor does not duplicate `accept-encoding` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.
 * dynamic_forward_proxy: if a DNS resolution fails, failing immediately with a specific resolution error, rather than finishing up all local filters and failing to select an upstream host.
