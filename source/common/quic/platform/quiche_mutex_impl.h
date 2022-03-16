@@ -63,10 +63,13 @@ public:
   QuicheNotificationImpl(const QuicheNotificationImpl&) = delete;
   QuicheNotificationImpl& operator=(const QuicheNotificationImpl&) = delete;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool HasBeenNotified() { return notification_.HasBeenNotified(); }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Notify() { notification_.Notify(); }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void WaitForNotification() { notification_.WaitForNotification(); }
 
 private:
