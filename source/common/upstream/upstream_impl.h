@@ -491,7 +491,18 @@ public:
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addPriorityUpdateCb(PriorityUpdateCb callback) const override {
-    return priority_update_cb_helper_.add(callback);
+    if (lazy_host_sets_cbs_ == nullptr) {
+      lazy_host_sets_cbs_ = std::make_unique<HostSetCbLazyWrapper>();
+      for (const std::unique_ptr<HostSet>& host_set : host_sets_) {
+        lazy_host_sets_cbs_->priority_update_cbs_.push_back(
+            static_cast<const HostSetImpl*>(host_set.get())
+                ->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                             const HostVector& hosts_removed) {
+                  runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
+                }));
+      }
+    }
+    return lazy_host_sets_cbs_->priority_update_helper_.add(callback);
   }
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
     return host_sets_;
@@ -527,8 +538,11 @@ protected:
     }
   }
   virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                           const HostVector& hosts_removed) {
-    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+                                           const HostVector& hosts_removed) const {
+    if (lazy_host_sets_cbs_ != nullptr) {
+      lazy_host_sets_cbs_->priority_update_helper_.runCallbacks(priority, hosts_added,
+                                                                hosts_removed);
+    }
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
@@ -539,14 +553,17 @@ protected:
   mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
 
 private:
-  // This is a matching vector to store the callback handles for host_sets_. It is kept separately
-  // because host_sets_ is directly returned so we avoid translation.
-  std::vector<Common::CallbackHandlePtr> host_sets_priority_update_cbs_;
   // TODO(mattklein123): Remove mutable.
   mutable std::unique_ptr<Common::CallbackManager<const HostVector&, const HostVector&>>
       member_update_cb_helper_;
-  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
-      priority_update_cb_helper_;
+
+  struct HostSetCbLazyWrapper {
+    // This is a matching vector to store the callback handles for host_sets_. It is kept separately
+    // because host_sets_ is directly returned so we avoid translation.
+    std::vector<Common::CallbackHandlePtr> priority_update_cbs_;
+    Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> priority_update_helper_;
+  };
+  mutable std::unique_ptr<HostSetCbLazyWrapper> lazy_host_sets_cbs_;
   bool batch_update_ : 1;
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
