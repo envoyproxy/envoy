@@ -154,6 +154,12 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       stats_.incResponseInvalidType(cluster, upstream_host_);
       break;
     }
+
+    if (callbacks.responseMetadata()->isDraining()) {
+      stats_.incCloseDrain(cluster);
+      resetStream();
+    }
+
     onResponseComplete();
   } else if (status == ThriftFilters::ResponseStatus::Reset) {
     // Note: invalid responses are not accounted in the response size histogram.

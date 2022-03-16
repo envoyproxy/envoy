@@ -17,6 +17,7 @@ namespace ThriftProxy {
   COUNTER(cx_destroy_local_with_active_rq)                                                         \
   COUNTER(cx_destroy_remote_with_active_rq)                                                        \
   COUNTER(downstream_cx_max_requests)                                                              \
+  COUNTER(downstream_response_drain_close)                                                         \
   COUNTER(request)                                                                                 \
   COUNTER(request_call)                                                                            \
   COUNTER(request_decoding_error)                                                                  \

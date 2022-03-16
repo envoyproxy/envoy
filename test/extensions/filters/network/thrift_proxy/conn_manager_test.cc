@@ -18,6 +18,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -117,7 +118,7 @@ public:
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -345,6 +346,62 @@ public:
     transport->encodeFrame(buffer, metadata, msg);
   }
 
+  void testRequestResponse(bool draining = false) {
+    TestScopedRuntime scoped_runtime;
+
+    if (draining) {
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
+      EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
+    }
+
+    initializeFilter();
+    writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+    ThriftFilters::DecoderFilterCallbacks* callbacks{};
+    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+        .WillOnce(
+            Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+    EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+    EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+    writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+
+    FramedTransportImpl transport;
+    BinaryProtocolImpl proto;
+    callbacks->startUpstreamResponse(transport, proto);
+
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+    EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+    const auto header =
+        callbacks->responseMetadata()->headers().get(ThriftProxy::Headers::get().Drain);
+
+    if (draining) {
+      EXPECT_FALSE(header.empty());
+      EXPECT_EQ("true", header[0]->value().getStringView());
+    } else {
+      EXPECT_TRUE(header.empty());
+    }
+
+    // This should not be incremented during a close triggered by a drain.
+    EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+    EXPECT_EQ(1U, store_.counter("test.request").value());
+    EXPECT_EQ(1U, store_.counter("test.request_call").value());
+    EXPECT_EQ(0U, stats_.request_active_.value());
+    EXPECT_EQ(1U, store_.counter("test.response").value());
+    EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+    EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+    EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+    EXPECT_EQ(1U, store_.counter("test.response_success").value());
+    EXPECT_EQ(0U, store_.counter("test.response_error").value());
+    EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   Stats::TestUtil::TestStore store_;
@@ -358,6 +415,7 @@ public:
   Buffer::OwnedImpl write_buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Network::MockDrainDecision> drain_decision_;
   std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
@@ -695,39 +753,9 @@ route_config:
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
-TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
-  initializeFilter();
-  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+TEST_F(ThriftConnectionManagerTest, RequestAndResponse) { testRequestResponse(false); }
 
-  ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
-      .WillOnce(
-          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
-
-  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
-
-  writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
-
-  FramedTransportImpl transport;
-  BinaryProtocolImpl proto;
-  callbacks->startUpstreamResponse(transport, proto);
-
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
-  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
-
-  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
-}
+TEST_F(ThriftConnectionManagerTest, RequestAndResponseDraining) { testRequestResponse(true); }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   initializeFilter();
@@ -1235,7 +1263,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
