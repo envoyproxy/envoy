@@ -77,7 +77,6 @@ envoy_cc_library(
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
         "quic_stream_buffer_allocator_impl.h",
-        "quic_testvalue_impl.h",
     ],
     external_deps = [
         "abseil_base",
@@ -121,28 +120,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_impl_lib",
+    name = "quic_platform_hostname_utils_impl_lib",
     srcs = [
         "quic_hostname_utils_impl.cc",
     ],
     hdrs = [
         "quic_hostname_utils_impl.h",
-        "quic_mutex_impl.h",
     ],
     external_deps = [
-        "quiche_quic_platform_base",
         "abseil_str_format",
-        "abseil_synchronization",
-        "abseil_time",
-        "ssl",
+        "quiche_quic_platform_base",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/filesystem:directory_lib",
-        "//source/common/filesystem:filesystem_lib",
         "//source/common/http:utility_lib",
+        "@com_github_google_quiche//:quic_platform_export",
     ],
 )
 
