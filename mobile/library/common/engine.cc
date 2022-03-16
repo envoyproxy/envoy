@@ -270,7 +270,7 @@ envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view m
   std::string body;
   const auto code = server_->admin().request(path, method, *response_headers, body);
   if (code != Http::Code::OK) {
-    ENVOY_LOG(warn, "admin call failed with status {} body {}", code, body);
+    ENVOY_LOG(warn, "admin call failed with status {} body {}", static_cast<uint64_t>(code), body);
     return ENVOY_FAILURE;
   }
 

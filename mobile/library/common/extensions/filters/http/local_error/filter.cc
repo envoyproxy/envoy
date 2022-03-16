@@ -8,7 +8,8 @@ namespace HttpFilters {
 namespace LocalError {
 
 Http::LocalErrorStatus LocalErrorFilter::onLocalReply(const LocalReplyData& reply) {
-  ENVOY_LOG(trace, "LocalErrorFilter::onLocalReply({}, {})", reply.code_, reply.details_);
+  ENVOY_LOG(trace, "LocalErrorFilter::onLocalReply({}, {})", static_cast<uint64_t>(reply.code_),
+            reply.details_);
   ASSERT(decoder_callbacks_);
   auto& info = decoder_callbacks_->streamInfo();
   // TODO(goaway): set responseCode in upstream Envoy when responseCodDetails are set.
