@@ -255,7 +255,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 
 namespace {
 
-// Implements a chunked handler for static text.
+// Implements a chunked request for static text.
 class StaticTextRequest : public Admin::Request {
 public:
   StaticTextRequest(absl::string_view response_text, Http::Code code) : code_(code) {
@@ -321,11 +321,11 @@ Admin::RequestPtr Admin::makeStaticTextRequest(Buffer::Instance& response, Http:
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
-  RequestPtr handler = makeRequest(path_and_query, admin_stream);
-  Http::Code code = handler->start(response_headers);
+  RequestPtr request = makeRequest(path_and_query, admin_stream);
+  Http::Code code = request->start(response_headers);
   bool more_data;
   do {
-    more_data = handler->nextChunk(response);
+    more_data = request->nextChunk(response);
   } while (more_data);
   Memory::Utils::tryShrinkHeap();
   return code;
@@ -338,6 +338,8 @@ Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
     query_index = path_and_query.size();
   }
 
+  // TODO(jmarantz): consider using an absl::btree_map or std::map rather than
+  // linearly searching for the first prefix match.
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       if (handler.mutates_server_state_) {

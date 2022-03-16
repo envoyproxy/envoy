@@ -226,12 +226,12 @@ public:
   virtual uint32_t concurrency() const PURE;
 
   /**
-   * Makes a chunked handler for static text. The version that takes the
+   * Makes a chunked request for static text. The version that takes the
    * Buffer::Instance& transfers the content from the passed-in buffer.
    *
    * @param response_text the text to populate response with
    * @param code the Http::Code for the response
-   * @return the handler
+   * @return the request
    */
   static RequestPtr makeStaticTextRequest(absl::string_view response_text, Http::Code code);
   static RequestPtr makeStaticTextRequest(Buffer::Instance& response_text, Http::Code code);

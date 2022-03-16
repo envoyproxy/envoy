@@ -70,9 +70,9 @@ TEST_F(StatsRenderTest, TextString) {
 TEST_F(StatsRenderTest, TextHistogramNoBuckets) {
   StatsTextRender renderer(Utility::HistogramBucketsMode::NoBuckets);
   constexpr absl::string_view expected =
-      "h1: P0(200.0,200.0) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
+      "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
       "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
-      "P99.9(309.985,309.985) P100(310.0,310.0)\n";
+      "P99.9(309.985,309.985) P100(310,310)\n";
   EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
 }
 

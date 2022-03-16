@@ -4,8 +4,10 @@
 #include "source/common/stats/histogram_impl.h"
 
 namespace {
-constexpr uint64_t JsonStatsFlushCount = 64; // This value found by iterating in benchmark.
-}
+// This value found by iterating in stats_handler_speed_test.cc, maximizing the
+// performance of the Json tests, and then rounding to a power of 2.
+constexpr uint64_t JsonStatsFlushCount = 64;
+} // namespace
 namespace Envoy {
 
 using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
