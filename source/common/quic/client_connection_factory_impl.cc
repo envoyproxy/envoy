@@ -34,6 +34,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
     OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
+  // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
+  // and call maybeSetInterfaceName based on that upon acquiring a local socket.
+  // Similar to what is done in ClientConnectionImpl::onConnected().
   ASSERT(crypto_config != nullptr);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
