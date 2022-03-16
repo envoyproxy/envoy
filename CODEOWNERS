@@ -32,8 +32,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp
-/*/extensions/filters/common/mutation_rules @gbrail @snowp
+/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
