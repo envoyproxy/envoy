@@ -36,16 +36,9 @@ public:
   AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   void sendMessage(const Protobuf::Message& request, bool end_stream) {
-	  std::cout << "1 stream_  = " << stream_ << "\n";
-	  std::cout << "111 this  " << this << "\n";
     Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
-  void resetStream() {
-	  std::cout << "3 stream_  = " << stream_ << "\n";
-  std::cout << "AsyncStream::resetStream()============\n"; stream_->resetStream(); 
-	  std::cout << "4 stream_  = " << stream_ << "\n";
-}
   bool isAboveWriteBufferHighWatermark() const {
     return stream_->isAboveWriteBufferHighWatermark();
   }
