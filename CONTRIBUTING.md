@@ -230,7 +230,9 @@ temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema
 
 * Typically we try to turn around reviews within one business day.
 * See [OWNERS.md](OWNERS.md) for the current list of maintainers.
-* It is generally expected that a senior maintainer should review every PR.
+* It is generally expected that a senior maintainer should review every PR to
+  core code. Test-only or extension-only changes need only be reviewed by a
+  maintainer, or senior extension maintainer.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
   PR. This person does not necessarily need to have commit access.
 * The previous two points generally mean that every PR should have two approvals. (Exceptions can

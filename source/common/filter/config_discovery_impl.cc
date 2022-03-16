@@ -160,7 +160,8 @@ void FilterConfigSubscription::onConfigUpdate(
 
 void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                                                     const EnvoyException*) {
-  ENVOY_LOG(debug, "Updating filter config {} failed due to {}", filter_config_name_, reason);
+  ENVOY_LOG(debug, "Updating filter config {} failed due to {}", filter_config_name_,
+            static_cast<int>(reason));
   stats_.config_fail_.inc();
   // Make sure to make progress in case the control plane is temporarily failing.
   init_target_.ready();
