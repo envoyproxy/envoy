@@ -54,11 +54,11 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
-using testing::_;
-using testing::HasSubstr;
+using quiche::GetLogger;
 using quiche::getVerbosityLogThreshold;
 using quiche::setVerbosityLogThreshold;
-using quiche::GetLogger;
+using testing::_;
+using testing::HasSubstr;
 
 namespace quic {
 namespace {

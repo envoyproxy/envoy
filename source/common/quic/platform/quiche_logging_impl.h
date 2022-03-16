@@ -39,17 +39,17 @@
 #define QUICHE_LOG_IF_IMPL(severity, condition)                                                    \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       QUICHE_IS_LOG_LEVEL_ENABLED(severity) && (condition),                                        \
-      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##severity), __FILE__,  \
-                             __LINE__, __func__)                                                   \
+      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##severity),    \
+                               __FILE__, __LINE__, __func__)                                       \
           .stream())
 
 #define QUICHE_LOG_IMPL(severity) QUICHE_LOG_IF_IMPL(severity, true)
 
 #define QUICHE_VLOG_IF_IMPL(verbosity, condition)                                                  \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
-      quiche::isVerboseLogEnabled(verbosity) && (condition),                                         \
-      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevelINFO), __FILE__,        \
-                             __LINE__, __func__)                                                   \
+      quiche::isVerboseLogEnabled(verbosity) && (condition),                                       \
+      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevelINFO),          \
+                               __FILE__, __LINE__, __func__)                                       \
           .stream())
 
 #define QUICHE_VLOG_IMPL(verbosity) QUICHE_VLOG_IF_IMPL(verbosity, true)
@@ -66,8 +66,8 @@
 #define QUICHE_PLOG_IMPL(severity)                                                                 \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       QUICHE_IS_LOG_LEVEL_ENABLED(severity),                                                       \
-      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##severity), __FILE__,  \
-                             __LINE__, __func__)                                                   \
+      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##severity),    \
+                               __FILE__, __LINE__, __func__)                                       \
           .SetPerror()                                                                             \
           .stream())
 
@@ -232,7 +232,7 @@ inline spdlog::logger& GetLogger() {
 #define QUICHE_IS_LOG_LEVEL_ENABLED(severity) quiche::isLogLevelEnabled##severity()
 #define QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(severity)                                                 \
   inline bool isLogLevelEnabled##severity() {                                                      \
-    return static_cast<spdlog::level::level_enum>(quiche::LogLevel##severity) >=                     \
+    return static_cast<spdlog::level::level_enum>(quiche::LogLevel##severity) >=                   \
            GetLogger().level();                                                                    \
   }
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(TRACE)
