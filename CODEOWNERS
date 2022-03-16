@@ -32,7 +32,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp
+/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
 /*/extensions/filters/common/mutation_rules @gbrail @snowp
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
