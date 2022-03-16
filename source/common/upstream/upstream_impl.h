@@ -1055,8 +1055,6 @@ protected:
  */
 Network::DnsLookupFamily
 getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster);
-Network::DnsLookupFamily
-getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family);
 
 /**
  * Utility function to report upstream cx destroy metrics
