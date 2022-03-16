@@ -195,7 +195,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   EXPECT_TRUE(clients.empty());
-  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::CLOSED, client_ref.state());
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Closed, client_ref.state());
   EXPECT_EQ(dispatcher_.to_delete_.front().get(), &client_ref);
 
   EXPECT_CALL(*async_connect_callback, cancel());

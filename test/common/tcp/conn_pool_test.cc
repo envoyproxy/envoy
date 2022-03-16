@@ -85,8 +85,8 @@ public:
 
   ~TestActiveTcpClient() override { parent().onConnDestroyed(); }
   void clearCallbacks() override {
-    if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
-        state() == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
+    if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy ||
+        state() == Envoy::ConnectionPool::ActiveClient::State::Draining) {
       parent().onConnReleased(*this);
     }
     ActiveTcpClient::clearCallbacks();
