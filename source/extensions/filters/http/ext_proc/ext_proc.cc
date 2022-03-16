@@ -321,10 +321,15 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
 
       if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
           state.queueOverHighLimit()) {
-        // We just transitioned to queue over high limit, which will then cause
-        // the receiving codec to buffer the data rather than send it to us.
-        // Prior, we'd rely on eager processing to kick off sending the data to
-        // the external processor, instead we kick it off here.
+        // When we transition to queue over high limit, we read disable the
+        // stream. With deferred processing, this means new data will buffer in
+        // the receiving codec buffer (not reaching this filter) and data
+        // already queued in this filter hasn't yet been sent externally.
+        //
+        // The filter would send the queued data if it was invoked again, or if
+        // we explicitly kick it off. The former wouldn't happen with deferred
+        // processing since we would be buffering in the receiving codec buffer,
+        // so we opt for the latter, explicitly kicking it off.
         bool terminate;
         Buffer::OwnedImpl empty_buffer{};
         std::tie(terminate, result) = sendStreamChunk(state, empty_buffer, false);
