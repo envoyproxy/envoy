@@ -60,7 +60,4 @@ message FileAccessLog {
     config.core.v3.SubstitutionFormatString log_format = 5
         [(validate.rules).message = {required: true}];
   }
-
-  // UDP access logging
-  bool udp_proxy = 6;
 }

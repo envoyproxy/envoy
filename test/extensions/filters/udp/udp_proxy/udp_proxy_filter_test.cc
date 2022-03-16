@@ -363,10 +363,9 @@ public:
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
-  const std::string access_log_format =
-      "%UDP_DOWNSTREAM_BYTES_RECEIVED% %UDP_DOWNSTREAM_DATAGRAMS_RECEIVED% "
-      "%UDP_DOWNSTREAM_BYTES_SENT% %UDP_DOWNSTREAM_DATAGRAMS_SENT% "
-      "%UDP_DOWNSTREAM_SESS_TOTAL%";
+  const std::string access_log_format = "%BYTES_RECEIVED% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+                                        "%BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_SENT% "
+                                        "%UPSTREAM_HEADER_BYTES_SENT%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -406,7 +405,8 @@ upstream_socket_config:
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
 
-  const std::string access_log_format = "%UDP_DOWNSTREAM_SESS_TOTAL% %UDP_DOWNSTREAM_IDLE_TIMEOUT%";
+  const std::string access_log_format =
+      "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -439,10 +439,10 @@ TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
   InSequence s;
 
   const std::string access_log_format =
-      "%UDP_DOWNSTREAM_BYTES_SENT% %UDP_DOWNSTREAM_BYTES_RECEIVED% "
-      "%UDP_DOWNSTREAM_ERRORS_SENT% %UDP_DOWNSTREAM_ERRORS_RECEIVED% "
-      "%UDP_DOWNSTREAM_DATAGRAMS_SENT% %UDP_DOWNSTREAM_DATAGRAMS_RECEIVED% "
-      "%UDP_DOWNSTREAM_SESS_TOTAL% %UDP_CLUSTER_NAME%";
+      "%BYTES_SENT% %BYTES_RECEIVED% "
+      "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED% "
+      "%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+      "%UPSTREAM_HEADER_BYTES_SENT% %ROUTE_NAME%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -495,7 +495,7 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, NoUpstreamHost) {
   InSequence s;
 
-  const std::string access_log_format = "%UDP_UPSTREAM_NONE_HEALTHY%";
+  const std::string access_log_format = "%UPSTREAM_WIRE_BYTES_SENT%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -516,7 +516,7 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
   InSequence s;
 
-  const std::string access_log_format = "%UDP_DOWNSTREAM_SESS_NO_ROUTE%";
+  const std::string access_log_format = "%UPSTREAM_WIRE_BYTES_RECEIVED%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -537,7 +537,7 @@ TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
   InSequence s;
 
   const std::string access_log_format =
-      "%UDP_DOWNSTREAM_SESS_TOTAL% %UDP_DOWNSTREAM_SESS_NO_ROUTE%";
+      "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
