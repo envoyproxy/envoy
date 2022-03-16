@@ -19,18 +19,15 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrictMock;
-using testing::WithArg;
 
 class OpenTelemetryDriverTest : public testing::Test {
 public:
-  OpenTelemetryDriverTest() {}
+  OpenTelemetryDriverTest() = default;
 
   void setup(envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config) {
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();

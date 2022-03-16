@@ -105,13 +105,7 @@ public:
   void setTraceId(const std::string& trace_id_hex) {
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
-
   std::string traceId() { return absl::BytesToHexString(span_.trace_id()); }
-
-  /**
-   * Sets the span's name attribute.
-   */
-  void setName(const std::string& val) { span_.set_name(val); }
 
   /**
    * Sets the span's id.
