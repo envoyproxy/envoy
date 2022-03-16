@@ -1,5 +1,7 @@
 #include "source/common/protobuf/visitor.h"
 
+#include <vector>
+
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -37,9 +39,26 @@ convertTypedStruct(const Protobuf::Message& message) {
   return {std::move(inner_message), target_type_url};
 }
 
+/**
+ * RAII wrapper that push message to parents on construction and pop it on destruction.
+ */
+struct ScopedMessageParents {
+  ScopedMessageParents(std::vector<const Protobuf::Message*>& parents,
+                       const Protobuf::Message& message)
+      : parents_(parents) {
+    parents_.push_back(&message);
+  }
+
+  ~ScopedMessageParents() { parents_.pop_back(); }
+
+private:
+  std::vector<const Protobuf::Message*>& parents_;
+};
+
 void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& message,
+                           std::vector<const Protobuf::Message*>& parents,
                            bool was_any_or_top_level, bool recurse_into_any) {
-  visitor.onMessage(message, was_any_or_top_level);
+  visitor.onMessage(message, parents, was_any_or_top_level);
 
   // If told to recurse into Any messages, do that here and skip the rest of the function.
   if (recurse_into_any) {
@@ -62,7 +81,9 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
     }
 
     if (inner_message != nullptr) {
-      traverseMessageWorker(visitor, *inner_message, true, recurse_into_any);
+      // Push the Any message as a wrapper.
+      ScopedMessageParents scoped_parents(parents, message);
+      traverseMessageWorker(visitor, *inner_message, parents, true, recurse_into_any);
       return;
     } else if (!target_type_url.empty()) {
       throw EnvoyException(fmt::format("Invalid type_url '{}' during traversal", target_type_url));
@@ -74,16 +95,19 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
   for (int i = 0; i < descriptor->field_count(); ++i) {
     const Protobuf::FieldDescriptor* field = descriptor->field(i);
     visitor.onField(message, *field);
-    // If this is a message, recurse to scrub deprecated fields in the sub-message.
+
+    // If this is a message, recurse in to the sub-message.
     if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+      ScopedMessageParents scoped_parents(parents, message);
+
       if (field->is_repeated()) {
         const int size = reflection->FieldSize(message, field);
         for (int j = 0; j < size; ++j) {
-          traverseMessageWorker(visitor, reflection->GetRepeatedMessage(message, field, j), false,
-                                recurse_into_any);
+          traverseMessageWorker(visitor, reflection->GetRepeatedMessage(message, field, j), parents,
+                                false, recurse_into_any);
         }
       } else if (reflection->HasField(message, field)) {
-        traverseMessageWorker(visitor, reflection->GetMessage(message, field), false,
+        traverseMessageWorker(visitor, reflection->GetMessage(message, field), parents, false,
                               recurse_into_any);
       }
     }
@@ -94,7 +118,8 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
 
 void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
                      bool recurse_into_any) {
-  traverseMessageWorker(visitor, message, true, recurse_into_any);
+  std::vector<const Protobuf::Message*> parents;
+  traverseMessageWorker(visitor, message, parents, true, recurse_into_any);
 }
 
 } // namespace ProtobufMessage

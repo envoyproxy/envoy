@@ -39,10 +39,11 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const Protobuf::MethodDescriptor& service_method,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
-                               const LocalInfo::LocalInfo& local_info)
+                               const LocalInfo::LocalInfo& local_info,
+                               CustomConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      local_info_(local_info),
+      local_info_(local_info), config_validators_(std::move(config_validators)),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
@@ -232,8 +233,9 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
                                      const bool use_namespace_matching) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
-                                       type_url, local_info_, use_namespace_matching, dispatcher_));
+  subscriptions_.emplace(
+      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
+                                                    dispatcher_, *config_validators_.get()));
   subscription_ordering_.emplace_back(type_url);
 }
 

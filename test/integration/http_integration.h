@@ -45,7 +45,7 @@ public:
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-  startRequest(const Http::RequestHeaderMap& headers);
+  startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
   waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
   Network::ClientConnection* connection() const { return connection_.get(); }
@@ -221,7 +221,6 @@ protected:
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
                                               const std::string& authority = "host");
-  void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();

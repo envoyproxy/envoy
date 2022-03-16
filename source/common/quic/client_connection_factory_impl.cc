@@ -18,6 +18,13 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
   quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
+  // Default enable RVCM connection option so that port migration is enabled.
+  quic::QuicTagVector connection_options;
+  if (quic_info->quic_config_.HasSendConnectionOptions()) {
+    connection_options = quic_info->quic_config_.SendConnectionOptions();
+  }
+  connection_options.push_back(quic::kRVCM);
+  quic_info->quic_config_.SetConnectionOptionsToSend(connection_options);
   return quic_info;
 }
 
@@ -27,6 +34,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
     OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
+  // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
+  // and call maybeSetInterfaceName based on that upon acquiring a local socket.
+  // Similar to what is done in ClientConnectionImpl::onConnected().
   ASSERT(crypto_config != nullptr);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
