@@ -39,17 +39,17 @@
 #define QUICHE_LOG_IF_IMPL(severity, condition)                                                    \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       QUICHE_IS_LOG_LEVEL_ENABLED(severity) && (condition),                                        \
-      quic::QuicLogEmitter(static_cast<quic::QuicLogLevel>(quic::LogLevel##severity), __FILE__,    \
-                           __LINE__, __func__)                                                     \
+      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##severity), __FILE__,  \
+                             __LINE__, __func__)                                                   \
           .stream())
 
 #define QUICHE_LOG_IMPL(severity) QUICHE_LOG_IF_IMPL(severity, true)
 
 #define QUICHE_VLOG_IF_IMPL(verbosity, condition)                                                  \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
-      quic::isVerboseLogEnabled(verbosity) && (condition),                                         \
-      quic::QuicLogEmitter(static_cast<quic::QuicLogLevel>(quic::LogLevelINFO), __FILE__,          \
-                           __LINE__, __func__)                                                     \
+      quiche::isVerboseLogEnabled(verbosity) && (condition),                                         \
+      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevelINFO), __FILE__,        \
+                             __LINE__, __func__)                                                   \
           .stream())
 
 #define QUICHE_VLOG_IMPL(verbosity) QUICHE_VLOG_IF_IMPL(verbosity, true)
@@ -66,8 +66,8 @@
 #define QUICHE_PLOG_IMPL(severity)                                                                 \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       QUICHE_IS_LOG_LEVEL_ENABLED(severity),                                                       \
-      quic::QuicLogEmitter(static_cast<quic::QuicLogLevel>(quic::LogLevel##severity), __FILE__,    \
-                           __LINE__, __func__)                                                     \
+      quiche::QuicheLogEmitter(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##severity), __FILE__,  \
+                             __LINE__, __func__)                                                   \
           .SetPerror()                                                                             \
           .stream())
 
@@ -95,7 +95,7 @@
 // Release build
 #define QUICHE_DCHECK_IMPL(condition) QUICHE_COMPILED_OUT_LOG(condition)
 #define QUICHE_COMPILED_OUT_LOG(condition)                                                         \
-  QUICHE_LOG_IMPL_INTERNAL(false && (condition), quic::NullLogStream().stream())
+  QUICHE_LOG_IMPL_INTERNAL(false && (condition), quiche::NullLogStream().stream())
 #define QUICHE_DVLOG_IMPL(verbosity) QUICHE_COMPILED_OUT_LOG(false)
 #define QUICHE_DVLOG_IF_IMPL(verbosity, condition) QUICHE_COMPILED_OUT_LOG(condition)
 #define QUICHE_DLOG_IMPL(severity) QUICHE_COMPILED_OUT_LOG(false)
@@ -130,12 +130,12 @@
 #define QUICHE_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 #define QUICHE_PREDICT_TRUE_IMPL(x) ABSL_PREDICT_TRUE(x)
 
-namespace quic {
+namespace quiche {
 
-// QuicLogLevel and this enum exist to bridge the gap between QUICHE logging and Envoy's spdlog.
+// QuicheLogLevel and this enum exist to bridge the gap between QUICHE logging and Envoy's spdlog.
 // QUICHE logs are used in forms such as QUICHE_LOG(ERROR) which is why the enum values have
 // non-standard casing, as they are used in pre-processor token concatenation by macros in this
-// file. We cannot use an enum class like quic::LogLevel::DEBUG here because some of Envoy's build
+// file. We cannot use an enum class like quiche::LogLevel::DEBUG here because some of Envoy's build
 // environments specify -DDEBUG=1 which would cause the enum value to be replaced by the
 // pre-processor. This format of token avoids that issue.
 enum {
@@ -153,7 +153,7 @@ enum {
 #endif // NDEBUG
 };
 
-using QuicLogLevel = spdlog::level::level_enum;
+using QuicheLogLevel = spdlog::level::level_enum;
 
 // NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
 // a nullptr_t, or a null char* or const char*, in which case it returns
@@ -172,40 +172,40 @@ template <> struct NullGuard<std::nullptr_t> {
   static const char* guard(const std::nullptr_t&) { return "(null)"; }
 };
 
-class QuicLogEmitter {
+class QuicheLogEmitter {
 public:
-  // |file_name| and |function_name| MUST be valid for the lifetime of the QuicLogEmitter. This is
+  // |file_name| and |function_name| MUST be valid for the lifetime of the QuicheLogEmitter. This is
   // guaranteed when passing __FILE__ and __func__.
-  explicit QuicLogEmitter(QuicLogLevel level, const char* file_name, int line,
-                          const char* function_name);
+  explicit QuicheLogEmitter(QuicheLogLevel level, const char* file_name, int line,
+                            const char* function_name);
 
-  ~QuicLogEmitter();
+  ~QuicheLogEmitter();
 
   // NOLINTNEXTLINE(readability-identifier-naming)
-  QuicLogEmitter& SetPerror() {
+  QuicheLogEmitter& SetPerror() {
     is_perror_ = true;
     return *this;
   }
 
-  template <typename T> QuicLogEmitter& operator<<(const T& v) {
+  template <typename T> QuicheLogEmitter& operator<<(const T& v) {
     stream_ << NullGuard<T>::guard(v);
     return *this;
   }
 
   // Handle stream manipulators such as std::endl.
-  QuicLogEmitter& operator<<(std::ostream& (*m)(std::ostream& os)) {
+  QuicheLogEmitter& operator<<(std::ostream& (*m)(std::ostream& os)) {
     stream_ << m;
     return *this;
   }
-  QuicLogEmitter& operator<<(std::ios_base& (*m)(std::ios_base& os)) {
+  QuicheLogEmitter& operator<<(std::ios_base& (*m)(std::ios_base& os)) {
     stream_ << m;
     return *this;
   }
 
-  QuicLogEmitter& stream() { return *this; }
+  QuicheLogEmitter& stream() { return *this; }
 
 private:
-  const QuicLogLevel level_;
+  const QuicheLogLevel level_;
   const char* file_name_;
   int line_;
   const char* function_name_;
@@ -229,10 +229,10 @@ inline spdlog::logger& GetLogger() {
 }
 
 // This allows us to use QUICHE_CHECK(condition) from constexpr functions.
-#define QUICHE_IS_LOG_LEVEL_ENABLED(severity) quic::isLogLevelEnabled##severity()
+#define QUICHE_IS_LOG_LEVEL_ENABLED(severity) quiche::isLogLevelEnabled##severity()
 #define QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(severity)                                                 \
   inline bool isLogLevelEnabled##severity() {                                                      \
-    return static_cast<spdlog::level::level_enum>(quic::LogLevel##severity) >=                     \
+    return static_cast<spdlog::level::level_enum>(quiche::LogLevel##severity) >=                     \
            GetLogger().level();                                                                    \
   }
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(TRACE)
@@ -253,20 +253,20 @@ inline bool isVerboseLogEnabled(int verbosity) {
 bool isDFatalExitDisabled();
 void setDFatalExitDisabled(bool is_disabled);
 
-// QuicLogSink is used to capture logs emitted from the QUICHE_LOG... macros.
-class QuicLogSink {
+// QuicheLogSink is used to capture logs emitted from the QUICHE_LOG... macros.
+class QuicheLogSink {
 public:
-  virtual ~QuicLogSink() = default;
+  virtual ~QuicheLogSink() = default;
 
   // Called when |message| is emitted at |level|.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  virtual void Log(QuicLogLevel level, const std::string& message) = 0;
+  virtual void Log(QuicheLogLevel level, const std::string& message) = 0;
 };
 
-// Only one QuicLogSink can capture log at a time. SetLogSink causes future logs
+// Only one QuicheLogSink can capture log at a time. SetLogSink causes future logs
 // to be captured by the |new_sink|.
 // Return the previous sink.
 // NOLINTNEXTLINE(readability-identifier-naming)
-QuicLogSink* SetLogSink(QuicLogSink* new_sink);
+QuicheLogSink* SetLogSink(QuicheLogSink* new_sink);
 
-} // namespace quic
+} // namespace quiche

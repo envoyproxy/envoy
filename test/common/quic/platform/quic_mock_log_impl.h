@@ -17,7 +17,7 @@ namespace quic {
 
 // A QuicEnvoyMockLog object captures QUIC_LOG() messages emitted between StartCapturingLogs() and
 // destruction(or StopCapturingLogs()).
-class QuicEnvoyMockLog : public QuicLogSink {
+class QuicEnvoyMockLog : public quiche::QuicheLogSink {
 public:
   QuicEnvoyMockLog() = default;
 
@@ -27,7 +27,7 @@ public:
     }
   }
 
-  MOCK_METHOD(void, Log, (QuicLogLevel level, const std::string& message));
+  MOCK_METHOD(void, Log, (quiche::QuicheLogLevel level, const std::string& message));
 
   void StartCapturingLogs() {
     ASSERT(!is_capturing_);
@@ -42,7 +42,7 @@ public:
   }
 
 private:
-  QuicLogSink* original_sink_;
+  quiche::QuicheLogSink* original_sink_;
   bool is_capturing_{false};
 };
 
@@ -51,14 +51,14 @@ private:
 // behavior is restored.
 class ScopedDisableExitOnDFatal {
 public:
-  ScopedDisableExitOnDFatal() : previous_value_(isDFatalExitDisabled()) {
-    setDFatalExitDisabled(true);
+  ScopedDisableExitOnDFatal() : previous_value_(quiche::isDFatalExitDisabled()) {
+    quiche::setDFatalExitDisabled(true);
   }
 
   ScopedDisableExitOnDFatal(const ScopedDisableExitOnDFatal&) = delete;
   ScopedDisableExitOnDFatal& operator=(const ScopedDisableExitOnDFatal&) = delete;
 
-  ~ScopedDisableExitOnDFatal() { setDFatalExitDisabled(previous_value_); }
+  ~ScopedDisableExitOnDFatal() { quiche::setDFatalExitDisabled(previous_value_); }
 
 private:
   const bool previous_value_;
@@ -73,7 +73,7 @@ using QuicMockLogImpl = quic::QuicEnvoyMockLog;
 #define EXPECT_QUIC_LOG_CALL_IMPL(log) EXPECT_CALL(log, Log(testing::_, testing::_))
 
 #define EXPECT_QUIC_LOG_CALL_CONTAINS_IMPL(log, level, content)                                    \
-  EXPECT_CALL(log, Log(static_cast<quic::QuicLogLevel>(quic::LogLevel##level),                     \
+  EXPECT_CALL(log, Log(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##level),                     \
                        testing::HasSubstr(content)))
 
 // Not part of the api exposed by quic_mock_log.h. This is used by
@@ -81,7 +81,7 @@ using QuicMockLogImpl = quic::QuicEnvoyMockLog;
 #define EXPECT_QUIC_LOG_IMPL(statement, level, matcher)                                            \
   do {                                                                                             \
     quic::QuicEnvoyMockLog mock_log;                                                               \
-    EXPECT_CALL(mock_log, Log(static_cast<quic::QuicLogLevel>(quic::LogLevel##level), matcher))    \
+    EXPECT_CALL(mock_log, Log(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##level), matcher))    \
         .Times(testing::AtLeast(1));                                                               \
     mock_log.StartCapturingLogs();                                                                 \
     { statement; }                                                                                 \
