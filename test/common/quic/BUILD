@@ -17,8 +17,20 @@ envoy_cc_test(
     deps = [
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_alarm_lib",
-        "//source/common/quic/platform:envoy_quic_clock_lib",
+        "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "envoy_quic_clock_test",
+    srcs = ["envoy_quic_clock_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:envoy_quic_clock_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )

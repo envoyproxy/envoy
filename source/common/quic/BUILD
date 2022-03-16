@@ -40,11 +40,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_clock_lib",
+    srcs = ["envoy_quic_clock.cc"],
+    hdrs = ["envoy_quic_clock.h"],
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "@com_github_google_quiche//:quic_core_clock_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_connection_helper_lib",
     hdrs = ["envoy_quic_connection_helper.h"],
     tags = ["nofips"],
     deps = [
-        "//source/common/quic/platform:envoy_quic_clock_lib",
+        ":envoy_quic_clock_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
         "@com_github_google_quiche//:quic_core_crypto_random_lib",
     ],
