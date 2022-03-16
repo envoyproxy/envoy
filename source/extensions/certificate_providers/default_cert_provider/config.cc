@@ -1,10 +1,10 @@
-#include "source/extensions/certificate_providers/static_cert_provider/config.h"
+#include "source/extensions/certificate_providers/default_cert_provider/config.h"
 
 #include <iterator>
 #include <set>
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/certificate_providers/static_cert_provider/v3/config.pb.h"
+#include "envoy/extensions/certificate_providers/default_cert_provider/v3/config.pb.h"
 
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
@@ -14,11 +14,11 @@ namespace Envoy {
 namespace Extensions {
 namespace CertificateProviders {
 
-StaticCertificateProvider::StaticCertificateProvider(
+DefaultCertificateProvider::DefaultCertificateProvider(
     const envoy::config::core::v3::TypedExtensionConfig& config, Api::Api& api) {
 
-  envoy::extensions::certificate_providers::static_cert_provider::v3::
-      StaticCertificateProviderConfig message;
+  envoy::extensions::certificate_providers::default_cert_provider::v3::
+      DefaultCertificateProviderConfig message;
   Config::Utility::translateOpaqueConfig(config.typed_config(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
@@ -41,11 +41,11 @@ StaticCertificateProvider::StaticCertificateProvider(
   ca_certpairs.emplace_back(ca_certpair);
   cert_pairs_.emplace("CA_CERTPAIR", ca_certpairs);
 
-  trust_ca_ = Config::DataSource::read(message.trust_ca(), true, api);
+  trusted_ca_ = Config::DataSource::read(message.trusted_ca(), true, api);
 }
 
 std::list<Envoy::CertificateProvider::Certpair>
-StaticCertificateProvider::certPairs(absl::string_view cert_name, bool generate) {
+DefaultCertificateProvider::certPairs(absl::string_view cert_name, bool generate) {
   auto it = cert_pairs_.find(cert_name);
   if (it != cert_pairs_.end()) {
     return it->second;
@@ -58,7 +58,7 @@ StaticCertificateProvider::certPairs(absl::string_view cert_name, bool generate)
 }
 
 Common::CallbackHandlePtr
-StaticCertificateProvider::addUpdateCallback(absl::string_view cert_name,
+DefaultCertificateProvider::addUpdateCallback(absl::string_view cert_name,
                                              std::function<void()> callback) {
   if (!update_callback_managers_.contains(cert_name)) {
     Common::CallbackManager<> update_callback_manager;
@@ -68,7 +68,7 @@ StaticCertificateProvider::addUpdateCallback(absl::string_view cert_name,
   return it->second.add(callback);
 }
 
-void StaticCertificateProvider::generateCertpair(absl::string_view cert_name) {
+void DefaultCertificateProvider::generateCertpair(absl::string_view cert_name) {
   auto ca_certpairs = cert_pairs_.at("CA_CERTPAIR");
   auto ca_cert_str = ca_certpairs.begin()->certificate_;
   auto ca_key_str = ca_certpairs.begin()->private_key_;
@@ -136,7 +136,7 @@ void StaticCertificateProvider::generateCertpair(absl::string_view cert_name) {
   onCertpairsUpdated(cert_name, generate_certpairs);
 }
 
-void StaticCertificateProvider::onCertpairsUpdated(
+void DefaultCertificateProvider::onCertpairsUpdated(
     absl::string_view cert_name, std::list<Envoy::CertificateProvider::Certpair> certpairs) {
   auto cert_it = cert_pairs_.find(cert_name);
   if (cert_it != cert_pairs_.end()) {

@@ -1,28 +1,28 @@
 syntax = "proto3";
 
-package envoy.extensions.certificate_providers.static_cert_provider.v3;
+package envoy.extensions.certificate_providers.default_cert_provider.v3;
 
 import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.certificate_providers.static_cert_provider.v3";
+option java_package = "io.envoyproxy.envoy.extensions.certificate_providers.default_cert_provider.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/certificate_providers/static_cert_provider/v3;static_cert_providerv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/certificate_providers/static_cert_provider/v3;default_cert_providerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Static Certificate Provider]
 // [#extension: envoy.cert_providers.static_cert_provider]
 
-// A StaticCertificateProvider provides one static TLS identity certpair,
-// one CA certpair and one trust ca cert
+// A DefaultCertificateProvider requires one static TLS identity certpair,
+// one CA certpair and one trusted ca cert configured
 // [#extension-category: envoy.cert_providers]
 
-message StaticCertificateProviderConfig {
+message DefaultCertificateProviderConfig {
   config.core.v3.DataSource identity_cert = 1;
   config.core.v3.DataSource identity_key = 2;
   config.core.v3.DataSource ca_cert = 3;
   config.core.v3.DataSource ca_key = 4;
-  config.core.v3.DataSource trust_ca = 5;
+  config.core.v3.DataSource trusted_ca = 5;
 }
