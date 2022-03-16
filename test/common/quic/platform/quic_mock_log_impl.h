@@ -29,12 +29,14 @@ public:
 
   MOCK_METHOD(void, Log, (quiche::QuicheLogLevel level, const std::string& message));
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void StartCapturingLogs() {
     ASSERT(!is_capturing_);
     is_capturing_ = true;
     original_sink_ = SetLogSink(this);
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void StopCapturingLogs() {
     ASSERT(is_capturing_);
     is_capturing_ = false;
