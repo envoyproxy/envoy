@@ -3,5 +3,5 @@ FROM golang
 RUN apt-get -y update && apt-get install -y -qq --no-install-recommends netcat
 RUN git clone https://github.com/envoyproxy/go-control-plane
 ADD ./resource.go /go/go-control-plane/internal/example/resource.go
-RUN cd go-control-plane && make bin/example
+RUN cd go-control-plane && git checkout b4adc3bb5fe5288bff01cd452dad418ef98c676e && make bin/example
 WORKDIR /go/go-control-plane
