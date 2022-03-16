@@ -83,6 +83,14 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_cc_test(
+    name = "utils_test",
+    srcs = ["utils_test.cc"],
+    deps = [
+        "//source/server/admin:utils_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "runtime_handler_test",
     srcs = ["runtime_handler_test.cc"],
     deps = [":admin_instance_lib"],
