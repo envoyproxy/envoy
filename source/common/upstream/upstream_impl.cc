@@ -28,6 +28,7 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/dns_utils.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
@@ -1841,25 +1842,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
 Network::DnsLookupFamily
 getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster) {
-  return getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
-}
-
-Network::DnsLookupFamily
-getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
-  switch (family) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::config::cluster::v3::Cluster::V6_ONLY:
-    return Network::DnsLookupFamily::V6Only;
-  case envoy::config::cluster::v3::Cluster::V4_ONLY:
-    return Network::DnsLookupFamily::V4Only;
-  case envoy::config::cluster::v3::Cluster::AUTO:
-    return Network::DnsLookupFamily::Auto;
-  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
-    return Network::DnsLookupFamily::V4Preferred;
-  case envoy::config::cluster::v3::Cluster::ALL:
-    return Network::DnsLookupFamily::All;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  return DnsUtils::getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
 }
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,

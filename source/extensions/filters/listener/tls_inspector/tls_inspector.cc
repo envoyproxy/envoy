@@ -121,7 +121,9 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+
+  IS_ENVOY_BUG("unexpected tcp filter parse_state");
+  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {

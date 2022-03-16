@@ -310,7 +310,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected tls version provided");
+  return default_version;
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
