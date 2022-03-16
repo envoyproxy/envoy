@@ -301,9 +301,9 @@ public:
     }
   }
 
-  virtual void criticalLog(HttpLogProto&&) override {}
+  void criticalLog(HttpLogProto&&) override {}
 
-  virtual void criticalLog(TcpLogProto&&) override {}
+  void criticalLog(TcpLogProto&&) override {}
 
 protected:
   Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;

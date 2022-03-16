@@ -151,7 +151,7 @@ tcp_logs:
 class CriticalGrpcAccessLoggerTest : public GrpcAccessLoggerImplTest {
 public:
   CriticalGrpcAccessLoggerTest()
-      : GrpcAccessLoggerImplTest(), timer_ttl_manager_(new Event::MockTimer(&dispatcher_)),
+      : timer_ttl_manager_(new Event::MockTimer(&dispatcher_)),
         timer_critical_flusher_(new Event::MockTimer(&dispatcher_)) {
     EXPECT_CALL(*timer_ttl_manager_, enableTimer(_, _));
     EXPECT_CALL(*timer_ttl_manager_, enabled());
