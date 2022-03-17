@@ -23,7 +23,16 @@ namespace SipProxy {
 MockConfig::MockConfig() = default;
 MockConfig::~MockConfig() = default;
 
-MockDecoderCallbacks::MockDecoderCallbacks() = default;
+MockDecoderCallbacks::MockDecoderCallbacks() {
+  /*
+  envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService service1,service2;
+  service1.set_parameter("transport");
+  service1.set_domain("pcsf-cfed.cncs.svc.cluster.local");
+  service1.set_parameter("x-suri");
+  service1.set_domain("pcsf-cfed.cncs.svc.cluster.local");
+  local_services_.emplace_back(service1);
+  local_services_.emplace_back(service2); */
+}
 MockDecoderCallbacks::~MockDecoderCallbacks() = default;
 
 MockDecoderEventHandler::MockDecoderEventHandler() {
@@ -88,23 +97,21 @@ MockRoute::~MockRoute() = default;
 
 } // namespace Router
 
-MockConnectionManager::~MockConnectionManager() = default;
-
 MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
     ConnectionManager& parent,
     const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
     Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
-    : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {
-  ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _))
-      .WillByDefault(
-          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
-            host = "10.0.0.11";
-            return QueryStatus::Continue;
-          }));
-}
+    : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {}
 
 MockTrafficRoutingAssistantHandler::~MockTrafficRoutingAssistantHandler() = default;
+
+MockConnectionManager::MockConnectionManager(
+    Config& config, Random::RandomGenerator& random_generator, TimeSource& time_system,
+    Server::Configuration::FactoryContext& context,
+    std::shared_ptr<Router::TransactionInfos> transaction_infos)
+    : ConnectionManager(config, random_generator, time_system, context, transaction_infos) {}
+
+MockConnectionManager::~MockConnectionManager() = default;
 
 } // namespace SipProxy
 } // namespace NetworkFilters
