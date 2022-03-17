@@ -72,6 +72,9 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
+  ConnectionInfoSetter& connectionInfoSetter() override {
+    return socket_->connectionInfoProvider();
+  }
   const ConnectionInfoProvider& connectionInfoProvider() const override {
     return socket_->connectionInfoProvider();
   }

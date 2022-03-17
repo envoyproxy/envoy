@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/optref.h"
+#include "envoy/http/persistent_quic_info.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_client.h"
@@ -126,7 +127,8 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    OptRef<PoolConnectResultCallback> connect_callback);
+                    OptRef<PoolConnectResultCallback> connect_callback,
+                    Http::PersistentQuicInfo& quic_info);
 
   ~Http3ConnPoolImpl() override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
@@ -147,20 +149,11 @@ protected:
 private:
   friend class Http3ConnPoolImplPeer;
 
-  // Returns the most recent crypto config from host_;
-  std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
-
-  // Store quic helpers which can be shared between connections and must live
-  // beyond the lifetime of individual connections.
-  std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
+  // Latches Quic helpers shared across the cluster
+  Quic::PersistentQuicInfoImpl& quic_info_;
   // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
   quic::QuicServerId server_id_;
-  // Latch the latest crypto config, to determine if it has updated since last
-  // checked.
-  Envoy::Ssl::ClientContextSharedPtr client_context_;
-  // If client_context_ changes, client config will be updated as well.
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
 };
@@ -172,7 +165,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
-                 OptRef<PoolConnectResultCallback> connect_callback);
+                 OptRef<PoolConnectResultCallback> connect_callback,
+                 Http::PersistentQuicInfo& quic_info);
 
 } // namespace Http3
 } // namespace Http

@@ -165,12 +165,10 @@ void AuthenticatorImpl::startVerify() {
   }
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
-  if (!jwt_->iss_.empty()) {
-    // Check if `iss` is allowed.
-    if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
-      doneWithStatus(Status::JwtUnknownIssuer);
-      return;
-    }
+  // Check if `iss` is allowed.
+  if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
+    doneWithStatus(Status::JwtUnknownIssuer);
+    return;
   }
 
   // Issuer is configured
