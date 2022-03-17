@@ -54,6 +54,9 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using quiche::GetLogger;
+using quiche::getVerbosityLogThreshold;
+using quiche::setVerbosityLogThreshold;
 using testing::_;
 using testing::HasSubstr;
 
@@ -74,7 +77,7 @@ protected:
     GetLogger().set_level(log_level_);
   }
 
-  const QuicLogLevel log_level_;
+  const quiche::QuicheLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
 
