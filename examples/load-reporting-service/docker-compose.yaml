@@ -1,6 +1,12 @@
 version: '3.7'
 services:
 
+  flask:
+    build:
+      context: ../shared/flask
+    image: flask:python-3.10-slim-bullseye
+    restart: "no"
+
   envoy:
     build:
       context: .
@@ -10,9 +16,9 @@ services:
     - "8081:8081"
 
   http_service:
-    build:
-      context: .
-      dockerfile: Dockerfile-http-server
+    image: flask:python-3.10-slim-bullseye
+    volumes:
+    - ./service.py:/code/service.py
 
   lrs_server:
     build:

@@ -12,6 +12,31 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/examples/cache"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/double-proxy"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/front-proxy"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/shared/flask"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/examples/shared/tracing"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/base"
   schedule:
     interval: "daily"

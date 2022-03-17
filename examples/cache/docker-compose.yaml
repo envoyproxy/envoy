@@ -1,6 +1,12 @@
 version: "3.7"
 services:
 
+  flask:
+    build:
+      context: ../shared/flask
+    image: flask:python-3.10-slim-bullseye
+    restart: "no"
+
   front-envoy:
     build:
       context: .
@@ -14,6 +20,7 @@ services:
       dockerfile: Dockerfile-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
+    - ./service.py:/code/service.py
     environment:
     - SERVICE_NAME=1
 
@@ -23,5 +30,6 @@ services:
       dockerfile: Dockerfile-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
+    - ./service.py:/code/service.py
     environment:
     - SERVICE_NAME=2

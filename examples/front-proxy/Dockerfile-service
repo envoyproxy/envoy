@@ -1,9 +1,12 @@
-FROM envoyproxy/envoy-dev:latest
+FROM flask:python-3.10-slim-bullseye
 
-RUN apt-get update && apt-get -q install --no-install-recommends -y python3-pip curl
-RUN pip3 install -q Flask==2.0.3 requests==2.18.4
-RUN mkdir /code
-ADD ./service.py /code
+COPY --from=envoyproxy/envoy-dev:latest /usr/local/bin/envoy /usr/local/bin/envoy
+
+RUN apt-get update && apt-get -q install --no-install-recommends -y curl
+
+ADD requirements.txt /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt
+
 ADD ./start_service.sh /usr/local/bin/start_service.sh
 RUN chmod u+x /usr/local/bin/start_service.sh
-ENTRYPOINT ["/bin/sh", "/usr/local/bin/start_service.sh"]
+ENTRYPOINT ["/usr/local/bin/start_service.sh"]

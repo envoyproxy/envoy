@@ -1,50 +1,48 @@
 version: "3.7"
 services:
+
+  flask:
+    build:
+      context: ../shared/flask
+    image: flask:python-3.10-slim-bullseye
+    restart: "no"
+
   client-envoy:
     build:
       context: .
       dockerfile: Dockerfile-client
     ports:
       - 8001:8001
-    networks:
-      - envoymesh
     depends_on:
     - "backend-local-1"
     - "backend-local-2"
     - "backend-remote-1"
     - "backend-remote-2"
+
   backend-local-1:
-    build:
-      context: .
-      dockerfile: Dockerfile-server
+    image: flask:python-3.10-slim-bullseye
+    volumes:
+    - ./service.py:/code/service.py
     environment:
       - HOST=backend-local-1
-    networks:
-      - envoymesh
+
   backend-local-2:
-    build:
-      context: .
-      dockerfile: Dockerfile-server
+    image: flask:python-3.10-slim-bullseye
+    volumes:
+    - ./service.py:/code/service.py
     environment:
       - HOST=backend-local-2
-    networks:
-      - envoymesh
+
   backend-remote-1:
-    build:
-      context: .
-      dockerfile: Dockerfile-server
+    image: flask:python-3.10-slim-bullseye
+    volumes:
+    - ./service.py:/code/service.py
     environment:
       - HOST=backend-remote-1
-    networks:
-      - envoymesh
+
   backend-remote-2:
-    build:
-      context: .
-      dockerfile: Dockerfile-server
+    image: flask:python-3.10-slim-bullseye
+    volumes:
+    - ./service.py:/code/service.py
     environment:
       - HOST=backend-remote-2
-    networks:
-      - envoymesh
-
-networks:
-  envoymesh: {}

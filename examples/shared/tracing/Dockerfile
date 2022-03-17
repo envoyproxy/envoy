@@ -1,11 +1,9 @@
-FROM envoyproxy/envoy-dev:latest
+FROM flask:python-3.10-slim-bullseye
 
-RUN apt-get update && apt-get -q install --no-install-recommends -y python3-pip curl
-RUN pip3 install -q Flask==2.0.3 requests==2.18.4
-RUN mkdir /code
-ADD ./service.py /code
-ADD ./start_service.sh /usr/local/bin/start_service.sh
-RUN chmod u+x /usr/local/bin/start_service.sh
+COPY --from=envoyproxy/envoy-dev:latest /usr/local/bin/envoy /usr/local/bin/envoy
+
+RUN apt-get update && apt-get -q install --no-install-recommends -y curl
+
 #
 # for discussion on jaeger binary compatibility, and the source of the file, see here:
 #  https://github.com/envoyproxy/envoy/issues/11382#issuecomment-638012072
@@ -16,4 +14,12 @@ RUN echo "4a7d17d4724ee890490bcd6cfdedb12a02316a3d33214348d30979abd201f1ca  /usr
          && mv /usr/local/lib/libjaegertracing.so.0.4.2 /usr/local/lib/libjaegertracing_plugin.so \
          && sha256sum -c /tmp/checksum \
          && rm /tmp/checksum
-ENTRYPOINT ["/bin/sh", "/usr/local/bin/start_service.sh"]
+
+ADD requirements.txt /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt
+
+ADD ./service.py /code/service.py
+
+ADD ./start_service.sh /usr/local/bin/start_service.sh
+RUN chmod u+x /usr/local/bin/start_service.sh
+ENTRYPOINT ["/usr/local/bin/start_service.sh"]
