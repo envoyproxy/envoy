@@ -1211,6 +1211,70 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   return true;
 }
 
+void ConfigHelper::initializeTlsKeyLog(
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context,
+    const ServerSslOptions& options) {
+  if (options.keylog_path_.empty()) {
+    return;
+  }
+  auto tls_keylog_path = tls_context.mutable_key_log()->mutable_path();
+  *tls_keylog_path = options.keylog_path_;
+
+  if (options.keylog_local_filter_) {
+    auto tls_keylog_local = tls_context.mutable_key_log()->mutable_local_address_range();
+    auto new_element_local = tls_keylog_local->Add();
+    if (options.keylog_local_negative_) {
+      if (options.ip_version_ == Network::Address::IpVersion::v6) {
+        new_element_local->set_address_prefix("1::2");
+        new_element_local->mutable_prefix_len()->set_value(128);
+      } else {
+        new_element_local->set_address_prefix("127.0.0.2");
+        new_element_local->mutable_prefix_len()->set_value(32);
+      }
+    } else {
+      new_element_local->set_address_prefix(
+          Network::Test::getLoopbackAddressString(options.ip_version_));
+      if (options.keylog_multiple_ips_) {
+        auto more_local = tls_keylog_local->Add();
+        if (options.ip_version_ == Network::Address::IpVersion::v6) {
+          more_local->set_address_prefix("1::2");
+          more_local->mutable_prefix_len()->set_value(128);
+        } else {
+          more_local->set_address_prefix("127.0.0.2");
+          more_local->mutable_prefix_len()->set_value(32);
+        }
+      }
+    }
+  }
+
+  if (options.keylog_remote_filter_) {
+    auto tls_keylog_remote = tls_context.mutable_key_log()->mutable_remote_address_range();
+    auto new_element_remote = tls_keylog_remote->Add();
+    if (options.keylog_remote_negative_) {
+      if (options.ip_version_ == Network::Address::IpVersion::v6) {
+        new_element_remote->set_address_prefix("1::2");
+        new_element_remote->mutable_prefix_len()->set_value(128);
+      } else {
+        new_element_remote->set_address_prefix("127.0.0.2");
+        new_element_remote->mutable_prefix_len()->set_value(32);
+      }
+    } else {
+      new_element_remote->set_address_prefix(
+          Network::Test::getLoopbackAddressString(options.ip_version_));
+      if (options.keylog_multiple_ips_) {
+        auto more_remote = tls_keylog_remote->Add();
+        if (options.ip_version_ == Network::Address::IpVersion::v6) {
+          more_remote->set_address_prefix("1::2");
+          more_remote->mutable_prefix_len()->set_value(128);
+        } else {
+          more_remote->set_address_prefix("127.0.0.2");
+          more_remote->mutable_prefix_len()->set_value(32);
+        }
+      }
+    }
+  }
+}
+
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
@@ -1259,6 +1323,7 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
+  initializeTlsKeyLog(common_tls_context, options);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {
