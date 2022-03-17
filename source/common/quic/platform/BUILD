@@ -71,7 +71,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
     hdrs = [
-        "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
         "quic_stream_buffer_allocator_impl.h",
     ],
@@ -123,6 +122,23 @@ envoy_cc_library(
     ],
     hdrs = [
         "quiche_hostname_utils_impl.h",
+    ],
+    external_deps = [
+        "abseil_str_format",
+        "quiche_quic_platform_base",
+    ],
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//source/common/http:utility_lib",
+        "@com_github_google_quiche//:quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_platform_error_code_wrappers_impl_lib",
+    hdrs = [
+        "quiche_error_code_wrappers_impl.h",
     ],
     external_deps = [
         "abseil_str_format",

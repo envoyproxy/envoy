@@ -1118,6 +1118,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_error_code_wrappers",
+    hdrs = [
+        "quiche/quic/platform/api/quic_error_code_wrappers.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_error_code_wrappers",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_stack_trace",
     hdrs = [
         "quiche/quic/platform/api/quic_stack_trace.h",
@@ -4275,6 +4288,20 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_error_code_wrappers",
+    hdrs = [
+        "quiche/common/platform/api/quiche_error_code_wrappers.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quiche_platform_error_code_wrappers_impl_lib",
     ],
 )
 
