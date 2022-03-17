@@ -549,10 +549,7 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "AssertFactory",
-            "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
-            }
+            "name": "AssertFactory"
           },
           "event": "MULTIKILL"
         }
@@ -560,10 +557,7 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "AssertFactory",
-            "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
-            }
+            "name": "AssertFactory"
           },
           "event": "KILL"
         }
@@ -571,10 +565,7 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "LogFactory",
-            "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
-            }
+            "name": "LogFactory"
           },
           "event": "MEGAMISS"
         }
@@ -582,10 +573,7 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "LogFactory",
-            "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
-            }
+            "name": "LogFactory"
           },
           "event": "MISS"
         }

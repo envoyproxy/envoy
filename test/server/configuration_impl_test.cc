@@ -435,7 +435,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+                            "Didn't find a registered implementation for type URL: 'envoy.config.trace.v2.BlackHoleConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {

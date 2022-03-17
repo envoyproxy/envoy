@@ -313,7 +313,7 @@ public:
       if (factory == nullptr && !is_optional) {
         ExceptionUtil::throwEnvoyException(
             fmt::format("Didn't find a registered implementation for type URL: '{}'",
-                        message.typed_config().type_url()));
+                        getFactoryType(message.typed_config())));
       }
       return factory;
     }
