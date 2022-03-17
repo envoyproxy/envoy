@@ -101,9 +101,9 @@ DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
     result->setException(true);
     break;
   case RpcResponseType::ResponseWithNullValue:
-  case RpcResponseType::ResponseNullValueWithAttachments:
     has_value = false;
     FALLTHRU;
+  case RpcResponseType::ResponseNullValueWithAttachments:
   case RpcResponseType::ResponseWithValue:
   case RpcResponseType::ResponseValueWithAttachments:
     result->setException(false);
