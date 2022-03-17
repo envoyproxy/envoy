@@ -135,7 +135,8 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   span_ptr->setOrigin(origin_);
   span_ptr->setAwsMetadata(aws_metadata_);
 
-  if (xray_header) { // there's a previous span that this span should be based-on
+  if (xray_header) {
+    // There's a previous span that this span should be based-on.
     span_ptr->setParentId(xray_header->parent_id_);
     span_ptr->setTraceId(xray_header->trace_id_);
     switch (xray_header->sample_decision_) {
@@ -167,7 +168,8 @@ XRay::SpanPtr Tracer::createNonSampledSpan(const Tracing::Config& config,
   span_ptr->setStartTime(start_time);
   span_ptr->setOrigin(origin_);
   span_ptr->setAwsMetadata(aws_metadata_);
-  if (xray_header) { // there's a previous span that this span should be based-on
+  if (xray_header) {
+    // There's a previous span that this span should be based-on.
     span_ptr->setParentId(xray_header->parent_id_);
     span_ptr->setTraceId(xray_header->trace_id_);
   } else {
