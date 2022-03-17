@@ -221,6 +221,31 @@ TEST_F(LocalRateLimitSharedTokenBucketTest, Shared) {
   test(true, yaml_shared_key_1, yaml_shared_key_1);
 }
 
+// Test that the Key from SharedRateLimitSingleton::get() is valid/stable even if
+// many entries are added and the hashtable is rehashed.
+TEST_F(LocalRateLimitSharedTokenBucketTest, RehashPointerStability) {
+  const char* yaml_template = R"EOF(
+stat_prefix: local_rate_limit_stats
+share_key: key_{}
+token_bucket:
+  max_tokens: 2
+  fill_interval: 1s
+)EOF";
+
+  std::vector<std::unique_ptr<Config>> configs;
+  // This assumes that growing a hashtable from size zero to size 100 will cause a rehash
+  // at some point.
+  for (uint32_t i = 0; i < 100; i++) {
+    std::string yaml = fmt::format(yaml_template, i);
+    envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+    configs.push_back(std::make_unique<Config>(proto_config, dispatcher_, stats_store_, runtime_,
+                                               singleton_manager_));
+  }
+
+  configs.clear();
+}
+
 } // namespace LocalRateLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions

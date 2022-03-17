@@ -33,9 +33,7 @@ using LocalRateLimiterImplSharedPtr =
 
 class SharedRateLimitSingleton : public Singleton::Instance, Logger::Loggable<Logger::Id::filter> {
 public:
-  LocalRateLimiterImplSharedPtr
-  get(const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
-      std::function<LocalRateLimiterImplSharedPtr()> create_fn);
+  ~SharedRateLimitSingleton() override;
 
   class Key : public std::pair<std::string, envoy::type::v3::TokenBucket> {
   public:
@@ -53,8 +51,16 @@ public:
     }
   };
 
+  std::pair<LocalRateLimiterImplSharedPtr, const Key*>
+  get(const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
+      std::function<LocalRateLimiterImplSharedPtr()> create_fn);
+
+  void removeIfUnused(const Key* key);
+
 private:
-  absl::flat_hash_map<Key, LocalRateLimiterImplSharedPtr> limiters_;
+  // Use node_hash_map so that a stable pointer to Key can be returned.
+  absl::node_hash_map<Key, std::weak_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>
+      limiters_;
 };
 
 /**
@@ -67,6 +73,8 @@ public:
       Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
       Singleton::Manager& singleton_manager);
 
+  ~Config();
+
   bool canCreateConnection();
   bool enabled() { return enabled_.enabled(); }
   LocalRateLimitStats& stats() { return stats_; }
@@ -77,8 +85,7 @@ private:
   LocalRateLimiterImplSharedPtr rate_limiter_;
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
-
-  // Nothing else holds a reference to the singleton, so hold one here to ensure it isn't deleted.
+  const SharedRateLimitSingleton::Key* shared_bucket_key_{};
   std::shared_ptr<SharedRateLimitSingleton> shared_bucket_registry_;
 
   friend class LocalRateLimitTestBase;
