@@ -80,8 +80,9 @@ for HTTP filters.
 
 Extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at
-*<stat_prefix>.extension_config_discovery.<extension_config_name>*. In addition
-to the common subscription statistics, it also provides the following:
+*<stat_prefix>.extension_config_discovery.<extension_config_name>*. For HTTP
+filters, the value of *<stat_prefix>* is *http_filters*. In addition to the
+common subscription statistics, it also provides the following:
 
 .. csv-table::
   :header: Name, Type, Description

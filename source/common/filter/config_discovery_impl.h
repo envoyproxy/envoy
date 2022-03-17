@@ -74,7 +74,7 @@ public:
                                   ProtobufTypes::MessagePtr&& default_config,
                                   bool last_filter_in_filter_chain,
                                   const std::string& filter_chain_type,
-                                  const std::string& stat_prefix)
+                                  absl::string_view stat_prefix)
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
                                             last_filter_in_filter_chain, filter_chain_type),
         stat_prefix_(stat_prefix), factory_context_(factory_context),
@@ -192,7 +192,7 @@ public:
   FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                            const std::string& filter_config_name,
                            Server::Configuration::ServerFactoryContext& factory_context,
-                           const std::string& stat_prefix,
+                           absl::string_view stat_prefix,
                            FilterConfigProviderManagerImplBase& filter_config_provider_manager,
                            const std::string& subscription_id);
 
@@ -277,7 +277,7 @@ protected:
   std::shared_ptr<FilterConfigSubscription>
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                   const std::string& name, Server::Configuration::FactoryContext& factory_context,
-                  const std::string& stat_prefix);
+                  absl::string_view stat_prefix);
   void applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
                                 DynamicFilterConfigProviderImplBase& provider,
                                 const std::string& filter_config_name);
@@ -300,8 +300,13 @@ public:
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type) override {
+    absl::string_view actual_stat_prefix =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.top_level_ecds_stats")
+            ? statPrefix()
+            : stat_prefix;
+
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
-                                        factory_context, stat_prefix);
+                                        factory_context, actual_stat_prefix);
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
@@ -323,7 +328,7 @@ public:
 
     auto provider = std::make_unique<DynamicFilterConfigProviderImpl<Factory, FactoryCb>>(
         subscription, require_type_urls, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, stat_prefix);
+        last_filter_in_filter_chain, filter_chain_type, actual_stat_prefix);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
@@ -338,6 +343,8 @@ public:
                                    const std::string& filter_config_name) override {
     return std::make_unique<StaticFilterConfigProviderImpl<FactoryCb>>(config, filter_config_name);
   }
+
+  virtual absl::string_view statPrefix() const override PURE;
 
 protected:
   virtual ProtobufTypes::MessagePtr
@@ -354,6 +361,8 @@ public:
   std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
              Server::Configuration::ServerFactoryContext& factory_context) const override;
+
+  absl::string_view statPrefix() const override;
 
 protected:
   ProtobufTypes::MessagePtr
