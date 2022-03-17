@@ -49,6 +49,7 @@ SharedRateLimitSingleton::get(
 }
 
 void SharedRateLimitSingleton::removeIfUnused(const Key* key) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (key != nullptr) {
     auto it = limiters_.find(*key);
     ASSERT(it != limiters_.end());
