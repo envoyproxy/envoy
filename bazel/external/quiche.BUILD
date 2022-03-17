@@ -2258,7 +2258,7 @@ envoy_cc_library(
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
-        "@envoy//source/common/quic/platform:quic_platform_logging_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
     ],
 )
 
@@ -4160,7 +4160,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quic_platform_logging_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
     ],
 )
 
@@ -4174,7 +4174,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_common_platform_logging_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
     ],
 )
 
