@@ -7,11 +7,11 @@
 // porting layer for QUICHE.
 
 #include "absl/strings/string_view.h"
-#include "quiche/quic/platform/api/quic_export.h"
+#include "quiche/common/platform/api/quiche_export.h"
 
-namespace quic {
+namespace quiche {
 
-class QUIC_EXPORT_PRIVATE QuicHostnameUtilsImpl {
+class QUICHE_EXPORT_PRIVATE QuicheHostnameUtilsImpl {
 public:
   // Returns true if the sni is valid, false otherwise.
   //  (1) disallow IP addresses;
@@ -32,7 +32,7 @@ public:
   static std::string NormalizeHostname(absl::string_view hostname);
 
 private:
-  QuicHostnameUtilsImpl() = delete;
+  QuicheHostnameUtilsImpl() = delete;
 };
 
-} // namespace quic
+} // namespace quiche

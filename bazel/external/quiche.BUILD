@@ -1106,9 +1106,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_hostname_utils",
-    srcs = [
-        "quiche/quic/platform/api/quic_hostname_utils.cc",
-    ],
     hdrs = [
         "quiche/quic/platform/api/quic_hostname_utils.h",
     ],
@@ -1116,8 +1113,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_platform_export",
-        "@envoy//source/common/quic/platform:quic_platform_hostname_utils_impl_lib",
+        ":quiche_common_platform_hostname_utils",
     ],
 )
 
@@ -4222,6 +4218,20 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_hostname_utils",
+    hdrs = [
+        "quiche/common/platform/api/quiche_hostname_utils.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
     ],
 )
 

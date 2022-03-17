@@ -119,12 +119,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_hostname_utils_impl_lib",
+    name = "quiche_platform_hostname_utils_impl_lib",
     srcs = [
-        "quic_hostname_utils_impl.cc",
+        "quiche_hostname_utils_impl.cc",
     ],
     hdrs = [
-        "quic_hostname_utils_impl.h",
+        "quiche_hostname_utils_impl.h",
     ],
     external_deps = [
         "abseil_str_format",
@@ -134,7 +134,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//source/common/http:utility_lib",
-        "@com_github_google_quiche//:quic_platform_export",
+        "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
 
