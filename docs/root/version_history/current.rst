@@ -79,6 +79,7 @@ New Features
 * config: added new :ref:`custom config validators <config_config_validation>` to dynamically verify config updates.
 * cors: add dynamic support for headers ``access-control-allow-methods`` and ``access-control-allow-headers`` in cors.
 * http: added random_value_specifier in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow random value to be specified from configuration proto.
+* http: added request_mirror_policies to higher levels ``RouteConfiguration`` and ``VirtualHost`` which applies to :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` in all routes underneath without configured mirror policies..
 * http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring `Proxy-Status <https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08>`_ HTTP response header fields.
 * http: make consistent custom header format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * http2: re-enabled the HTTP/2 wrapper API. This should be a transparent change that does not affect functionality. Any behavior changes can be reverted by setting the ``envoy.reloadable_features.http2_new_codec_wrapper`` runtime feature to false.

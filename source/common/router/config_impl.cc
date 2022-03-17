@@ -490,9 +490,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (!route.route().request_mirror_policies().empty()) {
     for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-      shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(mirror_policy_config));
+      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
     }
   }
+
+  // Inherit policies from the virtual host, which might be from the route config.
+  if (shadow_policies_.empty()) {
+    shadow_policies_ = vhost.shadowPolicies();
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
@@ -1439,6 +1445,17 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  if (!virtual_host.request_mirror_policies().empty()) {
+    for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
+      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+    }
+  }
+
+  // Inherit policies from the route config.
+  if (shadow_policies_.empty()) {
+    shadow_policies_ = global_route_config_.shadowPolicies();
+  }
+
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
     throw EnvoyException("cannot set both matcher and routes on virtual host");
   }
@@ -1727,6 +1744,12 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
+  if (!config.request_mirror_policies().empty()) {
+    for (const auto& mirror_policy_config : config.request_mirror_policies()) {
+      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+    }
+  }
+
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, optional_http_filters, *this, factory_context, validator,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
