@@ -292,9 +292,8 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory* getFactory(const ProtoMessage& message) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
-      return factory;
+    if (message.has_typed_config()) {
+      return Utility::getFactoryByType<Factory>(message.typed_config());
     }
 
     return Utility::getFactoryByName<Factory>(message.name());
@@ -309,8 +308,13 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
+    if (message.has_typed_config()) {
+      Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+      if (factory == nullptr && !is_optional) {
+        ExceptionUtil::throwEnvoyException(
+            fmt::format("Didn't find a registered implementation for type URL: '{}'",
+                        message.typed_config().type_url()));
+      }
       return factory;
     }
 
