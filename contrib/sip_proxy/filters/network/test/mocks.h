@@ -230,7 +230,7 @@ public:
     async_client_ = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
     request_ = new Grpc::MockAsyncRequest();
   }
-  ~MockGrpcClientImpl() { delete request_; }
+  ~MockGrpcClientImpl() override { delete request_; }
 
   std::shared_ptr<Grpc::MockAsyncClient> asyncClient() { return async_client_; }
 

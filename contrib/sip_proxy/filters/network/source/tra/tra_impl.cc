@@ -25,8 +25,16 @@ GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client
     : async_client_(async_client), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() {
-  cancel();
-  resetStream();
+  // Avoid to call virtual functions during destruction
+  // error: Call to virtual method 'GrpcClientImpl::cancel' during destruction bypasses virtual
+  // dispatch [clang-analyzer-optin.cplusplus.VirtualCall,-warnings-as-errors]
+  if (request_) {
+    request_->cancel();
+  }
+
+  if (stream_ != nullptr) {
+    stream_.closeStream();
+  }
 }
 
 void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {

@@ -40,7 +40,7 @@ namespace Router {
 class SipRouterTest : public testing::Test {
 public:
   SipRouterTest() = default;
-  ~SipRouterTest() { delete (filter_); }
+  ~SipRouterTest() override { delete (filter_); }
 
   void initializeTrans(const std::string& sip_protocol_options_yaml = "",
                        const std::string& sip_proxy_yaml = "") {
