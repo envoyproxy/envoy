@@ -68,7 +68,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "c7064405ab9dc4e04343147fc5fd399e90d25ccb849ede0d3e288b2e54c04634",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2022-03-17",
+        release_date = "2022-03-16",
         use_category = ["build"],
     ),
     boringssl = dict(
