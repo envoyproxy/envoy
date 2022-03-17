@@ -399,7 +399,7 @@ void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
   ASSERT(type_ >= Http::CodecType::HTTP2);
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
-  ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", code);
+  ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", static_cast<int>(code));
 }
 
 void FakeHttpConnection::encodeGoAway() {

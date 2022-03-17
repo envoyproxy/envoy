@@ -378,7 +378,8 @@ protected:
     initialize();
 
     TestRequestHeaderMapImpl request_headers;
-    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    request_headers.setMethod("POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
     driveToCompletion();
@@ -433,7 +434,8 @@ protected:
     initialize();
 
     TestRequestHeaderMapImpl request_headers;
-    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    request_headers.setMethod("POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
     driveToCompletion();

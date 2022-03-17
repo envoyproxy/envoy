@@ -79,7 +79,7 @@ def _envoy_repo_impl(repository_ctx):
 
     """
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
-    version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
+    version = repository_ctx.read(repo_path.get_child("VERSION.txt")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
