@@ -17,6 +17,8 @@ namespace {
 
 using testing::TestWithParam;
 
+constexpr char FilterName[] = "envoy.filters.http.gcp_authn";
+
 class GcpAuthnFilterIntegrationTest : public TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
@@ -45,7 +47,7 @@ public:
 
       TestUtility::loadFromYaml(default_config_, proto_config_);
       envoy::config::listener::v3::Filter gcp_authn_filter;
-      gcp_authn_filter.set_name("envoy.filters.http.gcp_authn");
+      gcp_authn_filter.set_name(FilterName);
       gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
 
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(gcp_authn_filter));
@@ -84,7 +86,7 @@ private:
   FakeStreamPtr token_request_{};
   const std::string default_config_ = R"EOF(
     http_uri:
-      uri: "gcp_authn:9000"
+      uri: "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=xyz.com"
       cluster: gcp_authn
       timeout:
         seconds: 5
@@ -99,6 +101,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initialize();
   sendRequestAndValidateResponse({0});
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
 } // namespace

@@ -33,7 +33,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
   // Cancel any active requests.
   cancel();
 
-  ASSERT(callbacks_ == nullptr);
+  // ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   const std::string cluster = config_.http_uri().cluster();
@@ -93,7 +93,6 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
 
 void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
-  ENVOY_LOG(error, "{}: haha", __func__);
   if (reason == Http::AsyncClient::FailureReason::Reset) {
     ENVOY_LOG(error, "Request to [uri = {}] failed: stream has been reset",
               config_.http_uri().uri());

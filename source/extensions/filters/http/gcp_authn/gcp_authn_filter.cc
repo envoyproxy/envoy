@@ -9,11 +9,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
+using Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   state_ = State::Calling;
   initiating_call_ = true;
+
   client_->fetchToken(*this);
   initiating_call_ = false;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
@@ -27,7 +29,6 @@ void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallback
 void GcpAuthnFilter::onComplete(const Http::ResponseMessage*) {
   state_ = State::Complete;
   if (!initiating_call_) {
-    ENVOY_LOG(error, "continue decoding");
     decoder_callbacks_->continueDecoding();
   }
 

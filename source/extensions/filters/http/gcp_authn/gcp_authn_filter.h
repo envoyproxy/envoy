@@ -22,6 +22,10 @@ class GcpAuthnFilter : public Http::PassThroughFilter,
                        public RequestCallbacks,
                        public Logger::Loggable<Logger::Id::filter> {
 public:
+  // State of this filter's communication with the external authorization service.
+  // The filter has either not started calling the external service, in the middle of calling
+  // it or has completed.
+  enum class State { NotStarted, Calling, Complete };
   GcpAuthnFilter(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       Server::Configuration::FactoryContext& context)
@@ -36,7 +40,7 @@ public:
   void onDestroy() override;
   void onComplete(const Http::ResponseMessage* response) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
-
+  State getState() { return state_; }
   ~GcpAuthnFilter() override = default;
 
 private:
@@ -46,10 +50,6 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
 
   bool initiating_call_{};
-  // State of this filter's communication with the external authorization service.
-  // The filter has either not started calling the external service, in the middle of calling
-  // it or has completed.
-  enum class State { NotStarted, Calling, Complete };
   State state_{State::NotStarted};
 };
 

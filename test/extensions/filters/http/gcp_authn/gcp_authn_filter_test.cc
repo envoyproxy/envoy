@@ -58,13 +58,13 @@ public:
   }
 
   void createClient(const std::string& config_str = DefaultConfig) {
-    GcpAuthnFilterConfig config;
-    TestUtility::loadFromYaml(config_str, config);
-    client_ = std::make_unique<GcpAuthnClient>(config, context_);
+    TestUtility::loadFromYaml(config_str, config_);
+    client_ = std::make_unique<GcpAuthnClient>(config_, context_);
   }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   Envoy::Http::MockAsyncClientRequest client_request_{&thread_local_cluster_.async_client_};
   MockRequestCallbacks request_callbacks_;
 
@@ -74,6 +74,9 @@ public:
   Envoy::Http::AsyncClient::RequestOptions options_;
 
   std::unique_ptr<GcpAuthnClient> client_;
+  GcpAuthnFilterConfig config_;
+  Http::TestRequestHeaderMapImpl default_headers_{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 };
 
 TEST_F(GcpAuthnFilterTest, Success) {
@@ -130,14 +133,35 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
-TEST_F(GcpAuthnFilterTest, FilterIsDestoryed) {
-  GcpAuthnFilterConfig config;
-  TestUtility::loadFromYaml(DefaultConfig, config);
-  auto filter = std::make_shared<GcpAuthnFilter>(config, context_);
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  EXPECT_EQ(filter->decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
+TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
+  setupMockObjects();
+  auto filter = std::make_shared<GcpAuthnFilter>(config_, context_);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+  // decodeHeaders() is expected to return `StopIteration` because none of complete functions(i.e.,
+  // onSuccess, onFailure, onDestroy, etc) has been called.
+  EXPECT_EQ(filter->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopIteration);
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnFilterTest, DestoryFilter) {
+  setupMockObjects();
+  auto filter = std::make_shared<GcpAuthnFilter>(config_, context_);
+  // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
+  // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been
+  // called.
+  EXPECT_EQ(filter->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(filter->getState(), GcpAuthnFilter::State::Calling);
   filter->onDestroy();
+  // onDestroy() call updated the state from `Calling` to `Complete`.
+  EXPECT_EQ(filter->getState(), GcpAuthnFilter::State::Complete);
 }
 
 } // namespace
