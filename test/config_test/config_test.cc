@@ -51,15 +51,6 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 #endif
 };
 
-class ScopedRuntimeInjector {
-public:
-  ScopedRuntimeInjector(Runtime::Loader& runtime) {
-    Runtime::LoaderSingleton::initialize(&runtime);
-  } // namespace
-
-  ~ScopedRuntimeInjector() { Runtime::LoaderSingleton::clear(); }
-}; // namespace ConfigTest
-
 } // namespace
 
 class ConfigTest {
@@ -82,7 +73,6 @@ public:
     // production code. Note that this test is actually more strict than production because
     // in production runtime is not setup until after the bootstrap config is loaded. This seems
     // better for configuration tests.
-    ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
 

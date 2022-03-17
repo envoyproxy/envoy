@@ -3035,8 +3035,7 @@ TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
 
   // Always call readDisable if lazy read disable flag is set to false.
   {

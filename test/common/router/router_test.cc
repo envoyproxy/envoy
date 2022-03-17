@@ -1144,7 +1144,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
 
 TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats",
         "false"}});
 

@@ -344,7 +344,7 @@ public:
   bool deleted_before_listener_ = false;
   std::shared_ptr<AccessLog::MockInstance> access_log_;
   TestScopedRuntime scoped_runtime_;
-  Runtime::Loader& runtime_{*Runtime::LoaderSingleton::getExisting()};
+  Runtime::Loader& runtime_{scoped_runtime_.loader()};
 };
 
 // Verify that if a listener is removed while a rebalanced connection is in flight, we correctly

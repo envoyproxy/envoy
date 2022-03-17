@@ -66,6 +66,7 @@ RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
 RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
+RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
 // Begin false flags. These should come with a TODO to flip true.
@@ -75,8 +76,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
-// TODO(alyssar) flip false once issue complete.
-FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 // TODO(kbaichoo): Make this enabled by default when fairness and chunking
 // are implemented, and we've had more cpu time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
