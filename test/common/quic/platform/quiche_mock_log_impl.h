@@ -11,23 +11,23 @@
 #include "source/common/common/assert.h"
 
 #include "gmock/gmock.h"
-#include "quiche/quic/platform/api/quic_logging.h"
+#include "quiche/common/platform/api/quiche_logging.h"
 
-namespace quic {
+namespace quiche {
 
-// A QuicEnvoyMockLog object captures QUIC_LOG() messages emitted between StartCapturingLogs() and
+// A QuicheEnvoyMockLog object captures QUICHE_LOG() messages emitted between StartCapturingLogs() and
 // destruction(or StopCapturingLogs()).
-class QuicEnvoyMockLog : public quiche::QuicheLogSink {
+class QuicheEnvoyMockLog : public quiche::QuicheLogSink {
 public:
-  QuicEnvoyMockLog() = default;
+  QuicheEnvoyMockLog() = default;
 
-  ~QuicEnvoyMockLog() override {
+  ~QuicheEnvoyMockLog() override {
     if (is_capturing_) {
       StopCapturingLogs();
     }
   }
 
-  MOCK_METHOD(void, Log, (quiche::QuicheLogLevel level, const std::string& message));
+  MOCK_METHOD(void, Log, (QuicheLogLevel level, const std::string& message));
 
   // NOLINTNEXTLINE(readability-identifier-naming)
   void StartCapturingLogs() {
@@ -49,40 +49,40 @@ private:
 };
 
 // ScopedDisableExitOnDFatal is used to disable exiting the program when we encounter a
-// QUIC_LOG(DFATAL) within the current block. After we leave the current block, the previous
+// QUICHE_LOG(DFATAL) within the current block. After we leave the current block, the previous
 // behavior is restored.
 class ScopedDisableExitOnDFatal {
 public:
-  ScopedDisableExitOnDFatal() : previous_value_(quiche::isDFatalExitDisabled()) {
+  ScopedDisableExitOnDFatal() : previous_value_(isDFatalExitDisabled()) {
     quiche::setDFatalExitDisabled(true);
   }
 
   ScopedDisableExitOnDFatal(const ScopedDisableExitOnDFatal&) = delete;
   ScopedDisableExitOnDFatal& operator=(const ScopedDisableExitOnDFatal&) = delete;
 
-  ~ScopedDisableExitOnDFatal() { quiche::setDFatalExitDisabled(previous_value_); }
+  ~ScopedDisableExitOnDFatal() { setDFatalExitDisabled(previous_value_); }
 
 private:
   const bool previous_value_;
 };
 
-} // namespace quic
+} // namespace quiche
 
-using QuicMockLogImpl = quic::QuicEnvoyMockLog;
+using QuicheMockLogImpl = quiche::QuicheEnvoyMockLog;
 
-#define CREATE_QUIC_MOCK_LOG_IMPL(log) QuicMockLog log
+#define CREATE_QUICHE_MOCK_LOG_IMPL(log) QuicheMockLog log
 
-#define EXPECT_QUIC_LOG_CALL_IMPL(log) EXPECT_CALL(log, Log(testing::_, testing::_))
+#define EXPECT_QUICHE_LOG_CALL_IMPL(log) EXPECT_CALL(log, Log(testing::_, testing::_))
 
-#define EXPECT_QUIC_LOG_CALL_CONTAINS_IMPL(log, level, content)                                    \
+#define EXPECT_QUICHE_LOG_CALL_CONTAINS_IMPL(log, level, content)                                    \
   EXPECT_CALL(log, Log(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##level),               \
                        testing::HasSubstr(content)))
 
-// Not part of the api exposed by quic_mock_log.h. This is used by
-// quic_expect_bug_impl.h.
-#define EXPECT_QUIC_LOG_IMPL(statement, level, matcher)                                            \
+// Not part of the api exposed by quiche_mock_log.h. This is used by
+// quiche_expect_bug_impl.h.
+#define EXPECT_QUICHE_LOG_IMPL(statement, level, matcher)                                            \
   do {                                                                                             \
-    quic::QuicEnvoyMockLog mock_log;                                                               \
+    quiche::QuicheEnvoyMockLog mock_log;                                                               \
     EXPECT_CALL(mock_log,                                                                          \
                 Log(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##level), matcher))        \
         .Times(testing::AtLeast(1));                                                               \
@@ -94,10 +94,10 @@ using QuicMockLogImpl = quic::QuicEnvoyMockLog;
     }                                                                                              \
   } while (false)
 
-#define EXPECT_QUIC_DFATAL_IMPL(statement, matcher)                                                \
-  EXPECT_QUIC_LOG_IMPL(                                                                            \
+#define EXPECT_QUICHE_DFATAL_IMPL(statement, matcher)                                                \
+  EXPECT_QUICHE_LOG_IMPL(                                                                            \
       {                                                                                            \
-        quic::ScopedDisableExitOnDFatal disable_exit_on_dfatal;                                    \
+        quiche::ScopedDisableExitOnDFatal disable_exit_on_dfatal;                                    \
         statement;                                                                                 \
       },                                                                                           \
       DFATAL, matcher)

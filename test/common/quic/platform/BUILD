@@ -117,8 +117,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_mock_log_impl_lib",
-    hdrs = ["quic_mock_log_impl.h"],
+    name = "quiche_platform_mock_log_impl_lib",
+    hdrs = ["quiche_mock_log_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:quic_platform_base"],
 )

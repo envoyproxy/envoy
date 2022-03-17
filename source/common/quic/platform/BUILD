@@ -140,14 +140,9 @@ envoy_cc_library(
     hdrs = [
         "quiche_error_code_wrappers_impl.h",
     ],
-    external_deps = [
-        "abseil_str_format",
-        "quiche_quic_platform_base",
-    ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )

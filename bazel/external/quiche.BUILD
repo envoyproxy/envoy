@@ -1203,6 +1203,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_containers",
+        ":quic_platform_error_code_wrappers",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
         ":quiche_common_buffer_allocator_lib",
@@ -1281,7 +1282,7 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_mock_log.h"],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = ["@envoy//test/common/quic/platform:quic_platform_mock_log_impl_lib"],
+    deps = [":quiche_common_platform_mock_log"],
 )
 
 envoy_cc_test_library(
@@ -4288,6 +4289,19 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_mock_log",
+    hdrs = [
+        "quiche/common/platform/api/quiche_mock_log.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//test/common/quic/platform:quiche_platform_mock_log_impl_lib",
     ],
 )
 
