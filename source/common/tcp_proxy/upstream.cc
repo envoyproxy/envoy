@@ -92,7 +92,8 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
 
 Tcp::ConnectionPool::ConnectionData*
 HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;
