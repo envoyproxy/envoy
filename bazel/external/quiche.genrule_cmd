@@ -24,7 +24,6 @@ cat <<EOF >sed_commands
 /^#include/ s!net/quic/platform/impl/quic_mock_log_impl.h!test/common/quic/platform/quic_mock_log_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_port_utils_impl.h!test/common/quic/platform/quic_port_utils_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_sleep_impl.h!test/common/quic/platform/quic_sleep_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_system_event_loop_impl.h!test/common/quic/platform/quic_system_event_loop_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/common/quic/platform/quic_test_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_mem_slice_vector_impl.h!test/common/quic/platform/quic_test_mem_slice_vector_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/common/quic/platform/quic_test_output_impl.h!

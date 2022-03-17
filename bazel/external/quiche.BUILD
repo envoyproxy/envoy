@@ -1159,6 +1159,7 @@ envoy_cc_library(
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
+        ":quiche_common_platform_client_stats",
         ":quiche_common_platform_default_quiche_platform_impl_export_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_testvalue",
@@ -1283,14 +1284,6 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = ["@envoy//test/common/quic/platform:quic_platform_test_output_impl_lib"],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_system_event_loop",
-    hdrs = ["quiche/quic/platform/api/quic_system_event_loop.h"],
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = ["@envoy//test/common/quic/platform:quic_platform_system_event_loop_impl_lib"],
 )
 
 envoy_cc_test_library(
@@ -2044,6 +2037,7 @@ envoy_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform",
+        ":quiche_common_platform_client_stats",
     ],
 )
 
@@ -4133,6 +4127,27 @@ envoy_cc_library(
         [
             ":quiche_common_platform_export",
         ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_client_stats",
+    hdrs = [
+        "quiche/common/platform/api/quiche_client_stats.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_client_stats_impl.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_system_event_loop",
+    hdrs = [
+        "quiche/common/platform/api/quiche_system_event_loop.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_system_event_loop_impl.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
 )
 
 envoy_cc_library(

@@ -71,7 +71,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
     hdrs = [
-        "quic_client_stats_impl.h",
         "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
         "quic_server_stats_impl.h",
