@@ -326,6 +326,7 @@ R"(
         dns_cache_config: *dns_cache_config
     transport_socket: *base_tls_socket
     upstream_connection_options: &upstream_opts
+      set_local_interface_name_on_upstream_connections: true
       tcp_keepalive:
         keepalive_interval: 5
         keepalive_probes: 1
