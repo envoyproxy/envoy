@@ -43,8 +43,9 @@ using namespace std::chrono_literals;
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
+
 class ExtProcIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+                               public Grpc::GrpcClientIntegrationParamTest {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
@@ -86,11 +87,6 @@ protected:
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
-
-      // Parameterize with defer processing to prevent bit rot as filter made
-      // assumptions of data flow, prior relying on eager processing.
-      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                        deferredProcessing() ? "true" : "false");
     });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -316,10 +312,8 @@ protected:
   FakeStreamPtr processor_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
@@ -652,12 +646,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
     return true;
   });
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // We get a reset since we've received some of the response already.
-    ASSERT_TRUE(response->waitForReset());
-  } else {
-    verifyDownstreamResponse(*response, 500);
-  }
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter configured to only send the response trailers message
