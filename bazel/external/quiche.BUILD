@@ -1118,6 +1118,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_containers",
+    hdrs = [
+        "quiche/quic/platform/api/quic_containers.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_containers",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_mutex",
     hdrs = [
         "quiche/quic/platform/api/quic_mutex.h",
@@ -1135,7 +1148,6 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
-        "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_error_code_wrappers.h",
         "quiche/quic/platform/api/quic_exported_stats.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
@@ -4236,6 +4248,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_containers",
+    hdrs = [
+        "quiche/common/platform/api/quiche_containers.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_containers.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform_testvalue",
     hdrs = [
         "quiche/common/platform/api/quiche_testvalue.h",
@@ -4275,7 +4301,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_export_lib",
     hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_thread_local_impl.h",
