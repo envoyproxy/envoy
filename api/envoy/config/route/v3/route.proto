@@ -133,6 +133,7 @@ message RouteConfiguration {
 message ClusterSpecifierPlugin {
   // The name of the plugin and its opaque configuration.
   core.v3.TypedExtensionConfig extension = 1;
+
   // If is_optional is not set and the plugin defined by this message is not
   // a supported type, the containing resource is NACKed. If is_optional is
   // set, the resource would not be NACKed for this reason. In this case,
