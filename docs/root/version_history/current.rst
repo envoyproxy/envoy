@@ -12,6 +12,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* access_log: added new access_log command operator ``%ENVIRONMENT(X):Z%``.
 * access_log: log all header values in the grpc access log.
 * config: warning messages for protobuf unknown fields now contain ancestors for easier troubleshooting.
 * decompressor: decompressor does not duplicate `accept-encoding` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.

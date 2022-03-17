@@ -438,7 +438,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     if (key.empty()) {
       throw EnvoyException("Empty environment name is not allowed.");
     }
-    return std::make_unique<EnvironmentFormatter>(key);
+    return std::make_unique<EnvironmentFormatter>(key, max_length);
   } else if (absl::StartsWith(token, "START_TIME")) {
     return std::make_unique<StartTimeFormatter>(token);
   } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
@@ -1659,12 +1659,15 @@ ProtobufWkt::Value SystemTimeFormatter::formatValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
 }
 
-EnvironmentFormatter::EnvironmentFormatter(const std::string& key) {
+EnvironmentFormatter::EnvironmentFormatter(const std::string& key,
+                                           absl::optional<size_t> max_length) {
   ASSERT(!key.empty());
 
   const char* env_value = std::getenv(key.c_str());
   if (env_value != nullptr) {
-    str_.set_string_value(std::string(env_value));
+    std::string env_string = env_value;
+    truncate(env_string, max_length);
+    str_.set_string_value(env_string);
     return;
   }
   str_.set_string_value(DefaultUnspecifiedValueString);

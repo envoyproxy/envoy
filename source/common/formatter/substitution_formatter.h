@@ -590,7 +590,7 @@ public:
  */
 class EnvironmentFormatter : public FormatterProvider {
 public:
-  EnvironmentFormatter(const std::string& str);
+  EnvironmentFormatter(const std::string& key, absl::optional<size_t> max_length);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
