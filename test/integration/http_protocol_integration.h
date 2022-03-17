@@ -6,13 +6,17 @@
 
 namespace Envoy {
 
-enum Http2Implementation { BARE_HTTP2, WRAPPED_HTTP2, OGHTTP2 };
+enum class Http2Impl {
+  Bare,
+  Wrapped,
+  Oghttp2,
+};
 
 struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
-  Http2Implementation http2_implementation;
+  Http2Impl http2_implementation;
   bool defer_processing_backedup_streams;
 };
 
@@ -58,16 +62,16 @@ public:
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
     switch (GetParam().http2_implementation) {
-    case BARE_HTTP2:
+    case Http2Impl::Bare:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "false");
       break;
-    case WRAPPED_HTTP2:
+    case Http2Impl::Wrapped:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "true");
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
       break;
-    case OGHTTP2:
+    case Http2Impl::Oghttp2:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "true");
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");

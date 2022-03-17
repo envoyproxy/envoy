@@ -11,14 +11,14 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   const auto addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing =
       [&ret](Network::Address::IpVersion ip_version, Http::CodecType downstream_protocol,
              Http::CodecType upstream_protocol) {
-        for (Http2Implementation impl : {WRAPPED_HTTP2, OGHTTP2}) {
+        for (Http2Impl impl : {Http2Impl::Wrapped, Http2Impl::Oghttp2}) {
           ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
                                                impl, false});
           ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
                                                impl, true});
         }
         ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                             BARE_HTTP2, true});
+                                             Http2Impl::Bare, true});
       };
 
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
@@ -26,7 +26,7 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
       for (auto upstream_protocol : upstream_protocols) {
 #ifdef ENVOY_ENABLE_QUIC
         ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                             BARE_HTTP2, false});
+                                             Http2Impl::Bare, false});
         if (downstream_protocol == Http::CodecType::HTTP2 ||
             upstream_protocol == Http::CodecType::HTTP2) {
           addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing(
@@ -38,7 +38,7 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
           ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
         } else {
           ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                               BARE_HTTP2, false});
+                                               Http2Impl::Bare, false});
           if (downstream_protocol == Http::CodecType::HTTP2 ||
               upstream_protocol == Http::CodecType::HTTP2) {
             addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing(
@@ -76,13 +76,13 @@ absl::string_view downstreamToString(Http::CodecType type) {
   return "UnknownDownstream";
 }
 
-absl::string_view implementationToString(Http2Implementation impl) {
+absl::string_view implementationToString(Http2Impl impl) {
   switch (impl) {
-  case BARE_HTTP2:
+  case Http2Impl::Bare:
     return "BareHttp2";
-  case WRAPPED_HTTP2:
+  case Http2Impl::Wrapped:
     return "WrappedHttp2";
-  case OGHTTP2:
+  case Http2Impl::Oghttp2:
     return "OgHttp2";
   }
   return "UnknownHttp2Impl";

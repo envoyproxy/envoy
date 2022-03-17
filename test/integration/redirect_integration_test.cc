@@ -256,7 +256,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectUpstreamBytesCount) {
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  BytesCountExpectation http2_expected = (GetParam().http2_implementation == OGHTTP2)
+  BytesCountExpectation http2_expected = (GetParam().http2_implementation == Http2Impl::Oghttp2)
                                              ? BytesCountExpectation(137, 59, 137, 59)
                                              : BytesCountExpectation(137, 64, 137, 64);
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85), http2_expected,
