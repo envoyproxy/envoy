@@ -199,7 +199,7 @@ message VirtualHost {
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 
-  // Specify a set of default request mirroring policies for every routes under this virtual host.
+  // Specify a set of default request mirroring policies for every route under this virtual host.
   // It takes precedence over the route config mirror policy entirely.
   // That is, policies are not merged, most internal non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
