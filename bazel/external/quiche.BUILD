@@ -1251,7 +1251,7 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_expect_bug.h"],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = ["@envoy//test/common/quic/platform:quic_platform_expect_bug_impl_lib"],
+    deps = [":quiche_common_platform_expect_bug"],
 )
 
 envoy_cc_library(
@@ -4289,6 +4289,19 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_expect_bug",
+    hdrs = [
+        "quiche/common/platform/api/quiche_expect_bug.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//test/common/quic/platform:quiche_platform_expect_bug_impl_lib",
     ],
 )
 

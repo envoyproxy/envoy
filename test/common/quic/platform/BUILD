@@ -73,8 +73,8 @@ envoy_cc_test_library(
     ],
     external_deps = ["abseil_time"],
     deps = [
-        ":quic_platform_expect_bug_impl_lib",
         ":quic_platform_thread_impl_lib",
+        ":quiche_platform_expect_bug_impl_lib",
         "//envoy/network:address_interface",
         "//source/common/quic/platform:quic_platform_base_impl_lib",
         "//test/test_common:environment_lib",
@@ -107,8 +107,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_expect_bug_impl_lib",
-    hdrs = ["quic_expect_bug_impl.h"],
+    name = "quiche_platform_expect_bug_impl_lib",
+    hdrs = ["quiche_expect_bug_impl.h"],
     tags = ["nofips"],
     deps = [
         "@com_github_google_quiche//:quic_platform_base",
