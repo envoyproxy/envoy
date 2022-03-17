@@ -55,6 +55,7 @@ cat <<EOF >sed_commands
 /^#include/ s!"quiche_platform_impl/quiche_mem_slice_impl.h!"source/common/quic/platform/quiche_mem_slice_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_server_stats_impl.h!"source/common/quic/platform/quiche_server_stats_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_stack_trace_impl.h!"source/common/quic/platform/quiche_stack_trace_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_udp_socket_platform_impl.h!"source/common/quic/platform/quiche_udp_socket_platform_impl.h!
 /^#include/ s!"quiche_platform_impl/quic_flags_impl.h!"source/common/quic/platform/quic_flags_impl.h!
 
 # The reset platform APIs use the QUICHE default implementations.

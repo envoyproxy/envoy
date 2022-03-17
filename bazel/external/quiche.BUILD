@@ -1279,14 +1279,14 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_udp_socket",
+    name = "quic_platform_udp_socket_platform",
     hdrs = select({
         "@envoy//bazel:linux": ["quiche/quic/platform/api/quic_udp_socket_platform_api.h"],
         "//conditions:default": [],
     }),
     repository = "@envoy",
     tags = ["nofips"],
-    deps = ["@envoy//source/common/quic/platform:quic_platform_udp_socket_impl_lib"],
+    deps = [":quiche_common_platform_udp_socket_platform"],
 )
 
 envoy_cc_library(
@@ -3685,7 +3685,7 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
         ":quic_platform",
-        ":quic_platform_udp_socket",
+        ":quic_platform_udp_socket_platform",
     ],
 )
 
@@ -4275,6 +4275,20 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_udp_socket_platform",
+    hdrs = [
+        "quiche/common/platform/api/quiche_udp_socket_platform_api.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quiche_platform_udp_socket_platform_impl_lib",
     ],
 )
 

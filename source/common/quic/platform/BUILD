@@ -161,9 +161,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_udp_socket_impl_lib",
+    name = "quiche_platform_udp_socket_platform_impl_lib",
     hdrs = select({
-        "//bazel:linux": ["quic_udp_socket_platform_impl.h"],
+        "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],
         "//conditions:default": [],
     }),
     repository = "@envoy",
