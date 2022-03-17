@@ -767,8 +767,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 
   // The two requests are sent with https scheme rather than http for QUIC downstream.
   const size_t quic_https_extra_bytes = (downstreamProtocol() == Http::CodecType::HTTP3 ? 2u : 0u);
-  const size_t http2_header_bytes_received =
-      (GetParam().http2_implementation == OGHTTP2) ? 24 : 27;
+  const size_t http2_header_bytes_received = (GetParam().http2_implementation == OGHTTP2) ? 24 : 27;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(2550 + quic_https_extra_bytes, 635, 414 + quic_https_extra_bytes, 54),
       BytesCountExpectation(2262, 548, 184, http2_header_bytes_received),
@@ -3354,8 +3353,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
   // Send to the same upstream from the two clients.
   auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
-  const size_t http2_header_bytes_received =
-      (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
+  const size_t http2_header_bytes_received = (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(298, 158, 156, 27),
       BytesCountExpectation(223, 122, 114, http2_header_bytes_received),
@@ -3465,8 +3463,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
 
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
-  const size_t http2_header_bytes_received =
-      (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
+  const size_t http2_header_bytes_received = (GetParam().http2_implementation == OGHTTP2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(159, 47, 128, 27),
       BytesCountExpectation(113, http2_header_bytes_received, 113, http2_header_bytes_received),
