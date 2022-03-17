@@ -146,26 +146,20 @@ public:
   virtual void initialize() {
     switch (http2_implementation_) {
     case BARE_HTTP2:
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
       break;
     case WRAPPED_HTTP2:
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
       break;
     case OGHTTP2:
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
       break;
     }
 
-    scoped_runtime_.mergeValues(
-        {{std::string(Runtime::defer_processing_backedup_streams),
-          defer_processing_backedup_streams_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
+                                  defer_processing_backedup_streams_ ? "true" : "false"}});
 
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
@@ -3667,25 +3661,19 @@ protected:
   void initialize() override {
     switch (http2_implementation_) {
     case BARE_HTTP2:
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
       break;
     case WRAPPED_HTTP2:
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
       break;
     case OGHTTP2:
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-      scoped_runtime_.mergeValues(
-          {{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
       break;
     }
-    scoped_runtime_.mergeValues(
-        {{std::string(Runtime::defer_processing_backedup_streams),
-          defer_processing_backedup_streams_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
+                                  defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
