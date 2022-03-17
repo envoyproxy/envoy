@@ -3702,6 +3702,71 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   test_server_.reset();
 }
 
+TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that the local interface name was not populated. This is the runtime default.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
+}
+
+// WIN32 fails configuration and terminates the server.
+#ifndef WIN32
+TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
+  config_helper_.prependFilter(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_upstream_connection_options()
+        ->set_set_local_interface_name_on_upstream_connections(true);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Make sure that the local interface name was populated due to runtime override.
+  // TODO: h3 upstreams don't have local interface name
+  if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
+  } else {
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("local_interface_name")).empty());
+  }
+}
+#endif
+
 #ifdef NDEBUG
 // These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.

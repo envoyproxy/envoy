@@ -928,7 +928,7 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", result.errno_));
+    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
@@ -940,12 +940,11 @@ void ClientConnectionImpl::onConnected() {
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
   // There are no meaningful socket source address semantics for non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
-    // interfaceName makes a syscall. Call once to minimize perf hit.
-    const auto maybe_interface_name = ioHandle().interfaceName();
+    socket_->connectionInfoProvider().maybeSetInterfaceName(ioHandle());
+    const auto maybe_interface_name = socket_->connectionInfoProvider().interfaceName();
     if (maybe_interface_name.has_value()) {
       ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
                            maybe_interface_name.value());
-      socket_->connectionInfoProvider().setInterfaceName(maybe_interface_name.value());
     }
   }
   ConnectionImpl::onConnected();

@@ -39,7 +39,7 @@ ActiveTcpClient::~ActiveTcpClient() {
   // TcpConnectionData. Make sure the TcpConnectionData will not refer to this ActiveTcpClient
   // and handle clean up normally done in clearCallbacks()
   if (tcp_connection_data_) {
-    ASSERT(state() == ActiveClient::State::CLOSED);
+    ASSERT(state() == ActiveClient::State::Closed);
     tcp_connection_data_->release();
     parent_.onStreamClosed(*this, true);
     parent_.checkForIdleAndCloseIdleConnsIfDraining();
@@ -47,7 +47,7 @@ ActiveTcpClient::~ActiveTcpClient() {
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+  if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
     pool->scheduleOnUpstreamReady();
   }

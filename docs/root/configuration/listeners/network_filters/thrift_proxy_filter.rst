@@ -6,6 +6,36 @@ Thrift proxy
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`
 * This filter should be configured with the name *envoy.filters.network.thrift_proxy*.
 
+Statistics
+----------
+
+Every configured Thrift proxy filter emits the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  cx_destroy_local_with_active_rq, Counter, Connections destroyed locally with an active request
+  cx_destroy_remote_with_active_rq, Counter, Connections destroyed remotely with an active request
+  downstream_cx_max_requests, Counter, Connections that have been closed due to reaching the max requests limit
+  downstream_response_drain_close, Counter, Connections that have received the drain close header in a response
+  request, Counter, Total number of requests
+  request_call, Counter, Total number of requests of type call
+  request_decoding_error, Counter, Total number of requests that caused a decoding error
+  request_invalid_type, Counter, Total number of requests with an invalid type
+  request_oneway, Counter, Total number of requests of type oneway
+  request_passthrough, Counter, Total number of requests with payload passthrough enabled
+  response, Counter, Total number of responses
+  response_decoding_error, Counter, Total number of responses with a decoding error
+  response_error, Counter, Total number of responses with an error
+  response_exception, Counter, Total number of responses with an exception
+  response_invalid_type, Counter, Total number of responses with an invalid type
+  response_passthrough, Counter, Total number of responses with payload passthrough enabled
+  response_reply, Counter, Total number of responses of type reply
+  response_success, Counter ,Total number of responses of type success
+  request_active, Gauge, Number of currently active requests
+  request_time_ms, Histogram, Request time in millisecondse
+
 Cluster Protocol Options
 ------------------------
 
