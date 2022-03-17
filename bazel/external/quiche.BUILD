@@ -1118,6 +1118,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_stack_trace",
+    hdrs = [
+        "quiche/quic/platform/api/quic_stack_trace.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_stack_trace",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_containers",
     hdrs = [
         "quiche/quic/platform/api/quic_containers.h",
@@ -1154,7 +1167,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_server_stats.h",
-        "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_testvalue.h",
         # TODO: uncomment the following files as implementations are added.
@@ -1166,6 +1178,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_containers",
+        ":quic_platform_stack_trace",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
         ":quiche_common_platform_client_stats",
@@ -4248,6 +4261,20 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_stack_trace",
+    hdrs = [
+        "quiche/common/platform/api/quiche_stack_trace.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quiche_platform_stack_trace_impl_lib",
     ],
 )
 

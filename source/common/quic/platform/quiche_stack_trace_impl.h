@@ -11,9 +11,9 @@
 
 #include "source/server/backtrace.h"
 
-namespace quic {
+namespace quiche {
 
-inline std::string QuicStackTraceImpl() {
+inline std::string QuicheStackTraceImpl() {
   Envoy::BackwardsTrace t;
   t.capture();
   std::ostringstream os;
@@ -21,4 +21,4 @@ inline std::string QuicStackTraceImpl() {
   return os.str();
 }
 
-} // namespace quic
+} // namespace quiche
