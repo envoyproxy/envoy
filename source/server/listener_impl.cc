@@ -345,7 +345,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.clusterManager(), parent_.server_.localInfo(),
               parent_.server_.dispatcher(), parent_.server_.stats(),
               parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-              validation_visitor_, parent_.server_.api(), parent_.server_.options())),
+              validation_visitor_, parent_.server_.api(), parent_.server_.options(),
+              parent_.server_.accessLogManager())),
       quic_stat_names_(parent_.quicStatNames()) {
 
   if ((address_->type() == Network::Address::Type::Ip &&

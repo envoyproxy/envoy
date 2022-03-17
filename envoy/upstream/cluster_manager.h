@@ -533,6 +533,7 @@ public:
     ProtobufMessage::ValidationVisitor& validation_visitor_;
     Api::Api& api_;
     const Server::Options& options_;
+    AccessLog::AccessLogManager& access_log_manager_;
   };
 
   /**
