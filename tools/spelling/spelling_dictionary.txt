@@ -300,6 +300,7 @@ RTDS
 RTOS
 RTTI
 RUNDIR
+RVCM
 RW
 RX
 RXQ
@@ -1176,6 +1177,7 @@ subnets
 suboptimal
 subsecond
 subseconds
+subsegment
 subsequence
 subsetting
 substr
@@ -1235,6 +1237,7 @@ transcoded
 transcoder
 transcoding
 transferral
+trds
 triaged
 trie
 tuple
@@ -1335,3 +1338,4 @@ routable
 vhosts
 infos
 ElastiCache
+pinterest

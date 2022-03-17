@@ -32,8 +32,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp
-/*/extensions/filters/common/mutation_rules @gbrail @snowp
+/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -203,6 +203,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # DNS Resolver
 /*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
+# Config Validators
+/*/extensions/config/validators/minimum_clusters @adisuissa @htuch
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

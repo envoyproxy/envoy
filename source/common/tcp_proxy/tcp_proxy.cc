@@ -382,34 +382,28 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
-    if (!read_callbacks_->connection()
-             .streamInfo()
-             .filterState()
-             ->hasData<Network::ProxyProtocolFilterState>(
-                 Network::ProxyProtocolFilterState::key())) {
-      read_callbacks_->connection().streamInfo().filterState()->setData(
-          Network::ProxyProtocolFilterState::key(),
-          std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              downstream_connection->connectionInfoProvider().remoteAddress(),
-              downstream_connection->connectionInfoProvider().localAddress()}),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
-    }
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        read_callbacks_->connection().streamInfo().filterState());
+  auto& downstream_connection = read_callbacks_->connection();
+  auto& filter_state = downstream_connection.streamInfo().filterState();
+  if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolFilterState::key())) {
+    filter_state->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+            downstream_connection.connectionInfoProvider().remoteAddress(),
+            downstream_connection.connectionInfoProvider().localAddress()}),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
 
-    if (auto typed_state = downstream_connection->streamInfo()
-                               .filterState()
-                               .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
-                                   Network::UpstreamSocketOptionsFilterState::key());
-        typed_state != nullptr) {
-      auto downstream_options = typed_state->value();
-      if (!upstream_options_) {
-        upstream_options_ = std::make_shared<Network::Socket::Options>();
-      }
-      Network::Socket::appendOptions(upstream_options_, downstream_options);
+  if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+          Network::UpstreamSocketOptionsFilterState::key());
+      typed_state != nullptr) {
+    auto downstream_options = typed_state->value();
+    if (!upstream_options_) {
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
     }
+    Network::Socket::appendOptions(upstream_options_, downstream_options);
   }
 
   if (!maybeTunnel(*thread_local_cluster)) {

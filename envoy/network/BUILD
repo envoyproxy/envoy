@@ -156,6 +156,7 @@ envoy_cc_library(
         ":post_io_action_interface",
         ":proxy_protocol_options_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:filter_state_interface",
     ],

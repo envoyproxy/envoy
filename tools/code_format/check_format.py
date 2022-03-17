@@ -144,7 +144,7 @@ BUILD_URLS_ALLOWLIST = (
     "./api/bazel/envoy_http_archive.bzl",
 )
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-11")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-12")
 BUILDIFIER_PATH = paths.get_buildifier()
 BUILDOZER_PATH = paths.get_buildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -348,13 +348,13 @@ class FormatChecker:
                     "users".format(CLANG_FORMAT_PATH))
         else:
             error_messages.append(
-                "Command {} not found. If you have clang-format in version 10.x.x "
+                "Command {} not found. If you have clang-format in version 12.x.x "
                 "installed, but the binary name is different or it's not available in "
                 "PATH, please use CLANG_FORMAT environment variable to specify the path. "
                 "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-11.0.1\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-11\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@11/bin/clang-format".format(
+                "    export CLANG_FORMAT=clang-format-12.0.1\n"
+                "    export CLANG_FORMAT=/opt/bin/clang-format-12\n"
+                "    export CLANG_FORMAT=/usr/local/opt/llvm@12/bin/clang-format".format(
                     CLANG_FORMAT_PATH))
 
         def check_bazel_tool(name, path, var):
@@ -1066,9 +1066,11 @@ class FormatChecker:
             top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
             self.check_owners(str(top_level), owned_directories, error_messages)
 
+        dir_name = normalize_path(dir_name)
+
         for file_name in names:
             result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + "/" + file_name,))
+                self.check_format_return_trace_on_error, args=(dir_name + file_name,))
             result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
@@ -1082,6 +1084,18 @@ class FormatChecker:
 
     def whitelisted_for_memcpy(self, file_path):
         return file_path in MEMCPY_WHITELIST
+
+
+def normalize_path(path):
+    """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
+    if not path.startswith("./"):
+        path = "./" + path
+
+    isdir = os.path.isdir(path)
+    if isdir and not path.endswith("/"):
+        path += "/"
+
+    return path
 
 
 if __name__ == "__main__":
@@ -1228,9 +1242,7 @@ if __name__ == "__main__":
         # All of our EXCLUDED_PREFIXES start with "./", but the provided
         # target path argument might not. Add it here if it is missing,
         # and use that normalized path for both lookup and `check_format`.
-        normalized_target_path = args.target_path
-        if not normalized_target_path.startswith("./"):
-            normalized_target_path = "./" + normalized_target_path
+        normalized_target_path = normalize_path(args.target_path)
         if not normalized_target_path.startswith(
                 EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
             error_messages += format_checker.check_format(normalized_target_path)
