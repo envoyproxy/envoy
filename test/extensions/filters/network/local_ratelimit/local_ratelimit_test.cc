@@ -222,7 +222,7 @@ TEST_F(LocalRateLimitSharedTokenBucketTest, Shared) {
 }
 
 // Test that the Key from SharedRateLimitSingleton::get() is valid/stable even if
-// many entries are added and the hashtable is rehashed.
+// many entries are added and the hash table is rehashed.
 TEST_F(LocalRateLimitSharedTokenBucketTest, RehashPointerStability) {
   const char* yaml_template = R"EOF(
 stat_prefix: local_rate_limit_stats
@@ -233,7 +233,7 @@ token_bucket:
 )EOF";
 
   std::vector<std::unique_ptr<Config>> configs;
-  // This assumes that growing a hashtable from size zero to size 100 will cause a rehash
+  // This assumes that growing a hash table from size zero to size 100 will cause a rehash
   // at some point.
   for (uint32_t i = 0; i < 100; i++) {
     std::string yaml = fmt::format(yaml_template, i);
