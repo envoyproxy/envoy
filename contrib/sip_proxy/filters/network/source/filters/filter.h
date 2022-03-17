@@ -90,7 +90,7 @@ public:
   virtual std::shared_ptr<SipProxy::SipSettings> settings() const PURE;
   virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;
-  virtual void continueHandling(const std::string& key) PURE;
+  virtual void continueHanding(const std::string& key) PURE;
   virtual MessageMetadataSharedPtr metadata() PURE;
 };
 

@@ -618,6 +618,25 @@ int Decoder::parseTopLine(absl::string_view& top_line) {
   return 0;
 }
 
+absl::string_view Decoder::domain(absl::string_view sip_header, HeaderType header_type) {
+  std::string domain = "";
+  std::string pattern = "";
+
+  switch (header_type) {
+  case HeaderType::TopLine:
+    pattern = ".*sip.*[:@](.*?) .*";
+    break;
+  case HeaderType::Route:
+    pattern = ".*sip.*[:@](.*?)[:;].*";
+    break;
+  default:
+    PANIC("not reached");
+  }
+
+  re2::RE2::FullMatch(static_cast<std::string>(sip_header), pattern, &domain);
+  return sip_header.substr(sip_header.find(domain), domain.length());
+}
+
 void Decoder::getParamFromHeader(absl::string_view header, MessageMetadataSharedPtr metadata) {
   std::size_t pos = 0;
   std::string pattern = "(.*)=(.*?)>*";

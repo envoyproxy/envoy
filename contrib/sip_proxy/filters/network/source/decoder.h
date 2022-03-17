@@ -125,8 +125,6 @@ public:
     state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
   }
 
-  void complete();
-
 private:
   friend class SipConnectionManagerTest;
   friend class SipDecoderTest;
@@ -136,6 +134,8 @@ private:
     DecoderEventHandler& handler_;
   };
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
+
+  void complete();
 
   int reassemble(Buffer::Instance& data);
 

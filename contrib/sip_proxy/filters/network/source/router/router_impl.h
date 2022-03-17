@@ -160,13 +160,13 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
       }
 
       ++it;
-      // In single thread, this condition should be cover in line 160
-      // And Envoy should be single thread
-      // if (it->second->deleted()) {
-      //   transaction_info_map_.erase(it++);
-      // } else {
-      //   ++it;
-      // }
+      /* In single thread, this condition should be cover in line 160
+       * And Envoy should be single thread
+      if (it->second->deleted()) {
+        transaction_info_map_.erase(it++);
+      } else {
+        ++it;
+      }*/
     }
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
@@ -271,7 +271,7 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (metadata_->destination().empty()) {
+    if (!metadata_->destination().empty()) {
       return false;
     }
     return host.address()->ip()->addressAsString() != metadata_->destination();
@@ -347,7 +347,7 @@ class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public std::enable_shared_from_this<UpstreamRequest>,
                         public Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool_data,
+  UpstreamRequest(Upstream::TcpPoolData& pool_data,
                   std::shared_ptr<TransactionInfo> transaction_info);
   ~UpstreamRequest() override;
   FilterStatus start();
@@ -373,7 +373,6 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
-  void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
@@ -388,7 +387,7 @@ public:
   std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
 
 private:
-  std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
+  Upstream::TcpPoolData& conn_pool_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
