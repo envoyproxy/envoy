@@ -41,7 +41,7 @@ public:
 };
 
 /**
- * A client used to query a centralized TRA service.
+ * A client used to query a centralized rate limit service.
  */
 class Client {
 public:
@@ -52,8 +52,6 @@ public:
   virtual void cancel() PURE;
 
   virtual void closeStream() PURE;
-
-  virtual void resetStream() PURE;
 
   virtual void createTrafficRoutingAssistant(
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
