@@ -28,6 +28,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/cleanup/cleanup.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 
@@ -356,6 +357,15 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
 
 void ConnectionImpl::StreamImpl::processBufferedData() {
   ENVOY_CONN_LOG(debug, "Stream {} processing buffered data.", parent_.connection_, stream_id_);
+
+  // Restore crash dump context when processing buffered data.
+  Event::Dispatcher& dispatcher = parent_.connection_.dispatcher();
+  ASSERT(dispatcher.trackedObjectStackIsEmpty());
+  Envoy::ScopeTrackedObjectStack stack;
+  stack.add(parent_.connection_);
+
+  stack.add(parent_);
+  ScopeTrackerScopeState scope{&stack, dispatcher};
 
   if (stream_manager_.body_buffered_ && continueProcessingBufferedData()) {
     decodeData();

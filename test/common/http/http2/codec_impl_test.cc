@@ -1335,6 +1335,56 @@ TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithout
               HasSubstr("Dumping corresponding downstream request for upstream stream 1:\n"));
 }
 
+TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcessing) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl first_part(std::string(1024, 'a'));
+  request_encoder_->encodeData(first_part, true);
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
+  EXPECT_CALL(server_connection_.dispatcher_, pushTrackedObject(_))
+      .WillOnce(Invoke([&](const ScopeTrackedObject* tracked_object) {
+        EXPECT_CALL(server_connection_, dumpState(_, _))
+            .WillOnce(Invoke([&](std::ostream& os, int) {
+              os << "Network Connection info would be dumped...\n";
+            }));
+        tracked_object->dumpState(ostream, 1);
+      }));
+  EXPECT_CALL(request_decoder_, decodeData(_, true));
+
+  process_buffered_data_callback->invokeCallback();
+
+  EXPECT_THAT(ostream.contents(), HasSubstr("Http2::ConnectionImpl "));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("Dumping current stream:\n  stream: \n    ConnectionImpl::StreamImpl"));
+  EXPECT_THAT(ostream.contents(), HasSubstr("Network Connection info would be dumped..."));
+}
+
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetForClientStreams) {
