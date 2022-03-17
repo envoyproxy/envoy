@@ -29,8 +29,6 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
-  * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
@@ -97,6 +95,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 * Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
+* Jose Nino ([junr03](https://github.com/junr03)) (recruiting@junr03.com)
 
 # Friends of Envoy
 
