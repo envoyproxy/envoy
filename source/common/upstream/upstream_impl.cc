@@ -28,6 +28,7 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/dns_utils.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
@@ -347,6 +348,8 @@ Network::ClientConnectionPtr HostImpl::createConnection(
                 socket_factory.createTransportSocket(std::move(transport_socket_options)),
                 connection_options);
 
+  connection->connectionInfoSetter().enableSettingInterfaceName(
+      cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
@@ -843,6 +846,8 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.connection_pool_per_downstream_connection()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
+      set_local_interface_name_on_upstream_connections_(
+          config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       cluster_type_(
           config.has_cluster_type()
               ? absl::make_optional<envoy::config::cluster::v3::Cluster::CustomClusterType>(
@@ -850,6 +855,13 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+#ifdef WIN32
+  if (set_local_interface_name_on_upstream_connections_) {
+    throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
+                         "on Windows platforms");
+  }
+#endif
+
   if (config.has_max_requests_per_connection() &&
       http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
     throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
@@ -1841,25 +1853,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
 Network::DnsLookupFamily
 getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster) {
-  return getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
-}
-
-Network::DnsLookupFamily
-getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
-  switch (family) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::config::cluster::v3::Cluster::V6_ONLY:
-    return Network::DnsLookupFamily::V6Only;
-  case envoy::config::cluster::v3::Cluster::V4_ONLY:
-    return Network::DnsLookupFamily::V4Only;
-  case envoy::config::cluster::v3::Cluster::AUTO:
-    return Network::DnsLookupFamily::Auto;
-  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
-    return Network::DnsLookupFamily::V4Preferred;
-  case envoy::config::cluster::v3::Cluster::ALL:
-    return Network::DnsLookupFamily::All;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  return DnsUtils::getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
 }
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,

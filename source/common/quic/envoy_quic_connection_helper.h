@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_clock.h"
 
 #include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/crypto/quic_random.h"

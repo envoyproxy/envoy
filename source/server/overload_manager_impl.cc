@@ -257,7 +257,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
       trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
       break;
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::TRIGGER_ONEOF_NOT_SET:
-      PANIC_DUE_TO_CORRUPT_ENUM;
+      throw EnvoyException(absl::StrCat("action not set for trigger ", trigger_config.name()));
     }
 
     if (!triggers_.try_emplace(trigger_config.name(), std::move(trigger)).second) {

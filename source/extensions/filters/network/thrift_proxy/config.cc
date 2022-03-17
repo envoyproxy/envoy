@@ -115,9 +115,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   // reference passed to ConfigImpl valid even after the local variable goes out of scope.
   return [route_config_provider_manager, filter_config,
           &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.mainThreadDispatcher().timeSource()));
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.api().randomGenerator(),
+        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
   };
 }
 
