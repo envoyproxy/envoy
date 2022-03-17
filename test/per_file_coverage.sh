@@ -31,7 +31,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
 "source/extensions/common:95.7"
-"source/extensions/common/tap:91.5"
+"source/extensions/common/tap:91.3"
 "source/extensions/common/wasm:95.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
