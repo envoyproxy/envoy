@@ -50,6 +50,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
@@ -356,6 +357,11 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
         max_pending_requests: 2
         max_requests: 3
         max_retries: 4
+      per_host_thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+      - priority: HIGH
+        max_connections: 990
     max_requests_per_connection: 3
     protocol_selection: USE_DOWNSTREAM_PROTOCOL
     http2_protocol_options:
@@ -388,7 +394,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       singleton_manager_, tls_, validation_visitor_, *api_, options_);
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
                                std::move(scope), false);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43))
+      .Times(AnyNumber());
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("circuit_breakers.name.default.max_pending_requests", 57));
@@ -410,6 +417,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
             cluster.info()->http1Settings().header_key_format_);
+  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
+  EXPECT_EQ(990U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
@@ -513,6 +522,13 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   EXPECT_CALL(resolver2.active_dns_query_,
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+
+  // Test per host connection limits: as it's set to 1, the host can create connections initially.
+  auto& host = cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
+  // If one connection exists to that host, canCreateConnection will fail.
+  host->stats().cx_active_.inc();
+  EXPECT_FALSE(host->canCreateConnection(ResourcePriority::Default));
 }
 
 // Verifies that host removal works correctly when hosts are being health checked
@@ -1336,7 +1352,7 @@ TEST_F(HostImplTest, CreateConnection) {
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
-
+  EXPECT_CALL(*connection, connectionInfoSetter());
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   EXPECT_EQ(connection, connection_data.connection_.get());
@@ -1373,6 +1389,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
   // The underlying connection should be created with the first address in the list.
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
@@ -2812,6 +2829,25 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
   EXPECT_EQ(min_retry_concurrency, 123UL);
+}
+
+TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
+    circuit_breakers:
+      per_host_thresholds:
+      - priority: DEFAULT
+        max_retries: 123
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Unsupported field in per_host_thresholds");
 }
 
 // Eds service_name is populated.

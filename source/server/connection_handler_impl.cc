@@ -313,27 +313,17 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
-    std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
-                               ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
-                               : Network::Address::Ipv6Instance(address.ip()->port()).asString();
 
-    auto iter = tcp_listener_map_by_address_.find(addr_str);
-    if (iter != tcp_listener_map_by_address_.end() &&
-        iter->second->listener_->listener() != nullptr) {
-      details = *iter->second;
-    }
-  } else {
-    for (auto& iter : tcp_listener_map_by_address_) {
-      if (iter.second->listener_->listener() != nullptr &&
-          iter.second->address_->type() == Network::Address::Type::Ip &&
-          iter.second->address_->ip()->port() == address.ip()->port() &&
-          iter.second->address_->ip()->isAnyAddress()) {
-        details = *iter.second;
-      }
-    }
+  std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
+                             ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
+                             : Network::Address::Ipv6Instance(address.ip()->port()).asString();
+
+  auto iter = tcp_listener_map_by_address_.find(addr_str);
+  if (iter != tcp_listener_map_by_address_.end() &&
+      iter->second->listener_->listener() != nullptr) {
+    details = *iter->second;
   }
+
   return (details.has_value())
              ? Network::BalancedConnectionHandlerOptRef(
                    ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(

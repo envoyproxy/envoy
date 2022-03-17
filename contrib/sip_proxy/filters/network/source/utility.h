@@ -36,6 +36,18 @@ public:
       local_services_.emplace_back(service);
     }
   }
+
+  SipSettings(
+      envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy::SipSettings sip_settings) {
+    transaction_timeout_ = static_cast<std::chrono::milliseconds>(
+        PROTOBUF_GET_MS_OR_DEFAULT(sip_settings, transaction_timeout, 32000));
+    tra_service_config_ = sip_settings.tra_service_config();
+    operate_via_ = sip_settings.operate_via();
+    for (const auto& service : sip_settings.local_services()) {
+      local_services_.emplace_back(service);
+    }
+  }
+
   std::chrono::milliseconds transactionTimeout() { return transaction_timeout_; }
   std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
   localServices() {

@@ -139,7 +139,7 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -233,6 +233,7 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  Http::PersistentQuicInfo& quic_info_;
 };
 
 } // namespace Http
