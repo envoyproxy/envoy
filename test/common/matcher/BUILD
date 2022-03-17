@@ -35,8 +35,16 @@ envoy_cc_test(
     deps = [
         ":test_utility_lib",
         "//source/common/matcher:exact_map_matcher_lib",
-        "//source/common/matcher:matcher_lib",
-        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "prefix_map_matcher_test",
+    srcs = ["prefix_map_matcher_test.cc"],
+    deps = [
+        ":test_utility_lib",
+        "//source/common/matcher:prefix_map_matcher_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -2017,7 +2017,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
-  Network::MockClientConnection* connection = new Network::MockClientConnection();
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   ON_CALL(*cluster2->info_, features())
       .WillByDefault(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -5641,6 +5641,34 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
   EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("added_via_api"),
                             EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
+
+#ifdef WIN32
+TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWin32) {
+  const std::string yaml = fmt::format(R"EOF(
+ static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    upstream_connection_options:
+      set_local_interface_name_on_upstream_connections: true
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 5678
+  )EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "set_local_interface_name_on_upstream_connections_ cannot be set to "
+                            "true on Windows platforms");
+}
+#endif
 
 class PreconnectTest : public ClusterManagerImplTest {
 public:

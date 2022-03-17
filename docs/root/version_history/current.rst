@@ -13,6 +13,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_log: log all header values in the grpc access log.
+* build: ``VERSION`` and ``API_VERSION`` have been renamed to ``VERSION.txt`` and ``API_VERSION.txt`` respectively to avoid conflicts with the C++ ``<version>`` header.
 * config: warning messages for protobuf unknown fields now contain ancestors for easier troubleshooting.
 * decompressor: decompressor does not duplicate `accept-encoding` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.
 * dynamic_forward_proxy: if a DNS resolution fails, failing immediately with a specific resolution error, rather than finishing up all local filters and failing to select an upstream host.
@@ -41,12 +42,14 @@ Bug Fixes
 * data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
 * data plane: fixing error handling where writing to a socket failed while under the stack of processing. This should genreally affect HTTP/3. This behavioral change can be reverted by setting ``envoy.reloadable_features.allow_upstream_inline_write`` to false.
 * eds: fix the eds cluster update by allowing update on the locality of the cluster endpoints. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` to false.
+* jwt_authn: fixed a bug where a JWT with empty "iss" is passed even the field :ref:`issuer <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.issuer>` is specified. If the "issuer" field is specified, "iss" in the JWT should match it.
 * jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
 * tcp_proxy: fix a crash that occurs when configured for :ref:`upstream tunneling <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` and the downstream connection disconnects while the the upstream connection or http/2 stream is still being established.
 * tls: fix a bug while matching a certificate SAN with an exact value in ``match_typed_subject_alt_names`` of a listener where wildcard ``*`` character is not the only character of the dns label. Example, ``baz*.example.net`` and ``*baz.example.net`` and ``b*z.example.net`` will match ``baz1.example.net`` and ``foobaz.example.net`` and ``buzz.example.net``, respectively.
 * upstream: cluster slow start config add ``min_weight_percent`` field to avoid too big EDF deadline which cause slow start endpoints receiving no traffic, default 10%. This fix is releted to `issue#19526 <https://github.com/envoyproxy/envoy/issues/19526>`_.
 * upstream: fix stack overflow when a cluster with large number of idle connections is removed.
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
+* xray: fix the AWS X-Ray tracer extension to annotate a child span with ``type=subsegment`` to correctly relate subsegments to a parent segment. Previously a subsegment would be treated as an independent segment.
 
 Removed Config or Runtime
 -------------------------
@@ -66,6 +69,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.internal_redirects_with_body`` and legacy code paths.
 * json: removed ``envoy.reloadable_features.remove_legacy_json`` and legacy code paths.
 * listener: removed ``envoy.reloadable_features.listener_reuse_port_default_enabled`` and legacy code paths.
+* listener: removed ``envoy.reloadable_features.listener_wildcard_match_ip_family`` and legacy code paths.
 * udp: removed ``envoy.reloadable_features.udp_per_event_loop_read_limit`` and legacy code paths.
 * upstream: removed ``envoy.reloadable_features.health_check.graceful_goaway_handling`` and legacy code paths.
 * xds: removed ``envoy.reloadable_features.vhds_heartbeats`` and legacy code paths.
@@ -75,6 +79,7 @@ New Features
 ------------
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * admin: :http:post:`/logging` now accepts ``/logging?paths=name1:level1,name2:level2,...`` to change multiple log levels at once.
+* cluster: added support for per host limits in :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>`. Currently only  :ref:`max_connections <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connections>` is supported.
 * cluster: support :ref:`override host status restriction <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.override_host_status>`.
 * config: added new file based xDS configuration via :ref:`path_config_source <envoy_v3_api_field_config.core.v3.ConfigSource.path_config_source>`.
   :ref:`watched_directory <envoy_v3_api_field_config.core.v3.PathConfigSource.watched_directory>` can
@@ -105,6 +110,7 @@ New Features
   into all sub messages, including Any messages, and perform full validation (deprecation,
   work-in-progress, PGV, etc.). Previously only top-level messages were fully validated.
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
+* thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 * thrift: added support for dynamic routing through aggregated discovery service.
 * tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
   useful in support systems such as CI, CD, etc. The

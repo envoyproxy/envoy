@@ -148,10 +148,16 @@ public:
   virtual void setConnectionID(uint64_t id) PURE;
 
   /**
+   * @param enable whether to enable or disable setting interface name. While having an interface
+   *               name might be helpful for debugging, it might come at a performance cost.
+   */
+  virtual void enableSettingInterfaceName(const bool enable) PURE;
+
+  /**
    * @param interface_name the name of the network interface used by the local end of the
    *connection.
    **/
-  virtual void setInterfaceName(absl::string_view interface_name) PURE;
+  virtual void maybeSetInterfaceName(IoHandle& io_handle) PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.
