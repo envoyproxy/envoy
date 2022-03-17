@@ -95,7 +95,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
       }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d", false);
+  client_->asyncGetAccessToken("a", "b", "c", "d", true);
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
