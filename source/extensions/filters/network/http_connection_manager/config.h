@@ -99,8 +99,7 @@ public:
     if (address.type() == Network::Address::Type::Pipe) {
       return unix_sockets_;
     }
-
-    // TODO(snowp): Make internal subnets configurable.
+    
     return cidr_ranges_.contains(address) || Network::Utility::isInternalAddress(address);
   }
 
