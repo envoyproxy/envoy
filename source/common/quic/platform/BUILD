@@ -73,7 +73,6 @@ envoy_cc_library(
     hdrs = [
         "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
-        "quic_server_stats_impl.h",
         "quic_stream_buffer_allocator_impl.h",
     ],
     external_deps = [
@@ -141,6 +140,18 @@ envoy_cc_library(
     name = "quiche_platform_stack_trace_impl_lib",
     hdrs = [
         "quiche_stack_trace_impl.h",
+    ],
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_google_quiche//:quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_platform_server_stats_impl_lib",
+    hdrs = [
+        "quiche_server_stats_impl.h",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],

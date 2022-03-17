@@ -1144,6 +1144,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_server_stats",
+    hdrs = [
+        "quiche/quic/platform/api/quic_server_stats.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_server_stats",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_mutex",
     hdrs = [
         "quiche/quic/platform/api/quic_mutex.h",
@@ -1166,7 +1179,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_logging.h",
-        "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_testvalue.h",
         # TODO: uncomment the following files as implementations are added.
@@ -1178,10 +1190,12 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_containers",
+        ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
         ":quiche_common_platform_client_stats",
+        ":quiche_common_platform_server_stats",
         ":quiche_common_platform_default_quiche_platform_impl_export_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_testvalue",
@@ -4261,6 +4275,20 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_server_stats",
+    hdrs = [
+        "quiche/common/platform/api/quiche_server_stats.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quiche_platform_server_stats_impl_lib",
     ],
 )
 
