@@ -171,6 +171,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:symbol_table_lib",

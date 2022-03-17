@@ -258,6 +258,7 @@ transport_socket_match_criteria:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   Server::MockOptions options_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly
@@ -583,7 +584,7 @@ TEST_F(HdsTest, TestSocketContext) {
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
             params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-            params.validation_visitor_, params.api_, params.options_);
+            params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
@@ -1035,7 +1036,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
             params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-            params.validation_visitor_, params.api_, params.options_);
+            params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
