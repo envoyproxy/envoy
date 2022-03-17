@@ -57,10 +57,7 @@ std::string AlternateProtocolsCacheImpl::originDataToStringForCache(const Origin
   }
   absl::StrAppend(&value, "|", origin_data.srtt.count());
   if (origin_data.h3_status_tracker != nullptr) {
-    absl::StrAppend(&value, "|",
-                    (origin_data.h3_status_tracker == nullptr
-                         ? ""
-                         : origin_data.h3_status_tracker->statusToStringForCache()));
+    absl::StrAppend(&value, "|", origin_data.h3_status_tracker->statusToStringForCache());
   }
   return value;
 }

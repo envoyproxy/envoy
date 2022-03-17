@@ -224,8 +224,6 @@ ConnectivityGrid::~ConnectivityGrid() {
   // the callback before deleting the pools.
   wrapped_callbacks_.clear();
   pools_.clear();
-  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
-                                         host_->address()->ip()->port());
 }
 
 void ConnectivityGrid::deleteIsPending() {

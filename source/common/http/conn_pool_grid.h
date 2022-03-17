@@ -207,7 +207,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  std::shared_ptr<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker_;
+  Http3StatusTrackerSharedPtr http3_status_tracker_;
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created
