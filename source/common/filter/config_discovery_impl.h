@@ -344,7 +344,7 @@ public:
     return std::make_unique<StaticFilterConfigProviderImpl<FactoryCb>>(config, filter_config_name);
   }
 
-  virtual absl::string_view statPrefix() const override PURE;
+  absl::string_view statPrefix() const override PURE;
 
 protected:
   virtual ProtobufTypes::MessagePtr
