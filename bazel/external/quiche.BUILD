@@ -1165,6 +1165,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_platform_containers",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
         ":quiche_common_platform_client_stats",
@@ -2692,6 +2693,9 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_containers",
+    ],
 )
 
 envoy_cc_library(
@@ -4251,7 +4255,7 @@ envoy_cc_library(
     name = "quiche_common_platform_containers",
     hdrs = [
         "quiche/common/platform/api/quiche_containers.h",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_containers.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
