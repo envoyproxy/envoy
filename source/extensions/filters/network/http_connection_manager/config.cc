@@ -255,7 +255,7 @@ REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
 InternalAddressConfig::InternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         InternalAddressConfig& config)
-    : unix_sockets_(config.unix_sockets()) {}
+    : unix_sockets_(config.unix_sockets()), cidr_ranges_(config.cidr_ranges()) {}
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

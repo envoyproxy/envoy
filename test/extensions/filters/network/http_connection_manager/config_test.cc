@@ -667,6 +667,35 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    cidr_ranges:
+    - address_prefix: 100.64.0.0
+      prefix_len: 10
+    - address_prefix: 50.20.0.0
+      prefix_len: 20
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  Network::Address::Ipv4Instance firstInternalIpAddress{"100.64.0.10", 0, nullptr};
+  Network::Address::Ipv4Instance secondInternalIpAddress{"50.20.0.5", 0, nullptr};
+  Network::Address::Ipv4Instance defaultInternalIpAddress{"10.48.179.130", 0, nullptr};
+  Network::Address::Ipv4Instance externalIpAddress{"90.60.0.10", 0, nullptr};
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(firstInternalIpAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(secondInternalIpAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(defaultInternalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
