@@ -7,7 +7,7 @@ Configuration
 -------------------------
 
 Access logs are configured as part of the :ref:`HTTP connection manager config
-<config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
+<config_http_conn_man>`, :ref:`TCP Proxy <config_network_filters_tcp_proxy>` or :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
@@ -53,6 +53,16 @@ Example of the default Envoy access log format:
 
   [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
   "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
+
+For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`, some :ref:`command operators <config_access_log_command_operators>`
+are reused to record stats. Recommended access log format for udp proxy:
+
+.. code-block:: none
+
+  [%START_TIME%] %ROUTE_NAME% %BYTES_SENT% %BYTES_RECEIVED% %DOWNSTREAM_HEADER_BYTES_SENT%
+  %DOWNSTREAM_HEADER_BYTES_RECEIVED% %DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED%
+  %UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT%
+  %UPSTREAM_WIRE_BYTES_RECEIVED%\n
 
 .. _config_access_log_format_dictionaries:
 
@@ -177,6 +187,9 @@ The following command operators are supported:
   TCP
     Downstream bytes received on connection.
 
+  UDP
+    Total number of downstream bytes received from the upstream.
+
   Renders a numeric value in typed JSON logs.
 
 %PROTOCOL%
@@ -240,6 +253,9 @@ The following command operators are supported:
 
   TCP
     Downstream bytes sent on connection.
+  
+  UDP
+    Total number of downstream bytes sent to the upstream.
 
 %UPSTREAM_REQUEST_ATTEMPT_COUNT%
   HTTP
@@ -259,12 +275,18 @@ The following command operators are supported:
   TCP
     Not implemented (0).
 
+  UDP
+    Number of downstream datagrams with no healthy host found in the upstream cluster. (reused operator for udp proxy).
+
 %UPSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
     Total number of bytes received from the upstream by the http stream.
 
   TCP
     Not implemented (0).
+
+  UDP
+    Number of downstream datagrams with no route found. (reused operator for udp proxy).
 
 %UPSTREAM_HEADER_BYTES_SENT%
   HTTP
@@ -273,12 +295,18 @@ The following command operators are supported:
   TCP
     Not implemented (0).
 
+  UDP
+    Total number of sessions. (reused operator for udp proxy).
+
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the upstream by the http stream.
 
   TCP
     Not implemented (0).
+
+  UDP
+    Number of times that session idle timeout. (reused operator for udp proxy).
 
 %DOWNSTREAM_WIRE_BYTES_SENT%
   HTTP
@@ -287,12 +315,18 @@ The following command operators are supported:
   TCP
     Not implemented (0).
 
+  UDP
+    Number of datagrams sent to the upstream successfully. (reused operator for udp proxy).
+
 %DOWNSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
     Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
 
   TCP
     Not implemented (0).
+
+  UDP
+    Number of datagrams received from the upstream successfully. (reused operator for udp proxy).
 
 %DOWNSTREAM_HEADER_BYTES_SENT%
   HTTP
@@ -301,12 +335,18 @@ The following command operators are supported:
   TCP
     Not implemented (0).
 
+  UDP
+    Number of errors that have occurred When sending datagrams to the upstream. (reused operator for udp proxy).
+
 %DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the downstream by the http stream.
 
   TCP
     Not implemented (0).
+
+  UDP
+    Number of errors that have occurred When receiving datagrams from the upstream. (reused operator for udp proxy).
 
   Renders a numeric value in typed JSON logs.
 
@@ -394,7 +434,11 @@ The following command operators are supported:
     * **DF**: The request was terminated due to DNS resolution failure.
 
 %ROUTE_NAME%
-  Name of the route.
+  HTTP/TCP
+    Name of the route.
+  
+  UDP
+    Name of the cluster (reused operator for udp proxy).
 
 %VIRTUAL_CLUSTER_NAME%
   HTTP*/gRPC

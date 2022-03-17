@@ -14,9 +14,7 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-
   if (!config->accessLogs().empty()) {
-
     udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(config->timeSource(), nullptr));
     ASSERT(udp_sess_stats_.has_value());
   }
@@ -69,9 +67,7 @@ Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) 
 
 UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->accessLogs().empty()) {
-
     fillStreamInfo();
-
     for (const auto& access_log : config_->accessLogs()) {
       access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
     }

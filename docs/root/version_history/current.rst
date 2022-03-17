@@ -107,6 +107,7 @@ New Features
   useful in support systems such as CI, CD, etc. The
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
   to the tools image.
+* udp_proxy: added support for :ref:`access logging <config_access_log>`.
 
 Deprecated
 ----------
