@@ -5,8 +5,6 @@
 This page lists all active maintainers and their areas of expertise. This can be used for
 routing PRs, questions, etc. to the right place.
 
-* Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
-  * Envoy mobile core, C bridge layer, C++ extensions, build system, Envoy upstream.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
   * Envoy Upstream. Stats.
 * Mike Schore ([goaway](https://github.com/goaway)) (mschore@lyft.com)
@@ -38,3 +36,4 @@ matter expert reviews. Feel free to loop them in as needed.
 
 * Michael Rebello ([rebello95](https://github.com/rebello95)) (mrebello@lyft.com)
 * Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
+* Jose Nino ([junr03](https://github.com/junr03)) (recruiting@junr03.com)
