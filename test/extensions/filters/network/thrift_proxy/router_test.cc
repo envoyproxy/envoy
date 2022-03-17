@@ -19,6 +19,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -541,7 +542,8 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true) {
+  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
+                      bool is_drain = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -549,6 +551,8 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
+    metadata->setDraining(is_drain);
+
     ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
     ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
 
@@ -560,12 +564,42 @@ public:
         .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
                 released(Ref(upstream_connection_)));
+
+    if (is_drain) {
+      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+    }
+
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
   void destroyRouter() {
     router_->onDestroy();
     router_.reset();
+  }
+
+  void expectStatCalls(Stats::MockStore& cluster_scope) {
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+        .WillByDefault(ReturnRef(cluster_scope));
+
+    EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
+
+    EXPECT_CALL(cluster_scope,
+                histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+    EXPECT_CALL(cluster_scope,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
+
+    EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_scope,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
+    EXPECT_CALL(cluster_scope,
+                histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_scope,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
   }
 
   TestNamedTransportConfigFactory transport_factory_;
@@ -1685,32 +1719,29 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
   initializeRouter();
 
   Stats::MockStore cluster_scope;
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
-      .WillByDefault(ReturnRef(cluster_scope));
-
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
-
-  EXPECT_CALL(cluster_scope,
-              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
-
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+  expectStatCalls(cluster_scope);
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();
   returnResponse();
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamDraining) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
+
+  initializeRouter();
+
+  Stats::MockStore cluster_scope;
+  expectStatCalls(cluster_scope);
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
+
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, true /* is_drain */);
   destroyRouter();
 }
 

@@ -799,6 +799,17 @@ TEST_F(OverloadManagerImplTest, Shutdown) {
   manager->stop();
 }
 
+TEST_F(OverloadManagerImplTest, MissingConfigTriggerType) {
+  constexpr char missingTriggerTypeConfig[] = R"YAML(
+  actions:
+    - name: envoy.overload_actions.dummy_action
+      triggers:
+        - name: envoy.resource_monitors.fake_resource1
+)YAML";
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(missingTriggerTypeConfig), EnvoyException,
+                          "action not set for trigger.*");
+}
+
 TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTest) {
   setDispatcherExpectation();
   auto manager(createOverloadManager(proactiveResourceConfig));
