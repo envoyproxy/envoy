@@ -510,7 +510,7 @@ void UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(info, "on pool failure {}", reason);
+  ENVOY_LOG(info, "on pool failure {}", static_cast<int>(reason));
   conn_state_ = ConnectionState::NotConnected;
   conn_pool_handle_ = nullptr;
 
@@ -600,7 +600,7 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
-  ENVOY_LOG(info, "received upstream event {}", event);
+  ENVOY_LOG(info, "received upstream event {}", static_cast<int>(event));
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);

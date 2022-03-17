@@ -1,28 +1,37 @@
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/flags/commandlineflag.h"
 #include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 
-/* To add a runtime guard to Envoy, add 2 lines to this file.
- *
- * RUNTIME_GUARD(envoy_reloadable_features_flag_name)
- *
- * to the sorted macro block below and
- *
- * &FLAGS_envoy_reloadable_features_flag_name
- *
- * to the runtime features constexpr.
- *
- * The runtime guard to use in source and release notes will then be of the form
- * "envoy.reloadable_features.flag_name" due to the prior naming scheme and swapPrefix.
- **/
-
 #define RUNTIME_GUARD(name) ABSL_FLAG(bool, name, true, "");        // NOLINT
 #define FALSE_RUNTIME_GUARD(name) ABSL_FLAG(bool, name, false, ""); // NOLINT
 
+// Add additional features here to enable the new code paths by default.
+//
+// Per documentation in CONTRIBUTING.md is expected that new high risk code paths be guarded
+// by runtime feature guards. If you add a guard of the form
+// RUNTIME_GUARD(envoy_reloadable_features_my_feature_name)
+// here you can guard code checking against "envoy.reloadable_features.my_feature_name".
+// Please note the swap of envoy_reloadable_features_ to envoy.reloadable_features.!
+//
+// if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")) {
+//   [new code path]
+// else {
+//   [old_code_path]
+// }
+//
+// Runtime features are true by default, so the new code path is exercised.
+// To make a runtime feature false by default, use FALSE_RUNTIME_GUARD, and add
+// a TODO to change it to true.
+//
+// If issues are found that require a runtime feature to be disabled, it should be reported
+// ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
+// problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
+RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
@@ -41,8 +50,8 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_internal_address);
 RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_listener_wildcard_match_ip_family);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
+RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http_header_referer);
@@ -71,6 +80,8 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 // TODO(kbaichoo): Make this enabled by default when fairness and chunking
 // are implemented, and we've had more cpu time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
+// TODO(rgs1): Make this enabled after Pinterest tests
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
@@ -80,18 +91,61 @@ ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
 
 namespace Envoy {
 namespace Runtime {
+namespace {
+
+std::string swapPrefix(std::string name) {
+  return absl::StrReplaceAll(name, {{"envoy_", "envoy."}, {"features_", "features."}});
+}
+
+} // namespace
+
+// This is a singleton class to map Envoy style flag names to absl flags
+class RuntimeFeatures {
+public:
+  RuntimeFeatures();
+
+  // Get the command line flag corresponding to the Envoy style feature name, or
+  // nullptr if it is not a registered flag.
+  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
+    auto it = all_features_.find(feature);
+    if (it == all_features_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+private:
+  absl::flat_hash_map<std::string, absl::CommandLineFlag*> all_features_;
+};
+
+using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
+
+RuntimeFeatures::RuntimeFeatures() {
+  absl::flat_hash_map<absl::string_view, absl::CommandLineFlag*> flags = absl::GetAllFlags();
+  for (auto& it : flags) {
+    absl::string_view name = it.second->Name();
+    if ((!absl::StartsWith(name, "envoy_reloadable_features_") &&
+         !absl::StartsWith(name, "envoy_restart_features_")) ||
+        !it.second->TryGet<bool>().has_value()) {
+      continue;
+    }
+    std::string envoy_name = swapPrefix(std::string(name));
+    all_features_.emplace(envoy_name, it.second);
+  }
+}
 
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  auto* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;
   }
-  return absl::GetFlag(*flag);
+  // We validate in map creation that the flag is a boolean.
+  return flag->TryGet<bool>().value();
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
@@ -112,80 +166,14 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   return default_value;
 }
 
-// Add additional features here to enable the new code paths by default.
-//
-// Per documentation in CONTRIBUTING.md is expected that new high risk code paths be guarded
-// by runtime feature guards, i.e
-//
-// if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")) {
-//   [new code path]
-// else {
-//   [old_code_path]
-// }
-//
-// Runtime features are false by default, so the old code path is exercised.
-// To make a runtime feature true by default, add it to the array below.
-// New features should be true-by-default for an Envoy release cycle before the
-// old code path is removed.
-//
-// If issues are found that require a runtime feature to be disabled, it should be reported
-// ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
-// problem of the bugs being found after the old code path has been removed.
-// clang-format off
-constexpr absl::Flag<bool>* runtime_features[] = {
-  // Test flags
-  &FLAGS_envoy_reloadable_features_test_feature_false,
-  &FLAGS_envoy_reloadable_features_test_feature_true,
-  // Begin alphabetically sorted section_
-  &FLAGS_envoy_reloadable_features_allow_multiple_dns_addresses,
-  &FLAGS_envoy_reloadable_features_allow_upstream_inline_write,
-  &FLAGS_envoy_reloadable_features_append_or_truncate,
-  &FLAGS_envoy_reloadable_features_conn_pool_delete_when_idle,
-  &FLAGS_envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3,
-  &FLAGS_envoy_reloadable_features_correct_scheme_and_xfp,
-  &FLAGS_envoy_reloadable_features_correctly_validate_alpn,
-  &FLAGS_envoy_reloadable_features_defer_processing_backedup_streams,
-  &FLAGS_envoy_reloadable_features_deprecate_global_ints,
-  &FLAGS_envoy_reloadable_features_disable_tls_inspector_injection,
-  &FLAGS_envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats,
-  &FLAGS_envoy_reloadable_features_enable_grpc_async_client_cache,
-  &FLAGS_envoy_reloadable_features_fix_added_trailers,
-  &FLAGS_envoy_reloadable_features_handle_stream_reset_during_hcm_encoding,
-  &FLAGS_envoy_reloadable_features_http1_lazy_read_disable,
-  &FLAGS_envoy_reloadable_features_http2_allow_capacity_increase_by_settings,
-  &FLAGS_envoy_reloadable_features_http2_new_codec_wrapper,
-  &FLAGS_envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect,
-  &FLAGS_envoy_reloadable_features_http_reject_path_with_fragment,
-  &FLAGS_envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled,
-  &FLAGS_envoy_reloadable_features_internal_address,
-  &FLAGS_envoy_reloadable_features_listener_wildcard_match_ip_family,
-  &FLAGS_envoy_reloadable_features_new_tcp_connection_pool,
-  &FLAGS_envoy_reloadable_features_postpone_h3_client_connect_to_next_loop,
-  &FLAGS_envoy_reloadable_features_proxy_102_103,
-  &FLAGS_envoy_reloadable_features_sanitize_http_header_referer,
-  &FLAGS_envoy_reloadable_features_skip_delay_close,
-  &FLAGS_envoy_reloadable_features_skip_dispatching_frames_for_closed_connection,
-  &FLAGS_envoy_reloadable_features_strict_check_on_ipv4_compat,
-  &FLAGS_envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints,
-  &FLAGS_envoy_reloadable_features_udp_listener_updates_filter_chain_in_place,
-  &FLAGS_envoy_reloadable_features_unified_mux,
-  &FLAGS_envoy_reloadable_features_update_expected_rq_timeout_on_retry,
-  &FLAGS_envoy_reloadable_features_update_grpc_response_error_tag,
-  &FLAGS_envoy_reloadable_features_use_dns_ttl,
-  &FLAGS_envoy_reloadable_features_validate_connect,
-  &FLAGS_envoy_restart_features_explicit_wildcard_resource,
-  &FLAGS_envoy_restart_features_use_apple_api_for_dns_lookups,
-  &FLAGS_envoy_restart_features_no_runtime_singleton,
-};
-// clang-format on
-
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {
-  auto* flag = RuntimeFeaturesDefaults::get().getFlag(name);
+  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(name);
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", name));
     return;
   }
-  absl::SetFlag(flag, value);
+  std::string err;
+  flag->ParseFrom(value ? "true" : "false", &err);
 }
 
 void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
@@ -207,37 +195,6 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
   } else if (name == "re2.max_program_size.warn_level") {
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
   }
-}
-
-std::string swapPrefix(std::string name) {
-  return absl::StrReplaceAll(name, {{"envoy_", "envoy."}, {"features_", "features."}});
-}
-
-RuntimeFeatures::RuntimeFeatures() {
-  for (auto& feature : runtime_features) {
-    auto& reflection = absl::GetFlagReflectionHandle(*feature);
-    std::string envoy_name = swapPrefix(std::string(reflection.Name()));
-    all_features_.emplace(envoy_name, feature);
-    absl::optional<bool> value = reflection.TryGet<bool>();
-    ASSERT(value.has_value());
-    if (value.value()) {
-      enabled_features_.emplace(envoy_name, feature);
-    } else {
-      disabled_features_.emplace(envoy_name, feature);
-    }
-  }
-}
-
-void RuntimeFeatures::restoreDefaults() const {
-  for (const auto& feature : enabled_features_) {
-    absl::SetFlag(feature.second, true);
-  }
-  for (const auto& feature : disabled_features_) {
-    absl::SetFlag(feature.second, false);
-  }
-  absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, 3);
-  absl::SetFlag(&FLAGS_re2_max_program_size_error_level, 100);
-  absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, std::numeric_limits<uint32_t>::max());
 }
 
 } // namespace Runtime

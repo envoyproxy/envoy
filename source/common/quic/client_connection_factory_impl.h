@@ -1,10 +1,13 @@
 #pragma once
 
-#include "source/common/http/http3/quic_client_connection_factory.h"
+#include <memory>
+
+#include "envoy/http/persistent_quic_info.h"
+#include "envoy/upstream/upstream.h"
+
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
-#include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
@@ -16,6 +19,8 @@ namespace Envoy {
 namespace Quic {
 
 // Information which can be shared across connections, though not across threads.
+// TODO(danzh) considering exposing these QUICHE interfaces via base class virtual methods, so that
+// down casting can be avoided while passing around this object.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit);
 

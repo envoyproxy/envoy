@@ -18,7 +18,8 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
     return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
                                : envoy::admin::v3::ServerInfo::LIVE;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected server state enum");
+  return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
 }
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map) {

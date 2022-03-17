@@ -84,7 +84,7 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->ne
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   cb_ = &cb;
-  // waiting for the inspect data.
+
   return Network::FilterStatus::StopIteration;
 }
 
@@ -142,6 +142,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
       // Do nothing but wait for the next event.
       return Network::FilterStatus::StopIteration;
     }
+    IS_ENVOY_BUG("unexpected tcp filter parse_state");
   }
   return Network::FilterStatus::StopIteration;
 }
