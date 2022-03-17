@@ -138,6 +138,7 @@ public:
     if (rtt.has_value()) {
       alternate_protocols_->setSrtt(origin, rtt.value());
     }
+    alternate_protocols_->getHttp3StatusTracker(origin);
   }
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
@@ -613,7 +614,9 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   initialize();
   addHttp3AlternateProtocol();
-  grid_->markHttp3Broken();
+  alternate_protocols_
+      ->getHttp3StatusTracker(AlternateProtocolsCache::Origin("https", "hostname", 9000))
+      ->markHttp3Broken();
   EXPECT_EQ(grid_->first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'hostname', skipping.",

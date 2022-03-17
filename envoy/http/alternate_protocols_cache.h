@@ -99,6 +99,8 @@ public:
     virtual void markHttp3Broken() PURE;
     // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.
     virtual void markHttp3Confirmed() PURE;
+    // Returns string form of the HTTP/3 status.
+    virtual std::string statusToStringForCache() PURE;
   };
 
   virtual ~AlternateProtocolsCache() = default;
@@ -144,22 +146,15 @@ public:
   virtual size_t size() const PURE;
 
   /**
-   * Transfer the ownership of HTTP/3 status tracker, if there is one, to the caller.
    * @param origin The origin to get HTTP/3 status for.
    * @return the status tracker if there is one. Otherwise, nullptr.
    */
-  virtual std::unique_ptr<Http3StatusTracker> acquireHttp3StatusTracker(const Origin& origin) PURE;
-  /**
-   * Transfer the ownership of HTTP/3 status tracker to the cache if the origin exists in the cache.
-   * Otherwise this is a no-op
-   * @param origin The origin to store HTTP/3 status for.
-   * @param h3_status_tracker the status tracker to be stored.
-   */
-  virtual void storeHttp3StatusTracker(const Origin& origin,
-                                       std::unique_ptr<Http3StatusTracker> h3_status_tracker) PURE;
+  virtual std::shared_ptr<AlternateProtocolsCache::Http3StatusTracker>
+  getHttp3StatusTracker(const Origin& origin) PURE;
 };
 
 using AlternateProtocolsCacheSharedPtr = std::shared_ptr<AlternateProtocolsCache>;
+using Http3StatusTrackerSharedPtr = std::shared_ptr<AlternateProtocolsCache::Http3StatusTracker>;
 
 /**
  * A manager for multiple alternate protocols caches.

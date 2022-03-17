@@ -2,6 +2,7 @@
 
 #include "source/common/common/logger.h"
 
+#include "http3_status_tracker_impl.h"
 #include "quiche/spdy/core/spdy_alt_svc_wire_format.h"
 #include "re2/re2.h"
 
@@ -36,13 +37,12 @@ AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
   return {};
 }
 
-std::string AlternateProtocolsCacheImpl::originDataToStringForCache(
-    const std::vector<AlternateProtocol>& protocols, std::chrono::microseconds srtt) {
-  if (protocols.empty()) {
+std::string AlternateProtocolsCacheImpl::originDataToStringForCache(const OriginData& origin_data) {
+  if (origin_data.protocols.empty()) {
     return std::string("clear|0");
   }
   std::string value;
-  for (auto& protocol : protocols) {
+  for (auto& protocol : origin_data.protocols) {
     if (!value.empty()) {
       value.push_back(',');
     }
@@ -55,24 +55,41 @@ std::string AlternateProtocolsCacheImpl::originDataToStringForCache(
         std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_.time_since_epoch())
             .count());
   }
-  absl::StrAppend(&value, "|", srtt.count());
+  absl::StrAppend(&value, "|", origin_data.srtt.count());
+  if (origin_data.h3_status_tracker != nullptr) {
+    absl::StrAppend(&value, "|",
+                    (origin_data.h3_status_tracker == nullptr
+                         ? ""
+                         : origin_data.h3_status_tracker->statusToStringForCache()));
+  }
   return value;
 }
 
 absl::optional<AlternateProtocolsCacheImpl::OriginData>
-AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_string,
-                                                  TimeSource& time_source, bool from_cache) {
+AlternateProtocolsCacheImpl::originDataFromString(const Origin& origin,
+                                                  absl::string_view origin_data_string,
+                                                  Event::Dispatcher& dispatcher,
+                                                  Http3StatusTrackerCallback& callback,
+                                                  bool from_cache) {
   OriginData data;
   const std::vector<absl::string_view> parts = absl::StrSplit(origin_data_string, '|');
-  if (parts.size() == 2) {
+  if (parts.size() > 3) {
+    return {};
+  }
+  if (parts.size() == 3) {
+    data.h3_status_tracker =
+        Http3StatusTrackerImpl::createFromCachedString(dispatcher, origin, parts[2], callback);
+    if (data.h3_status_tracker == nullptr) {
+      return {};
+    }
+  }
+  if (parts.size() >= 2) {
     int64_t srtt;
     if (!absl::SimpleAtoi(parts[1], &srtt)) {
       return {};
     }
     data.srtt = std::chrono::microseconds(srtt);
-  } else if (parts.size() != 1) {
-    return {};
-  } else {
+  } else if (parts.size() == 1) {
     // Handling raw alt-svc with no endpoint info
     data.srtt = std::chrono::microseconds(0);
   }
@@ -86,14 +103,16 @@ AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_
     if (from_cache) {
       auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age_seconds);
       auto time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(
-          time_source.monotonicTime().time_since_epoch());
+          dispatcher.approximateMonotonicTime().time_since_epoch());
       if (expire_time_from_epoch < time_since_epoch) {
-        expiration = time_source.monotonicTime();
+        expiration = dispatcher.approximateMonotonicTime();
       } else {
-        expiration = time_source.monotonicTime() + (expire_time_from_epoch - time_since_epoch);
+        expiration =
+            dispatcher.approximateMonotonicTime() + (expire_time_from_epoch - time_since_epoch);
       }
     } else {
-      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
+      expiration =
+          dispatcher.approximateMonotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
     }
     Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
                                                               alt_svc.port, expiration);
@@ -109,19 +128,24 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
   if (key_value_store) {
     KeyValueStore::ConstIterateCb load_protocols = [this](const std::string& key,
                                                           const std::string& value) {
-      absl::optional<OriginData> origin_data =
-          originDataFromString(value, dispatcher_.timeSource(), true);
       absl::optional<Origin> origin = stringToOrigin(key);
-      if (origin_data.has_value() && origin.has_value()) {
-        // We deferred transfering ownership into key_value_store_ prior, so
-        // that we won't end up doing redundant updates to the store while
-        // iterating.
-        setAlternativesImpl(origin.value(), origin_data.value().protocols);
-        setSrttImpl(origin.value(), origin_data.value().srtt);
-      } else {
+      if (!origin.has_value()) {
+        ENVOY_LOG(warn, fmt::format("Unable to parse cache entry with key: {}", key));
+        return KeyValueStore::Iterate::Continue;
+      }
+      absl::optional<OriginData> origin_data =
+          originDataFromString(origin.value(), value, dispatcher_, *this, true);
+      if (!origin_data.has_value()) {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
+        return KeyValueStore::Iterate::Continue;
       }
+      // We deferred transfering ownership into key_value_store_ prior, so
+      // that we won't end up doing redundant updates to the store while
+      // iterating.
+      setAlternativesImpl(origin.value(), origin_data.value().protocols);
+      setSrttImpl(origin.value(), origin_data.value().srtt);
+      protocols_[origin.value()].h3_status_tracker = std::move(origin_data->h3_status_tracker);
       return KeyValueStore::Iterate::Continue;
     };
     key_value_store->iterate(load_protocols);
@@ -135,9 +159,8 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   std::vector<AlternateProtocol>& protocols) {
   setAlternativesImpl(origin, protocols);
   if (key_value_store_) {
-    key_value_store_->addOrUpdate(
-        originToString(origin),
-        originDataToStringForCache(protocols, std::chrono::microseconds(0)));
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(protocols_[origin]));
   }
 }
 
@@ -154,7 +177,7 @@ void AlternateProtocolsCacheImpl::setSrttImpl(const Origin& origin,
   entry_it->second.srtt = srtt;
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin),
-                                  originDataToStringForCache(entry_it->second.protocols, srtt));
+                                  originDataToStringForCache(entry_it->second));
   }
 }
 
@@ -206,7 +229,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   }
   if (key_value_store_ && original_size != protocols.size()) {
     key_value_store_->addOrUpdate(originToString(origin),
-                                  originDataToStringForCache(protocols, entry_it->second.srtt));
+                                  originDataToStringForCache(entry_it->second));
   }
 
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
@@ -214,23 +237,30 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
 
-std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>
-AlternateProtocolsCacheImpl::acquireHttp3StatusTracker(const Origin& origin) {
+Http3StatusTrackerSharedPtr
+AlternateProtocolsCacheImpl::getHttp3StatusTracker(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
     return nullptr;
   }
-  return std::move(entry_it->second.h3_status_tracker);
+  if (entry_it->second.h3_status_tracker == nullptr) {
+    entry_it->second.h3_status_tracker =
+        std::make_shared<Http3StatusTrackerImpl>(dispatcher_, origin, *this);
+  }
+  return entry_it->second.h3_status_tracker;
 }
 
-void AlternateProtocolsCacheImpl::storeHttp3StatusTracker(
-    const Origin& origin,
-    std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker) {
+void AlternateProtocolsCacheImpl::onHttp3StatusChanged(
+    const AlternateProtocolsCache::Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
     return;
   }
-  entry_it->second.h3_status_tracker = std::move(h3_status_tracker);
+
+  if (key_value_store_) {
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(entry_it->second));
+  }
 }
 
 } // namespace Http

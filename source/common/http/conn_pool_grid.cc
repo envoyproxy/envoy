@@ -215,10 +215,6 @@ ConnectivityGrid::ConnectivityGrid(
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
   }
-  http3_status_tracker_ = alternate_protocols_->acquireHttp3StatusTracker(origin);
-  if (http3_status_tracker_ == nullptr) {
-    http3_status_tracker_ = std::make_unique<Http3StatusTrackerImpl>(dispatcher);
-  }
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
@@ -230,7 +226,6 @@ ConnectivityGrid::~ConnectivityGrid() {
   pools_.clear();
   AlternateProtocolsCache::Origin origin("https", host_->hostname(),
                                          host_->address()->ip()->port());
-  alternate_protocols_->storeHttp3StatusTracker(origin, std::move(http3_status_tracker_));
 }
 
 void ConnectivityGrid::deleteIsPending() {
@@ -355,11 +350,20 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-bool ConnectivityGrid::isHttp3Broken() const { return http3_status_tracker_->isHttp3Broken(); }
+bool ConnectivityGrid::isHttp3Broken() const {
+  ASSERT(http3_status_tracker_);
+  return http3_status_tracker_->isHttp3Broken();
+}
 
-void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_->markHttp3Broken(); }
+void ConnectivityGrid::markHttp3Broken() {
+  ASSERT(http3_status_tracker_);
+  http3_status_tracker_->markHttp3Broken();
+}
 
-void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_->markHttp3Confirmed(); }
+void ConnectivityGrid::markHttp3Confirmed() {
+  ASSERT(http3_status_tracker_);
+  http3_status_tracker_->markHttp3Confirmed();
+}
 
 bool ConnectivityGrid::isIdle() const {
   // This is O(n) but the function is constant and there are no plans for n > 8.
@@ -384,10 +388,6 @@ void ConnectivityGrid::onIdleReceived() {
 }
 
 bool ConnectivityGrid::shouldAttemptHttp3() {
-  if (http3_status_tracker_->isHttp3Broken()) {
-    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
-    return false;
-  }
   if (host_->address()->type() != Network::Address::Type::Ip) {
     ENVOY_LOG(error, "Address is not an IP address");
     ASSERT(false);
@@ -403,7 +403,14 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
               host_->hostname());
     return false;
   }
-
+  if (http3_status_tracker_ == nullptr) {
+    http3_status_tracker_ = alternate_protocols_->getHttp3StatusTracker(origin);
+    ASSERT(http3_status_tracker_ != nullptr);
+  }
+  if (http3_status_tracker_->isHttp3Broken()) {
+    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
+    return false;
+  }
   for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
     // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
     if (!protocol.hostname_.empty() || protocol.port_ != port) {
