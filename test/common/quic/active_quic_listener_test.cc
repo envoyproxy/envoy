@@ -10,8 +10,8 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/envoy_quic_clock.h"
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/platform/envoy_quic_clock.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
@@ -27,6 +27,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
@@ -85,10 +86,6 @@ protected:
   void SetUp() override {
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-        Runtime::LoaderPtr{new Runtime::LoaderImpl(*dispatcher_, tls_, config, local_info_, store_,
-                                                   generator_, validation_visitor_, *api_)});
-
     listen_socket_ =
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
@@ -123,8 +120,7 @@ protected:
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
-            Runtime::LoaderSingleton::get(), 0, connection_handler_, *dispatcher_,
-            listener_config_));
+            scoped_runtime_.loader(), 0, connection_handler_, *dispatcher_, listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
@@ -250,7 +246,6 @@ protected:
     }
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    Runtime::LoaderSingleton::clear();
   }
 
 protected:
@@ -278,6 +273,7 @@ protected:
                        handshake_timeout_);
   }
 
+  TestScopedRuntime scoped_runtime_;
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
   Api::ApiPtr api_;
@@ -297,7 +293,6 @@ protected:
   Network::ActiveUdpListenerFactoryPtr listener_factory_;
   NiceMock<Network::MockListenSocketFactory> socket_factory_;
   EnvoyQuicDispatcher* quic_dispatcher_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
@@ -452,14 +447,14 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
+  scoped_runtime_.mergeValues({{"quic.enabled", " false"}});
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
+  scoped_runtime_.mergeValues({{"quic.enabled", " true"}});
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
