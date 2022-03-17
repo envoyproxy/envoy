@@ -525,6 +525,10 @@ public:
 class MatchingData {
 public:
   static absl::string_view name() { return "network"; }
+
+  virtual ~MatchingData() = default;
+
+  virtual const ConnectionSocket& socket() const PURE;
 };
 
 } // namespace Network

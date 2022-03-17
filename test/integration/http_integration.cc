@@ -29,6 +29,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -167,11 +168,12 @@ void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
 }
 
 std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
+IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
+                                     bool header_only_request) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false).IgnoreError();
+  encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }
@@ -242,9 +244,14 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                           server_addr, local_addr, quic_stat_names_, {},
-                                           stats_store_);
+  auto& quic_transport_socket_factory_ref =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
+  return Quic::createQuicNetworkConnection(
+      *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
+      quic::QuicServerId(
+          quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
+          static_cast<uint16_t>(port)),
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -346,15 +353,12 @@ void HttpIntegrationTest::initialize() {
   config_helper_.addQuicDownstreamTransportSocketConfig();
 
   BaseIntegrationTest::initialize();
-  registerTestServerPorts({"http"});
+  registerTestServerPorts({"http"}, test_server_);
 
-  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
-      "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic::QuicConfig config;
-  auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr->ip()->port(),
-      config, 0);
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  auto quic_connection_persistent_info =
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

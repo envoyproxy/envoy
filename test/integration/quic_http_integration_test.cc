@@ -1,6 +1,7 @@
 #include <openssl/x509_vfy.h>
 
 #include <cstddef>
+#include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
@@ -26,6 +27,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
@@ -144,9 +146,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-    SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
-  }
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -183,9 +183,11 @@ public:
     OptRef<Http::AlternateProtocolsCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        (host.empty() ? persistent_info.server_id_
-                      : quic::QuicServerId{host, static_cast<uint16_t>(port), false}),
-        persistent_info.cryptoConfig(), &push_promise_index_, *dispatcher_,
+        quic::QuicServerId{
+            (host.empty() ? transport_socket_factory_->clientContextConfig().serverNameIndication()
+                          : host),
+            static_cast<uint16_t>(port), false},
+        transport_socket_factory_->getCryptoConfig(), &push_promise_index_, *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,

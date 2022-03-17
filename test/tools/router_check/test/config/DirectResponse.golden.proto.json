@@ -9,6 +9,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",
@@ -39,6 +40,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping-json",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",
@@ -69,6 +71,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping-json2",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",
@@ -93,6 +96,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping-empty",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",

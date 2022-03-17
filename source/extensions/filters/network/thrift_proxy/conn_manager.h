@@ -4,6 +4,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
@@ -51,7 +52,7 @@ class ConnectionManager : public Network::ReadFilter,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                    TimeSource& time_system);
+                    TimeSource& time_system, const Network::DrainDecision& drain_decision);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -268,6 +269,7 @@ private:
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;
+  const Network::DrainDecision& drain_decision_;
 
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};

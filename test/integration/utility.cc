@@ -17,7 +17,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -25,6 +24,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -214,10 +214,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
-  quic::QuicConfig config;
-  std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr->ip()->port(), config, 0);
+  auto& quic_transport_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
+  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -227,7 +226,10 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
+      *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
+      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
+                         static_cast<uint16_t>(addr->ip()->port())),
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

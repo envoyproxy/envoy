@@ -78,7 +78,7 @@ void ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do1xxHeaders() if we've actually seen 1xx headers.
-  if (has1xxheaders()) {
+  if (has1xxHeaders()) {
     continued_1xx_headers_ = true;
     do1xxHeaders();
     // If the response headers have not yet come in, don't continue on with
@@ -303,6 +303,12 @@ bool ActiveStreamDecoderFilter::canContinue() {
   return !parent_.state_.local_complete_;
 }
 
+bool ActiveStreamEncoderFilter::canContinue() {
+  // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
+  // continue if a local reply has been sent.
+  return !parent_.state_.remote_encode_complete_;
+}
+
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->requestDataDrained(); },
@@ -316,7 +322,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_complete_; }
+bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_decode_complete_; }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -832,8 +838,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 }
 
 void FilterManager::maybeEndDecode(bool end_stream) {
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
+  ASSERT(!state_.remote_decode_complete_);
+  state_.remote_decode_complete_ = end_stream;
   if (end_stream) {
     stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(dispatcher().timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
@@ -909,7 +915,6 @@ void FilterManager::sendLocalReply(
   }
 
   stream_info_.setResponseCodeDetails(details);
-
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
@@ -1356,6 +1361,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ASSERT(!state_.remote_encode_complete_);
+    state_.remote_encode_complete_ = true;
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1542,7 +1549,7 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
-bool ActiveStreamEncoderFilter::has1xxheaders() {
+bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
 void ActiveStreamEncoderFilter::do1xxHeaders() {
@@ -1646,6 +1653,7 @@ Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOpt
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {
+  ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", parent_);
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
