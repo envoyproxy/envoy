@@ -99,7 +99,7 @@ public:
     if (address.type() == Network::Address::Type::Pipe) {
       return unix_sockets_;
     }
-    
+
     return cidr_ranges_.contains(address) || Network::Utility::isInternalAddress(address);
   }
 

@@ -424,9 +424,8 @@ TEST_P(HeaderMapImplTest, AllInlineHeaders) {
     INLINE_REQ_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
   }
   {
-    // No request trailer O(1) headers.
-  }
-  {
+      // No request trailer O(1) headers.
+  } {
     auto header_map = ResponseHeaderMapImpl::create();
     INLINE_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
     INLINE_REQ_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
