@@ -1395,7 +1395,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
 TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
+      "Didn't find a registered implementation for type URL: 'test.common.config.DummyConfig'");
 }
 
 // Insufficient support on Windows.

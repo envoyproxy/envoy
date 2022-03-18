@@ -60,7 +60,7 @@ matcher_tree:
                   input:
                     name: inner_input
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
                   value_match:
                     exact: foo
   )EOF";
@@ -70,12 +70,13 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  auto outer_factory = TestDataInputFactory("outer_input", "value");
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
 
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(2);
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
@@ -108,7 +109,7 @@ matcher_tree:
                   input:
                     name: inner_input
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
                   value_match:
                     exact: foo
   )EOF";
@@ -118,12 +119,13 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  auto outer_factory = TestDataInputFactory("outer_input", "value");
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
 
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(2);
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
@@ -204,10 +206,11 @@ matcher_list:
         input:
           name: inner_input
           typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
+            "@type": type.googleapis.com/google.protobuf.BoolValue
         custom_match:
           name: never_match
-          typed_config: {}
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
   )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
@@ -215,11 +218,11 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto inner_factory = TestDataInputBoolFactory("foo");
   NeverMatchFactory match_factory;
 
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
@@ -253,14 +256,14 @@ matcher_tree:
                       input:
                         name: inner_input
                         typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
                       value_match:
                         exact: foo
                   - single_predicate:
                       input:
                         name: inner_input
                         typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
                       value_match:
                         exact: foo
   )EOF";
@@ -270,12 +273,14 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  auto outer_factory = TestDataInputFactory("outer_input", "value");
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
 
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(3);
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
+      .Times(2);
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
@@ -310,14 +315,14 @@ matcher_tree:
                       input:
                         name: inner_input
                         typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
                       value_match:
                         exact: foo
                   - single_predicate:
                       input:
                         name: inner_input
                         typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
                       value_match:
                         exact: foo
   )EOF";
@@ -327,12 +332,14 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  auto outer_factory = TestDataInputFactory("outer_input", "value");
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
 
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(3);
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
+      .Times(2);
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
@@ -367,7 +374,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto inner_factory = TestDataInputStringFactory("foo");
   NeverMatchFactory match_factory;
 
   EXPECT_CALL(validation_visitor_,
@@ -398,7 +405,7 @@ matcher_list:
                 input:
                   name: inner_input
                   typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    "@type": type.googleapis.com/google.protobuf.BoolValue
                 value_match:
                   exact: foo
     predicate:
@@ -406,7 +413,7 @@ matcher_list:
         input:
           name: inner_input
           typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
+            "@type": type.googleapis.com/google.protobuf.BoolValue
         value_match:
           exact: foo
   )EOF";
@@ -416,11 +423,11 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  auto outer_factory = TestDataInputFactory("outer_input", "value");
-  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
 
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
       .Times(2);
   auto match_tree = factory_.create(matcher);
 

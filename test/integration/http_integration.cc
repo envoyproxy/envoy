@@ -1123,8 +1123,6 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
     config_helper_.prependFilter(
         fmt::format(R"EOF(
   name: pause-filter{}
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF",
                     downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
   }
@@ -1457,8 +1455,7 @@ void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t 
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+)EOF"));
 
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;

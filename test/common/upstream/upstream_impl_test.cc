@@ -2193,10 +2193,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.Struct
-              value:
-                foo: "bar"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -2238,10 +2234,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.Struct
-              value:
-                foo: "bar"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -2281,10 +2273,6 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
       policies:
         - typed_extension_config:
             name: custom_lb
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.Struct
-              value:
-                foo: "bar"
     load_assignment:
         endpoints:
           - lb_endpoints:

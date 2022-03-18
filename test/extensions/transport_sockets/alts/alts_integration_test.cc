@@ -117,8 +117,6 @@ public:
 
     config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Empty
     )EOF");
 
     HttpIntegrationTest::initialize();

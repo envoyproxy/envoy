@@ -293,7 +293,11 @@ public:
   template <class Factory, class ProtoMessage>
   static Factory* getFactory(const ProtoMessage& message) {
     if (message.has_typed_config()) {
-      return Utility::getFactoryByType<Factory>(message.typed_config());
+      Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+      if (factory != nullptr ||
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unique_extension_type_url")) {
+        return factory;
+      }
     }
 
     return Utility::getFactoryByName<Factory>(message.name());
@@ -310,12 +314,16 @@ public:
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
     if (message.has_typed_config()) {
       Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-      if (factory == nullptr && !is_optional) {
-        ExceptionUtil::throwEnvoyException(
-            fmt::format("Didn't find a registered implementation for type URL: '{}'",
-                        getFactoryType(message.typed_config())));
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unique_extension_type_url")) {
+        if (factory == nullptr && !is_optional) {
+          ExceptionUtil::throwEnvoyException(
+              fmt::format("Didn't find a registered implementation for type URL: '{}'",
+                          getFactoryType(message.typed_config())));
+        }
+        return factory;
+      } else if (factory != nullptr) {
+        return factory;
       }
-      return factory;
     }
 
     return Utility::getAndCheckFactoryByName<Factory>(message.name(), is_optional);

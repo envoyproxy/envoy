@@ -2627,7 +2627,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         direct_source_prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -3319,7 +3318,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -5241,7 +5239,6 @@ per_connection_buffer_limit_bytes: 10
   filter_chains:
   - filters:
     - name: fake
-      typed_config: {}
     )EOF";
 
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);

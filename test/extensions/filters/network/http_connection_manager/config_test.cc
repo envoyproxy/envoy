@@ -1382,8 +1382,6 @@ route_config:
         cluster: cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
 - name: envoy.filters.http.router
   )EOF";
 

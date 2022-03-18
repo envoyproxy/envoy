@@ -50,8 +50,7 @@ typed_config:
 
     config_helper_.prependFilter(fmt::format(R"EOF(
 name: stream-info-to-headers-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+)EOF"));
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
@@ -232,8 +231,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+)EOF"));
 
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));

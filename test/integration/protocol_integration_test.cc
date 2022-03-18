@@ -266,8 +266,6 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
 TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   config_helper_.prependFilter(R"EOF(
   name: continue-headers-only-inject-body-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -294,8 +292,6 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
 TEST_P(ProtocolIntegrationTest, StopIterationHeadersInjectBodyFilter) {
   config_helper_.prependFilter(R"EOF(
   name: stop-iteration-headers-inject-body-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -322,8 +318,6 @@ TEST_P(ProtocolIntegrationTest, StopIterationHeadersInjectBodyFilter) {
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.prependFilter(R"EOF(
 name: add-trailers-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF");
   initialize();
 
@@ -485,8 +479,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
     autonomous_upstream_ = true;
   }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -530,8 +523,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
                                        downstreamProtocol() == Http::CodecType::HTTP3);
       });
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -549,8 +541,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -571,8 +562,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -595,8 +585,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -618,8 +607,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesC
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -641,8 +629,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1185,8 +1172,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
 // Test hitting the decoder buffer filter with too many request bytes to buffer. Ensure the
 // connection manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1228,8 +1214,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
       });
 
   useAccessLog();
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -2396,8 +2381,7 @@ TEST_P(ProtocolIntegrationTest, MultipleCookiesAndSetCookies) {
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2796,8 +2780,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
 TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
   config_helper_.prependFilter(R"EOF(
   name: local-reply-with-metadata-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -2866,8 +2848,6 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
 
 static std::string remove_response_headers_filter = R"EOF(
 name: remove-response-headers-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
@@ -3528,8 +3508,7 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
       });
 
   useAccessLog();
-  config_helper_.addFilter("{ name: buffer-continue-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: buffer-continue-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -3691,8 +3670,6 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -3718,8 +3695,6 @@ TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
 TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

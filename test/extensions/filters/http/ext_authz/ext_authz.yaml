@@ -38,7 +38,6 @@ static_resources:
                         allow_partial_message: true
                         pack_as_bytes: false
                   - name: envoy.filters.http.router
-                    typed_config: {}
   clusters:
     - name: local_service
       connect_timeout: 30s

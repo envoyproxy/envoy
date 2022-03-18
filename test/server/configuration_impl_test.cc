@@ -435,7 +435,8 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Didn't find a registered implementation for type URL: 'envoy.config.trace.v2.BlackHoleConfig'");
+                            "Didn't find a registered implementation for type URL: "
+                            "'envoy.config.trace.v2.BlackHoleConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -591,7 +592,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Provided name for static registration lookup was empty.");
+                            "Didn't find a registered implementation for type URL: ''");
 }
 
 // An explicit non-empty LayeredRuntime is available to the server with no

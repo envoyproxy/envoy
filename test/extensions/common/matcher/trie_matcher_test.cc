@@ -35,7 +35,8 @@ using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
 using ::Envoy::Matcher::StringActionFactory;
 using ::Envoy::Matcher::TestData;
-using ::Envoy::Matcher::TestDataInputFactory;
+using ::Envoy::Matcher::TestDataInputBoolFactory;
+using ::Envoy::Matcher::TestDataInputStringFactory;
 
 class TrieMatcherTest : public ::testing::Test {
 public:
@@ -117,19 +118,19 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto input = TestDataInputStringFactory("192.0.100.1");
     validateMatch("foo");
   }
   {
-    auto input = TestDataInputFactory("input", "192.101.0.1");
+    auto input = TestDataInputStringFactory("192.101.0.1");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
+    auto input = TestDataInputStringFactory("128.0.0.1");
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "xxx");
+    auto input = TestDataInputStringFactory("xxx");
     validateNoMatch();
   }
 }
@@ -165,23 +166,23 @@ on_no_match:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto input = TestDataInputStringFactory("192.0.100.1");
     validateMatch("foo");
   }
   {
     // No range matches.
-    auto input = TestDataInputFactory("input", "128.0.0.1");
+    auto input = TestDataInputStringFactory("128.0.0.1");
     validateMatch("bar");
   }
   {
     // Input is not a valid IP.
-    auto input = TestDataInputFactory("input", "xxx");
+    auto input = TestDataInputStringFactory("xxx");
     validateMatch("bar");
   }
   {
     // Input is nullopt.
-    auto input = TestDataInputFactory(
-        "input", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory(
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
     validateMatch("bar");
   }
 }
@@ -228,15 +229,15 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto input = TestDataInputStringFactory("192.0.100.1");
     validateMatch("foo");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.0.1");
+    auto input = TestDataInputStringFactory("192.0.0.1");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "255.0.0.1");
+    auto input = TestDataInputStringFactory("255.0.0.1");
     validateMatch("bar");
   }
 }
@@ -270,7 +271,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               exact_match_map:
                 map:
                   baz:
@@ -283,18 +284,18 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "baz");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("baz");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
 }
@@ -330,7 +331,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               exact_match_map:
                 map:
                   baz:
@@ -343,18 +344,18 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "baz");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("baz");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
 }
@@ -388,7 +389,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               exact_match_map:
                 map:
                   bar:
@@ -403,7 +404,7 @@ matcher_tree:
                   input:
                     name: nested
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
                   exact_match_map:
                     map:
                       baz:
@@ -416,18 +417,18 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "baz");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("baz");
     validateMatch("baz");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "bar");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("bar");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
 }
@@ -452,7 +453,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               custom_match:
                 name: ip_matcher
                 typed_config:
@@ -471,27 +472,27 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory(
-        "input", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory(
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "127.0.0.1");
-    auto nested = TestDataInputFactory(
-        "nested", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory("127.0.0.1");
+    auto nested = TestDataInputBoolFactory(
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory(
-        "input", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory(
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "127.0.0.1");
-    auto nested = TestDataInputFactory(
-        "nested", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory("127.0.0.1");
+    auto nested = TestDataInputBoolFactory(
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
     validateUnableToMatch();
   }
 }

@@ -1008,9 +1008,9 @@ message HttpFilter {
 
   reserved "config";
 
-  // The name of the filter configuration. The name is used as a fallback to
-  // select an extension if the type of the configuration proto is not
-  // sufficient. It also serves as a resource name in ExtensionConfigDS.
+  // The name of the filter configuration. It also serves as a resource name in ExtensionConfigDS.
+  // Note: the name is free-form unless the rest of the configuration is
+  // omitted, in which case it must be the same as the extension name.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {

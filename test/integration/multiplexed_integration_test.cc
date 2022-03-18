@@ -205,8 +205,6 @@ TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 class Http2MetadataIntegrationTest : public HttpProtocolIntegrationTest {
@@ -696,8 +694,6 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataThenTrailers) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -886,8 +882,6 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -1942,8 +1936,6 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
 
 static std::string on_local_reply_filter = R"EOF(
 name: on-local-reply-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(MultiplexedIntegrationTest, OnLocalReply) {

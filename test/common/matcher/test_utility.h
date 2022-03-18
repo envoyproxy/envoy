@@ -54,14 +54,12 @@ struct TestInput : public DataInput<TestData> {
 };
 
 // Self-injecting factory for TestInput.
-class TestDataInputFactory : public DataInputFactory<TestData> {
+class TestDataInputStringFactory : public DataInputFactory<TestData> {
 public:
-  TestDataInputFactory(absl::string_view factory_name, DataInputGetResult result)
-      : factory_name_(std::string(factory_name)), result_(result), injection_(*this) {}
-  TestDataInputFactory(absl::string_view factory_name, absl::string_view data)
-      : TestDataInputFactory(factory_name, {DataInputGetResult::DataAvailability::AllDataAvailable,
-                                            std::string(data)}) {}
-
+  TestDataInputStringFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
+  TestDataInputStringFactory(absl::string_view data)
+      : TestDataInputStringFactory(
+            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
@@ -70,10 +68,31 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
   }
-  std::string name() const override { return factory_name_; }
+  std::string name() const override { return "string"; }
 
 private:
-  const std::string factory_name_;
+  const DataInputGetResult result_;
+  Registry::InjectFactory<DataInputFactory<TestData>> injection_;
+};
+
+// Secondary data input to avoid duplicate type registration.
+class TestDataInputBoolFactory : public DataInputFactory<TestData> {
+public:
+  TestDataInputBoolFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
+  TestDataInputBoolFactory(absl::string_view data)
+      : TestDataInputBoolFactory(
+            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+  DataInputFactoryCb<TestData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    return [&]() { return std::make_unique<TestInput>(result_); };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::BoolValue>();
+  }
+  std::string name() const override { return "bool"; }
+
+private:
   const DataInputGetResult result_;
   Registry::InjectFactory<DataInputFactory<TestData>> injection_;
 };
