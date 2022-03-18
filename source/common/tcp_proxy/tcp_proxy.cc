@@ -416,13 +416,30 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 }
 
 void Filter::onClusterDiscoveryCompletion(
-    [[maybe_unused]] Upstream::ClusterDiscoveryStatus cluster_status) {
+    Upstream::ClusterDiscoveryStatus cluster_status) {
   // Clear the handle_ before calling establishUpstreamConnection since we may request cluster
   // again.
   cluster_discovery_handle_.reset();
-  if (!downstream_closed_) {
-    establishUpstreamConnection();
+  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
+  switch (cluster_status) {
+  case Upstream::ClusterDiscoveryStatus::Missing:
+    ENVOY_CONN_LOG(debug, "On on demand cluster {} is missing", read_callbacks_->connection(),
+                   cluster_name);
+    break;
+  case Upstream::ClusterDiscoveryStatus::Timeout:
+    ENVOY_CONN_LOG(debug, "On on demand cluster {} is not found before time out.",
+                   read_callbacks_->connection(), cluster_name);
+    break;
+  case Upstream::ClusterDiscoveryStatus::Available:
+    if (!downstream_closed_) {
+      establishUpstreamConnection();
+    }
+    return;
   }
+  // Failure path.
+  config_->stats().downstream_cx_no_route_.inc();
+  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+  onInitFailure(UpstreamFailureReason::NoRoute);
 }
 
 bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
