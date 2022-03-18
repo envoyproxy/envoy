@@ -2295,6 +2295,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4199,21 +4200,43 @@ envoy_cc_library(
     name = "quiche_common_platform_client_stats",
     hdrs = [
         "quiche/common/platform/api/quiche_client_stats.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [ ":quiche_common_platform_client_stats_impl" ],
+
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_client_stats_impl",
+    hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_client_stats_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_test_library(
     name = "quiche_common_platform_system_event_loop",
     hdrs = [
         "quiche/common/platform/api/quiche_system_event_loop.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [ ":quiche_common_platform_system_event_loop_impl" ],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_system_event_loop_impl",
+    hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_system_event_loop_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4263,6 +4286,19 @@ envoy_cc_library(
     name = "quiche_common_platform_prefetch",
     hdrs = [
         "quiche/common/platform/api/quiche_prefetch.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_prefetch_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_prefetch_impl",
+    hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
     ],
     repository = "@envoy",
@@ -4271,16 +4307,32 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
     ],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
     name = "quiche_common_platform_mutex",
     srcs = [
         "quiche/common/platform/api/quiche_mutex.cc",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
     ],
     hdrs = [
         "quiche/common/platform/api/quiche_mutex.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+	":quiche_common_platform_mutex_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_mutex_impl",
+    srcs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
+    ],
+    hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.h",
     ],
     repository = "@envoy",
@@ -4289,6 +4341,7 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
     ],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4435,6 +4488,19 @@ envoy_cc_library(
     name = "quiche_common_platform_containers",
     hdrs = [
         "quiche/common/platform/api/quiche_containers.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_containers_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_containers_impl",
+    hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
     ],
     repository = "@envoy",
@@ -4443,6 +4509,7 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_export",
     ],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4491,6 +4558,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4509,6 +4577,7 @@ envoy_cc_library(
         ":quic_platform_export",
         ":quiche_common_platform_export",
     ],
+    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(

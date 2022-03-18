@@ -41,6 +41,7 @@ envoy_cc_library(
         "abseil_base",
         "abseil_synchronization",
     ],
+    include_prefix = "quiche_platform_impl",
     visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:assert_lib",
@@ -59,6 +60,7 @@ envoy_cc_library(
         "quiche_bug_tracker_impl.h",
         "quiche_logging_impl.h",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -81,6 +83,7 @@ envoy_cc_library(
         "abseil_node_hash_map",
         "abseil_node_hash_set",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -108,6 +111,7 @@ envoy_cc_library(
         "abseil_node_hash_map",
         "abseil_node_hash_set",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -126,6 +130,7 @@ envoy_cc_library(
         "abseil_str_format",
         "quiche_quic_platform_base",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -139,6 +144,7 @@ envoy_cc_library(
     hdrs = [
         "quiche_stream_buffer_allocator_impl.h",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -151,6 +157,7 @@ envoy_cc_library(
     hdrs = [
         "quiche_error_code_wrappers_impl.h",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -163,6 +170,7 @@ envoy_cc_library(
     hdrs = [
         "quiche_stack_trace_impl.h",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -175,6 +183,7 @@ envoy_cc_library(
     hdrs = [
         "quiche_server_stats_impl.h",
     ],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -188,6 +197,7 @@ envoy_cc_library(
         "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],
         "//conditions:default": [],
     }),
+    include_prefix = "quiche_platform_impl",
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -205,6 +215,7 @@ envoy_cc_library(
         "abseil_hash",
         "abseil_node_hash_map",
     ],
+    include_prefix = "quiche_platform_impl",
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_flags_impl_lib",
