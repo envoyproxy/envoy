@@ -25,7 +25,7 @@ class GcpAuthnFilter : public Http::PassThroughFilter,
                        public RequestCallbacks,
                        public Logger::Loggable<Logger::Id::filter> {
 public:
-  // State of this filter's communication with the external authorization service.
+  // State of this filter's communication with the external authentication service.
   // The filter has either not started calling the external service, in the middle of calling
   // it or has completed.
   enum class State { NotStarted, Calling, Complete };
