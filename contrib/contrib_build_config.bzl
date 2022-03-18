@@ -35,4 +35,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
+
+    #
+    # Input matchers
+    #
+
+    "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
 }
