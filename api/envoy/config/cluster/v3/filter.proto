@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.cluster.Filter";
 
-  // The name of the filter configuraton.
+  // The name of the filter configuration.
   // Note: the name is free-form unless the rest of the configuration is
   // omitted, in which case it must be same as the extension name.
   string name = 1 [(validate.rules).string = {min_len: 1}];
