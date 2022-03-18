@@ -28,6 +28,7 @@ DnsCacheImpl::DnsCacheImpl(
       resource_manager_(*scope_, context.runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
+      min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
       file_system_(context.api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
@@ -353,8 +354,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     }
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_dns_ttl")) {
       // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
-      dns_ttl =
-          std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().addrInfo().ttl_);
+      dns_ttl = std::max<std::chrono::seconds>(
+          std::chrono::duration_cast<std::chrono::seconds>(min_refresh_interval_),
+          response.front().addrInfo().ttl_);
     }
     primary_host_info->host_info_->updateStale(resolution_time.value(), dns_ttl);
   }
