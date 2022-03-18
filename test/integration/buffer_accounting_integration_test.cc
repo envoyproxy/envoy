@@ -740,9 +740,9 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   config_helper_.setBufferLimits(1000, 1000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
 
   // Stop writes to the upstream.
   write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -784,9 +784,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
   config_helper_.setBufferLimits(1000, 1000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -828,9 +828,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream) {
   config_helper_.setBufferLimits(1000, 1000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -872,9 +872,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream)
 TEST_P(Http2DeferredProcessingIntegrationTest,
        ShouldCloseDeferredUpstreamOnStreamCloseIfLocalReply) {
   config_helper_.setBufferLimits(9000, 9000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -930,9 +930,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 TEST_P(Http2DeferredProcessingIntegrationTest,
        ShouldCloseDeferredUpstreamOnStreamCloseIfResetByDownstream) {
   config_helper_.setBufferLimits(1000, 1000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
   initialize();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));

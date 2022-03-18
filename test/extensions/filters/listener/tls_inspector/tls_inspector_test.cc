@@ -50,7 +50,7 @@ public:
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(
             Invoke([](os_fd_t fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
-              ENVOY_LOG_MISC(error, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
+              ENVOY_LOG_MISC(debug, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
               return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
             }));
     EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,

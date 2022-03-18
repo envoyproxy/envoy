@@ -71,7 +71,6 @@ An exception to the above policy exists for:
 * Changes made within 14 days of the introduction of a new API field or message, provided the new field
 or message has not been included in an Envoy release.
 * API versions tagged `vNalpha`. Within an alpha major version, arbitrary breaking changes are allowed.
-* Any field, message or enum with a `[#not-implemented-hide:..` comment.
 * Any proto with a `(udpa.annotations.file_status).work_in_progress`,
   `(xds.annotations.v3.file_status).work_in_progress`
   `(xds.annotations.v3.message_status).work_in_progress`, or

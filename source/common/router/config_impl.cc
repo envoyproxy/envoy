@@ -1618,7 +1618,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       return nullptr;
     }
 
-    ENVOY_LOG(debug, "failed to match incoming request: {}", match.match_state_);
+    ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
 
     return nullptr;
   } else {

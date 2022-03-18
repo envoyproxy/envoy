@@ -472,12 +472,6 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
-
-  assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
-      [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
-  envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
-      [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
-
   InstanceImpl::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
@@ -632,6 +626,13 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
   initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
+
+  if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
+    assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
+        [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
+    envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
+        [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+  }
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
