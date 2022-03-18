@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 @app.route('/service/<service_number>/<response_id>')
 def get(service_number, response_id):
-    stored_response = yaml.load(open('/etc/responses.yaml', 'r')).get(response_id)
+    stored_response = yaml.safe_load(open('/etc/responses.yaml', 'r')).get(response_id)
 
     if stored_response is None:
         abort(404, 'No response found with the given id')
