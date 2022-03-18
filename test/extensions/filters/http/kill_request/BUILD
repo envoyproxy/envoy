@@ -44,7 +44,7 @@ envoy_extension_cc_test(
     name = "kill_request_filter_integration_test",
     srcs = ["kill_request_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",
@@ -55,7 +55,7 @@ envoy_cc_test(
     name = "crash_integration_test",
     size = "large",
     srcs = ["crash_integration_test.cc"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",
