@@ -440,13 +440,11 @@ static void ios_track_event(envoy_map map, const void *context) {
 
   _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
 
-#ifndef TARGET_OS_MAC
   if (enableNetworkPathMonitor) {
     [EnvoyNetworkMonitor startPathMonitorIfNeeded];
   } else {
     [EnvoyNetworkMonitor startReachabilityIfNeeded];
   }
-#endif
 
   return self;
 }
