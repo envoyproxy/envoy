@@ -51,6 +51,7 @@ Bug Fixes
 * upstream: fix stack overflow when a cluster with large number of idle connections is removed.
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
 * xray: fix the AWS X-Ray tracer extension to annotate a child span with ``type=subsegment`` to correctly relate subsegments to a parent segment. Previously a subsegment would be treated as an independent segment.
+* xray: fix the AWS X-Ray tracer extension to reuse the trace ID already present in the header ``x-amzn-trace-id`` instead of creating a new one.
 
 Removed Config or Runtime
 -------------------------

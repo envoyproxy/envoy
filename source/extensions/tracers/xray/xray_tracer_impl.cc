@@ -114,7 +114,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // This is important to communicate that information to upstream services (see injectContext()).
   // Otherwise, the upstream service can decide to sample the request regardless and we end up with
   // more samples than we asked for.
-  return tracer->createNonSampledSpan();
+  return tracer->createNonSampledSpan(config, operation_name, start_time,
+                                      header.has_value() ? absl::optional<XRayHeader>(xray_header)
+                                                         : absl::nullopt);
 }
 
 } // namespace XRay
