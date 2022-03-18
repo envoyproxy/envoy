@@ -90,7 +90,12 @@ static void _reachability_callback(SCNetworkReachabilityRef target,
     return;
   }
 
+#ifdef TARGET_OS_MAC
+  BOOL isUsingWWAN = NO; // Macs don't have WWAN interfaces
+#else
   BOOL isUsingWWAN = flags & kSCNetworkReachabilityFlagsIsWWAN;
+#endif
+
   NSLog(@"[Envoy] setting preferred network to %@", isUsingWWAN ? @"WWAN" : @"WLAN");
   set_preferred_network(isUsingWWAN ? ENVOY_NET_WWAN : ENVOY_NET_WLAN);
 }

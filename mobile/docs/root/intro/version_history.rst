@@ -8,6 +8,7 @@ Bugfixes:
 
 - Android: Fix `NoClassDefFoundError` errors when using `addDNSFallbackNameservers`
   or `addH2RawDomains` with Android versions older than API level 24.
+- iOS: Fix reachability which has been broken since February 11.
 
 Features:
 
