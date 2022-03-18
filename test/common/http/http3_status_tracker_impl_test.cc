@@ -1,5 +1,6 @@
 #include "source/common/http/http3_status_tracker_impl.h"
 
+#include "test/common/http/common.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 
@@ -15,11 +16,6 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-
-class MockHttp3StatusTrackerCallback : public Http3StatusTrackerCallback {
-public:
-  MOCK_METHOD(void, onHttp3StatusChanged, (const AlternateProtocolsCache::Origin& origin));
-};
 
 class Http3StatusTrackerImplTest : public testing::Test {
 public:

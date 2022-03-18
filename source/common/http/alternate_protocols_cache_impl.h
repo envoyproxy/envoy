@@ -67,7 +67,14 @@ public:
                                                          absl::string_view origin_data,
                                                          Event::Dispatcher& dispatcher,
                                                          Http3StatusTrackerCallback& callback,
-                                                         bool from_cache = false);
+                                                         bool from_cache);
+  // Parse an alt-svc string into a vector of structured data.
+  // If from_cache is true, it is assumed the string was serialized using
+  // protocolsToStringForCache and the the ma fields will be parsed as absolute times
+  // rather than relative time.
+  static std::vector<Http::AlternateProtocolsCache::AlternateProtocol>
+  alternateProtocolsFromString(absl::string_view altsvc_str, TimeSource& time_source,
+                               bool from_cache);
 
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;

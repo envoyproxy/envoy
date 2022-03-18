@@ -90,32 +90,36 @@ AlternateProtocolsCacheImpl::originDataFromString(const Origin& origin,
     // Handling raw alt-svc with no endpoint info
     data.srtt = std::chrono::microseconds(0);
   }
+  data.protocols = alternateProtocolsFromString(parts[0], dispatcher.timeSource(), from_cache);
+  return data;
+}
 
+std::vector<Http::AlternateProtocolsCache::AlternateProtocol>
+AlternateProtocolsCacheImpl::alternateProtocolsFromString(absl::string_view altsvc_str,
+                                                          TimeSource& time_source,
+                                                          bool from_cache) {
   spdy::SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
-  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(parts[0], &altsvc_vector)) {
+  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(altsvc_str, &altsvc_vector)) {
     return {};
   }
+  std::vector<Http::AlternateProtocolsCache::AlternateProtocol> results;
   for (const auto& alt_svc : altsvc_vector) {
     MonotonicTime expiration;
     if (from_cache) {
       auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age_seconds);
       auto time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(
-          dispatcher.approximateMonotonicTime().time_since_epoch());
+          time_source.monotonicTime().time_since_epoch());
       if (expire_time_from_epoch < time_since_epoch) {
-        expiration = dispatcher.approximateMonotonicTime();
+        expiration = time_source.monotonicTime();
       } else {
-        expiration =
-            dispatcher.approximateMonotonicTime() + (expire_time_from_epoch - time_since_epoch);
+        expiration = time_source.monotonicTime() + (expire_time_from_epoch - time_since_epoch);
       }
     } else {
-      expiration =
-          dispatcher.approximateMonotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
+      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
     }
-    Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
-                                                              alt_svc.port, expiration);
-    data.protocols.push_back(protocol);
+    results.emplace_back(alt_svc.protocol_id, alt_svc.host, alt_svc.port, expiration);
   }
-  return data;
+  return results;
 }
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
