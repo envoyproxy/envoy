@@ -22,11 +22,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/examples/front-proxy"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/examples/shared/flask"
   schedule:
     interval: "daily"
