@@ -1,10 +1,10 @@
 version: '3.7'
 services:
 
-  flask:
+  flask_service:
     build:
       context: ../../shared/flask
-    image: flask:python-3.10-slim-bullseye
+    image: flask_service:python-3.10-slim-bullseye
     restart: "no"
 
   front-envoy:
@@ -16,7 +16,7 @@ services:
     - "8001:8001"
 
   service:
-    image: flask:python-3.10-slim-bullseye
+    image: flask_service:python-3.10-slim-bullseye
     volumes:
     - ./service.py:/code/service.py
     - ../index.html:/code/index.html

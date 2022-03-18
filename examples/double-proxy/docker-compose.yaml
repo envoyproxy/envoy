@@ -1,10 +1,10 @@
 version: "3.7"
 services:
 
-  flask:
+  flask_service:
     build:
       context: ../shared/flask
-    image: flask:python-3.10-slim-bullseye
+    image: flask_service:python-3.10-slim-bullseye
     restart: "no"
 
   proxy-frontend:
