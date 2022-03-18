@@ -76,7 +76,7 @@ public:
   // Return true if it is ready to dispatch the next stream.
   virtual bool readyForStream() const {
     ASSERT(!supportsEarlyData());
-    return state_ == State::READY;
+    return state_ == State::Ready;
   }
 
   // This function is called onStreamClosed to see if there was a negative delta
@@ -86,14 +86,14 @@ public:
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
-    CONNECTING,        // Connection is not yet established.
+    Connecting,        // Connection is not yet established.
     ReadyForEarlyData, // Any additional early data stream can be immediately dispatched to this
                        // connection.
-    READY,             // Any additional streams may be immediately dispatched to this connection.
-    BUSY,              // Connection is at its concurrent stream limit.
-    DRAINING, // No more streams can be dispatched to this connection, and it will be closed
-    // when all streams complete.
-    CLOSED // Connection is closed and object is queued for destruction.
+    Ready,             // Additional streams may be immediately dispatched to this connection.
+    Busy,              // Connection is at its concurrent stream limit.
+    Draining,          // No more streams can be dispatched to this connection, and it will be
+                       // closed when all streams complete.
+    Closed             // Connection is closed and object is queued for destruction.
   };
 
   State state() const { return state_; }
@@ -105,7 +105,7 @@ public:
     }
     // If the client is transitioning to draining, update the remaining
     // streams and pool and cluster capacity.
-    if (state == State::DRAINING) {
+    if (state == State::Draining) {
       drain();
     }
     state_ = state;
@@ -116,7 +116,7 @@ public:
 
   virtual bool hasHandshakeCompleted() const {
     ASSERT(!supportsEarlyData());
-    return state_ != State::CONNECTING;
+    return state_ != State::Connecting;
   }
 
   ConnPoolImplBase& parent_;
@@ -149,7 +149,7 @@ protected:
   virtual bool supportsEarlyData() const { return false; }
 
 private:
-  State state_{State::CONNECTING};
+  State state_{State::Connecting};
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -366,13 +366,13 @@ protected:
   std::list<PendingStreamPtr> pending_streams_to_purge_;
 
   // Clients that are ready to handle additional streams.
-  // All entries are in state READY.
+  // All entries are in state Ready.
   std::list<ActiveClientPtr> ready_clients_;
 
-  // Clients that are not ready to handle additional streams due to being BUSY or DRAINING.
+  // Clients that are not ready to handle additional streams due to being Busy or Draining.
   std::list<ActiveClientPtr> busy_clients_;
 
-  // Clients that are not ready to handle additional streams because they are CONNECTING.
+  // Clients that are not ready to handle additional streams because they are Connecting.
   std::list<ActiveClientPtr> connecting_clients_;
 
   // Clients that are ready to handle additional early data streams because they have 0-RTT
@@ -380,7 +380,7 @@ protected:
   std::list<ActiveClientPtr> early_data_clients_;
 
   // The number of streams that can be immediately dispatched
-  // if all CONNECTING connections become connected.
+  // if all Connecting connections become connected.
   uint32_t connecting_stream_capacity_{0};
 
 private:

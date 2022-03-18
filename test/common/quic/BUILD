@@ -17,8 +17,20 @@ envoy_cc_test(
     deps = [
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_alarm_lib",
-        "//source/common/quic/platform:envoy_quic_clock_lib",
+        "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "envoy_quic_clock_test",
+    srcs = ["envoy_quic_clock_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:envoy_quic_clock_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -209,6 +221,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@com_github_google_quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],

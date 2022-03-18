@@ -168,11 +168,12 @@ void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
 }
 
 std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
+IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
+                                     bool header_only_request) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false).IgnoreError();
+  encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }

@@ -61,7 +61,7 @@ public:
 
   // Overridden to include ReadyForEarlyData state.
   bool readyForStream() const override {
-    return state() == State::READY || state() == State::ReadyForEarlyData;
+    return state() == State::Ready || state() == State::ReadyForEarlyData;
   }
 
   void updateCapacity(uint64_t new_quiche_capacity) {

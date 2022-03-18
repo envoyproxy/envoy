@@ -29,7 +29,7 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data),
       async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
-        if (state() != Envoy::ConnectionPool::ActiveClient::State::CONNECTING) {
+        if (state() != Envoy::ConnectionPool::ActiveClient::State::Connecting) {
           return;
         }
         codec_client_->connect();
@@ -51,15 +51,14 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
-  if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
-    parent_.transitionActiveClientState(*this, (hasHandshakeCompleted()
-                                                    ? ActiveClient::State::READY
-                                                    : ActiveClient::State::ReadyForEarlyData));
+  if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
+    ENVOY_BUG(hasHandshakeCompleted(), "Received MAX_STREAM frame before handshake completed.");
+    parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
   } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::ReadyForEarlyData) {
     // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
-    parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
+    parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
   }
 }
 

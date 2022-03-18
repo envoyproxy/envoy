@@ -166,7 +166,6 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
   EXPECT_EQ(1u, clients.size());
-  EXPECT_TRUE(clients.front()->supportsEarlyData());
   EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
@@ -197,7 +196,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   EXPECT_TRUE(clients.empty());
-  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::CLOSED, client_ref.state());
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Closed, client_ref.state());
   EXPECT_EQ(dispatcher_.to_delete_.front().get(), &client_ref);
 
   EXPECT_CALL(*async_connect_callback, cancel());
