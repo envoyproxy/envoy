@@ -14,11 +14,10 @@ namespace GcpAuthn {
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
 
-// TODO(tyxia) Add audience field.
-Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& server_url) {
+Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& url) {
   absl::string_view host;
   absl::string_view path;
-  Envoy::Http::Utility::extractHostPathFromUri(server_url, host, path);
+  Envoy::Http::Utility::extractHostPathFromUri(url, host, path);
   Http::RequestHeaderMapPtr headers =
       Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Method, method},
@@ -29,11 +28,11 @@ Http::RequestMessagePtr buildRequest(const std::string& method, const std::strin
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
 }
 
-void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
+void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessagePtr&& request) {
   // Cancel any active requests.
   cancel();
 
-  // ASSERT(callbacks_ == nullptr);
+  ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   const std::string cluster = config_.http_uri().cluster();
@@ -42,6 +41,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
+    // TODO(tyxia) Revisit error or debug
     ENVOY_LOG(error,
               "Failed to fetch the token [uri = {}]: [cluster = {}] is not found or configured.",
               uri, cluster);
@@ -66,7 +66,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks) {
     options.setBufferBodyForRetry(true);
   }
 
-  Http::RequestMessagePtr request = buildRequest("GET", uri);
+  // Http::RequestMessagePtr request = buildRequest("GET", uri);
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
 }

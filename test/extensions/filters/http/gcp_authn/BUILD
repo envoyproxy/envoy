@@ -59,6 +59,7 @@ envoy_extension_cc_test(
     srcs = ["gcp_authn_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
+        "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",

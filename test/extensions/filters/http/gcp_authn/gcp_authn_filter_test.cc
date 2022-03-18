@@ -61,6 +61,9 @@ public:
     TestUtility::loadFromYaml(config_str, config_);
     client_ = std::make_unique<GcpAuthnClient>(config_, context_);
   }
+  void createClient(const GcpAuthnFilterConfig& config) {
+    client_ = std::make_unique<GcpAuthnClient>(config, context_);
+  }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
@@ -84,7 +87,7 @@ TEST_F(GcpAuthnFilterTest, Success) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_);
+  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Host()->value().getStringView(), "testhost");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(), "/path/test");
@@ -120,8 +123,10 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
   EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
-  createClient(no_cluster_config);
-  client_->fetchToken(request_callbacks_);
+  GcpAuthnFilterConfig config;
+  TestUtility::loadFromYaml(no_cluster_config, config);
+  createClient(config);
+  client_->fetchToken(request_callbacks_, buildRequest("GET", config.http_uri().uri()));
 }
 
 TEST_F(GcpAuthnFilterTest, Failure) {
@@ -129,7 +134,7 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   // Create the client object.
   createClient();
   EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
-  client_->fetchToken(request_callbacks_);
+  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -152,7 +157,12 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
 
 TEST_F(GcpAuthnFilterTest, DestoryFilter) {
   setupMockObjects();
+
   auto filter = std::make_shared<GcpAuthnFilter>(config_, context_);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+  const std::string upstream_cluster("cluster_0");
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_, clusterName())
+      .WillOnce(testing::ReturnRef(upstream_cluster));
   // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
   // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been
   // called.

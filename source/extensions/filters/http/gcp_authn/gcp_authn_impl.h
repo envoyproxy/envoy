@@ -28,7 +28,7 @@ public:
   virtual void onComplete(const Http::ResponseMessage* response) PURE;
 };
 
-Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& server_url);
+Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& url);
 
 class GcpAuthnClient : public Http::AsyncClient::Callbacks,
                        public Logger::Loggable<Logger::Id::init> {
@@ -42,7 +42,7 @@ public:
   ~GcpAuthnClient() override { cancel(); }
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
-  void fetchToken(RequestCallbacks& callbacks);
+  void fetchToken(RequestCallbacks& callbacks, Http::RequestMessagePtr&& request);
   void cancel();
 
   // Http::AsyncClient::Callbacks implemented by this class.
