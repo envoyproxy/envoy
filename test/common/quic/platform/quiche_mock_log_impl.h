@@ -15,8 +15,8 @@
 
 namespace quiche {
 
-// A QuicheEnvoyMockLog object captures QUICHE_LOG() messages emitted between StartCapturingLogs() and
-// destruction(or StopCapturingLogs()).
+// A QuicheEnvoyMockLog object captures QUICHE_LOG() messages emitted between StartCapturingLogs()
+// and destruction(or StopCapturingLogs()).
 class QuicheEnvoyMockLog : public quiche::QuicheLogSink {
 public:
   QuicheEnvoyMockLog() = default;
@@ -74,15 +74,15 @@ using QuicheMockLogImpl = quiche::QuicheEnvoyMockLog;
 
 #define EXPECT_QUICHE_LOG_CALL_IMPL(log) EXPECT_CALL(log, Log(testing::_, testing::_))
 
-#define EXPECT_QUICHE_LOG_CALL_CONTAINS_IMPL(log, level, content)                                    \
+#define EXPECT_QUICHE_LOG_CALL_CONTAINS_IMPL(log, level, content)                                  \
   EXPECT_CALL(log, Log(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##level),               \
                        testing::HasSubstr(content)))
 
 // Not part of the api exposed by quiche_mock_log.h. This is used by
 // quiche_expect_bug_impl.h.
-#define EXPECT_QUICHE_LOG_IMPL(statement, level, matcher)                                            \
+#define EXPECT_QUICHE_LOG_IMPL(statement, level, matcher)                                          \
   do {                                                                                             \
-    quiche::QuicheEnvoyMockLog mock_log;                                                               \
+    quiche::QuicheEnvoyMockLog mock_log;                                                           \
     EXPECT_CALL(mock_log,                                                                          \
                 Log(static_cast<quiche::QuicheLogLevel>(quiche::LogLevel##level), matcher))        \
         .Times(testing::AtLeast(1));                                                               \
@@ -94,10 +94,10 @@ using QuicheMockLogImpl = quiche::QuicheEnvoyMockLog;
     }                                                                                              \
   } while (false)
 
-#define EXPECT_QUICHE_DFATAL_IMPL(statement, matcher)                                                \
-  EXPECT_QUICHE_LOG_IMPL(                                                                            \
+#define EXPECT_QUICHE_DFATAL_IMPL(statement, matcher)                                              \
+  EXPECT_QUICHE_LOG_IMPL(                                                                          \
       {                                                                                            \
-        quiche::ScopedDisableExitOnDFatal disable_exit_on_dfatal;                                    \
+        quiche::ScopedDisableExitOnDFatal disable_exit_on_dfatal;                                  \
         statement;                                                                                 \
       },                                                                                           \
       DFATAL, matcher)

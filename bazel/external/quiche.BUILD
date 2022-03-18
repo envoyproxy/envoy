@@ -1222,9 +1222,9 @@ envoy_cc_library(
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
         ":quiche_common_platform_client_stats",
-        ":quiche_common_platform_server_stats",
         ":quiche_common_platform_default_quiche_platform_impl_export_lib",
         ":quiche_common_platform_export",
+        ":quiche_common_platform_server_stats",
         ":quiche_common_platform_testvalue",
         "@envoy//source/common/quic/platform:quic_platform_base_impl_lib",
     ],
@@ -4293,11 +4293,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_hostname_utils",
-    hdrs = [
-        "quiche/common/platform/api/quiche_hostname_utils.h",
-    ],
     srcs = [
         "quiche/common/platform/api/quiche_hostname_utils.cc",
+    ],
+    hdrs = [
+        "quiche/common/platform/api/quiche_hostname_utils.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],

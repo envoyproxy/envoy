@@ -13,5 +13,5 @@
 
 #define EXPECT_QUICHE_BUG_IMPL(statement, regex) EXPECT_ENVOY_BUG(statement, regex)
 
-#define EXPECT_QUICHE_PEER_BUG_IMPL(statement, regex)                                                \
+#define EXPECT_QUICHE_PEER_BUG_IMPL(statement, regex)                                              \
   EXPECT_QUICHE_LOG_IMPL(statement, ERROR, testing::ContainsRegex(regex))
