@@ -445,14 +445,43 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 //  %DOWNSTREAM_WIRE_BYTES_SENT%, %DOWNSTREAM_WIRE_BYTES_RECEIVED%,
 //  %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED%
 TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
-  useListenerAccessLog("upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
-                       "upstreamhost=%UPSTREAM_HOST% "
-                       "downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
-                       "sent=%BYTES_SENT% received=%BYTES_RECEIVED% "
-                       "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
-                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-                       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
-                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt",
+      version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+      TestUtility::uniqueFilename()));
+  useListenerAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
+        "upstreamhost=%UPSTREAM_HOST% "
+        "downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
+        "sent=%BYTES_SENT% received=%BYTES_RECEIVED% "
+        "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
+        "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+        "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+        "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
+    runtime_filter->set_runtime_key("unused-key");
+    auto* percent_sampled = runtime_filter->mutable_percent_sampled();
+    percent_sampled->set_numerator(100);
+    percent_sampled->set_denominator(envoy::type::v3::FractionalPercent::DenominatorType::
+                                         FractionalPercent_DenominatorType_HUNDRED);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -470,7 +499,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
 
   // Guarantee client is done writing to the log.
   test_server_.reset();
-  auto log_result = waitForAccessLog(listener_access_log_name_);
+  auto log_result = waitForAccessLog(access_log_path);
 
   // Regex matching localhost:port
 #ifndef GTEST_USES_SIMPLE_RE
