@@ -102,13 +102,7 @@ public:
       RateLimit::Descriptor new_descriptor;
       for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
         std::string value = descriptorEntry.value_;
-        if (config_->dynamicDownstreamIp() &&
-            absl::StrContains(descriptorEntry.value_, "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT")) {
-          // value =
-          //     substitutionFormattedString("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%",
-          //     stream_info);
-          value = formatValue(value, stream_info);
-        }
+        value = formatValue(value, stream_info);
         new_descriptor.entries_.push_back({descriptorEntry.key_, value});
       }
       dynamicDescriptors.push_back(new_descriptor);
@@ -132,7 +126,7 @@ public:
     Http::ResponseHeaderMapPtr response_headers = Http::ResponseHeaderMapImpl::create();
     Http::ResponseTrailerMapPtr response_trailers = Http::ResponseTrailerMapImpl::create();
 
-    Formatter::FormatterImpl formatter("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+    Formatter::FormatterImpl formatter(body);
 
     std::string value = formatter.format(*request_headers.get(), *response_headers.get(),
                                          *response_trailers.get(), stream_info, body);

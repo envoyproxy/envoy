@@ -53,12 +53,9 @@ public:
 
     auto downstream_direct_remote = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
+    filter_callbacks_.connection_.stream_info_.protocol_ = Http::Protocol::Http11;
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(downstream_direct_remote);
-    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
-        ->setDirectRemoteAddressForTest(downstream_direct_remote);
-    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
-        ->setLocalAddress(downstream_direct_remote);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -106,11 +103,10 @@ domain: foo
 descriptors:
 - entries:
   - key: remote_address
-    value: DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
+    value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
   - key: hello
-    value: world
+    value: "%PROTOCOL%"
 stat_prefix: name
-dynamic_downstream_ip: true
 )EOF";
 
   const std::string replace_ip_config_disabled = R"EOF(
@@ -118,11 +114,10 @@ domain: foo
 descriptors:
 - entries:
   - key: remote_address
-    value: DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
+    value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
   - key: hello
     value: world
 stat_prefix: name
-dynamic_downstream_ip: false
 )EOF";
 
   Stats::TestUtil::TestStore stats_store_;
@@ -169,11 +164,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
   InSequence s;
   setUpTest(replace_ip_config_enabled);
 
-  EXPECT_EQ("8.8.8.8", filter_->formatValue("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
-                                            filter_callbacks_.connection_.streamInfo()));
-
   std::vector<RateLimit::Descriptor> expected_descriptors;
-  expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
+  expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "HTTP/1.1"}}});
 
   std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
                                                         filter_->descriptors().end()};
@@ -192,7 +184,7 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"remote_address", "8.8.8.8"}, {"hello", "world"}}}}),
+                                  {{{"remote_address", "8.8.8.8"}, {"hello", "HTTP/1.1"}}}}),
                               testing::A<Tracing::Span&>(), _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -222,8 +214,7 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
   setUpTest(replace_ip_config_disabled);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
-  expected_descriptors.push_back(
-      {{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"}, {"hello", "world"}}});
+  expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
 
   std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
                                                         filter_->descriptors().end()};
@@ -242,8 +233,7 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"remote_address", "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"},
-                                    {"hello", "world"}}}}),
+                                  {{{"remote_address", "8.8.8.8"}, {"hello", "world"}}}}),
                               testing::A<Tracing::Span&>(), _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
