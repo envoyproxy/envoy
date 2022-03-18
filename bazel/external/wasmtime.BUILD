@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_rust//rust:rust.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -17,7 +17,6 @@ rust_library(
     name = "rust_c_api",
     srcs = glob(["crates/c-api/src/**/*.rs"]),
     crate_root = "crates/c-api/src/lib.rs",
-    crate_type = "staticlib",
     edition = "2018",
     proc_macro_deps = [
         "@proxy_wasm_cpp_host//bazel/cargo/wasmtime:wasmtime_c_api_macros",
