@@ -159,7 +159,7 @@ public:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
       listener_config_.set_name(listener_name_);
-      ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
+      ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
       bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
       auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
       lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);

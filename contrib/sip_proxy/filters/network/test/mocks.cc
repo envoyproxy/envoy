@@ -14,7 +14,7 @@ namespace Envoy {
 
 // Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
 template <>
-void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&) {}
+void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
 
 namespace Extensions {
 namespace NetworkFilters {
@@ -32,7 +32,6 @@ MockDecoderCallbacks::MockDecoderCallbacks() {
   service1.set_domain("pcsf-cfed.cncs.svc.cluster.local");
   local_services_.emplace_back(service1);
   local_services_.emplace_back(service2); */
-  ON_CALL(*this, getLocalIp()).WillByDefault(Return("127.0.0.1"));
 }
 MockDecoderCallbacks::~MockDecoderCallbacks() = default;
 

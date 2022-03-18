@@ -1,7 +1,11 @@
+name: CodeQL
+
 on:
   push:
     paths:
     - 'source/common/**'
+    branches-ignore:
+    - 'dependabot/**'
   pull_request:
 
 jobs:
@@ -35,7 +39,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@75f07e7ab2ee63cba88752d8c696324e4df67466
+      uses: github/codeql-action/init@883476649888a9e8e219d5b2e6b789dc024f690c
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -65,4 +69,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
-      uses: github/codeql-action/analyze@75f07e7ab2ee63cba88752d8c696324e4df67466
+      uses: github/codeql-action/analyze@883476649888a9e8e219d5b2e6b789dc024f690c

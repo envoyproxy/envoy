@@ -917,6 +917,40 @@ export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/b
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
+A relatively easy way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
+
+* Run the ci docker image
+
+```shell
+ci/run_envoy_docker.sh bash
+```
+
+* Get the docker container ID
+
+```shell
+dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
+```
+
+* Copy the `clang-format` to host machine
+
+```shell
+docker cp $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
+```
+
+* Ensure that the copied `clang-format` is the default one, by ensuring it is in `$PATH`:
+
+```shell
+cp clang-format-ci /usr/local/bin/clang-format
+```
+
+Alternatively, if you are a non-root user, you can use a bin dir and add that to `$PATH`
+
+```shell
+mkdir bin
+mv clang-format-ci bin/clang-format
+export PATH=$PATH:$PWD/bin/
+```
+
 Once this is set up, you can run clang-format without docker:
 
 ```shell
