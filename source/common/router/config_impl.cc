@@ -488,10 +488,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
-  if (!route.route().request_mirror_policies().empty()) {
-    for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
-    }
+  for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
+    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
   // Inherit policies from the virtual host, which might be from the route config.
@@ -1445,10 +1443,8 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
-  if (!virtual_host.request_mirror_policies().empty()) {
-    for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
-      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
-    }
+  for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
+    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
   // Inherit policies from the route config.

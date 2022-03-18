@@ -129,6 +129,7 @@ message RouteConfiguration {
   repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
 
   // Specify a set of default request mirroring policies which apply to all routes under its virtual hosts.
+  // Note that policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 13;
 }
 
