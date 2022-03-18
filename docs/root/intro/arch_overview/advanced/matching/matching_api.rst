@@ -30,10 +30,10 @@ HTTP Input Functions
 
 These input functions are available for matching HTTP requests:
 
-* :ref:`Request header value <extension_request-headers>`.
-* :ref:`Request trailer value <extension_request-trailers>`.
-* :ref:`Response header value <extension_response-headers>`.
-* :ref:`Response trailer value <extension_response-trailers>`.
+* :ref:`Request header value <extension_envoy.matching.inputs.request-headers>`.
+* :ref:`Request trailer value <extension_envoy.matching.inputs.request-trailers>`.
+* :ref:`Response header value <extension_envoy.matching.inputs.response-headers>`.
+* :ref:`Response trailer value <extension_envoy.matching.inputs.response-trailers>`.
 
 .. _extension_category_envoy.matching.network.input:
 
@@ -42,15 +42,15 @@ Network Input Functions
 
 These input functions are available for matching TCP connections:
 
-* :ref:`Destination IP <extension_destination-ip>`.
-* :ref:`Destination port <extension_destination-port>`.
-* :ref:`Source IP <extension_source-ip>`.
-* :ref:`Direct source IP <extension_direct-source-ip>`.
-* :ref:`Source port <extension_source-port>`.
-* :ref:`Source type <extension_source-type>`.
-* :ref:`Server name <extension_server-name>`.
-* :ref:`Transport protocol <extension_transport-protocol>`.
-* :ref:`Application protocol <extension_application-protocol>`.
+* :ref:`Destination IP <extension_envoy.matching.inputs.destination-ip>`.
+* :ref:`Destination port <extension_envoy.matching.inputs.destination-port>`.
+* :ref:`Source IP <extension_envoy.matching.inputs.source-ip>`.
+* :ref:`Direct source IP <extension_envoy.matching.inputs.direct-source-ip>`.
+* :ref:`Source port <extension_envoy.matching.inputs.source-port>`.
+* :ref:`Source type <extension_envoy.matching.inputs.source-type>`.
+* :ref:`Server name <extension_envoy.matching.inputs.server-name>`.
+* :ref:`Transport protocol <extension_envoy.matching.inputs.transport-protocol>`.
+* :ref:`Application protocol <extension_envoy.matching.inputs.application-protocol>`.
 
 Common Input Functons
 *********************
@@ -59,13 +59,13 @@ These input functions are available in any context:
 
 * :ref:`Environment variable <extension_envoy.matching.common_inputs.environment_variable>`.
 
-Matching Algorithms
-*******************
+Custom Matching Algorithms
+**************************
 
 In addition to the built-in exact and prefix matchers, these custom matchers
 are available in some contexts:
 
-.. _extension_trie-matcher:
+.. _extension_envoy.matching.custom_matchers.trie_matcher:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
 

@@ -334,7 +334,7 @@ EXTENSIONS = {
     # Custom matchers
     #
 
-    "trie-matcher":                                    "//source/extensions/common/matcher:trie_matcher_lib",
+    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

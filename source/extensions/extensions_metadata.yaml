@@ -750,72 +750,72 @@ envoy.http.stateful_session.cookie:
   - envoy.http.stateful_session
   security_posture: unknown
   status: alpha
-request-headers:
+envoy.matching.inputs.request-headers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-request-trailers:
+envoy.matching.inputs.request-trailers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-response-headers:
+envoy.matching.inputs.response-headers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-response-trailers:
+envoy.matching.inputs.response-trailers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-destination-ip:
+envoy.matching.inputs.destination-ip:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-destination-port:
+envoy.matching.inputs.destination-port:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-source-ip:
+envoy.matching.inputs.source-ip:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-source-port:
+envoy.matching.inputs.source-port:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-direct-source-ip:
+envoy.matching.inputs.direct-source-ip:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-source-type:
+envoy.matching.inputs.source-type:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-server-name:
+envoy.matching.inputs.server-name:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-transport-protocol:
+envoy.matching.inputs.transport-protocol:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-application-protocol:
+envoy.matching.inputs.application-protocol:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-trie-matcher:
+envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.network.custom_matchers
   security_posture: unknown
