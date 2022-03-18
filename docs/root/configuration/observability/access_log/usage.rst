@@ -253,7 +253,7 @@ The following command operators are supported:
 
   TCP
     Downstream bytes sent on connection.
-  
+
   UDP
     Total number of downstream bytes sent to the upstream.
 
@@ -436,7 +436,7 @@ The following command operators are supported:
 %ROUTE_NAME%
   HTTP/TCP
     Name of the route.
-  
+
   UDP
     Name of the cluster (reused operator for udp proxy).
 
