@@ -6,6 +6,7 @@
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -123,6 +124,22 @@ TEST_F(HttpTracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
   EXPECT_THROW_WITH_MESSAGE(http_tracer_manager_.getOrCreateHttpTracer(&tracing_config),
                             EnvoyException,
                             "Didn't find a registered implementation for name: 'invalid'");
+}
+
+TEST_F(HttpTracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
+  envoy::config::trace::v3::Tracing_Http tracing_config;
+  tracing_config.set_name("envoy.tracers.sample");
+  tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
+
+  ProtobufWkt::Any expected_any_proto;
+  expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
+  EXPECT_THROW_WITH_MESSAGE(http_tracer_manager_.getOrCreateHttpTracer(&tracing_config),
+                            EnvoyException,
+                            fmt::format("Unable to unpack as google.protobuf.Struct: {}",
+                                        expected_any_proto.DebugString()));
 }
 
 class HttpTracerManagerImplCacheTest : public testing::Test {

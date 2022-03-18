@@ -295,7 +295,7 @@ public:
     if (message.has_typed_config()) {
       Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
       if (factory != nullptr ||
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unique_extension_type_url")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_extension_type_url")) {
         return factory;
       }
     }
@@ -314,7 +314,7 @@ public:
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
     if (message.has_typed_config()) {
       Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unique_extension_type_url")) {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_extension_type_url")) {
         if (factory == nullptr && !is_optional) {
           ExceptionUtil::throwEnvoyException(
               fmt::format("Didn't find a registered implementation for type URL: '{}'",
