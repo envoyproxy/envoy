@@ -26,7 +26,9 @@ services:
     - 8.8.4.4
 
   service1:
-    image: envoyproxy:tracing
+    build:
+      context: .
+      dockerfile: Dockerfile-jaeger-service
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
@@ -36,7 +38,9 @@ services:
     - 8.8.4.4
 
   service2:
-    image: envoyproxy:tracing
+    build:
+      context: .
+      dockerfile: Dockerfile-jaeger-service
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
