@@ -1272,8 +1272,14 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "quic_core_quic_epoll_clock_lib",
-    srcs = ["quiche/quic/core/quic_epoll_clock.cc"],
-    hdrs = ["quiche/quic/core/quic_epoll_clock.h"],
+    srcs = select({
+        "@envoy//bazel:linux": ["quiche/quic/core/quic_epoll_clock.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "@envoy//bazel:linux": ["quiche/quic/core/quic_epoll_clock.h"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
