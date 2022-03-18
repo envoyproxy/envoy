@@ -41,7 +41,6 @@
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
-#include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_system_event_loop.h"
@@ -55,6 +54,9 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using quiche::GetLogger;
+using quiche::getVerbosityLogThreshold;
+using quiche::setVerbosityLogThreshold;
 using testing::_;
 using testing::HasSubstr;
 
@@ -75,7 +77,7 @@ protected:
     GetLogger().set_level(log_level_);
   }
 
-  const QuicLogLevel log_level_;
+  const quiche::QuicheLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
 
@@ -196,8 +198,6 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 #endif
 }
-
-TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
 
 TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {

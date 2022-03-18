@@ -815,7 +815,7 @@ std::string jsonStrToPbStrucStr(std::string json) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
-  // Lower the timeout for the 408 response.
+  // Lower the timeout for a incomplete response.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -842,7 +842,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "408"}, {"content-type", "text/plain"}}, "");
+      Http::TestResponseHeaderMapImpl{{":status", "504"}, {"content-type", "text/plain"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(

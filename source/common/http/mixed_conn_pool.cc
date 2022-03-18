@@ -74,7 +74,7 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
     state_.incrConnectingAndConnectedStreamCapacity(new_client->effectiveConcurrentStreamLimit() -
                                                     1);
   }
-  new_client->setState(ActiveClient::State::CONNECTING);
+  new_client->setState(ActiveClient::State::Connecting);
   LinkedList::moveIntoList(std::move(new_client), owningList(new_client->state()));
 }
 

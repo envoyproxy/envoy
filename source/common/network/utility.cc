@@ -422,7 +422,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (absl::StrContains(s, '-')) {
       char dash = 0;
       ss >> min;
       ss >> dash;

@@ -3000,6 +3000,155 @@ TEST_F(Http1ServerConnectionImplTest, ManyLargeRequestHeadersAccepted) {
   testRequestHeadersAccepted(createLargeHeaderFragment(64));
 }
 
+TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
+  TestScopedRuntime scoped_runtime;
+
+  // No readDisable for normal non-piped HTTP request.
+  {
+    initialize();
+
+    NiceMock<MockRequestDecoder> decoder;
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+
+    EXPECT_CALL(connection_, readDisable(true)).Times(0);
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: a.com\r\n\r\n");
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+
+    std::string output;
+    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+    EXPECT_CALL(connection_, readDisable(false)).Times(0);
+    // Delete active request.
+    connection_.dispatcher_.clearDeferredDeleteList();
+  }
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
+
+  // Always call readDisable if lazy read disable flag is set to false.
+  {
+    initialize();
+
+    NiceMock<MockRequestDecoder> decoder;
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+
+    EXPECT_CALL(connection_, readDisable(true));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: a.com\r\n\r\n");
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+
+    std::string output;
+    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+    EXPECT_CALL(connection_, readDisable(false));
+    // Delete active request.
+    connection_.dispatcher_.clearDeferredDeleteList();
+  }
+}
+
+// Tests the scenario where the client sends pipelined requests and the requests reach Envoy at the
+// same time.
+TEST_F(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
+  TestScopedRuntime scoped_runtime;
+
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
+  EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+
+  EXPECT_CALL(connection_, readDisable(true));
+
+  Buffer::OwnedImpl buffer(
+      "GET / HTTP/1.1\r\nhost: a.com\r\n\r\nGET / HTTP/1.1\r\nhost: b.com\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  TestResponseHeaderMapImpl headers{{":status", "200"}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+  EXPECT_CALL(connection_, readDisable(false));
+  // Delete active request to re-enable connection reading.
+  connection_.dispatcher_.clearDeferredDeleteList();
+}
+
+// Tests the scenario where the client sends pipelined requests. The second request reaches Envoy
+// before the end of the first request.
+TEST_F(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
+  TestScopedRuntime scoped_runtime;
+
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
+  EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: a.com\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+
+  Buffer::OwnedImpl second_buffer("GET / HTTP/1.1\r\nhost: a.com\r\n\r\n");
+
+  // Second request before first request complete will disable downstream connection reading.
+  EXPECT_CALL(connection_, readDisable(true));
+  auto second_status = codec_->dispatch(second_buffer);
+  EXPECT_TRUE(second_status.ok());
+  // The second request will no be consumed.
+  EXPECT_TRUE(second_buffer.length() != 0);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  TestResponseHeaderMapImpl headers{{":status", "200"}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+
+  EXPECT_CALL(connection_, readDisable(false));
+  // Delete active request to re-enable connection reading.
+  connection_.dispatcher_.clearDeferredDeleteList();
+}
+
 // Tests that incomplete response headers of 80 kB header value fails.
 TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
   initialize();

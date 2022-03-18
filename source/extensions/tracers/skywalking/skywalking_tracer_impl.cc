@@ -82,7 +82,7 @@ void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_con
                                       ? server_factory_context.localInfo().clusterName()
                                       : DEFAULT_SERVICE_AND_INSTANCE.data()));
   config_.set_instance_name(!client_config.instance_name().empty()
-                                ? client_config.service_name()
+                                ? client_config.instance_name()
                                 : (!server_factory_context.localInfo().nodeName().empty()
                                        ? server_factory_context.localInfo().nodeName()
                                        : DEFAULT_SERVICE_AND_INSTANCE.data()));

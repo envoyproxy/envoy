@@ -78,7 +78,7 @@ def _envoy_repo_impl(repository_ctx):
 
     """
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
-    version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
+    version = repository_ctx.read(repo_path.get_child("VERSION.txt")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
@@ -522,10 +522,6 @@ def _com_github_tencent_rapidjson():
         name = "com_github_tencent_rapidjson",
         build_file = "@envoy//bazel/external:rapidjson.BUILD",
     )
-    native.bind(
-        name = "rapidjson",
-        actual = "@com_github_tencent_rapidjson//:rapidjson",
-    )
 
 def _com_github_nlohmann_json():
     external_http_archive(
@@ -951,7 +947,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.1 && ./emsdk activate --embedded 3.1.1; fi",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.7 && ./emsdk activate --embedded 3.1.7; fi",
         ],
     )
 

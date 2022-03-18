@@ -56,3 +56,11 @@ envoy_cc_library(
         "//source/common/common:token_bucket_impl_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "ratelimit_headers_lib",
+    hdrs = ["ratelimit_headers.h"],
+    deps = [
+        "//source/common/http:header_map_lib",
+    ],
+)
