@@ -2294,8 +2294,8 @@ envoy_cc_library(
     hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    tags = ["nofips"],
     strip_include_prefix = "quiche/common/platform/default/",
+    tags = ["nofips"],
 )
 
 envoy_cc_library(
@@ -4204,8 +4204,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
-    deps = [ ":quiche_common_platform_client_stats_impl" ],
-
+    deps = [":quiche_common_platform_client_stats_impl"],
 )
 
 envoy_cc_library(
@@ -4214,9 +4213,9 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_client_stats_impl.h",
     ],
     repository = "@envoy",
+    strip_include_prefix = "quiche/common/platform/default/",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
-    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_test_library(
@@ -4226,7 +4225,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [ ":quiche_common_platform_system_event_loop_impl" ],
+    deps = [":quiche_common_platform_system_event_loop_impl"],
 )
 
 envoy_cc_test_library(
@@ -4235,8 +4234,8 @@ envoy_cc_test_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_system_event_loop_impl.h",
     ],
     repository = "@envoy",
-    tags = ["nofips"],
     strip_include_prefix = "quiche/common/platform/default/",
+    tags = ["nofips"],
 )
 
 envoy_cc_library(
@@ -4302,12 +4301,12 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
     ],
     repository = "@envoy",
+    strip_include_prefix = "quiche/common/platform/default/",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ],
-    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4323,7 +4322,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-	":quiche_common_platform_mutex_impl",
+        ":quiche_common_platform_mutex_impl",
     ],
 )
 
@@ -4336,12 +4335,12 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.h",
     ],
     repository = "@envoy",
+    strip_include_prefix = "quiche/common/platform/default/",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ],
-    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4493,8 +4492,8 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_common_platform_export",
         ":quiche_common_platform_containers_impl",
+        ":quiche_common_platform_export",
     ],
 )
 
@@ -4504,12 +4503,12 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
     ],
     repository = "@envoy",
+    strip_include_prefix = "quiche/common/platform/default/",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ],
-    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
@@ -4557,8 +4556,8 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_thread_local_impl.h",
     ],
     repository = "@envoy",
-    tags = ["nofips"],
     strip_include_prefix = "quiche/common/platform/default/",
+    tags = ["nofips"],
 )
 
 envoy_cc_library(
@@ -4572,12 +4571,12 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.h",
     ],
     repository = "@envoy",
+    strip_include_prefix = "quiche/common/platform/default/",
     tags = ["nofips"],
     deps = [
         ":quic_platform_export",
         ":quiche_common_platform_export",
     ],
-    strip_include_prefix = "quiche/common/platform/default/",
 )
 
 envoy_cc_library(
