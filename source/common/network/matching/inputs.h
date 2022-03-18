@@ -15,7 +15,7 @@ protected:
   explicit BaseFactory(const std::string& name) : name_(name) {}
 
 public:
-  std::string name() const override { return name_; }
+  std::string name() const override { return "envoy.matching.inputs." + name_; }
 
   Matcher::DataInputFactoryCb<MatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {

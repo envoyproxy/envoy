@@ -51,7 +51,7 @@ class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<HttpMat
 public:
   explicit HttpHeadersDataInputFactoryBase(const std::string& name) : name_(name) {}
 
-  std::string name() const override { return name_; }
+  std::string name() const override { return "envoy.matching.inputs." + name_; }
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
