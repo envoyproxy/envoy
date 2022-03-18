@@ -23,6 +23,7 @@ open class EngineBuilder: NSObject {
   private var dnsPreresolveHostnames: String = "[]"
   private var enableHappyEyeballs: Bool = false
   private var enableInterfaceBinding: Bool = false
+  private var enforceTrustChainVerification: Bool = true
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var h2RawDomains: [String] = []
@@ -157,6 +158,17 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
     self.enableInterfaceBinding = enableInterfaceBinding
+    return self
+  }
+
+  /// Specify whether to enforce TLS trust chain verification for secure sockets.
+  ///
+  /// - parameter enforceTrustChainVerification: whether to enforce trust chain verification.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enforceTrustChainVerification(_ enforceTrustChainVerification: Bool) -> Self {
+    self.enforceTrustChainVerification = enforceTrustChainVerification
     return self
   }
 
@@ -391,6 +403,7 @@ open class EngineBuilder: NSObject {
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableInterfaceBinding: self.enableInterfaceBinding,
+      enforceTrustChainVerification: self.enforceTrustChainVerification,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,

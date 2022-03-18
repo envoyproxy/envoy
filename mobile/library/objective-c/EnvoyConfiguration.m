@@ -14,6 +14,7 @@
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
+                    enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
@@ -48,6 +49,7 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableInterfaceBinding = enableInterfaceBinding;
+  self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
@@ -144,6 +146,9 @@
                    @"envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig\"}\n"];
   [definitions appendFormat:@"- &enable_interface_binding %@\n",
                             self.enableInterfaceBinding ? @"true" : @"false"];
+  [definitions appendFormat:@"- &trust_chain_verification %@\n", self.enforceTrustChainVerification
+                                                                     ? @"VERIFY_TRUST_CHAIN"
+                                                                     : @"ACCEPT_UNTRUSTED"];
   [definitions appendFormat:@"- &h2_connection_keepalive_idle_interval %.*fs\n", 3,
                             (double)self.h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0];
   [definitions appendFormat:@"- &h2_connection_keepalive_timeout %lus\n",
