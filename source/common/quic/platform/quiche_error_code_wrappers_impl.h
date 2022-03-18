@@ -6,11 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-namespace quic {
+#include <memory>
 
-int QuicPickServerPortForTestsOrDieImpl();
-inline void QuicRecyclePortImpl(int) {
-  // No-op with current port picking implementation.
-}
+#include "envoy/api/io_error.h"
 
-} // namespace quic
+#define QUICHE_EMSGSIZE_IMPL static_cast<int>(Envoy::Api::IoError::IoErrorCode::MessageTooBig)

@@ -8,14 +8,14 @@
 
 #include "absl/strings/string_view.h"
 
-namespace quic {
+namespace quiche {
 // NOLINTNEXTLINE(readability-identifier-naming)
-void QuicSaveTestOutputImpl(absl::string_view filename, absl::string_view data);
+void QuicheSaveTestOutputImpl(absl::string_view filename, absl::string_view data);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-bool QuicLoadTestOutputImpl(absl::string_view filename, std::string* data);
+bool QuicheLoadTestOutputImpl(absl::string_view filename, std::string* data);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-void QuicRecordTraceImpl(absl::string_view identifier, absl::string_view data);
+void QuicheRecordTraceImpl(absl::string_view identifier, absl::string_view data);
 
-} // namespace quic
+} // namespace quiche

@@ -28,6 +28,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_mem_slice.h"
+#include "quiche/common/platform/api/quiche_system_event_loop.h"
 #include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
@@ -43,7 +44,6 @@
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
-#include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
@@ -248,7 +248,7 @@ TEST_F(QuicPlatformTest, QuicThread) {
         t3.Start();
         t3.waitForRun();
       },
-      "QuicThread should be joined before destruction");
+      "QuicheThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
@@ -430,7 +430,7 @@ TEST_F(QuicPlatformTest, QuicNotification) {
 }
 
 TEST_F(QuicPlatformTest, QuicTestOutput) {
-  Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
+  Envoy::TestEnvironment::setEnvVar("QUICHE_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
   GetLogger().set_level(spdlog::level::info);
@@ -600,8 +600,8 @@ TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
 TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // These two interfaces are no-op in Envoy. The test just makes sure they
   // build.
-  QuicRunSystemEventLoopIteration();
-  QuicSystemEventLoop("dummy");
+  quiche::QuicheRunSystemEventLoopIteration();
+  quiche::QuicheSystemEventLoop("dummy");
 }
 
 TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {

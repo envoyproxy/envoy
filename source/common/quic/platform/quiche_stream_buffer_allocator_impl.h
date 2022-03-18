@@ -8,11 +8,11 @@
 
 #include "quiche/common/simple_buffer_allocator.h"
 
-namespace quic {
+namespace quiche {
 
 // Implements the interface required by
 // https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_stream_buffer_allocator.h
 // with the default implementation provided by QUICHE.
-using QuicStreamBufferAllocatorImpl = quiche::SimpleBufferAllocator;
+using QuicheStreamBufferAllocatorImpl = quiche::SimpleBufferAllocator;
 
-} // namespace quic
+} // namespace quiche
