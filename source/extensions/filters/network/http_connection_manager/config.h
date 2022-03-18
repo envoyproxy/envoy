@@ -100,7 +100,7 @@ public:
       return unix_sockets_;
     }
     if (!cidr_ranges_.isEmpty()) {
-      return cidr_ranges_.contains(address);  
+      return cidr_ranges_.contains(address);
     }
     return Network::Utility::isInternalAddress(address);
   }
