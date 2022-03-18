@@ -297,16 +297,22 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
 }
 
 TEST_F(XRayTracerTest, NonSampledSpansNotSerialized) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan();
+  auto span =
+      tracer.createNonSampledSpan(config_, "egress" /*operation name*/,
+                                  server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->finishSpan();
 }
 
 TEST_F(XRayTracerTest, BaggageNotImplemented) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan();
+  auto span =
+      tracer.createNonSampledSpan(config_, "ingress" /*operation name*/,
+                                  server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setBaggage("baggage_key", "baggage_value");
   span->finishSpan();
 
@@ -315,18 +321,24 @@ TEST_F(XRayTracerTest, BaggageNotImplemented) {
 }
 
 TEST_F(XRayTracerTest, LogNotImplemented) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan();
+  auto span =
+      tracer.createNonSampledSpan(config_, "ingress" /*operation name*/,
+                                  server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "dummy log value");
   span->finishSpan();
   // Nothing to assert here as log is a dummy function
 }
 
 TEST_F(XRayTracerTest, GetTraceId) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan();
+  auto span =
+      tracer.createNonSampledSpan(config_, "ingress" /*operation name*/,
+                                  server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->finishSpan();
 
   // This method is unimplemented and a noop.
@@ -455,6 +467,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
 }
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   constexpr absl::string_view span_name = "my span";
   Tracer tracer{span_name,
                 "",
@@ -462,7 +475,9 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
                 std::move(broker_),
                 server_.timeSource(),
                 server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan();
+  auto span =
+      tracer.createNonSampledSpan(config_, "ingress" /*operation name*/,
+                                  server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
   auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
@@ -473,6 +488,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
 }
 
 TEST_F(XRayTracerTest, TraceIDFormatTest) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   constexpr absl::string_view span_name = "my span";
   Tracer tracer{span_name,
                 "",
@@ -480,14 +496,38 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
                 std::move(broker_),
                 server_.timeSource(),
                 server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan(); // startSpan and createNonSampledSpan use the same
-                                             // logic to create a trace ID
+  auto span = tracer.createNonSampledSpan(
+      config_, "ingress" /*operation name*/, server_.timeSource().systemTime(),
+      absl::nullopt /*headers*/); // startSpan and createNonSampledSpan use the
+                                  // same logic to create a trace ID
   XRay::Span* xray_span = span.get();
   std::vector<std::string> parts = absl::StrSplit(xray_span->traceId(), absl::ByChar('-'));
   EXPECT_EQ(3, parts.size());
   EXPECT_EQ(1, parts[0].length());
   EXPECT_EQ(8, parts[1].length());
   EXPECT_EQ(24, parts[2].length());
+}
+
+TEST_F(XRayTracerTest, UseExistingHeaderInformationNonSampled) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+  XRayHeader xray_header;
+  xray_header.trace_id_ = "a";
+  xray_header.parent_id_ = "b";
+  constexpr absl::string_view span_name = "my span";
+
+  Tracer tracer{span_name,
+                "",
+                aws_metadata_,
+                std::move(broker_),
+                server_.timeSource(),
+                server_.api().randomGenerator()};
+  auto span = tracer.createNonSampledSpan(config_, "ingress", server_.timeSource().systemTime(),
+                                          xray_header);
+
+  const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
+  EXPECT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
+  EXPECT_STREQ(xray_header.parent_id_.c_str(), xray_span->parentId().c_str());
+  EXPECT_FALSE(xray_span->sampled());
 }
 
 class XRayDaemonTest : public testing::TestWithParam<Network::Address::IpVersion> {};
