@@ -74,6 +74,7 @@ envoy_cc_test_library(
     external_deps = ["abseil_time"],
     deps = [
         ":quiche_platform_expect_bug_impl_lib",
+        ":quiche_platform_thread_impl_lib",
         "//envoy/network:address_interface",
         "//source/common/quic/platform:quic_platform_base_impl_lib",
         "//test/test_common:environment_lib",
@@ -155,6 +156,6 @@ envoy_cc_test_library(
     name = "quiche_common_platform_test_helpers_impl_lib",
     hdrs = ["quiche_test_helpers_impl.h"],
     deps = [
-        ":quic_platform_expect_bug_impl_lib",
+        ":quiche_platform_expect_bug_impl_lib",
     ],
 )
