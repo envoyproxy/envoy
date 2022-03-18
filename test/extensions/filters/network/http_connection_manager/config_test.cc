@@ -688,11 +688,11 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
                                      filter_config_provider_manager_);
   Network::Address::Ipv4Instance firstInternalIpAddress{"100.64.0.10", 0, nullptr};
   Network::Address::Ipv4Instance secondInternalIpAddress{"50.20.0.5", 0, nullptr};
-  Network::Address::Ipv4Instance defaultInternalIpAddress{"10.48.179.130", 0, nullptr};
+  Network::Address::Ipv4Instance defaultIpAddress{"10.48.179.130", 0, nullptr};
   Network::Address::Ipv4Instance externalIpAddress{"90.60.0.10", 0, nullptr};
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(firstInternalIpAddress));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(secondInternalIpAddress));
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(defaultInternalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(defaultIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 

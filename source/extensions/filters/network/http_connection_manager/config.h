@@ -99,13 +99,15 @@ public:
     if (address.type() == Network::Address::Type::Pipe) {
       return unix_sockets_;
     }
-
-    return cidr_ranges_.contains(address) || Network::Utility::isInternalAddress(address);
+    if (!cidr_ranges_.isEmpty()) {
+      return cidr_ranges_.contains(address);  
+    }
+    return Network::Utility::isInternalAddress(address);
   }
 
 private:
   const bool unix_sockets_;
-  Network::Address::IpList cidr_ranges_;
+  const Network::Address::IpList cidr_ranges_;
 };
 
 /**

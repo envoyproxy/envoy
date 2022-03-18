@@ -136,6 +136,8 @@ public:
 
   bool contains(const Instance& address) const;
 
+  bool isEmpty() const;
+
 private:
   std::vector<CidrRange> ip_list_;
 };
