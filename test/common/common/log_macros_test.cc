@@ -18,6 +18,7 @@
 namespace Envoy {
 
 using namespace std::chrono_literals;
+using ::testing::HasSubstr;
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -333,7 +334,7 @@ TEST(Fancy, Iteration) {
   FANCY_LOG(info, "Info: iteration test begins.");
   getFancyContext().setAllFancyLoggers(spdlog::level::info);
   std::string output = getFancyContext().listFancyLoggers();
-  EXPECT_EQ(output, "   " __FILE__ ": 2\n");
+  EXPECT_THAT(output, HasSubstr("   " __FILE__ ": 2\n"));
   std::string log_format = "[%T.%e][%t][%l][%n] %v";
   getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
   // setDefaultFancyLevelFormat relies on previous default and might cause error online

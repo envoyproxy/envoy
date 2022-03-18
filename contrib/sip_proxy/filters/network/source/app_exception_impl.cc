@@ -49,7 +49,7 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
   }
 
   // Call-ID
-  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::CallId]).empty()) {
+  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From]).empty()) {
     output << fmt::format("Call-ID: {}\r\n",
                           absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::CallId])[0]);
   } else {
@@ -62,7 +62,7 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
   }
 
   // CSeq
-  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Cseq]).empty()) {
+  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From]).empty()) {
     output << fmt::format("CSeq: {}\r\n",
                           absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Cseq])[0]);
   } else {

@@ -1793,6 +1793,9 @@ message RateLimit {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
 
+      // The key to use in the descriptor entry. Defaults to `header_match`.
+      string descriptor_key = 4;
+
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
