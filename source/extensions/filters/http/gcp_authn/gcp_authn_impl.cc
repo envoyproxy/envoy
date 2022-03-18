@@ -41,7 +41,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
-    // TODO(tyxia) Revisit error or debug
+    // TODO(tyxia) Revisit log option, error or debug
     ENVOY_LOG(error,
               "Failed to fetch the token [uri = {}]: [cluster = {}] is not found or configured.",
               uri, cluster);
@@ -113,6 +113,7 @@ void GcpAuthnClient::cancel() {
 void GcpAuthnClient::onError() {
   // Cancel if the request is active.
   cancel();
+
   ASSERT(callbacks_ != nullptr);
   callbacks_->onComplete(nullptr);
   callbacks_ = nullptr;

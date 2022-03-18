@@ -13,6 +13,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
+Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& url);
+
 /**
  * Async callbacks used during fetchToken() calls.
  */
@@ -23,12 +25,11 @@ public:
   /**
    * Called on completion of request.
    *
-   * @param response the pointer to the response message.
+   * @param response the pointer to the response message. Null response pointer means the request
+   *        was completed with error.
    */
   virtual void onComplete(const Http::ResponseMessage* response) PURE;
 };
-
-Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& url);
 
 class GcpAuthnClient : public Http::AsyncClient::Callbacks,
                        public Logger::Loggable<Logger::Id::init> {

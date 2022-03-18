@@ -138,6 +138,37 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
+TEST_F(GcpAuthnFilterTest, NotOkResponse) {
+  setupMockObjects();
+  // Create the client object.
+  createClient();
+
+  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "504"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnFilterTest, GetResponseThrowException) {
+  setupMockObjects();
+  // Create the client object.
+  createClient();
+
+  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
+
+  Envoy::Http::ResponseHeaderMapPtr empty_resp_headers(
+      new Envoy::Http::TestResponseHeaderMapImpl({}));
+  Envoy::Http::ResponseMessagePtr empty_response(
+      new Envoy::Http::ResponseMessageImpl(std::move(empty_resp_headers)));
+  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
+  client_callback_->onSuccess(client_request_, std::move(empty_response));
+}
+
 TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
   setupMockObjects();
   auto filter = std::make_shared<GcpAuthnFilter>(config_, context_);
@@ -151,6 +182,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  // continueDecoding() is expected to be called to resume the filter chain after onSuccess().
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -168,10 +200,10 @@ TEST_F(GcpAuthnFilterTest, DestoryFilter) {
   // called.
   EXPECT_EQ(filter->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopIteration);
-  EXPECT_EQ(filter->getState(), GcpAuthnFilter::State::Calling);
+  EXPECT_EQ(filter->state(), GcpAuthnFilter::State::Calling);
   filter->onDestroy();
-  // onDestroy() call updated the state from `Calling` to `Complete`.
-  EXPECT_EQ(filter->getState(), GcpAuthnFilter::State::Complete);
+  // onDestroy() call is expected to update the state from `Calling` to `Complete`.
+  EXPECT_EQ(filter->state(), GcpAuthnFilter::State::Complete);
 }
 
 } // namespace

@@ -27,7 +27,7 @@ public:
 
   void createUpstreams() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    //  Add two fake upstreams, the second one is for token stream
+    //  Add two fake upstreams, the second one is for gcp authentication stream.
     for (int i = 0; i < 2; ++i) {
       addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
@@ -46,12 +46,13 @@ public:
       gcp_authn_cluster->mutable_load_assignment()->set_cluster_name("gcp_authn");
       ConfigHelper::setHttp2(*gcp_authn_cluster);
 
-      // Add the metadata to cluster 0 which is destination cluster to provide the audience name.
+      // Add the metadata to cluster 0 (destination cluster) configuration. The audience (URL of the
+      // destionation cluster) is provided through the metadata.
       auto cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       envoy::config::core::v3::Metadata* cluster_metadata = cluster_0->mutable_metadata();
       (*(*cluster_metadata
               ->mutable_filter_metadata())[Envoy::Extensions::HttpFilters::GcpAuthn::FilterName]
-            .mutable_fields())["audience_key"]
+            .mutable_fields())[Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey]
           .set_string_value("http://test.com");
 
       TestUtility::loadFromYaml(default_config_, proto_config_);
@@ -59,6 +60,7 @@ public:
       gcp_authn_filter.set_name(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName);
       gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
 
+      // Add the filter to the filter chain.
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(gcp_authn_filter));
     });
   }
@@ -129,8 +131,10 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initialize();
 
   initiateClientConnection();
+  // Send the request to cluster `gcp_authn`.
   waitForGcpAuthnServerResponse();
 
+  // Send the request to cluster `cluster_0`;
   AssertionResult result =
       fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
   RELEASE_ASSERT(result, result.message());
