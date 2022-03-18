@@ -170,7 +170,9 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
   }
 
   // Add RSA padding to the the hash. Only `PSS` padding is supported.
+  // TODO(ipuustin): add PKCS #1 v1.5 padding scheme later if requested.
   if (!SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
+    ops->logDebugMsg("non-supported RSA padding");
     return status;
   }
 
