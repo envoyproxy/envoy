@@ -132,6 +132,16 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaSigning) {
   EXPECT_EQ(res_, ssl_private_key_success);
 }
 
+TEST_F(CryptoMbProviderRsaTest, TestRsaPkcs1Signing) {
+  // PKCS #1 v1.5 is not supported.
+  TestCallbacks cb;
+  CryptoMbPrivateKeyConnection op(cb, *dispatcher_, bssl::UpRef(pkey_), queue_);
+
+  res_ = rsaPrivateKeySignForTest(&op, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PKCS1_SHA256,
+                                  in_, in_len_);
+  EXPECT_EQ(res_, ssl_private_key_failure);
+}
+
 TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
