@@ -15,10 +15,14 @@ from envoy.base import utils
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
-    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic", "request-headers",
-    "request-trailers", "response-headers", "response-trailers", "destination-ip",
-    "destination-port", "source-ip", "source-port", "direct-source-ip", "source-type",
-    "server-name", "transport-protocol", "application-protocol")
+    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic",
+    "envoy.matching.inputs.request-headers", "envoy.matching.inputs.request-trailers",
+    "envoy.matching.inputs.response-headers", "envoy.matching.inputs.response-trailers",
+    "envoy.matching.inputs.destination-ip", "envoy.matching.inputs.destination-port",
+    "envoy.matching.inputs.source-ip", "envoy.matching.inputs.source-port",
+    "envoy.matching.inputs.direct-source-ip", "envoy.matching.inputs.source-type",
+    "envoy.matching.inputs.server-name", "envoy.matching.inputs.transport-protocol",
+    "envoy.matching.inputs.application-protocol")
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
