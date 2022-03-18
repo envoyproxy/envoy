@@ -921,9 +921,8 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
 
 TEST_F(FastFailOrderingTest,
        GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunkWithDeferredProcessing) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{std::string(Runtime::defer_processing_backedup_streams), "true"}});
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{std::string(Runtime::defer_processing_backedup_streams), "true"}});
 
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
