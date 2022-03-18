@@ -110,6 +110,9 @@ trailing_comma:
   mandatory_comma: true
 line_length:
   - 100
+type_body_length:
+  warning: 300
+  error: 400
 file_length:
   warning: 300
   ignore_comment_only_lines: true
