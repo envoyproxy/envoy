@@ -47,7 +47,6 @@ public:
         subscription_stats_(Config::Utility::generateStats(stats_)),
         api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
-    TestDeprecatedV2Api::allowDeprecatedV2();
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
@@ -89,7 +88,7 @@ public:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -182,6 +181,7 @@ public:
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 } // namespace Upstream

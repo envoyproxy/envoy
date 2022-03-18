@@ -99,6 +99,11 @@ public:
    * @return reference to the Api object
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return reference to the access log manager object
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 };
 
 using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
