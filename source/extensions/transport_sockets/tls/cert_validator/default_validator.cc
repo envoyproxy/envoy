@@ -150,7 +150,12 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
+        auto san_matcher = createStringSanMatcher(matcher);
+        if (san_matcher == nullptr) {
+          throw EnvoyException(
+              absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
+        }
+        subject_alt_name_matchers_.push_back(std::move(san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -376,6 +381,35 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     rc = EVP_DigestUpdate(md.get(), hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
+
+  rc = EVP_DigestUpdate(md.get(), &verify_trusted_ca_, sizeof(verify_trusted_ca_));
+  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+  if (config_ != nullptr) {
+    for (const auto& matcher : config_->subjectAltNameMatchers()) {
+      size_t hash = MessageUtil::hash(matcher);
+      rc = EVP_DigestUpdate(md.get(), &hash, sizeof(hash));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    const std::string& crl = config_->certificateRevocationList();
+    if (!crl.empty()) {
+      rc = EVP_DigestUpdate(md.get(), crl.data(), crl.length());
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    bool allow_expired = config_->allowExpiredCertificate();
+    rc = EVP_DigestUpdate(md.get(), &allow_expired, sizeof(allow_expired));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    auto trust_chain_verification = config_->trustChainVerification();
+    rc = EVP_DigestUpdate(md.get(), &trust_chain_verification, sizeof(trust_chain_verification));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    auto only_leaf_crl = config_->onlyVerifyLeafCertificateCrl();
+    rc = EVP_DigestUpdate(md.get(), &only_leaf_crl, sizeof(only_leaf_crl));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }

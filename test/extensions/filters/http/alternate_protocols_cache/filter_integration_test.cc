@@ -5,6 +5,7 @@
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -28,6 +29,7 @@ protected:
     alt_cache.set_name("default_alternate_protocols_cache");
     envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig config;
     config.set_filename(filename);
+    config.mutable_flush_interval()->set_nanos(0);
     envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
     kv_config.mutable_config()->set_name("envoy.key_value.file_based");
     kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
@@ -49,6 +51,8 @@ typed_config:
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
             filename: {}
+            flush_interval:
+              nanos: 0
 
 )EOF",
                                            filename);
@@ -135,6 +139,57 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
 }
 
+TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-lyft-user-id", "123"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"x-envoy-retry-on", "http3-post-connect-failure"}};
+  int port = fake_upstreams_[0]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request should go out over HTTP/2. The response includes an Alt-Svc header.
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0,
+                                                /*upstream_index=*/0, timeout);
+  checkSimpleRequestSuccess(0, response_size, response.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+
+  // Close the connection so the HTTP/2 connection will not be used.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  fake_upstream_connection_.reset();
+
+  // Second request should go out over HTTP/3 because of the Alt-Svc information.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  fake_upstream_connection_.reset();
+  upstream_request_.reset();
+
+  // The reset request should be retried over TCP.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  }
+
+  checkSimpleRequestSuccess(0, response_size, response2.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
+}
+
 INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
@@ -144,17 +199,27 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
+  void initialize() override {
+    // TODO(alyssawilk) there's no config guarantee that SNI and hostname
+    // match, but alt-svc rtt caching doesn't work unless they do. Fix.
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+          auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(0);
+          auto endpoint = locality_lb->mutable_lb_endpoints(0)->mutable_endpoint();
+          endpoint->set_hostname("foo.lyft.com");
+        });
+    FilterIntegrationTest::initialize();
+  }
+
   void writeFile() {
-    const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
-    // There's no hostname here because we're not doing dynamic forward proxying so we infer the
-    // hostname from the config (which does not set it)
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
-    std::string key = absl::StrCat("https://:", port);
+    std::string key = absl::StrCat("https://foo.lyft.com:", port);
 
     size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
                          timeSystem().monotonicTime().time_since_epoch())
                          .count();
-    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds);
+    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0");
     TestEnvironment::writeStringToFileForTest(
         "alt_svc_cache.txt", absl::StrCat(key.length(), "\n", key, value.length(), "\n", value));
   }
@@ -179,10 +244,28 @@ protected:
   bool use_http2_{false};
 };
 
+int getSrtt(std::string alt_svc, TimeSource& time_source) {
+  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source);
+  return data.has_value() ? data.value().srtt.count() : 0;
+}
 // Test auto-config with a pre-populated HTTP/3 alt-svc entry. The upstream request will
 // occur over HTTP/3.
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
   testRouterRequestAndResponseWithBody(0, 0, false);
+  cleanupUpstreamAndDownstream();
+  std::string alt_svc;
+
+  // Make sure the srtt gets updated to a non-zero value.
+  for (int i = 0; i < 5; ++i) {
+    // Make sure that srtt is updated.
+    const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
+    alt_svc = TestEnvironment::readFileToStringForTest(filename);
+    if (getSrtt(alt_svc, timeSystem()) != 0) {
+      break;
+    }
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+  }
+  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << alt_svc;
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

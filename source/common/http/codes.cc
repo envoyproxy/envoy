@@ -262,6 +262,7 @@ const char* CodeUtility::toString(Code code) {
   case Code::PreconditionRequired:          return "Precondition Required";
   case Code::TooManyRequests:               return "Too Many Requests";
   case Code::RequestHeaderFieldsTooLarge:   return "Request Header Fields Too Large";
+  case Code::TooEarly:                      return "Too Early";
 
   // 5xx
   case Code::InternalServerError:           return "Internal Server Error";

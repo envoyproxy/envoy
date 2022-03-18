@@ -13,11 +13,13 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                                     TimeSource& time_source)
+                                     TimeSource& time_source,
+                                     const Network::DrainDecision& drain_decision)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator), time_source_(time_source) {}
+      random_generator_(random_generator), time_source_(time_source),
+      drain_decision_(drain_decision) {}
 
 ConnectionManager::~ConnectionManager() = default;
 
@@ -124,8 +126,6 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   case DirectResponse::ResponseType::Exception:
     stats_.response_exception_.inc();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -222,6 +222,32 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   if (metadata->hasReplyType()) {
     success_ = metadata->replyType() == ReplyType::Success;
   }
+
+  // Check if the upstream host is draining.
+  //
+  // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
+  // that we can support the header in TTwitter protocol, which reads/adds response headers to
+  // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
+  // should happen here.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
+    metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
+    metadata->headers().remove(Headers::get().Drain);
+
+    // Check if this host itself is draining.
+    //
+    // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
+    // should be set before the encodeFrame() call. It should be set at or after the messageBegin
+    // call so that the header is added after all upstream headers passed, due to messageBegin
+    // possibly not getting headers in transportBegin.
+    ConnectionManager& cm = parent_.parent_;
+    if (cm.drain_decision_.drainClose()) {
+      // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
+      // over)?
+      metadata->headers().addReferenceKey(Headers::get().Drain, "true");
+      parent_.parent_.stats_.downstream_response_drain_close_.inc();
+    }
+  }
+
   return ProtocolConverter::messageBegin(metadata);
 }
 

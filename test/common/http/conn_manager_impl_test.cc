@@ -2163,7 +2163,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
 public:
-  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message) {
+  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message,
+                                                  bool send_complete_request = true) {
     setup(false, "");
 
     EXPECT_CALL(*codec_, dispatch(_))
@@ -2173,7 +2174,7 @@ public:
           // These request headers are missing the necessary ":host"
           RequestHeaderMapPtr headers{
               new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-          decoder_->decodeHeaders(std::move(headers), true);
+          decoder_->decodeHeaders(std::move(headers), send_complete_request);
           data.drain(0);
           return Http::okStatus();
         }));
@@ -2191,6 +2192,19 @@ public:
         .WillOnce(Return(stream_error_on_invalid_http_message));
     EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
+    if (!stream_error_on_invalid_http_message) {
+      EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
+      if (send_complete_request) {
+        // The request is complete, so we should not flush close.
+        EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+            .Times(AnyNumber());
+      } else {
+        // If the request isn't complete, avoid a FIN/RST race with delay close.
+        EXPECT_CALL(filter_callbacks_.connection_,
+                    close(Network::ConnectionCloseType::FlushWriteAndDelay))
+            .Times(AnyNumber());
+      }
+    }
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
           EXPECT_EQ("400", headers.getStatusValue());
@@ -2214,6 +2228,12 @@ public:
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
   sendInvalidRequestAndVerifyConnectionState(false);
+}
+
+TEST_F(StreamErrorOnInvalidHttpMessageTest,
+       ConnectionTerminatedWithDelayIfCodecStreamErrorIsFalse) {
+  // Same as above, only with an incomplete request.
+  sendInvalidRequestAndVerifyConnectionState(false, false);
 }
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
@@ -3359,6 +3379,65 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStream) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationFiredReturn408IfRequestWasNotComplete) {
+  max_stream_duration_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  Event::MockTimer* duration_timer = setUpTimer();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(2);
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "localhost:8080"}, {":path", "/"}, {":method", "GET"}}};
+    // The codec will dispatch data after the header.
+    decoder_->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*duration_timer, disableTimer());
+  // Response code 408 after downstream max stream timeout because the request is not fully read by
+  // the decoder.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("408", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  duration_timer->invokeCallback();
+}
+
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationFiredReturn504IfRequestWasFullyRead) {
+  max_stream_duration_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  Event::MockTimer* duration_timer = setUpTimer();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(2);
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "localhost:8080"}, {":path", "/"}, {":method", "GET"}}};
+    // This is a header only request.
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*duration_timer, disableTimer());
+  // 504 direct response after downstream max stream timeout because the request is fully read.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("504", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  duration_timer->invokeCallback();
+}
+
 TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
   setup(false, "");
   EXPECT_CALL(*codec_, protocol()).Times(AnyNumber()).WillRepeatedly(Return(Protocol::Http10));
@@ -3366,7 +3445,7 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    decoder_->decodeHeaders(std::move(headers), false);
     data.drain(4);
     return Http::okStatus();
   }));
@@ -3376,6 +3455,12 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
         EXPECT_EQ("426", headers.getStatusValue());
         EXPECT_EQ("close", headers.getConnectionValue());
       }));
+  // No delay close for HTTP/1.0, even if the request is not complete.
+  // Note there may be more than one close: the important thing is one does not
+  // kick off delay.
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(AnyNumber());
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);

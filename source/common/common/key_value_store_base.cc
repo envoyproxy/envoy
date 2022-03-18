@@ -1,5 +1,7 @@
 #include "source/common/common/key_value_store_base.h"
 
+#include "absl/cleanup/cleanup.h"
+
 namespace Envoy {
 namespace {
 
@@ -29,9 +31,14 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 } // namespace
 
 KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
-                                     std::chrono::seconds flush_interval)
-    : flush_timer_(dispatcher.createTimer([this]() { flush(); })) {
-  flush_timer_->enableTimer(flush_interval);
+                                     std::chrono::milliseconds flush_interval)
+    : flush_timer_(dispatcher.createTimer([this, flush_interval]() {
+        flush();
+        flush_timer_->enableTimer(flush_interval);
+      })) {
+  if (flush_interval.count() > 0) {
+    flush_timer_->enableTimer(flush_interval);
+  }
 }
 
 // Assuming |contents| is in the format
@@ -58,11 +65,18 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents,
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key, absl::string_view value) {
-  store_.erase(key);
-  store_.emplace(key, value);
+  store_.insert_or_assign(key, std::string(value));
+  if (!flush_timer_->enabled()) {
+    flush();
+  }
 }
 
-void KeyValueStoreBase::remove(absl::string_view key) { store_.erase(key); }
+void KeyValueStoreBase::remove(absl::string_view key) {
+  store_.erase(key);
+  if (!flush_timer_->enabled()) {
+    flush();
+  }
+}
 
 absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) {
   auto it = store_.find(key);
@@ -73,6 +87,16 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
 }
 
 void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
+#ifndef NDEBUG
+  // When running in debug mode, verify we don't modify the underlying store
+  // while iterating.
+  absl::flat_hash_map<std::string, std::string> store_before_iteration = store_;
+  absl::Cleanup verify_store_is_not_modified = [this, &store_before_iteration] {
+    ASSERT(store_ == store_before_iteration,
+           "Expected iterate to not modify the underlying store.");
+  };
+#endif
+
   for (const auto& [key, value] : store_) {
     Iterate ret = cb(key, value);
     if (ret == Iterate::Break) {

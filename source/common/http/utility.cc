@@ -1126,5 +1126,23 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
   return route_retry_policy;
 }
 
+bool Utility::isSafeRequest(Http::RequestHeaderMap& request_headers) {
+  absl::string_view method = request_headers.getMethodValue();
+  return method == Http::Headers::get().MethodValues.Get ||
+         method == Http::Headers::get().MethodValues.Head ||
+         method == Http::Headers::get().MethodValues.Options ||
+         method == Http::Headers::get().MethodValues.Trace;
+}
+
+Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
+  return remote_decode_complete &&
+                 Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
+             ? Http::Code::GatewayTimeout
+             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
+             // connection any more.
+             : Http::Code::RequestTimeout;
+}
+
 } // namespace Http
 } // namespace Envoy

@@ -1,6 +1,5 @@
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
@@ -32,13 +31,6 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     )
     rules_cc_dependencies()
     rules_cc_toolchains()
-
-    custom_exec_properties(
-        name = "envoy_large_machine_exec_property",
-        constants = {
-            "LARGE_MACHINE": create_rbe_exec_properties_dict(labels = dict(size = "large")),
-        },
-    )
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
@@ -85,12 +77,12 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "com_github_lyft_protoc_gen_star",
         importpath = "github.com/lyft/protoc-gen-star",
-        sum = "h1:sImehRT+p7lW9n6R7MQc5hVgzWGEkDVZU4AsBQ4Isu8=",
-        version = "v0.5.1",
+        sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
+        version = "v0.6.0",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2020-08-06"
+        # last_update = "2022-03-04"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L35-L40"
+        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",

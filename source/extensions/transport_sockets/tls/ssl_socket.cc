@@ -42,6 +42,7 @@ public:
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 };
 
 } // namespace
@@ -75,6 +76,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
+  SSL_set_ex_data(rawSsl(), ContextImpl::sslSocketIndex(), static_cast<void*>(callbacks_));
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
@@ -359,9 +361,11 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_, nullptr)) {
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
+
+ClientSslSocketFactory::~ClientSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
@@ -387,10 +391,12 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  auto ctx = manager_.createSslClientContext(stats_scope_, *config_);
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_, ssl_ctx_);
+    std::swap(ctx, ssl_ctx_);
   }
+  manager_.removeContext(ctx);
   stats_.ssl_context_update_by_sds_.inc();
 }
 
@@ -400,17 +406,19 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
+
+ServerSslSocketFactory::~ServerSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
 
 Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   absl::ReaderMutexLock l(&ssl_ctx_mu_);
   return ssl_ctx_;
 }
 
-Network::TransportSocketPtr
-ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
+Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -420,8 +428,8 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsCon
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                       config_->createHandshaker());
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();
@@ -433,10 +441,13 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_, ssl_ctx_);
+    std::swap(ctx, ssl_ctx_);
   }
+  manager_.removeContext(ctx);
+
   stats_.ssl_context_update_by_sds_.inc();
 }
 

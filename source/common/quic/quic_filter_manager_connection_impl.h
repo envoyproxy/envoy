@@ -5,6 +5,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -60,6 +61,11 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
+  Network::ConnectionInfoSetter& connectionInfoSetter() override {
+    ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
+              "No connection socket.");
+    return network_connection_->connectionSocket()->connectionInfoProvider();
+  }
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
     ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
               "No connection socket.");
@@ -114,8 +120,10 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
-  // TODO(#2557) Implement this.
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

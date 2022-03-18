@@ -120,6 +120,7 @@ envoy_cc_library(
     hdrs = ["filesystem_subscription_impl.h"],
     deps = [
         ":decoded_resource_lib",
+        ":watched_directory_lib",
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
@@ -129,6 +130,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -156,6 +158,7 @@ envoy_cc_library(
     hdrs = ["grpc_mux_impl.h"],
     deps = [
         ":api_version_lib",
+        ":custom_config_validators_interface",
         ":decoded_resource_lib",
         ":grpc_stream_lib",
         ":ttl_lib",
@@ -191,6 +194,7 @@ envoy_cc_library(
     srcs = ["new_grpc_mux_impl.cc"],
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
+        ":custom_config_validators_interface",
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
@@ -313,6 +317,7 @@ envoy_cc_library(
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
     deps = [
+        ":custom_config_validators_lib",
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
@@ -322,6 +327,7 @@ envoy_cc_library(
         ":xds_resource_lib",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/server:instance_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
@@ -410,6 +416,7 @@ envoy_cc_library(
     srcs = ["watch_map.cc"],
     hdrs = ["watch_map.h"],
     deps = [
+        ":custom_config_validators_interface",
         ":decoded_resource_lib",
         ":utility_lib",
         ":xds_resource_lib",
@@ -430,6 +437,27 @@ envoy_cc_library(
         ":opaque_resource_decoder_lib",
         ":resource_name_lib",
         "//envoy/config:subscription_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "custom_config_validators_interface",
+    hdrs = ["custom_config_validators.h"],
+    deps = [
+        "//envoy/config:config_validator_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "custom_config_validators_lib",
+    srcs = ["custom_config_validators_impl.cc"],
+    hdrs = ["custom_config_validators_impl.h"],
+    deps = [
+        ":custom_config_validators_interface",
+        ":opaque_resource_decoder_lib",
+        ":resource_name_lib",
+        "//envoy/server:instance_interface",
+        "//source/common/config:utility_lib",
     ],
 )
 

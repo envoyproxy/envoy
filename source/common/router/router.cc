@@ -310,7 +310,7 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
                                &Router::RetryStateImpl::parseRetryGrpcOn);
   }
   // Should only validate headers for which we have implemented a validator.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("unexpectedly reached");
 }
 
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
@@ -385,10 +385,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // we should append cluster and host headers to the response, and whether to forward the request
   // upstream.
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
-  const DebugConfig* debug_config =
-      filter_state->hasData<DebugConfig>(DebugConfig::key())
-          ? &(filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key()))
-          : nullptr;
+  const DebugConfig* debug_config = filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key());
 
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
@@ -565,26 +562,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
+      callbacks_->streamInfo().filterState());
 
-  auto has_options_from_downstream =
-      downstreamConnection() && downstreamConnection()
-                                    ->streamInfo()
-                                    .filterState()
-                                    .hasData<Network::UpstreamSocketOptionsFilterState>(
-                                        Network::UpstreamSocketOptionsFilterState::key());
-
-  if (has_options_from_downstream) {
-    auto downstream_options = downstreamConnection()
-                                  ->streamInfo()
-                                  .filterState()
-                                  .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
-                                      Network::UpstreamSocketOptionsFilterState::key())
-                                  .value();
-    if (!upstream_options_) {
-      upstream_options_ = std::make_shared<Network::Socket::Options>();
+  if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
+    if (auto typed_state = downstream_connection->streamInfo()
+                               .filterState()
+                               .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                   Network::UpstreamSocketOptionsFilterState::key());
+        typed_state != nullptr) {
+      auto downstream_options = typed_state->value();
+      if (!upstream_options_) {
+        upstream_options_ = std::make_shared<Network::Socket::Options>();
+      }
+      Network::Socket::appendOptions(upstream_options_, downstream_options);
     }
-    Network::Socket::appendOptions(upstream_options_, downstream_options);
   }
 
   if (upstream_options_ && callbacks_->getUpstreamSocketOptions()) {
@@ -688,16 +679,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  internal_redirects_with_body_enabled_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body");
-
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
+  conn_pool_new_stream_with_early_data_and_http3_ =
+      Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
+  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_http3_ &&
+                                   Http::Utility::isSafeRequest(*downstream_headers_);
+
   UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
+                                        /*can_use_http3=*/true);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -753,11 +747,13 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ASSERT(upstream_requests_.size() <= 1);
 
   bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty() ||
-                   (internal_redirects_with_body_enabled_ && route_entry_ &&
-                    route_entry_->internalRedirectPolicy().enabled());
+                   (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
-    // The request is larger than we should buffer. Give up on the retry/shadow
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+              "up on the retry/shadow.",
+              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
@@ -920,21 +916,30 @@ void Filter::onResponseTimeout() {
     UpstreamRequestPtr upstream_request =
         upstream_requests_.back()->removeFromList(upstream_requests_);
 
-    // Don't do work for upstream requests we've already seen headers for.
-    if (upstream_request->awaitingHeaders()) {
+    // We want to record the upstream timeouts and increase the stats counters in all the cases.
+    // For example, we also want to record the stats in the case of BiDi streaming APIs where we
+    // might have already seen the headers.
+    // If desired, the old behavior to not do any work for those upstream requests we've already
+    // seen the headers for can be achieved by overloading the runtime guard
+    // `do_not_await_headers_on_upstream_timeout_to_emit_stats` to false.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats") ||
+        upstream_request->awaitingHeaders()) {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
 
+      if (upstream_request->upstreamHost()) {
+        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
+      }
+    }
+
+    if (upstream_request->awaitingHeaders()) {
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
         // play when the global timeout was hit.
         upstream_request->recordTimeoutBudget(false);
-      }
-
-      if (upstream_request->upstreamHost()) {
-        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
       }
 
       // If this upstream request already hit a "soft" timeout, then it
@@ -963,8 +968,13 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   upstream_request.outlierDetectionTimeoutRecorded(true);
 
   if (!downstream_response_started_ && retry_state_) {
-    RetryStatus retry_status =
-        retry_state_->shouldHedgeRetryPerTryTimeout([this]() -> void { doRetry(); });
+    RetryStatus retry_status = retry_state_->shouldHedgeRetryPerTryTimeout(
+        [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_]() -> void {
+          // Without any knowledge about what's going on in the connection pool, retry the request
+          // with the safest settings which is no early data but keep using or not using alt-svc as
+          // before. In this way, QUIC won't be falsely marked as broken.
+          doRetry(/*can_send_early_data*/ false, can_use_http3);
+        });
 
     if (retry_status == RetryStatus::Yes) {
       runRetryOptionsPredicates(upstream_request);
@@ -1035,10 +1045,17 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
 
   callbacks_->streamInfo().setResponseFlag(
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+  // Grab the const ref to call the const method of StreamInfo.
+  const auto& stream_info = callbacks_->streamInfo();
+  const bool downstream_decode_complete =
+      stream_info.downstreamTiming().has_value() &&
+      stream_info.downstreamTiming().value().get().lastDownstreamRxByteReceived().has_value();
+
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
   callbacks_->sendLocalReply(
-      Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
-      absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+      Http::Utility::maybeRequestTimeoutCode(downstream_decode_complete),
+      "upstream max stream duration reached", modify_headers_, absl::nullopt,
+      StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
@@ -1114,9 +1131,23 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   if (downstream_response_started_ || !retry_state_ || upstream_request.retried()) {
     return false;
   }
-
-  const RetryStatus retry_status =
-      retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
+  RetryState::Http3Used was_using_http3 = RetryState::Http3Used::Unknown;
+  if (conn_pool_new_stream_with_early_data_and_http3_ && upstream_request.hadUpstream()) {
+    was_using_http3 = (upstream_request.streamInfo().protocol().has_value() &&
+                       upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
+                          ? RetryState::Http3Used::Yes
+                          : RetryState::Http3Used::No;
+  }
+  const RetryStatus retry_status = retry_state_->shouldRetryReset(
+      reset_reason, was_using_http3,
+      [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
+       can_use_http3 =
+           upstream_request.upstreamStreamOptions().can_use_http3_](bool disable_http3) -> void {
+        // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
+        // the original request is retried with the same can_send_early_data setting, it will not be
+        // sent as early data by the underlying connection pool grid.
+        doRetry(can_send_early_data, disable_http3 ? false : can_use_http3);
+      });
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
@@ -1178,9 +1209,9 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
 
   const std::string body =
-      absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
-                   Http::Utility::resetReasonToString(reset_reason),
-
+      absl::StrCat("upstream connect error or disconnect/reset before headers. ",
+                   (is_retry_ ? "retried and the latest " : ""),
+                   "reset reason: ", Http::Utility::resetReasonToString(reset_reason),
                    !transport_failure_reason.empty() ? ", transport failure reason: " : "",
                    transport_failure_reason);
   const std::string& basic_details =
@@ -1220,7 +1251,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::OverloadManager;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -1341,10 +1372,18 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       // We already retried this request (presumably for a per try timeout) so
       // we definitely won't retry it again. Check if we would have retried it
       // if we could.
-      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers);
+      bool retry_as_early_data; // Not going to be used as we are not retrying.
+      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers, *downstream_headers_,
+                                                            retry_as_early_data) !=
+                        RetryState::RetryDecision::NoRetry;
     } else {
-      const RetryStatus retry_status =
-          retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
+      const RetryStatus retry_status = retry_state_->shouldRetryHeaders(
+          *headers, *downstream_headers_,
+          [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_,
+           had_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_](
+              bool disable_early_data) -> void {
+            doRetry((disable_early_data ? false : had_early_data), can_use_http3);
+          });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
         pending_retries_++;
@@ -1554,9 +1593,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
   // Redirects are not supported for streaming requests yet.
-  if (downstream_end_stream_ &&
-      ((internal_redirects_with_body_enabled_ && !request_buffer_overflowed_) ||
-       !callbacks_->decodingBuffer()) &&
+  if (downstream_end_stream_ && (!request_buffer_overflowed_ || !callbacks_->decodingBuffer()) &&
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
       callbacks_->recreateStream(&headers)) {
@@ -1568,7 +1605,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   // details for other failure modes here.
   if (!downstream_end_stream_) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: request incomplete", *callbacks_);
-  } else if (internal_redirects_with_body_enabled_ && request_buffer_overflowed_) {
+  } else if (request_buffer_overflowed_) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: request body overflow", *callbacks_);
   } else if (location == nullptr) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: missing location header", *callbacks_);
@@ -1615,15 +1652,20 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
   // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
-  if (!filter_state->hasData<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName)) {
-    filter_state->setData(
-        NumInternalRedirectsFilterStateName, std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
-  }
-  StreamInfo::UInt32Accessor& num_internal_redirect =
-      filter_state->getDataMutable<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName);
+  StreamInfo::UInt32Accessor* num_internal_redirect{};
 
-  if (num_internal_redirect.value() >= policy.maxInternalRedirects()) {
+  if (num_internal_redirect = filter_state->getDataMutable<StreamInfo::UInt32Accessor>(
+          NumInternalRedirectsFilterStateName);
+      num_internal_redirect == nullptr) {
+    auto state = std::make_shared<StreamInfo::UInt32AccessorImpl>(0);
+    num_internal_redirect = state.get();
+
+    filter_state->setData(NumInternalRedirectsFilterStateName, std::move(state),
+                          StreamInfo::FilterState::StateType::Mutable,
+                          StreamInfo::FilterState::LifeSpan::Request);
+  }
+
+  if (num_internal_redirect->value() >= policy.maxInternalRedirects()) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: redirect limits exceeded.", *callbacks_);
     config_.stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
@@ -1666,7 +1708,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
 
-  const auto& route_name = route->routeEntry()->routeName();
+  const auto& route_name = route->directResponseEntry() ? route->directResponseEntry()->routeName()
+                                                        : route->routeEntry()->routeName();
   for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {
@@ -1687,7 +1730,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
   }
 
-  num_internal_redirect.increment();
+  num_internal_redirect->increment();
   restore_original_headers.cancel();
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(absl::StrCat(scheme_is_http
@@ -1708,7 +1751,7 @@ void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   }
 }
 
-void Filter::doRetry() {
+void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   is_retry_ = true;
@@ -1730,8 +1773,8 @@ void Filter::doRetry() {
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -1788,8 +1831,16 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Random::RandomGenerator& random,
                                            Event::Dispatcher& dispatcher, TimeSource& time_source,
                                            Upstream::ResourcePriority priority) {
-  return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                                dispatcher, time_source, priority);
+  std::unique_ptr<RetryStateImpl> retry_state =
+      RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
+                             dispatcher, time_source, priority);
+  if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
+    // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
+    // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
+    // buffer safe requests with body which is not common.
+    setRetryShadownBufferLimit(0);
+  }
+  return retry_state;
 }
 
 } // namespace Router

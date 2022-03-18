@@ -19,6 +19,7 @@ public:
   ~MockMain() override = default;
 
   MOCK_METHOD(Upstream::ClusterManager*, clusterManager, ());
+  MOCK_METHOD(const Upstream::ClusterManager*, clusterManager, (), (const));
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(const Watchdog&, mainThreadWatchdogConfig, (), (const));
   MOCK_METHOD(const Watchdog&, workerWatchdogConfig, (), (const));

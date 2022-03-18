@@ -159,6 +159,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// On OSX this is flaky as we can end up with connection imbalance.
+#if !defined(__APPLE__)
 // Make sure all workers pick up connections
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
@@ -205,6 +207,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   EXPECT_TRUE(w0_ctr > 1);
   EXPECT_TRUE(w1_ctr > 1);
 }
+#endif
 
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
@@ -573,6 +576,53 @@ TEST_P(IntegrationTest, MatchTreeRouting) {
         exact_match_map:
           map:
             "route":
+              action:
+                name: route
+                typed_config:
+                  "@type": type.googleapis.com/envoy.config.route.v3.Route
+                  match:
+                    prefix: /
+                  route:
+                    cluster: cluster_0
+  )EOF";
+
+  envoy::config::route::v3::VirtualHost virtual_host;
+  TestUtility::loadFromYaml(vhost_yaml, virtual_host);
+
+  config_helper_.addVirtualHost(virtual_host);
+  autonomous_upstream_ = true;
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/whatever"},
+                                         {":scheme", "http"},
+                                         {"match-header", "route"},
+                                         {":authority", "matcher.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+}
+
+// Verifies routing via the match tree API with prefix matching.
+TEST_P(IntegrationTest, PrefixMatchTreeRouting) {
+  const std::string vhost_yaml = R"EOF(
+    name: vhost
+    domains: ["matcher.com"]
+    matcher:
+      matcher_tree:
+        input:
+          name: request-headers
+          typed_config:
+            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            header_name: match-header
+        prefix_match_map:
+          map:
+            "r":
               action:
                 name: route
                 typed_config:

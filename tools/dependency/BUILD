@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@base_pip3//:requirements.bzl", "requirement")
@@ -7,11 +7,6 @@ load("@envoy_repo//:path.bzl", "PATH")
 licenses(["notice"])  # Apache 2
 
 envoy_package()
-
-py_library(
-    name = "utils",
-    srcs = ["utils.py"],
-)
 
 envoy_entry_point(
     name = "check",

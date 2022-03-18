@@ -1,46 +1,38 @@
 #include <openssl/x509_vfy.h>
 
 #include <cstddef>
+#include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/utility.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/active_quic_listener.h"
-#include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
-#include "source/common/quic/envoy_quic_alarm_factory.h"
-#include "source/common/quic/envoy_quic_packet_writer.h"
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
-#include "test/common/quic/test_utils.h"
-#include "test/config/integration/certs/clientcert_hash.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -154,9 +146,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-    SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
-  }
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -190,15 +180,18 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+    OptRef<Http::AlternateProtocolsCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        (host.empty() ? persistent_info.server_id_
-                      : quic::QuicServerId{host, static_cast<uint16_t>(port), false}),
-        persistent_info.cryptoConfig(), &push_promise_index_, *dispatcher_,
+        quic::QuicServerId{
+            (host.empty() ? transport_socket_factory_->clientContextConfig().serverNameIndication()
+                          : host),
+            static_cast<uint16_t>(port), false},
+        transport_socket_factory_->getCryptoConfig(), &push_promise_index_, *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
     return session;
   }
 
@@ -398,8 +391,10 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
-  // Make sure both connections use the same PersistentQuicInfoImpl.
+  // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -412,6 +407,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   ASSERT_TRUE(response1->waitForEndStream());
   // Close the first connection.
   codec_client_->close();
+
   // Start a second connection.
   codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
                                          /*wait_for_1rtt_key*/ false);
@@ -450,10 +446,10 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
-  const Http::TestResponseHeaderMapImpl response_headers{{":status", "425"}};
-  upstream_request_->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
-  // Without retry, 425 should be forwarded back to the client.
+  // This is downstream sending early data, so the 425 response should be forwarded back to the
+  // client.
   EXPECT_EQ("425", response3->headers().getStatusValue());
   codec_client_->close();
 
@@ -470,10 +466,10 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response3->waitForEndStream());
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response4->waitForEndStream());
   // 425 response should be forwarded back to the client.
-  EXPECT_EQ("425", response3->headers().getStatusValue());
+  EXPECT_EQ("425", response4->headers().getStatusValue());
   codec_client_->close();
 }
 

@@ -25,6 +25,7 @@ BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -32,6 +33,7 @@ cbor
 CDN
 CDS
 CEL
+CWND
 DSR
 DSS
 EBADF
@@ -298,6 +300,7 @@ RTDS
 RTOS
 RTTI
 RUNDIR
+RVCM
 RW
 RX
 RXQ
@@ -319,6 +322,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIO
 SMTP
 SNI
 SOTW
@@ -745,6 +749,7 @@ inflater
 inflight
 -ing
 init
+initialize
 initializer
 initializers
 inlined
@@ -856,6 +861,7 @@ multi
 multicast
 multikill
 multimap
+multiple
 multivalue
 mutator
 mutex
@@ -1010,6 +1016,7 @@ ratelimited
 ratelimiter
 rawseti
 rc
+rdsone
 readded
 readonly
 readv
@@ -1131,6 +1138,7 @@ spdlog
 splitter
 spoofable
 src
+srtt
 ssize
 stackdriver
 stacktrace
@@ -1169,6 +1177,7 @@ subnets
 suboptimal
 subsecond
 subseconds
+subsegment
 subsequence
 subsetting
 substr
@@ -1228,6 +1237,7 @@ transcoded
 transcoder
 transcoding
 transferral
+trds
 triaged
 trie
 tuple
@@ -1327,3 +1337,8 @@ transid
 routable
 vhosts
 infos
+ElastiCache
+pinterest
+NSS
+SSLKEYLOGFILE
+

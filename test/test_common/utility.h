@@ -248,7 +248,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the counter was >= to the value within the timeout, else
+   * @return AssertionSuccess() if the counter was >= the value within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
@@ -647,8 +647,9 @@ public:
                                          ProtobufMessage::getStrictValidationVisitor());
   }
 
-  template <class MessageType> static void validate(const MessageType& message) {
-    MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor());
+  template <class MessageType>
+  static void validate(const MessageType& message, bool recurse_into_any = false) {
+    MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor(), recurse_into_any);
   }
 
   template <class MessageType>

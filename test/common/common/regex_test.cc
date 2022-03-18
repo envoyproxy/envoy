@@ -73,8 +73,8 @@ TEST(Utility, ParseRegex) {
   // The deprecated field codepath precedes any runtime settings.
   {
     TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"re2.max_program_size.error_level", "3"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
+                                {"re2.max_program_size.error_level", "3"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
@@ -90,8 +90,8 @@ TEST(Utility, ParseRegex) {
   // Verify that an exception is thrown for the error level max program size.
   {
     TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"re2.max_program_size.error_level", "1"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
+                                {"re2.max_program_size.error_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
@@ -109,6 +109,7 @@ TEST(Utility, ParseRegex) {
   // Verify that the error level max program size defaults to 100 if not set by runtime.
   {
     TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex(
         "/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
@@ -127,33 +128,24 @@ TEST(Utility, ParseRegex) {
   // Verify that a warning is logged for the warn level max program size.
   {
     TestScopedRuntime scoped_runtime;
-    Envoy::Stats::Counter& warn_count =
-        Runtime::LoaderSingleton::getExisting()->getRootScope().counterFromString(
-            "re2.exceeded_warn_level");
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"re2.max_program_size.warn_level", "1"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
+                                {"re2.max_program_size.warn_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
-    EXPECT_EQ(1, warn_count.value());
     EXPECT_LOG_CONTAINS("warn", "> max program size of 1 set for the warn level threshold",
                         Utility::parseRegex(matcher));
-    EXPECT_EQ(2, warn_count.value());
   }
 
   // Verify that no check is performed if the warn level max program size is not set by runtime.
   {
     TestScopedRuntime scoped_runtime;
-    Envoy::Stats::Counter& warn_count =
-        Runtime::LoaderSingleton::getExisting()->getRootScope().counterFromString(
-            "re2.exceeded_warn_level");
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
     EXPECT_LOG_NOT_CONTAINS("warn", "> max program size", Utility::parseRegex(matcher));
-    EXPECT_EQ(0, warn_count.value());
   }
 }
 

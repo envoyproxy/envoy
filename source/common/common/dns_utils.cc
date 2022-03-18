@@ -15,6 +15,7 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 Network::DnsLookupFamily
 getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::config::cluster::v3::Cluster::V4_ONLY:
@@ -23,9 +24,11 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::Auto;
   case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
     return Network::DnsLookupFamily::V4Preferred;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    return Network::DnsLookupFamily::All;
   }
+  IS_ENVOY_BUG("unexpected dns lookup family enum");
+  return Network::DnsLookupFamily::All;
 }
 
 std::vector<Network::Address::InstanceConstSharedPtr>

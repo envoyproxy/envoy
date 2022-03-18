@@ -240,8 +240,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -254,8 +253,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -269,8 +267,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
 
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -1970,7 +1967,7 @@ TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
 
 TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
 
   TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
@@ -2003,9 +2000,9 @@ TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
 
 TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled", "false"}});
 
   TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};

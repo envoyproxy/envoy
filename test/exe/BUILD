@@ -53,7 +53,7 @@ envoy_sh_test(
     srcs = ["version_out_test.sh"],
     coverage = False,
     data = [
-        "//:VERSION",
+        "//:VERSION.txt",
         "//bazel:raw_build_id.ldscript",
         "//source/exe:envoy-static",
     ],

@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <list>
 #include <map>
@@ -121,8 +122,10 @@ Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
       {"x-forwarded-proto", "http"}, {":scheme", "http"}};
 }
 
-Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
-                                          const std::string& method, const std::string& scheme) {
+Http::TestRequestHeaderMapImpl
+genHeaders(const std::string& host, const std::string& path, const std::string& method,
+           const std::string& scheme,
+           absl::optional<std::pair<std::string, std::string>> random_value_pair) {
   auto hdrs =
       Http::TestRequestHeaderMapImpl{{":authority", host},         {":path", path},
                                      {":method", method},          {"x-safe", "safe"},
@@ -134,12 +137,22 @@ Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::st
     hdrs.remove(":scheme");
   }
 
+  if (random_value_pair.has_value()) {
+    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                  random_value_pair.value().second);
+  }
   return hdrs;
 }
 
+struct OptionalGenHeadersArg {
+  std::string scheme = "http";
+  absl::optional<std::pair<std::string, std::string>> random_value_pair;
+};
+
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
-                                          const std::string& method) {
-  return genHeaders(host, path, method, "http");
+                                          const std::string& method,
+                                          const OptionalGenHeadersArg& optional_args = {}) {
+  return genHeaders(host, path, method, optional_args.scheme, optional_args.random_value_pair);
 }
 
 // Loads a V3 RouteConfiguration yaml
@@ -1339,7 +1352,7 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters(
       {"www2", "root_www2", "www2_staging", "instant-server"}, {});
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
       "only match on request headers, saw "
@@ -3141,6 +3154,43 @@ TEST_F(RouteMatcherTest, WeightedClusterHeader) {
   EXPECT_EQ("some_cluster", config.route(headers, 115)->routeEntry()->clusterName());
   EXPECT_EQ("cluster1", config.route(headers, 445)->routeEntry()->clusterName());
   EXPECT_EQ("cluster2", config.route(headers, 560)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  total_weight: 80
+                  header_name: "x_random_value"
+                  clusters:
+                    - name: cluster1
+                      weight: 40
+                    - name: cluster2
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Override the weighted cluster selection by using the weight that is specified in
+  // `random_value_pair` which will be passed to request header.
+  std::pair<std::string, std::string> random_value_pair = {"x_random_value", "10"};
+  OptionalGenHeadersArg optional_arg;
+  optional_arg.random_value_pair = random_value_pair;
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET", optional_arg);
+  // Here we expect `cluster1` is selected even though random value passed to `route()` function is
+  // 60 because the overridden weight specified in `random_value_pair` is 10.
+  EXPECT_EQ("cluster1", config.route(headers, 60)->routeEntry()->clusterName());
+
+  headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  // `cluster2` is expected to be selected when no random value is specified because the default
+  // random value(60) that is passed to `route()` will be used.
+  EXPECT_EQ("cluster2", config.route(headers, 60)->routeEntry()->clusterName());
 }
 
 TEST_F(RouteMatcherTest, ContentType) {
@@ -8553,13 +8603,15 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"foo_bar_baz", "foo_bar", "default"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  OptionalGenHeadersArg optional_arg;
+  optional_arg.scheme = "";
   RouteConstSharedPtr accepted_route = config.route(
       [](RouteConstSharedPtr, RouteEvalStatus) -> RouteMatchStatus {
         ADD_FAILURE() << "RouteCallback should not be invoked since there are no matching "
                          "route to override";
         return RouteMatchStatus::Continue;
       },
-      genHeaders("bat.com", "/", "GET", ""));
+      genHeaders("bat.com", "/", "GET", optional_arg));
   EXPECT_EQ(accepted_route, nullptr);
 }
 

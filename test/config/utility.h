@@ -87,6 +87,19 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool local_negative,
+                                         bool remote_negative, std::string log_path,
+                                         bool multiple_ips, Network::Address::IpVersion version) {
+      keylog_local_filter_ = local;
+      keylog_remote_filter_ = remote;
+      keylog_local_negative_ = local_negative;
+      keylog_remote_negative_ = remote_negative;
+      keylog_path_ = log_path;
+      keylog_multiple_ips_ = multiple_ips;
+      ip_version_ = version;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -96,6 +109,13 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
+    bool keylog_local_filter_{false};
+    bool keylog_remote_filter_{false};
+    bool keylog_local_negative_{false};
+    bool keylog_remote_negative_{false};
+    bool keylog_multiple_ips_{false};
+    std::string keylog_path_;
+    Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
   };
@@ -112,6 +132,9 @@ public:
   initializeTls(const ServerSslOptions& options,
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
+  static void initializeTlsKeyLog(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+      const ServerSslOptions& options);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
@@ -153,6 +176,11 @@ public:
   buildStaticCluster(const std::string& name, int port, const std::string& address,
                      const std::string& lb_policy = "ROUND_ROBIN");
 
+  static envoy::config::cluster::v3::Cluster
+  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
+                                              const std::string& address,
+                                              const std::string& lb_policy = "ROUND_ROBIN");
+
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
   buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
@@ -190,6 +218,9 @@ public:
   // Ports are assigned by looping through clusters, hosts, and addresses in the
   // order they are stored in |bootstrap_|
   void finalize(const std::vector<uint32_t>& ports);
+
+  // Called by finalize to set up the ports.
+  void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
 
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
@@ -314,7 +345,7 @@ public:
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
   // Add this key value pair to the static runtime.
-  void addRuntimeOverride(const std::string& key, const std::string& value);
+  void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
   void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
