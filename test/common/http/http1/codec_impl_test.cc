@@ -3002,7 +3002,6 @@ TEST_F(Http1ServerConnectionImplTest, ManyLargeRequestHeadersAccepted) {
 
 TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
   TestScopedRuntime scoped_runtime;
-  Runtime::RuntimeFeaturesDefaults::get().restoreDefaults();
 
   // No readDisable for normal non-piped HTTP request.
   {
@@ -3036,8 +3035,7 @@ TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
 
   // Always call readDisable if lazy read disable flag is set to false.
   {
@@ -3077,7 +3075,6 @@ TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
 // same time.
 TEST_F(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
   TestScopedRuntime scoped_runtime;
-  Runtime::RuntimeFeaturesDefaults::get().restoreDefaults();
 
   initialize();
 
@@ -3114,7 +3111,6 @@ TEST_F(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
 // before the end of the first request.
 TEST_F(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
   TestScopedRuntime scoped_runtime;
-  Runtime::RuntimeFeaturesDefaults::get().restoreDefaults();
 
   initialize();
 

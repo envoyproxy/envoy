@@ -96,13 +96,14 @@ protected:
   // Send data through the filter as if we are the proxy
 
   void sendRequestHeadersGet(bool expect_callback) {
-    HttpTestUtility::addDefaultHeaders(request_headers_, "GET");
+    HttpTestUtility::addDefaultHeaders(request_headers_);
     EXPECT_EQ(expect_callback ? FilterHeadersStatus::StopIteration : FilterHeadersStatus::Continue,
               filter_->decodeHeaders(request_headers_, true));
   }
 
   void sendRequestHeadersPost(bool expect_callback) {
-    HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers_);
+    request_headers_.setMethod("POST");
     request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
     request_headers_.addCopy(LowerCaseString("content-length"), "10");
     EXPECT_EQ(expect_callback ? FilterHeadersStatus::StopIteration : FilterHeadersStatus::Continue,
@@ -873,7 +874,7 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
 // gRPC failure while opening stream
 TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestHeaders) {
   initialize(absl::nullopt);
-  HttpTestUtility::addDefaultHeaders(request_headers_, "GET");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 }

@@ -1112,7 +1112,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1200,7 +1201,8 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
