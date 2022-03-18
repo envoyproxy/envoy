@@ -73,7 +73,6 @@ envoy_cc_test_library(
     ],
     external_deps = ["abseil_time"],
     deps = [
-        ":quic_platform_thread_impl_lib",
         ":quiche_platform_expect_bug_impl_lib",
         "//envoy/network:address_interface",
         "//source/common/quic/platform:quic_platform_base_impl_lib",
@@ -124,8 +123,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_thread_impl_lib",
-    hdrs = ["quic_thread_impl.h"],
+    name = "quiche_platform_thread_impl_lib",
+    hdrs = ["quiche_thread_impl.h"],
     tags = ["nofips"],
     deps = [
         "//envoy/thread:thread_interface",
@@ -135,9 +134,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_test_output_impl_lib",
-    srcs = ["quic_test_output_impl.cc"],
-    hdrs = ["quic_test_output_impl.h"],
+    name = "quiche_platform_test_output_impl_lib",
+    srcs = ["quiche_test_output_impl.cc"],
+    hdrs = ["quiche_test_output_impl.h"],
     tags = ["nofips"],
     deps = [
         "//test/test_common:file_system_for_test_lib",

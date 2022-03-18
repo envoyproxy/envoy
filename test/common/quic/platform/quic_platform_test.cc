@@ -430,7 +430,7 @@ TEST_F(QuicPlatformTest, QuicNotification) {
 }
 
 TEST_F(QuicPlatformTest, QuicTestOutput) {
-  Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
+  Envoy::TestEnvironment::setEnvVar("QUICHE_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
   GetLogger().set_level(spdlog::level::info);

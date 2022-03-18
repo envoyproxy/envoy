@@ -1118,6 +1118,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_stream_buffer_allocator",
+    hdrs = [
+        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_stream_buffer_allocator",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_error_code_wrappers",
     hdrs = [
         "quiche/quic/platform/api/quic_error_code_wrappers.h",
@@ -1192,7 +1205,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_logging.h",
-        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_testvalue.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
@@ -1206,6 +1218,7 @@ envoy_cc_library(
         ":quic_platform_error_code_wrappers",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
+        ":quic_platform_stream_buffer_allocator",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
         ":quiche_common_platform_client_stats",
@@ -1333,7 +1346,7 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_test_output.h"],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = ["@envoy//test/common/quic/platform:quic_platform_test_output_impl_lib"],
+    deps = [":quiche_common_platform_test_output"],
 )
 
 envoy_cc_test_library(
@@ -1341,7 +1354,7 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_thread.h"],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = ["@envoy//test/common/quic/platform:quic_platform_thread_impl_lib"],
+    deps = [":quiche_common_platform_thread"],
 )
 
 #TODO(danzh) Figure out why using envoy_proto_library() fails.
@@ -4283,12 +4296,55 @@ envoy_cc_library(
     hdrs = [
         "quiche/common/platform/api/quiche_hostname_utils.h",
     ],
+    srcs = [
+        "quiche/common/platform/api/quiche_hostname_utils.cc",
+    ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_thread",
+    hdrs = [
+        "quiche/common/platform/api/quiche_thread.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//test/common/quic/platform:quiche_platform_thread_impl_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_test_output",
+    hdrs = [
+        "quiche/common/platform/api/quiche_test_output.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//test/common/quic/platform:quiche_platform_test_output_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_stream_buffer_allocator",
+    hdrs = [
+        "quiche/common/platform/api/quiche_stream_buffer_allocator.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@envoy//source/common/quic/platform:quiche_platform_stream_buffer_allocator_impl_lib",
     ],
 )
 
@@ -4334,9 +4390,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_udp_socket_platform",
-    hdrs = [
-        "quiche/common/platform/api/quiche_udp_socket_platform_api.h",
-    ],
+    hdrs = select({
+        "@envoy//bazel:linux": ["quiche/common/platform/api/quiche_udp_socket_platform_api.h"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],

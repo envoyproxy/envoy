@@ -72,7 +72,6 @@ envoy_cc_library(
     name = "quic_platform_base_impl_lib",
     hdrs = [
         "quic_flags_impl.h",
-        "quic_stream_buffer_allocator_impl.h",
     ],
     external_deps = [
         "abseil_base",
@@ -133,6 +132,15 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
+)
+
+envoy_cc_library(
+    name = "quiche_platform_stream_buffer_allocator_impl_lib",
+    hdrs = [
+        "quiche_stream_buffer_allocator_impl.h",
+    ],
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
 )
 
 envoy_cc_library(

@@ -26,8 +26,6 @@ cat <<EOF >sed_commands
 /^#include/ s!net/quic/platform/impl/quic_sleep_impl.h!test/common/quic/platform/quic_sleep_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/common/quic/platform/quic_test_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_test_mem_slice_vector_impl.h!test/common/quic/platform/quic_test_mem_slice_vector_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/common/quic/platform/quic_test_output_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/common/quic/platform/quic_thread_impl.h!
 /^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/common/quic/platform/quiche_test_impl.h!
 /^#include/ s!net/quiche/common/platform/impl/quiche_test_helpers_impl.h!test/common/quic/platform/quiche_test_helpers_impl.h!
 /^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/common/quic/platform/spdy_test_impl.h!
@@ -59,6 +57,9 @@ cat <<EOF >sed_commands
 /^#include/ s!"quiche_platform_impl/quiche_mock_log_impl.h!"test/common/quic/platform/quiche_mock_log_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_server_stats_impl.h!"source/common/quic/platform/quiche_server_stats_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_stack_trace_impl.h!"source/common/quic/platform/quiche_stack_trace_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_stream_buffer_allocator_impl.h!"source/common/quic/platform/quiche_stream_buffer_allocator_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_test_output_impl.h!"test/common/quic/platform/quiche_test_output_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_thread_impl.h!"test/common/quic/platform/quiche_thread_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_udp_socket_platform_impl.h!"source/common/quic/platform/quiche_udp_socket_platform_impl.h!
 /^#include/ s!"quiche_platform_impl/quic_flags_impl.h!"source/common/quic/platform/quic_flags_impl.h!
 
