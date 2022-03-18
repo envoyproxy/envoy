@@ -697,7 +697,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
 
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
 #ifdef WIN32
-  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
 #endif
   initialize();
@@ -730,6 +730,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
   if (upstreamProtocol() != Http::CodecType::HTTP3 ||
       !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
