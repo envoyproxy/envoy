@@ -143,6 +143,9 @@ The following command operators are supported:
   TCP
     Downstream connection start time including milliseconds.
 
+  UDP
+    UDP proxy start time including milliseconds.
+
   START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   In addition to that, START_TIME also accepts following specifiers:
 
@@ -177,7 +180,7 @@ The following command operators are supported:
   HTTP
     Uncompressed bytes of request headers.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %BYTES_RECEIVED%
@@ -196,7 +199,7 @@ The following command operators are supported:
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
@@ -211,7 +214,7 @@ The following command operators are supported:
     will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
     If a 100-continue results in a disconnect, the 100 will be logged.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -223,7 +226,7 @@ The following command operators are supported:
     HTTP response code details provides additional information about the response code, such as
     who set it (the upstream or envoy) and why.
 
-  TCP
+  TCP/UDP
     Not implemented ("-")
 
 .. _config_access_log_format_connection_termination_details:
@@ -237,14 +240,14 @@ The following command operators are supported:
   HTTP
     Uncompressed bytes of response headers.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %RESPONSE_TRAILERS_BYTES%
   HTTP
     Uncompressed bytes of response trailers.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %BYTES_SENT%
@@ -265,6 +268,9 @@ The following command operators are supported:
   TCP
     Number of times the connection request is attempted upstream. Note that an attempt count of '0'
     means that the connection request was never attempted upstream.
+
+  UDP
+    Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
 
@@ -357,6 +363,9 @@ The following command operators are supported:
   TCP
     Total duration in milliseconds of the downstream connection.
 
+  UDP
+    Not implemented (0).
+
   Renders a numeric value in typed JSON logs.
 
 %REQUEST_DURATION%
@@ -364,7 +373,7 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the start time to the last byte of
     the request received from the downstream.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -373,7 +382,7 @@ The following command operators are supported:
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte sent upstream.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -383,7 +392,7 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the start time to the first byte read from the
     upstream host.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -393,7 +402,7 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the first byte read from the upstream host to the last
     byte sent downstream.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -432,6 +441,9 @@ The following command operators are supported:
     * **UMSDR**: The upstream request reached max stream duration.
     * **OM**: Overload Manager terminated the request.
     * **DF**: The request was terminated due to DNS resolution failure.
+
+  UDP
+    Not implemented ("-").
 
 %ROUTE_NAME%
   HTTP/TCP
@@ -486,7 +498,7 @@ The following command operators are supported:
     reason from the transport socket. The format of this field depends on the configured upstream
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
 
-  TCP
+  TCP/UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
@@ -588,21 +600,21 @@ The following command operators are supported:
     the HTTP request header named X first and if it's not set, then request header Y is used. If
     none of the headers are present '-' symbol will be in the log.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
 %RESP(X?Y):Z%
   HTTP
     Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
 %TRAILER(X?Y):Z%
   HTTP
     Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
 .. _config_access_log_format_dynamic_metadata:
@@ -626,7 +638,7 @@ The following command operators are supported:
     * %DYNAMIC_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   .. note::
@@ -660,7 +672,7 @@ The following command operators are supported:
     * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   .. note::
@@ -686,7 +698,7 @@ The following command operators are supported:
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
 
-  TCP
+  TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
 
   .. note::
@@ -701,78 +713,104 @@ The following command operators are supported:
     String value set on ssl connection socket for Server Name Indication (SNI)
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
     The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
   TCP
     The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_URI_SAN%
   HTTP
     The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
   TCP
     The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_LOCAL_SUBJECT%
   HTTP
     The subject present in the local certificate used to establish the downstream TLS connection.
   TCP
     The subject present in the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_SUBJECT%
   HTTP
     The subject present in the peer certificate used to establish the downstream TLS connection.
   TCP
     The subject present in the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_ISSUER%
   HTTP
     The issuer present in the peer certificate used to establish the downstream TLS connection.
   TCP
     The issuer present in the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_TLS_SESSION_ID%
   HTTP
     The session ID for the established downstream TLS connection.
   TCP
     The session ID for the established downstream TLS connection.
+  UDP
+    Not implemented (0).
 
 %DOWNSTREAM_TLS_CIPHER%
   HTTP
     The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
   TCP
     The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_TLS_VERSION%
   HTTP
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
   TCP
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_FINGERPRINT_256%
   HTTP
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
   TCP
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_FINGERPRINT_1%
   HTTP
     The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
   TCP
     The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_SERIAL%
   HTTP
     The serial number of the client certificate used to establish the downstream TLS connection.
   TCP
     The serial number of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_CERT%
   HTTP
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
   TCP
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
@@ -781,6 +819,8 @@ The following command operators are supported:
     The validity start date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
   DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
@@ -792,6 +832,8 @@ The following command operators are supported:
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
   DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
