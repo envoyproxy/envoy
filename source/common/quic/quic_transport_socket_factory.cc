@@ -21,8 +21,9 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   auto server_config = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       quic_transport.downstream_tls_context(), context);
-  auto factory =
-      std::make_unique<QuicServerTransportSocketFactory>(context.scope(), std::move(server_config));
+  auto factory = std::make_unique<QuicServerTransportSocketFactory>(
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true), context.scope(),
+      std::move(server_config));
   factory->initialize();
   return factory;
 }

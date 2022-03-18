@@ -278,14 +278,15 @@ public:
   void configDownstreamTransportSocketWithTls(
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-          configure_tls_context);
+          configure_tls_context,
+      bool enable_quic_early_data = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig();
+  void addQuicDownstreamTransportSocketConfig(bool enable_early_data);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.

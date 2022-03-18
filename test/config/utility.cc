@@ -1114,7 +1114,8 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
 void ConfigHelper::configDownstreamTransportSocketWithTls(
     envoy::config::bootstrap::v3::Bootstrap& bootstrap,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-        configure_tls_context) {
+        configure_tls_context,
+    bool enable_quic_early_data) {
   for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
     ASSERT(listener.filter_chains_size() > 0);
     auto* filter_chain = listener.mutable_filter_chains(0);
@@ -1125,6 +1126,7 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
           quic_transport_socket_config;
       configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
                                  ->mutable_common_tls_context());
+      quic_transport_socket_config.mutable_enable_early_data()->set_value(enable_quic_early_data);
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     } else if (!listener.has_udp_listener_config()) {
       transport_socket->set_name("envoy.transport_sockets.tls");
@@ -1150,7 +1152,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1162,7 +1164,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
       bootstrap_,
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
-      });
+      },
+      enable_early_data);
 }
 
 bool ConfigHelper::setAccessLog(
