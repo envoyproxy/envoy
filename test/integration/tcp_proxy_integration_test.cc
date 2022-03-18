@@ -446,9 +446,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 //  %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED%
 TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   std::string access_log_path = TestEnvironment::temporaryPath(
-      fmt::format("access_log{}{}.txt",
-      version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
-      TestUtility::uniqueFilename()));
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
   useListenerAccessLog();
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
