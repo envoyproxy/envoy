@@ -101,7 +101,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT, parent_trace_header);
 
   // Mock the random call for generating span ID so we can check it later.
-  const u_int64_t new_span_id = 3;
+  const uint64_t new_span_id = 3;
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(new_span_id));
@@ -109,6 +109,8 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   Tracing::SpanPtr span =
       driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
                          time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+
+  EXPECT_EQ(span->getTraceIdAsHex(), trace_id_hex);
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
@@ -172,6 +174,10 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
       driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
                          time_system_.systemTime(), {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
+
+  // Test baggage noop
+  span->setBaggage("baggage_key", "baggage_value");
+  EXPECT_TRUE(span->getBaggage("baggage_key").empty());
 
   // Flush after a single span.
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))

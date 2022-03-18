@@ -38,7 +38,7 @@ Span::Span(const Tracing::Config& config, const std::string& name, SystemTime st
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
-  SpanContext span_context(kDefaultVersion, traceId(), spanId(), sampled());
+  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled());
   return parent_tracer_.startSpan(config, name, start_time, span_context);
 }
 

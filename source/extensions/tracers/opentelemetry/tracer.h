@@ -95,7 +95,6 @@ public:
 
   std::string getBaggage(absl::string_view /*key*/) override { return EMPTY_STRING; };
   void setBaggage(absl::string_view /*key*/, absl::string_view /*value*/) override{};
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
   // Additional methods
 
@@ -105,7 +104,8 @@ public:
   void setTraceId(const std::string& trace_id_hex) {
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
-  std::string traceId() { return absl::BytesToHexString(span_.trace_id()); }
+
+  std::string getTraceIdAsHex() const override { return absl::BytesToHexString(span_.trace_id()); };
 
   /**
    * Sets the span's id.
