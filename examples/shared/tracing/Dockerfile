@@ -1,4 +1,4 @@
-FROM flask:python-3.10-slim-bullseye
+FROM flask_service:python-3.10-slim-bullseye
 
 COPY --from=envoyproxy/envoy-dev:latest /usr/local/bin/envoy /usr/local/bin/envoy
 
