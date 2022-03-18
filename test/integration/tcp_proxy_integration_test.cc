@@ -526,7 +526,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
   const int upstream_count = 3;
 
   enableHalfClose(false);
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* load_assignment = cluster->mutable_load_assignment();
     load_assignment->clear_endpoints();
