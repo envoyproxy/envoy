@@ -248,7 +248,7 @@ TEST_F(QuicPlatformTest, QuicThread) {
         t3.Start();
         t3.waitForRun();
       },
-      "QuicThread should be joined before destruction");
+      "QuicheThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
