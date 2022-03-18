@@ -33,6 +33,7 @@ public:
     }
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Start() {
     if (thread_ != nullptr || thread_is_set_.HasBeenNotified()) {
       PANIC("QuicheThread can only be started once.");
@@ -44,6 +45,7 @@ public:
     thread_is_set_.Notify();
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Join() {
     if (thread_ == nullptr) {
       PANIC("QuicheThread has not been started.");

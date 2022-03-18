@@ -13,6 +13,7 @@
 
 namespace quiche {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 inline std::string QuicheStackTraceImpl() {
   Envoy::BackwardsTrace t;
   t.capture();

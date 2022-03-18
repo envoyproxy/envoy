@@ -141,6 +141,9 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
+    ],
 )
 
 envoy_cc_library(
