@@ -37,10 +37,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
     }
   }
   // Add the audience from the config to the final url.
-  // According to
+  // `[AUDIENCE]` field is substituted with real audience string from the config based on
   // https://cloud.google.com/run/docs/authenticating/service-to-service#use_the_metadata_server,
-  // the uri should be defined to have `[AUDIENCE]` field to be substituted with real audience
-  // string from config.
   std::string final_url =
       absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str}});
   Http::RequestMessagePtr request = buildRequest("GET", final_url);

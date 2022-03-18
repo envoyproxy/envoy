@@ -66,7 +66,6 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
     options.setBufferBodyForRetry(true);
   }
 
-  // Http::RequestMessagePtr request = buildRequest("GET", uri);
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
 }
