@@ -415,8 +415,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void Filter::onClusterDiscoveryCompletion(
-    Upstream::ClusterDiscoveryStatus cluster_status) {
+void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status) {
   // Clear the handle_ before calling establishUpstreamConnection since we may request cluster
   // again.
   cluster_discovery_handle_.reset();

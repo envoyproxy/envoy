@@ -3,7 +3,6 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "integration_tcp_client.h"
 #include "source/common/common/macros.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 
@@ -234,6 +233,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnClusterMissing) {
   tcp_client->close();
 }
 
+// Verify the tcp proxy filter can handle the client close while waiting for the cds response.
 TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownTcpClientBeforeOdcdsResponse) {
   initialize();
 
@@ -247,9 +247,11 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownTcpClientBeforeOdcdsResponse) {
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
-  // Verify the delta CDS request and respond the required cluster is missing.
+  // Verify the delta CDS request and stall the response before tcp client close.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_));
+
+  // Client disconnect when the tcp proxy is waiting for the on demand response.
   tcp_client->close();
 }
 

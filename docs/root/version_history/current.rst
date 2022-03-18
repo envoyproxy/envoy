@@ -111,6 +111,7 @@ New Features
   into all sub messages, including Any messages, and perform full validation (deprecation,
   work-in-progress, PGV, etc.). Previously only top-level messages were fully validated.
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
+* tcp_proxy: added support for on demand cluster. If the :ref:`on_demand <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.on_demand>` is set and the destination cluster is not present, a delta CDS request will be sent and the tcp proxy flow will be resumed after that cds response.
 * thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 * thrift: added support for dynamic routing through aggregated discovery service.
 * tls: add support for tls key log :ref:`key_log<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.key_log>`.
