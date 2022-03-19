@@ -63,8 +63,7 @@ class TcpProxyTest : public TcpProxyTestBase {
 public:
   using TcpProxyTestBase::setup;
   void setup(uint32_t connections, bool set_redirect_records,
-             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
-             absl::optional<uint32_t> downstream_connections) override {
+             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
     if (config.has_on_demand()) {
       EXPECT_CALL(factory_context_.cluster_manager_, allocateOdCdsApi(_, _, _))
           .WillOnce(
@@ -136,11 +135,8 @@ public:
           ->setSslConnection(filter_callbacks_.connection_.ssl());
     }
 
-    // Downstream_connections either has value 1 or no value. The latter case means follow upstream
-    // connections.
-    if (downstream_connections.has_value() || connections > 0) {
+    if (connections > 0) {
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
       EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
       EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
@@ -1138,7 +1134,7 @@ TEST_F(TcpProxyTest, OdcdsCancelIfConnectionClose) {
       .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
       }));
-  setup(0, false, config, absl::nullopt);
+  setup(0, config);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
@@ -1163,7 +1159,7 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
       }));
 
-  setup(1, false, config, 1);
+  setup(1, config);
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
   raiseEventUpstreamConnected(0);
 
@@ -1195,7 +1191,7 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
       }));
 
-  setup(0, false, config, absl::nullopt);
+  setup(0, config);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
