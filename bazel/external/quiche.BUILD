@@ -22,18 +22,10 @@ licenses(["notice"])  # Apache 2
 #    "Platform impl", and must be provided by the codebase that embeds QUICHE.
 #
 # Concretely, header files in group 2 (the Platform API) #include header and
-# source files in group 3 (the Platform impl). Unfortunately, QUICHE does not
-# yet provide a built-in way to customize this dependency, e.g. to override the
-# directory or namespace in which Platform impl types are defined. Hence the
-# gross hacks in quiche.genrule_cmd, invoked from here to tweak QUICHE source
-# files into a form usable by Envoy.
-#
-# The mechanics of this will change as QUICHE evolves, supplies its own Bazel
-# buildfiles, and provides a built-in way to override platform impl directory
-# location. However, the end result (QUICHE files placed under
-# quiche/{http2,quic,spdy}/, with the Envoy-specific implementation of the
-# QUICHE platform APIs in //source/common/quic/platform/,
-# should remain largely the same.
+# source files in group 3 (the Platform impl). The #include path for these
+# files is always "quiche_platform_impl/". The files in type 3 are placed in
+# //source/common/quic/platform/ or //test/common/quic/platform/ and are
+# defined with include_prefix set to "quiche_platform_impl".
 
 src_files = glob([
     "**/*.h",
