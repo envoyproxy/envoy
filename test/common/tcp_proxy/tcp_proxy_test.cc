@@ -34,7 +34,9 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
+#include "test/mocks/upstream/cluster_discovery_callback_handle.h"
 #include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/od_cds_api_handle.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -47,6 +49,7 @@ namespace TcpProxy {
 namespace {
 
 using ::testing::_;
+using ::testing::ByMove;
 using ::testing::DoAll;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
@@ -60,7 +63,14 @@ class TcpProxyTest : public TcpProxyTestBase {
 public:
   using TcpProxyTestBase::setup;
   void setup(uint32_t connections, bool set_redirect_records,
-             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
+             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
+             absl::optional<uint32_t> downstream_connections) override {
+    if (config.has_on_demand()) {
+      EXPECT_CALL(factory_context_.cluster_manager_, allocateOdCdsApi(_, _, _))
+          .WillOnce(
+              Invoke([this]() { return Upstream::MockOdCdsApiHandlePtr(mock_odcds_api_handle_); }));
+    }
+
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
@@ -91,7 +101,6 @@ public:
             .WillOnce(Invoke(
                 [=](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
                   conn_pool_callbacks_.push_back(&cb);
-
                   return onNewConnection(conn_pool_handles_.at(i).get());
                 }))
             .RetiresOnSaturation();
@@ -127,7 +136,9 @@ public:
           ->setSslConnection(filter_callbacks_.connection_.ssl());
     }
 
-    if (connections > 0) {
+    // Downstream_connections either has value 1 or no value. The latter case means follow upstream
+    // connections.
+    if (downstream_connections.has_value() || connections > 0) {
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -135,6 +146,10 @@ public:
       EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
     }
   }
+
+  // Saved api handle pointer. The pointer is assigned in setup() in most of the on demand cases.
+  // In these cases, the mocked allocateOdCdsApi() takes the ownership.
+  Upstream::MockOdCdsApiHandle* mock_odcds_api_handle_{};
 };
 
 TEST_F(TcpProxyTest, ExplicitCluster) {
@@ -1088,6 +1103,105 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }
+
+// Verify the on demand api is not invoked when the target thread local cluster is present.
+TEST_F(TcpProxyTest, OdcdsIsIgnoredIfClusterExists) {
+  auto config = onDemandConfig();
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Verify the on demand request is cancelled if the tcp downstream connection is closed.
+TEST_F(TcpProxyTest, OdcdsCancelIfConnectionClose) {
+  auto config = onDemandConfig();
+  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
+
+  // To trigger the on demand request, we enforce the first call to getThreadLocalCluster returning
+  // no cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+      .WillOnce(Return(nullptr))
+      .RetiresOnSaturation();
+
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+  setup(0, false, config, absl::nullopt);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Verify a request can be served after a successful on demand cluster request.
+TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
+  auto config = onDemandConfig();
+  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
+
+  // To trigger the on demand request, we enforce the first call to getThreadLocalCluster returning
+  // no cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+
+  Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+        cluster_discovery_callback = std::move(cb);
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+
+  setup(1, false, config, 1);
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Verify the connection is closed up cluster missing callback.
+TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
+  auto config = onDemandConfig();
+  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
+
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+      .WillOnce(Return(nullptr))
+      .RetiresOnSaturation();
+
+  Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+        cluster_discovery_callback = std::move(cb);
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+
+  setup(0, false, config, absl::nullopt);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy

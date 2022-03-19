@@ -88,6 +88,12 @@ public:
     return config;
   }
 
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy onDemandConfig() {
+    auto config = defaultConfig();
+    config.mutable_on_demand();
+    return config;
+  }
+
   // Return the default config, plus one file access log with the specified format
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy
   accessLogConfig(const std::string& access_log_format) {
@@ -113,9 +119,9 @@ public:
     setup(connections, set_redirect_records, defaultConfig());
   }
 
-  virtual void
-  setup(uint32_t connections, bool set_redirect_records,
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) PURE;
+  virtual void setup(uint32_t connections, bool set_redirect_records,
+                     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
+                     absl::optional<uint32_t> downstream_connections = absl::nullopt) PURE;
 
   void raiseEventUpstreamConnected(uint32_t conn_index) {
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
