@@ -24,7 +24,6 @@ public:
                                        const Protobuf::MethodDescriptor& service_method)
       : client_(client), service_method_(service_method) {}
 
-public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<
                            opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse> {
     LocalStream(OpenTelemetryGrpcTraceExporterClient& parent) : parent_(parent) {}
@@ -49,8 +48,6 @@ public:
     Grpc::AsyncStream<opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest>
         stream_{};
   };
-
-  bool isStreamStarted() { return stream_ != nullptr && stream_->stream_ != nullptr; }
 
   bool log(const ExportTraceServiceRequest& request) {
     // If we don't have a stream already, we need to initialize it.
