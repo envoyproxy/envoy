@@ -11,7 +11,7 @@
 #include "source/common/memory/stats.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/quic/platform/quiche_flags_impl.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/common/quic/platform/quic_epoll_clock.h"

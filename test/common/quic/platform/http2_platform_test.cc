@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 
-#include "source/common/quic/platform/quiche_flags_impl.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 #include "test/test_common/logging.h"
 
