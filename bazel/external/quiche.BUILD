@@ -1283,7 +1283,6 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":epoll_server_lib",
         ":quic_core_clock_lib",
         ":quic_platform_epoll_lib",
     ],
