@@ -7,8 +7,6 @@
 #include <memory>
 #include <string>
 
-#include "quiche_platform_impl/quiche_flags_impl.h"
-
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
@@ -16,6 +14,7 @@
 #include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/test_tools/http2_random.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 // Basic tests to validate functioning of the QUICHE http2 platform
 // implementation. For platform APIs in which the implementation is a simple
