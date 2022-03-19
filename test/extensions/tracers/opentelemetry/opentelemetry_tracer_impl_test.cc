@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include "test/mocks/common.h"
@@ -162,6 +163,22 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   EXPECT_EQ(sampled_entry.size(), 1);
   EXPECT_EQ(sampled_entry[0]->value().getStringView(),
             "00-00000000000000010000000000000002-0000000000000003-01");
+}
+
+TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
+  setupValidDriver();
+  // Add an invalid OTLP header to the request headers.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT,
+                                  "invalid00-0000000000000003-01");
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+
+  auto& null_span = *span;
+  EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
 }
 
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
