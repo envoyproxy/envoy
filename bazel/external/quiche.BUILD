@@ -2290,15 +2290,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quiche_flag_utils_impl_lib",
-    hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    strip_include_prefix = "quiche/common/platform/default/",
-    tags = ["nofips"],
-)
-
-envoy_cc_library(
     name = "quiche_common_buffer_allocator_lib",
     srcs = [
         "quiche/common/quiche_buffer_allocator.cc",
