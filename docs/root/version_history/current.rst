@@ -147,6 +147,7 @@ New Features
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
   to the tools image.
 * udp_proxy: added support for :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log>`.
+* Network rate limiter supports runtime value substitution using stream info and substitution formatting. See :ref:` Network Rate Limiter <config_network_filters_rate_limit>`
 
 Deprecated
 ----------
