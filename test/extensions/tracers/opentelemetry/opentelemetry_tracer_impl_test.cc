@@ -175,9 +175,12 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
                          time_system_.systemTime(), {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  // Test baggage noop
+  // Test baggage noop and other noop calls.
   span->setBaggage("baggage_key", "baggage_value");
   EXPECT_TRUE(span->getBaggage("baggage_key").empty());
+  span->setOperation("operation");
+  span->setTag("tag_name", "tag_value");
+  span->log(time_system_.systemTime(), "event");
 
   // Flush after a single span.
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
