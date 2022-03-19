@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include <cstdint>
-#include <regex>
 #include <string>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
@@ -20,8 +19,7 @@ namespace RateLimitFilter {
 Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
-      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()),
-      dynamic_downstream_ip_(config.dynamic_downstream_ip()) {
+      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {

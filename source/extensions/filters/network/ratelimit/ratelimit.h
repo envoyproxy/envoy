@@ -1,13 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include <exception>
 #include <memory>
-#include <regex>
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -57,7 +54,6 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
-  bool dynamicDownstreamIp() const { return dynamic_downstream_ip_; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
@@ -66,7 +62,6 @@ private:
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
-  const bool dynamic_downstream_ip_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -109,17 +104,6 @@ public:
     }
     filter_descriptors_ = dynamicDescriptors;
   }
-
-  // std::string substitutionFormattedString(std::string format, StreamInfo::StreamInfo&
-  // stream_info) {
-  //   std::string body;
-
-  //   Formatter::FormatterImpl formatter(format, false);
-
-  //   return formatter.format(*Http::RequestHeaderMapImpl::create(),
-  //                           *Http::ResponseHeaderMapImpl::create(),
-  //                           *Http::ResponseTrailerMapImpl::create(), stream_info, body);
-  // }
 
   std::string formatValue(std::string body, StreamInfo::StreamInfo& stream_info) {
     Http::RequestHeaderMapPtr request_headers = Http::RequestHeaderMapImpl::create();
