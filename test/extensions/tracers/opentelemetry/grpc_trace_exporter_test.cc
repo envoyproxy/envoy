@@ -15,11 +15,8 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::InSequence;
 using testing::Invoke;
-using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 class OpenTelemetryGrpcTraceExporterTest : public testing::Test {
 public:
