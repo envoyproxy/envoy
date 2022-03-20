@@ -43,9 +43,6 @@ envoy_cc_library(
         "json",
     ],
     deps = [
-        "//envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/protobuf:utility_lib",
     ],
 )

@@ -42,7 +42,11 @@ private:
   // the property of UTF-8 where all two-byte characters have the high-order bit
   // set for both bytes, and don't require escaping for JSON. Thus we can
   // consider each character in isolation for escaping.
-  std::unique_ptr<std::string> char_escapes_[256];
+  struct Escape {
+    uint8_t size_;
+    char chars_[7];
+  };
+  Escape char_escapes_[256];
 };
 
 } // namespace Json
