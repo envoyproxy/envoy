@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-using Envoy::Router::RouteConstSharedPtr;
+using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
@@ -37,7 +37,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
     }
   }
   // Add the audience from the config to the final url.
-  // `[AUDIENCE]` field is substituted with real audience string from the config based on
+  // `[AUDIENCE]` field is substituted with real audience string from the config.
   std::string final_url =
       absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str}});
   Http::RequestMessagePtr request = buildRequest("GET", final_url);
@@ -56,8 +56,8 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage*) {
   if (!initiating_call_) {
     decoder_callbacks_->continueDecoding();
   }
-  // TODO(tyxia) Decode jwt token to get the exp time for cache. Integration test already hit this
-  // path, so something can be added for test once decode path is added.
+  // TODO(tyxia) Decode jwt token from the response (e.g., get the exp time for cache.)
+  // Integration test already hit this path, so add test coverage once decode path is added.
 }
 
 void GcpAuthnFilter::onDestroy() {

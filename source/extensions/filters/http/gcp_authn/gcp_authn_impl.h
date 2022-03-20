@@ -28,7 +28,7 @@ public:
    * @param response the pointer to the response message. Null response pointer means the request
    *        was completed with error.
    */
-  virtual void onComplete(const Http::ResponseMessage* response) PURE;
+  virtual void onComplete(const Http::ResponseMessage* response_ptr) PURE;
 };
 
 class GcpAuthnClient : public Http::AsyncClient::Callbacks,
@@ -39,7 +39,6 @@ public:
       Server::Configuration::FactoryContext& context)
       : config_(config), context_(context) {}
 
-  // TODO(tyxia) Copy Move constructor
   ~GcpAuthnClient() override { cancel(); }
 
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}

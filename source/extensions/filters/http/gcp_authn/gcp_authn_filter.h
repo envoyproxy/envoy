@@ -15,8 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-constexpr char FilterName[] = "envoy.filters.http.gcp_authn";
-constexpr char AudienceKey[] = "audience_key";
+inline constexpr char FilterName[] = "envoy.filters.http.gcp_authn";
+inline constexpr char AudienceKey[] = "audience_key";
 
 using FilterConfigProtoSharedPtr =
     std::shared_ptr<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
@@ -41,7 +41,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   void onDestroy() override;
-  void onComplete(const Http::ResponseMessage* response) override;
+  void onComplete(const Http::ResponseMessage* response_ptr) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   State state() { return state_; }

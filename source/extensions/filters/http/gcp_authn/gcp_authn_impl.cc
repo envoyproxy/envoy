@@ -115,7 +115,7 @@ void GcpAuthnClient::onError() {
   cancel();
 
   ASSERT(callbacks_ != nullptr);
-  callbacks_->onComplete(nullptr);
+  callbacks_->onComplete(/*response_ptr=*/nullptr);
   callbacks_ = nullptr;
 }
 

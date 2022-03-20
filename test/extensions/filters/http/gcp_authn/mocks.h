@@ -1,8 +1,5 @@
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"

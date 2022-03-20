@@ -20,11 +20,11 @@ namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
 
-using envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
+using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 using Server::Configuration::MockFactoryContext;
-using testing::_;
-using testing::Invoke;
-using testing::NiceMock;
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::NiceMock;
 using Upstream::MockThreadLocalCluster;
 
 constexpr char DefaultConfig[] = R"EOF(
@@ -57,6 +57,11 @@ public:
         }));
   }
 
+  void setupFilterAndCallback() {
+    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  }
+
   void createClient(const std::string& config_str = DefaultConfig) {
     TestUtility::loadFromYaml(config_str, config_);
     client_ = std::make_unique<GcpAuthnClient>(config_, context_);
@@ -77,6 +82,7 @@ public:
   Envoy::Http::AsyncClient::RequestOptions options_;
 
   std::unique_ptr<GcpAuthnClient> client_;
+  std::unique_ptr<GcpAuthnFilter> filter_;
   GcpAuthnFilterConfig config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -120,9 +126,12 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
       num_retries: 5
   )EOF";
 
+  // The pointer of thread local cluster is expected to be nullptr and http async client is not
+  // expected to be called since `cluster` is not configured.
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
-  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
+
+  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
   GcpAuthnFilterConfig config;
   TestUtility::loadFromYaml(no_cluster_config, config);
   createClient(config);
@@ -133,7 +142,7 @@ TEST_F(GcpAuthnFilterTest, Failure) {
   setupMockObjects();
   // Create the client object.
   createClient();
-  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
   client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
@@ -150,11 +159,11 @@ TEST_F(GcpAuthnFilterTest, NotOkResponse) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
-TEST_F(GcpAuthnFilterTest, GetResponseThrowException) {
+TEST_F(GcpAuthnFilterTest, EmptyResponseHeader) {
   setupMockObjects();
   // Create the client object.
   createClient();
@@ -165,17 +174,27 @@ TEST_F(GcpAuthnFilterTest, GetResponseThrowException) {
       new Envoy::Http::TestResponseHeaderMapImpl({}));
   Envoy::Http::ResponseMessagePtr empty_response(
       new Envoy::Http::ResponseMessageImpl(std::move(empty_resp_headers)));
-  EXPECT_CALL(request_callbacks_, onComplete_(nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
   client_callback_->onSuccess(client_request_, std::move(empty_response));
+}
+
+TEST_F(GcpAuthnFilterTest, NoRoute) {
+  setupFilterAndCallback();
+
+  // route() call return nullptr
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  // decodeHeaders() is expected to return `Continue` because nothing can really be done without
+  // route.
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
   setupMockObjects();
-  auto filter = std::make_shared<GcpAuthnFilter>(config_, context_);
-  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+  setupFilterAndCallback();
+
   // decodeHeaders() is expected to return `StopIteration` because none of complete functions(i.e.,
   // onSuccess, onFailure, onDestroy, etc) has been called.
-  EXPECT_EQ(filter->decodeHeaders(default_headers_, true),
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopIteration);
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "200"},
@@ -189,21 +208,20 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
 
 TEST_F(GcpAuthnFilterTest, DestoryFilter) {
   setupMockObjects();
+  setupFilterAndCallback();
 
-  auto filter = std::make_shared<GcpAuthnFilter>(config_, context_);
-  filter->setDecoderFilterCallbacks(decoder_callbacks_);
   const std::string upstream_cluster("cluster_0");
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, clusterName())
       .WillOnce(testing::ReturnRef(upstream_cluster));
   // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
   // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been
   // called.
-  EXPECT_EQ(filter->decodeHeaders(default_headers_, true),
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopIteration);
-  EXPECT_EQ(filter->state(), GcpAuthnFilter::State::Calling);
-  filter->onDestroy();
+  EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Calling);
+  filter_->onDestroy();
   // onDestroy() call is expected to update the state from `Calling` to `Complete`.
-  EXPECT_EQ(filter->state(), GcpAuthnFilter::State::Complete);
+  EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
 }
 
 } // namespace

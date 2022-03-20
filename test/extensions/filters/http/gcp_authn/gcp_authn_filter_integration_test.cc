@@ -17,9 +17,7 @@ namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
 
-using testing::TestWithParam;
-
-class GcpAuthnFilterIntegrationTest : public TestWithParam<Network::Address::IpVersion>,
+class GcpAuthnFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
   GcpAuthnFilterIntegrationTest()
@@ -47,7 +45,7 @@ public:
       ConfigHelper::setHttp2(*gcp_authn_cluster);
 
       // Add the metadata to cluster 0 (destination cluster) configuration. The audience (URL of the
-      // destionation cluster) is provided through the metadata.
+      // destination cluster) is provided through the metadata.
       auto cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       envoy::config::core::v3::Metadata* cluster_metadata = cluster_0->mutable_metadata();
       (*(*cluster_metadata
@@ -84,32 +82,6 @@ public:
     request_->encodeHeaders(default_response_headers_, true);
   }
 
-  void sendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices) {
-    // Create a client aimed at Envoy’s default HTTP port.
-    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-    // Create some request headers.
-    Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-
-    // Send the request headers from the client, wait until they are received
-    // upstream. When they are received, send the default response headers from
-    // upstream and wait until they are received at by client.
-    IntegrationStreamDecoderPtr response = sendRequestAndWaitForResponse(
-        request_headers, 0, default_response_headers_, 0, upstream_indices);
-
-    // Verify the proxied request was received upstream, as expected.
-    EXPECT_TRUE(upstream_request_->complete());
-    EXPECT_EQ(0U, upstream_request_->bodyLength());
-    // Verify the proxied response was received downstream, as expected.
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-    EXPECT_EQ(0U, response->body().size());
-
-    // Perform the clean-up.
-    cleanupUpstreamAndDownstream();
-  }
-
   IntegrationStreamDecoderPtr response_;
   FakeHttpConnectionPtr fake_gcp_authn_connection_{};
   FakeStreamPtr request_{};
@@ -129,8 +101,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 
 TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initialize();
-
   initiateClientConnection();
+
   // Send the request to cluster `gcp_authn`.
   waitForGcpAuthnServerResponse();
 
