@@ -43,7 +43,8 @@ private:
   // the character does not require substitution. This strategy is dependent on
   // the property of UTF-8 where all two-byte characters have the high-order bit
   // set for both bytes, and don't require escaping for JSON. Thus we can
-  // consider each character in isolation for escaping.
+  // consider each character in isolation for escaping. Reference:
+  // https://en.wikipedia.org/wiki/UTF-8.
   struct Escape {
     uint8_t size_{0};
     char chars_[7]; // No need to initialize char data, as we are not null-terminating.
