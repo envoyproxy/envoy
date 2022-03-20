@@ -12,19 +12,19 @@ JsonSanitizer::JsonSanitizer() {
   memset(&char_escapes_[0], 0, sizeof(char_escapes_));
 
   // Single-char escape sequences for common control characters.
-  auto control_char = [this](char escape_char, char symbolic) {
+  auto symbolic_escape = [this](char escape_char, char symbolic) {
     Escape& escape = char_escapes_[static_cast<uint32_t>(escape_char)];
     escape.size_ = 2;
     escape.chars_[0] = '\\';
     escape.chars_[1] = symbolic;
   };
-  control_char('\b', 'b');
-  control_char('\f', 'f');
-  control_char('\n', 'n');
-  control_char('\r', 'r');
-  control_char('\t', 't');
-  control_char('\\', '\\');
-  control_char('"', '"');
+  symbolic_escape('\b', 'b');
+  symbolic_escape('\f', 'f');
+  symbolic_escape('\n', 'n');
+  symbolic_escape('\r', 'r');
+  symbolic_escape('\t', 't');
+  symbolic_escape('\\', '\\');
+  symbolic_escape('"', '"');
 
   // Low characters (0-31) not listed above are encoded as unicode 4-digit hex, plus
   // a few other specific ones.
@@ -58,13 +58,21 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
         // We only initialize buffer when we first learn we need to add an
         // escape-sequence to the sanitized string.
         if (i == 0) {
+          // The first character is an escape, and 'buffer' has not been cleared yet,
+          // so we need to assign it rather than append to i.
           buffer.assign(escape_view.data(), escape_view.size());
         } else {
+          // We found our first escape, but this is not the first character in the
+          // string, so we combine the unescaped characters in the string we already
+          // looped over with the new escaped character.
           buffer = absl::StrCat(str.substr(0, i), escape_view);
         }
       } else if (i == past_escape) {
+        // We are adding an escape immediately after another escaped character.
         absl::StrAppend(&buffer, escape_view);
       } else {
+        // We are adding a new escape but must first cover the characters
+        // encountered since the previous escape.
         absl::StrAppend(&buffer, str.substr(past_escape, i - past_escape), escape_view);
       }
       past_escape = i + 1;
