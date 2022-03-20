@@ -34,3 +34,18 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "json_sanitizer_lib",
+    srcs = ["json_sanitizer.cc"],
+    hdrs = ["json_sanitizer.h"],
+    external_deps = [
+        "json",
+    ],
+    deps = [
+        "//envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)

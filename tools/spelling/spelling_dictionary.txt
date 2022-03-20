@@ -1099,6 +1099,7 @@ rver
 rxhash
 sandboxed
 sanitization
+sanitizations
 sanitizer
 satisfiable
 scalability

@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
@@ -34,5 +35,23 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "json_sanitizer_test",
+    srcs = ["json_sanitizer_test.cc"],
+    deps = [
+        "//source/common/json:json_sanitizer_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "json_sanitizer_speed_test",
+    srcs = ["json_sanitizer_speed_test.cc"],
+    deps = [
+        "//source/common/json:json_sanitizer_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
