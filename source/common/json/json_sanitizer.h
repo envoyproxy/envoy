@@ -14,10 +14,10 @@ namespace Json {
 // ---------------------------------------------------------------------
 // Benchmark                           Time             CPU   Iterations
 // ---------------------------------------------------------------------
-// BM_ProtoEncoderNoEscape          1100 ns         1100 ns       636735
-// BM_JsonSanitizerNoEscape         18.1 ns         18.1 ns     38671848
-// BM_ProtoEncoderWithEscape        1376 ns         1375 ns       507137
-// BM_JsonSanitizerWithEscape       94.5 ns         94.5 ns      7402468
+// BM_ProtoEncoderNoEscape          1102 ns         1102 ns       542926
+// BM_JsonSanitizerNoEscape         12.0 ns         12.0 ns     57347682
+// BM_ProtoEncoderWithEscape        1377 ns         1377 ns       507363
+// BM_JsonSanitizerWithEscape       77.3 ns         77.3 ns      8729626
 //
 class JsonSanitizer {
 public:
@@ -30,7 +30,9 @@ public:
    * Sanitizes a string so it is suitable for JSON. The buffer is
    * used if any of the characters in str need to be escaped.
    *
-   * @param buffer a string in which an escaped string can be written, if needed
+   * @param buffer a string in which an escaped string can be written, if needed. It
+   *   is not necessary for callers to clear the buffer first; it be cleared
+   *   by this method if the input needs to be escaped.
    * @param str the string to be translated
    * @return the translated string_view.
    */
