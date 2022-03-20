@@ -913,7 +913,8 @@ message RouteAction {
     string cluster_specifier_plugin = 37;
 
     // Custom cluster provider configuration to use to determine the cluster for requests on this route.
-    core.v3.TypedExtensionConfig cluster_provider = 39 [(xds.annotations.v3.field_status).work_in_progress = true];
+    core.v3.TypedExtensionConfig cluster_provider = 39
+        [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
   // The HTTP status code to use when configured cluster is not found.
