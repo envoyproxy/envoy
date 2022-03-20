@@ -92,13 +92,9 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
 
 void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
-  if (reason == Http::AsyncClient::FailureReason::Reset) {
-    ENVOY_LOG(error, "Request to [uri = {}] failed: stream has been reset",
-              config_.http_uri().uri());
-  } else {
-    ENVOY_LOG(error, "Request to [uri = {}] failed: network error {}", config_.http_uri().uri(),
-              enumToInt(reason));
-  }
+  // Http::AsyncClient::FailureReason only has one value: "Reset".
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  ENVOY_LOG(error, "Request to [uri = {}] failed: stream has been reset", config_.http_uri().uri());
   active_request_ = nullptr;
   onError();
 }

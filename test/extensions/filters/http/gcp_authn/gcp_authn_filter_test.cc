@@ -53,7 +53,7 @@ public:
           message_.swap(message);
           client_callback_ = &callback;
           options_ = options;
-          return nullptr;
+          return &client_request_;
         }));
   }
 
@@ -73,7 +73,8 @@ public:
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  Envoy::Http::MockAsyncClientRequest client_request_{&thread_local_cluster_.async_client_};
+  NiceMock<Envoy::Http::MockAsyncClientRequest> client_request_{
+      &thread_local_cluster_.async_client_};
   MockRequestCallbacks request_callbacks_;
 
   // Mocks for http request.
