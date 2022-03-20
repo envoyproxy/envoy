@@ -13,6 +13,7 @@
 #include "source/common/network/utility.h"
 
 #include "test/common/buffer/utility.h"
+#include "test/common/quic/platform/quic_epoll_clock.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -45,7 +46,6 @@
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
-#include "quiche_platform_impl/quic_epoll_clock.h"
 #include "quiche_platform_impl/quiche_flags_impl.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
