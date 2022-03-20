@@ -9,8 +9,6 @@ namespace Envoy {
 namespace Json {
 
 JsonSanitizer::JsonSanitizer() {
-  memset(&char_escapes_[0], 0, sizeof(char_escapes_));
-
   // Single-char escape sequences for common control characters.
   auto symbolic_escape = [this](char escape_char, char symbolic) {
     Escape& escape = char_escapes_[static_cast<uint32_t>(escape_char)];
@@ -59,7 +57,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
         // escape-sequence to the sanitized string.
         if (i == 0) {
           // The first character is an escape, and 'buffer' has not been cleared yet,
-          // so we need to assign it rather than append to i.
+          // so we need to assign it rather than append to it.
           buffer.assign(escape_view.data(), escape_view.size());
         } else {
           // We found our first escape, but this is not the first character in the

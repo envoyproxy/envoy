@@ -43,8 +43,8 @@ private:
   // set for both bytes, and don't require escaping for JSON. Thus we can
   // consider each character in isolation for escaping.
   struct Escape {
-    uint8_t size_;
-    char chars_[7];
+    uint8_t size_{0};
+    char chars_[7]; // No need to initialize char data, as we are not null-terminating.
   };
   Escape char_escapes_[256];
 };
