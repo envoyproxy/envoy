@@ -4,7 +4,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_hostname_utils_impl.h"
+#include "quiche_platform_impl/quiche_hostname_utils_impl.h"
 
 #include <string>
 

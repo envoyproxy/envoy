@@ -11,7 +11,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/platform/quiche_mem_slice_impl.h"
+#include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"

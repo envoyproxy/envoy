@@ -4,7 +4,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "test/common/quic/platform/quic_epoll_clock.h"
+#include "quiche_platform_impl/quic_epoll_clock.h"
 
 namespace quic {
 

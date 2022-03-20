@@ -13,7 +13,7 @@
 #include "source/common/network/utility.h"
 
 #include "test/common/buffer/utility.h"
-#include "test/common/quic/platform/quic_epoll_clock.h"
+#include "quiche_platform_impl/quic_epoll_clock.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
