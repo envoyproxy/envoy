@@ -122,10 +122,17 @@ message RouteConfiguration {
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
 
-  // A list of cluster providers and their configurations which may be used by a
-  // :ref:`cluster provider name <envoy_v3_api_field_config.route.v3.RouteAction.cluster_provider_name>`
-  // within the route. All *name* fields in this list must be unique.
-  repeated core.v3.TypedExtensionConfig cluster_providers = 12;
+  // [#not-implemented-hide:]
+  // A list of plugins and their configurations which may be used by a
+  // :ref:`envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin`
+  // within the route. All *extension.name* fields in this list must be unique.
+  repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
+}
+
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1;
 }
 
 message Vhds {

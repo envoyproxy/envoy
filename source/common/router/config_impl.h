@@ -1220,8 +1220,6 @@ public:
     return max_direct_response_body_size_bytes_;
   }
 
-  ClusterProviderSharedPtr clusterProvider(absl::string_view provider) const;
-
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1232,8 +1230,6 @@ private:
   const bool uses_vhds_;
   const bool most_specific_header_mutations_wins_;
   const uint32_t max_direct_response_body_size_bytes_;
-  // Cluster providers.
-  absl::flat_hash_map<std::string, ClusterProviderSharedPtr> cluster_providers_;
 };
 
 /**
