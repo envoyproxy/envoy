@@ -38,35 +38,37 @@ JsonSanitizer::JsonSanitizer() {
 }
 
 absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view str) const {
-  size_t last_escape = absl::string_view::npos;
+  size_t past_escape = absl::string_view::npos;
   for (uint32_t i = 0, n = str.size(); i < n; ++i) {
     uint32_t index = static_cast<uint32_t>(static_cast<uint8_t>(str[i]));
     const std::string* escape = char_escapes_[index].get();
     if (escape != nullptr) {
-      if (last_escape == absl::string_view::npos) {
+      if (past_escape == absl::string_view::npos) {
         // We only initialize buffer when we first learn we need to add an
         // escape-sequence to the sanitized string.
-        last_escape = i;
         if (i == 0) {
           buffer = *escape;
         } else {
           buffer = absl::StrCat(str.substr(0, i), *escape);
         }
+      } else if (i == past_escape) {
+        absl::StrAppend(&buffer, *escape);
       } else {
-        absl::StrAppend(&buffer, str.substr(last_escape + 1, i - last_escape), *escape);
+        absl::StrAppend(&buffer, str.substr(past_escape, i - past_escape), *escape);
       }
+      past_escape = i + 1;
     }
   }
 
   // If no escape-sequence was needed, we just return the input.
-  if (last_escape == absl::string_view::npos) {
+  if (past_escape == absl::string_view::npos) {
     return str;
   }
 
   // Otherwise we append on any unescaped chunk at the end of the input, and
   // return buffer as the result.
-  if (last_escape < str.size() - 1) {
-    absl::StrAppend(&buffer, str.substr(last_escape + 1, str.size() - last_escape));
+  if (past_escape < str.size()) {
+    absl::StrAppend(&buffer, str.substr(past_escape, str.size() - past_escape));
   }
   return buffer;
 }
