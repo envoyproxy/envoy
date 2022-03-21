@@ -64,7 +64,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   client_config:
     backend_token: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
     service_name: "FAKE_FAKE_FAKE"
-    instance_name: "FAKE_FAKE_FAKE"
+    instance_name: "FAKE_FAKE_FAKE_INSTANCE"
     max_cache_size: 2333
   )EOF";
   setupSkyWalkingDriver(yaml_string);
@@ -90,7 +90,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     ASSERT(span);
 
     EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->service());
-    EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->serviceInstance());
+    EXPECT_EQ("FAKE_FAKE_FAKE_INSTANCE", span->tracingContext()->serviceInstance());
 
     // Tracing decision will be overwrite by skip analysis flag in propagation headers.
     EXPECT_FALSE(span->tracingContext()->skipAnalysis());
