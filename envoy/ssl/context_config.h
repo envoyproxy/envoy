@@ -11,6 +11,8 @@
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "source/common/network/cidr_range.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -89,6 +91,26 @@ public:
    * @return a callback for configuring an SSL_CTX before use.
    */
   virtual SslCtxCb sslctxCb() const PURE;
+
+  /**
+   * @return the TLS key log local filter.
+   */
+  virtual const Network::Address::IpList& tlsKeyLogLocal() const PURE;
+
+  /**
+   * @return the TLS key log remote filter.
+   */
+  virtual const Network::Address::IpList& tlsKeyLogRemote() const PURE;
+
+  /**
+   * @return the TLS key log path
+   */
+  virtual const std::string& tlsKeyLogPath() const PURE;
+
+  /**
+   * @return the access log manager object reference
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
