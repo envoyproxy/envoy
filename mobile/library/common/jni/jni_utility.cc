@@ -133,9 +133,11 @@ jobject native_map_to_map(JNIEnv* env, envoy_map map) {
   jmethodID jmid_hashMapPut = env->GetMethodID(
       jcls_hashMap, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   for (envoy_map_size_t i = 0; i < map.length; i++) {
-    env->CallObjectMethod(j_hashMap, jmid_hashMapPut,
-                          native_data_to_string(env, map.entries[i].key),
-                          native_data_to_string(env, map.entries[i].value));
+    auto key = native_data_to_string(env, map.entries[i].key);
+    auto value = native_data_to_string(env, map.entries[i].value);
+    env->CallObjectMethod(j_hashMap, jmid_hashMapPut, key, value);
+    env->DeleteLocalRef(key);
+    env->DeleteLocalRef(value);
   }
   env->DeleteLocalRef(jcls_hashMap);
   return j_hashMap;
