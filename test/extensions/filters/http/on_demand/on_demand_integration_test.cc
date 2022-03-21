@@ -61,7 +61,7 @@ key:
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
   createRdsStream("foo_route1");
@@ -119,7 +119,7 @@ key:
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=bar"}});
   ASSERT_TRUE(response->waitForEndStream());
@@ -169,7 +169,7 @@ key:
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/neh"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
   ASSERT_TRUE(response->waitForEndStream());
@@ -225,7 +225,7 @@ key:
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/neh"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=bar"}});
   ASSERT_TRUE(response->waitForEndStream());
@@ -283,7 +283,7 @@ key:
     sendRequestAndVerifyResponse(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/meh"},
-                                       {":authority", "host"},
+                                       {":authority", "sni.lyft.com"},
                                        {":scheme", "http"},
                                        {"Addr", fmt::format("x-foo-key={}", scope_key)}},
         456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123, 0);
@@ -323,7 +323,7 @@ key:
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
