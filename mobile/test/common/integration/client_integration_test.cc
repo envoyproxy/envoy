@@ -400,5 +400,70 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   test_server_->waitForCounterEq("http.client.stream_success", 1);
 }
 
+TEST_P(ClientIntegrationTest, Timeout) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
+    auto* em_hcm = listener->mutable_api_listener()->mutable_api_listener();
+    auto hcm =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::v3::
+                                    EnvoyMobileHttpConnectionManager>(*em_hcm);
+    hcm.mutable_config()->mutable_stream_idle_timeout()->set_seconds(1);
+    em_hcm->PackFrom(hcm);
+  });
+
+  autonomous_upstream_ = false;
+  initialize();
+
+  ConditionalInitializer server_started;
+  test_server_->server().dispatcher().post([this, &server_started]() -> void {
+    http_client_ = std::make_unique<Http::Client>(
+        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
+        test_server_->statStore(), test_server_->server().api().randomGenerator());
+    dispatcher_->drain(test_server_->server().dispatcher());
+    server_started.setReady();
+  });
+  server_started.waitReady();
+
+  envoy_stream_t stream = 1;
+  bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
+                                    void* context) -> void* {
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+    cc_->on_headers_calls++;
+    cc_->status = response_headers->Status()->value().getStringView();
+    return nullptr;
+  };
+
+  // Build a set of request headers.
+  Http::TestRequestHeaderMapImpl headers{{"FoO", "bar"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+  // Create a stream.
+  dispatcher_->post([&]() -> void {
+    http_client_->startStream(stream, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream, c_headers, false);
+  });
+
+  Envoy::FakeRawConnectionPtr upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+
+  std::string upstream_request;
+  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
+                                               &upstream_request));
+
+  // Send response headers but no body.
+  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\nMy-ResponsE-Header: foo\r\n\r\n";
+  ASSERT_TRUE(upstream_connection->write(response));
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
 } // namespace
 } // namespace Envoy
