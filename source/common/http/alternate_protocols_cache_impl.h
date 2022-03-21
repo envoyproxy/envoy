@@ -55,7 +55,7 @@ public:
   // This function also does not do standards-required normalization. Entries requiring
   // normalization will simply not be read from cache.
   // The string format is:
-  // protocols|rtt|h3_status
+  // protocols|rtt
   static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
                                                 std::chrono::microseconds srtt);
   // Parse an origin data into structured data, or absl::nullopt

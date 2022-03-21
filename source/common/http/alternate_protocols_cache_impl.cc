@@ -143,7 +143,7 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   if (key_value_store_) {
     key_value_store_->addOrUpdate(
         originToString(origin),
-        originDataToStringForCache(protocols_[origin].protocols, protocols_[origin].srtt));
+        originDataToStringForCache(protocols, std::chrono::microseconds(0)));
   }
 }
 
@@ -159,9 +159,8 @@ void AlternateProtocolsCacheImpl::setSrttImpl(const Origin& origin,
   }
   entry_it->second.srtt = srtt;
   if (key_value_store_) {
-    key_value_store_->addOrUpdate(
-        originToString(origin),
-        originDataToStringForCache(entry_it->second.protocols, entry_it->second.srtt));
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(entry_it->second.protocols, srtt));
   }
 }
 
@@ -212,9 +211,8 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
   if (key_value_store_ && original_size != protocols.size()) {
-    key_value_store_->addOrUpdate(
-        originToString(origin),
-        originDataToStringForCache(entry_it->second.protocols, entry_it->second.srtt));
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  originDataToStringForCache(protocols, entry_it->second.srtt));
   }
 
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));

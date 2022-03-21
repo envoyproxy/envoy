@@ -31,19 +31,6 @@ private:
     Confirmed,
   };
 
-  std::string stateToString(State s) {
-    switch (s) {
-    case State::Pending:
-      return "Pending";
-    case State::Broken:
-      return "Broken";
-    case State::Confirmed:
-      return "Confirmed";
-    }
-    IS_ENVOY_BUG("Unexpected HTTP3 status");
-    return "";
-  }
-
   // Called when the expiration timer fires.
   void onExpirationTimeout();
 
