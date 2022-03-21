@@ -31,8 +31,6 @@ message AccessLog {
   reserved "config";
 
   // The name of the access log extension configuration.
-  // Note: the name is free-form unless the rest of the configuration is
-  // omitted, in which case it must be the same as the extension name.
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.
