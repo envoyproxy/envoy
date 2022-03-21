@@ -55,7 +55,7 @@ Example of the default Envoy access log format:
   "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
 
 For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`, some :ref:`command operators <config_access_log_command_operators>`
-are reused to record stats. Recommended access log format for udp proxy:
+are reused to record stats. Recommended access log format for UDP proxy:
 
 .. code-block:: none
 
@@ -144,7 +144,7 @@ The following command operators are supported:
     Downstream connection start time including milliseconds.
 
   UDP
-    UDP proxy start time including milliseconds.
+    UDP proxy session start time including milliseconds.
 
   START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   In addition to that, START_TIME also accepts following specifiers:

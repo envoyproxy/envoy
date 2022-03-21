@@ -91,6 +91,6 @@ message UdpProxyConfig {
   bool use_per_packet_load_balancing = 7;
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
-  // emitted by the this udp_proxy.
+  // emitted by the udp_proxy.
   repeated config.accesslog.v3.AccessLog access_log = 8;
 }
