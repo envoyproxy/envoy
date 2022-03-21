@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
@@ -56,13 +57,15 @@ DEFINE_PROTO_FUZZER(
   // default time system in GlobalTimeSystem.
   dispatcher.time_system_ = std::make_unique<Event::SimulatedTimeSystem>();
   Stats::IsolatedStoreImpl stats_store;
+  Singleton::ManagerImpl singleton_manager(Thread::threadFactoryForTest());
   static NiceMock<Runtime::MockLoader> runtime;
   Event::MockTimer* fill_timer = new Event::MockTimer(&dispatcher);
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
       input.config();
   ConfigSharedPtr config = nullptr;
   try {
-    config = std::make_shared<Config>(proto_config, dispatcher, stats_store, runtime);
+    config =
+        std::make_shared<Config>(proto_config, dispatcher, stats_store, runtime, singleton_manager);
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;

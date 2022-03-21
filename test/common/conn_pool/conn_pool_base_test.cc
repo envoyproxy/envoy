@@ -139,14 +139,14 @@ public:
     EXPECT_CALL(pool_, instantiateActiveClient);
     pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
     ASSERT_EQ(1, clients_.size());
-    EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+    EXPECT_EQ(ActiveClient::State::Connecting, clients_.back()->state());
 
     // Verify that the connection duration timer isn't set yet. This shouldn't happen
     // until after connect.
     EXPECT_EQ(nullptr, clients_.back()->connection_duration_timer_);
   }
 
-  void newActiveClientAndStream(ActiveClient::State expected_state = ActiveClient::State::BUSY) {
+  void newActiveClientAndStream(ActiveClient::State expected_state = ActiveClient::State::Busy) {
     // Start with a connecting client
     newConnectingClient();
 
@@ -167,7 +167,7 @@ public:
   void newDrainingClient() {
     // Use a stream limit of 1 to force draining. Then, connect and expect draining.
     stream_limit_ = 1;
-    newActiveClientAndStream(ActiveClient::State::DRAINING);
+    newActiveClientAndStream(ActiveClient::State::Draining);
   }
 
   void newClosedClient() {
@@ -192,7 +192,7 @@ public:
   void closeStreamAndDrainClient() {
     // Close the active stream and expect the client to be ready.
     closeStream();
-    EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+    EXPECT_EQ(ActiveClient::State::Ready, clients_.back()->state());
 
     // The client is still ready. So, to clean up, we have to drain the pool manually.
     pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
@@ -348,13 +348,13 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   // connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
   EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
-  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::Busy, clients_.back()->state());
 
   // Verify that advancing past the connection duration timeout drains the connection,
   // because there's a busy client.
   advanceTimeAndRun(2);
   EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
-  EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::Draining, clients_.back()->state());
   closeStream();
 }
 
@@ -363,13 +363,13 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
 
   // Close active stream and expect that the client goes back to ready
   closeStream();
-  EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::Ready, clients_.back()->state());
 
   // Verify that advancing to just before the connection duration timeout doesn't close the
   // connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
   EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
-  EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::Ready, clients_.back()->state());
 
   // Verify that advancing past the connection duration timeout closes the connection,
   // because there's nothing to drain.
@@ -385,7 +385,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
   // that is already draining.
   advanceTimeAndRun(max_connection_duration_ + 1);
   EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
-  EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::Draining, clients_.back()->state());
   closeStream();
 }
 
@@ -403,7 +403,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileClosedB
   // Start with a connecting client
   newClosedClient();
 
-  // Expect an ENVOY_BUG if the connection duration callback fires while in the CLOSED state.
+  // Expect an ENVOY_BUG if the connection duration callback fires while in the Closed state.
   // We forcibly call the connection duration callback here because under normal circumstances there
   // is no timer set up.
   EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(),
@@ -414,7 +414,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileConnect
   // Start with a connecting client
   newConnectingClient();
 
-  // Expect an ENVOY_BUG if the connection duration callback fires while still in the CONNECTING
+  // Expect an ENVOY_BUG if the connection duration callback fires while still in the Connecting
   // state. We forcibly call the connection duration callback here because under normal
   // circumstances there is no timer set up.
   EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(),
@@ -437,7 +437,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
   // onPoolReady, and the client is marked as busy.
   EXPECT_CALL(pool_, onPoolReady).Times(0);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
-  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+  EXPECT_EQ(ActiveClient::State::Busy, clients_.back()->state());
 
   // Clean up.
   EXPECT_CALL(pool_, instantiateActiveClient);

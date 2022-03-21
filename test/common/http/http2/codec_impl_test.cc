@@ -136,12 +136,11 @@ public:
   }
 
   virtual void initialize() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.http2_new_codec_wrapper",
-          enable_new_codec_wrapper_ ? "true" : "false"}});
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{std::string(Runtime::defer_processing_backedup_streams),
-          defer_processing_backedup_streams_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper",
+                                  enable_new_codec_wrapper_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
+                                  defer_processing_backedup_streams_ ? "true" : "false"}});
+
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -378,7 +377,8 @@ protected:
     initialize();
 
     TestRequestHeaderMapImpl request_headers;
-    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    request_headers.setMethod("POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
     driveToCompletion();
@@ -433,7 +433,8 @@ protected:
     initialize();
 
     TestRequestHeaderMapImpl request_headers;
-    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    request_headers.setMethod("POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
     driveToCompletion();
@@ -3599,12 +3600,10 @@ public:
 
 protected:
   void initialize() override {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.http2_new_codec_wrapper",
-          enable_new_codec_wrapper_ ? "true" : "false"}});
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{std::string(Runtime::defer_processing_backedup_streams),
-          defer_processing_backedup_streams_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper",
+                                  enable_new_codec_wrapper_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
+                                  defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
