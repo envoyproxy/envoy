@@ -1470,7 +1470,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   for (const auto& header_value : downstream_set_cookies_) {
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
-  
+
   callbacks_->streamInfo().setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
