@@ -96,24 +96,6 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_iovec_impl_lib",
-    hdrs = [
-        "quiche_iovec_impl.h",
-    ],
-    external_deps = [
-        "abseil_base",
-        "abseil_hash",
-        "abseil_inlined_vector",
-        "abseil_memory",
-        "abseil_node_hash_map",
-        "abseil_node_hash_set",
-    ],
-    tags = ["nofips"],
-    deps = [
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quiche_platform_hostname_utils_impl_lib",
     srcs = [
         "quiche_hostname_utils_impl.cc",
@@ -129,17 +111,6 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_stream_buffer_allocator_impl_lib",
-    hdrs = [
-        "quiche_stream_buffer_allocator_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
     ],
 )
 

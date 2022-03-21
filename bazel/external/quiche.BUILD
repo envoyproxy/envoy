@@ -2329,8 +2329,8 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quiche_common_iovec",
         ":quiche_common_platform_export",
-        ":quiche_common_platform_iovec",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
         "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
@@ -4249,9 +4249,9 @@ envoy_quiche_platform_impl_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "quiche_common_platform_iovec",
+    name = "quiche_common_iovec",
     hdrs = [
-        "quiche/common/platform/api/quiche_iovec.h",
+        "quiche/common/quiche_iovec.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
@@ -4259,7 +4259,6 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib",
     ],
 )
 
@@ -4398,7 +4397,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_stream_buffer_allocator_impl_lib",
+	":quiche_common_platform_stream_buffer_allocator_impl",
     ],
 )
 
@@ -4503,6 +4502,16 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_containers_impl",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
+    ],
+    deps = [
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_stream_buffer_allocator_impl",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_stream_buffer_allocator_impl.h",
     ],
     deps = [
         ":quiche_common_platform_export",
@@ -4623,8 +4632,8 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quiche_common_iovec",
         ":quiche_common_platform",
-        ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
         "@envoy//test/common/quic/platform:quiche_common_platform_test_impl_lib",
     ],
