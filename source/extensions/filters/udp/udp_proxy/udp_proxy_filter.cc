@@ -75,28 +75,33 @@ UdpProxyFilter::~UdpProxyFilter() {
 }
 
 void UdpProxyFilter::fillStreamInfo() {
-  udp_sess_stats_.value().addBytesSent(config_->stats().downstream_sess_tx_bytes_.value());
-  udp_sess_stats_.value().addBytesReceived(config_->stats().downstream_sess_rx_bytes_.value());
-
-  auto downstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
-  downstream_bytes_meter->addHeaderBytesSent(config_->stats().downstream_sess_tx_errors_.value());
-  downstream_bytes_meter->addHeaderBytesReceived(
-      config_->stats().downstream_sess_rx_errors_.value());
-  downstream_bytes_meter->addWireBytesSent(config_->stats().downstream_sess_tx_datagrams_.value());
-  downstream_bytes_meter->addWireBytesReceived(
-      config_->stats().downstream_sess_rx_datagrams_.value());
-  udp_sess_stats_.value().setDownstreamBytesMeter(downstream_bytes_meter);
-
-  auto upstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
-  upstream_bytes_meter->addHeaderBytesSent(config_->stats().downstream_sess_total_.value());
-  upstream_bytes_meter->addHeaderBytesReceived(config_->stats().idle_timeout_.value());
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
   if (cluster_info_.has_value()) {
-    udp_sess_stats_.value().setRouteName(cluster_info_.value()->cluster_.info()->name());
-    upstream_bytes_meter->addWireBytesSent(
+    fields_map["cluster_name"] =
+        ValueUtil::stringValue(cluster_info_.value()->cluster_.info()->name());
+    fields_map["none_healthy"] = ValueUtil::numberValue(
         cluster_info_.value()->cluster_.info()->stats().upstream_cx_none_healthy_.value());
   }
-  upstream_bytes_meter->addWireBytesReceived(config_->stats().downstream_sess_no_route_.value());
-  udp_sess_stats_.value().setUpstreamBytesMeter(upstream_bytes_meter);
+  fields_map["bytes_sent"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_tx_bytes_.value());
+  fields_map["bytes_received"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_rx_bytes_.value());
+  fields_map["errors_sent"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_tx_errors_.value());
+  fields_map["errors_received"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_rx_errors_.value());
+  fields_map["datagrams_sent"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_tx_datagrams_.value());
+  fields_map["datagrams_received"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_rx_datagrams_.value());
+
+  fields_map["sess_total"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_total_.value());
+  fields_map["idle_timeout"] = ValueUtil::numberValue(config_->stats().idle_timeout_.value());
+  fields_map["no_route"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_no_route_.value());
+  udp_sess_stats_.value().setDynamicMetadata("udp.proxy", stats_obj);
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,

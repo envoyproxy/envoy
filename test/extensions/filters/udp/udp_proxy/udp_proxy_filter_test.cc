@@ -363,9 +363,11 @@ public:
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
-  const std::string access_log_format = "%BYTES_RECEIVED% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-                                        "%BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_SENT% "
-                                        "%UPSTREAM_HEADER_BYTES_SENT%";
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:sess_total)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -405,8 +407,8 @@ upstream_socket_config:
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
 
-  const std::string access_log_format =
-      "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%";
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:sess_total)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:idle_timeout)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -438,11 +440,14 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
   InSequence s;
 
-  const std::string access_log_format =
-      "%BYTES_SENT% %BYTES_RECEIVED% "
-      "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED% "
-      "%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-      "%UPSTREAM_HEADER_BYTES_SENT% %ROUTE_NAME%";
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:cluster_name)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:errors_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:errors_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:sess_total)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -488,14 +493,14 @@ cluster: fake_cluster
              ->value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "0 10 1 1 0 2 1 fake_cluster");
+  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 10 1 1 0 2 1");
 }
 
 // No upstream host handling.
 TEST_F(UdpProxyFilterTest, NoUpstreamHost) {
   InSequence s;
 
-  const std::string access_log_format = "%UPSTREAM_WIRE_BYTES_SENT%";
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:none_healthy)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -516,7 +521,7 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
   InSequence s;
 
-  const std::string access_log_format = "%UPSTREAM_WIRE_BYTES_RECEIVED%";
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:no_route)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -536,8 +541,8 @@ cluster: fake_cluster
 TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
   InSequence s;
 
-  const std::string access_log_format =
-      "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED%";
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:sess_total)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:no_route)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
