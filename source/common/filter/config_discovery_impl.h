@@ -74,7 +74,7 @@ public:
                                   ProtobufTypes::MessagePtr&& default_config,
                                   bool last_filter_in_filter_chain,
                                   const std::string& filter_chain_type,
-                                  const std::string& stat_prefix)
+                                  absl::string_view stat_prefix)
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
                                             last_filter_in_filter_chain, filter_chain_type),
         stat_prefix_(stat_prefix), factory_context_(factory_context),
@@ -230,7 +230,6 @@ private:
   bool started_{false};
 
   Stats::ScopePtr scope_;
-  const std::string stat_prefix_;
   ExtensionConfigDiscoveryStats stats_;
 
   // FilterConfigProviderManagerImplBase maintains active subscriptions in a map.
@@ -300,8 +299,20 @@ public:
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type) override {
+    std::string subscription_stat_prefix;
+    absl::string_view provider_stat_prefix;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.top_level_ecds_stats")) {
+      subscription_stat_prefix =
+          absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
+      provider_stat_prefix = subscription_stat_prefix;
+    } else {
+      subscription_stat_prefix =
+          absl::StrCat(stat_prefix, "extension_config_discovery.", filter_config_name, ".");
+      provider_stat_prefix = stat_prefix;
+    }
+
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
-                                        factory_context, stat_prefix);
+                                        factory_context, subscription_stat_prefix);
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
@@ -323,7 +334,7 @@ public:
 
     auto provider = std::make_unique<DynamicFilterConfigProviderImpl<Factory, FactoryCb>>(
         subscription, require_type_urls, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, stat_prefix);
+        last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
@@ -338,6 +349,8 @@ public:
                                    const std::string& filter_config_name) override {
     return std::make_unique<StaticFilterConfigProviderImpl<FactoryCb>>(config, filter_config_name);
   }
+
+  absl::string_view statPrefix() const override PURE;
 
 protected:
   virtual ProtobufTypes::MessagePtr
@@ -354,6 +367,8 @@ public:
   std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
              Server::Configuration::ServerFactoryContext& factory_context) const override;
+
+  absl::string_view statPrefix() const override;
 
 protected:
   ProtobufTypes::MessagePtr
