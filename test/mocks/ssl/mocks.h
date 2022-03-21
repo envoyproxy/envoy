@@ -62,6 +62,7 @@ public:
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
   MOCK_METHOD(const std::string&, alpn, (), (const));
+  MOCK_METHOD(const std::string&, sni, (), (const));
 };
 
 class MockClientContext : public ClientContext {
