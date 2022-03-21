@@ -22,13 +22,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message RingHash {
   // The hash function used to hash hosts onto the ketama ring.
   enum HashFunction {
-    // Use `xxHash <https://github.com/Cyan4973/xxHash>`_, this is the default hash function.
-    XX_HASH = 0;
+    // Currently defaults to XX_HASH.
+    DEFAULT_HASH = 0;
+
+    // Use `xxHash <https://github.com/Cyan4973/xxHash>`_.
+    XX_HASH = 1;
 
     // Use `MurmurHash2 <https://sites.google.com/site/murmurhash/>`_, this is compatible with
     // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
     // on Linux and not macOS.
-    MURMUR_HASH_2 = 1;
+    MURMUR_HASH_2 = 2;
   }
 
   // The hash function used to hash hosts onto the ketama ring. The value defaults to
