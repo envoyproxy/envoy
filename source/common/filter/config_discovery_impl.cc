@@ -61,7 +61,7 @@ const std::string& DynamicFilterConfigProviderImplBase::name() { return subscrip
 FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name,
-    Server::Configuration::ServerFactoryContext& factory_context, absl::string_view stat_prefix,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     FilterConfigProviderManagerImplBase& filter_config_provider_manager,
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
@@ -69,9 +69,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
-      scope_(factory_context.scope().createScope(
-          absl::StrCat(stat_prefix, "extension_config_discovery.", filter_config_name_, "."))),
-      stat_prefix_(stat_prefix),
+      scope_(factory_context.scope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
@@ -180,7 +178,7 @@ void FilterConfigSubscription::incrementConflictCounter() { stats_.config_confli
 
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-    Server::Configuration::FactoryContext& factory_context, absl::string_view stat_prefix) {
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
   // FilterConfigSubscriptions are unique based on their config source and filter config name
   // combination.
   // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription
