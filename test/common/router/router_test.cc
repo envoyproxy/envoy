@@ -1144,7 +1144,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
 
 TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats",
         "false"}});
 
@@ -4324,7 +4324,7 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
 
 TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
   enableRedirects();
   default_request_headers_.setForwardedProto("http");
@@ -5914,7 +5914,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
 
 TEST_F(RouterTest, ExpectedUpstreamTimeoutNotUpdatedDuringRetriesWhenRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.update_expected_rq_timeout_on_retry", "false"}});
 
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
@@ -6170,8 +6170,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
 
   auto override_host = router_.overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host->first);
-  EXPECT_EQ(~static_cast<uint32_t>(0), override_host->second);
+  EXPECT_EQ("1.2.3.4", override_host.value());
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

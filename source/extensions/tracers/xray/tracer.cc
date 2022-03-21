@@ -71,7 +71,9 @@ void Span::finishSpan() {
   s.set_error(clientError());
   s.set_fault(serverError());
   s.set_throttle(isThrottled());
-
+  if (type() == Subsegment) {
+    s.set_type(std::string(Subsegment));
+  }
   auto* aws = s.mutable_aws()->mutable_fields();
   for (const auto& field : aws_metadata_) {
     aws->insert({field.first, field.second});
@@ -108,13 +110,14 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
                                   Envoy::SystemTime start_time) {
   auto child_span = std::make_unique<XRay::Span>(time_source_, random_, broker_);
-  child_span->setName(name());
+  child_span->setName(operation_name);
   child_span->setOperation(operation_name);
   child_span->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
   child_span->setStartTime(start_time);
   child_span->setParentId(id());
   child_span->setTraceId(traceId());
   child_span->setSampled(sampled());
+  child_span->setType(Subsegment);
   return child_span;
 }
 
@@ -132,7 +135,8 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   span_ptr->setOrigin(origin_);
   span_ptr->setAwsMetadata(aws_metadata_);
 
-  if (xray_header) { // there's a previous span that this span should be based-on
+  if (xray_header) {
+    // There's a previous span that this span should be based-on.
     span_ptr->setParentId(xray_header->parent_id_);
     span_ptr->setTraceId(xray_header->trace_id_);
     switch (xray_header->sample_decision_) {
@@ -151,12 +155,26 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   return span_ptr;
 }
 
-XRay::SpanPtr Tracer::createNonSampledSpan() const {
+XRay::SpanPtr Tracer::createNonSampledSpan(const Tracing::Config& config,
+                                           const std::string& operation_name,
+                                           Envoy::SystemTime start_time,
+                                           const absl::optional<XRayHeader>& xray_header) const {
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
+  span_ptr->setOperation(operation_name);
+  span_ptr->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
+  // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
+  // more precise value than calling the systemTime() at this point in time.
+  span_ptr->setStartTime(start_time);
   span_ptr->setOrigin(origin_);
-  span_ptr->setTraceId(generateTraceId(time_source_.systemTime(), random_));
   span_ptr->setAwsMetadata(aws_metadata_);
+  if (xray_header) {
+    // There's a previous span that this span should be based-on.
+    span_ptr->setParentId(xray_header->parent_id_);
+    span_ptr->setTraceId(xray_header->trace_id_);
+  } else {
+    span_ptr->setTraceId(generateTraceId(time_source_.systemTime(), random_));
+  }
   span_ptr->setSampled(false);
   return span_ptr;
 }

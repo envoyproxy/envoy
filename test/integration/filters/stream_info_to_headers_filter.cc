@@ -43,8 +43,16 @@ public:
             Http::LowerCaseString("alpn"),
             decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
       }
+
       headers.addCopy(Http::LowerCaseString("num_streams"),
                       decoder_callbacks_->streamInfo().upstreamInfo()->upstreamNumStreams());
+
+      const auto maybe_local_interface_name =
+          decoder_callbacks_->streamInfo().upstreamInfo()->upstreamInterfaceName();
+      if (maybe_local_interface_name.has_value()) {
+        headers.addCopy(Http::LowerCaseString("local_interface_name"),
+                        maybe_local_interface_name.value());
+      }
 
       StreamInfo::UpstreamTiming& upstream_timing =
           decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming();

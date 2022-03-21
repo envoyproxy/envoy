@@ -5,7 +5,6 @@
 #include <string>
 
 #include "source/common/http/codec_client.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
@@ -46,7 +45,7 @@ public:
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-  startRequest(const Http::RequestHeaderMap& headers);
+  startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
   waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
   Network::ClientConnection* connection() const { return connection_.get(); }
@@ -222,7 +221,6 @@ protected:
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
                                               const std::string& authority = "host");
-  void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();
@@ -298,6 +296,7 @@ protected:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
+  bool enable_quic_early_data_{true};
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

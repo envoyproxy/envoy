@@ -114,7 +114,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
               context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
               context.localInfo(), context.mainThreadDispatcher(), context.stats(),
               context.singletonManager(), context.threadLocal(), context.messageValidationVisitor(),
-              context.api(), context.options());
+              context.api(), context.options(), context.logManager());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, *transport_factory_context, std::move(stats_scope));

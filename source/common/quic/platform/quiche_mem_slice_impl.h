@@ -12,7 +12,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
-#include "quiche/quic/core/quic_buffer_allocator.h"
+#include "quiche/common/quiche_buffer_allocator.h"
 
 namespace quiche {
 
@@ -26,7 +26,7 @@ public:
   ~QuicheMemSliceImpl();
 
   // Constructs a QuicheMemSliceImpl by taking ownership of the memory in |buffer|.
-  QuicheMemSliceImpl(quic::QuicUniqueBufferPtr buffer, size_t length);
+  QuicheMemSliceImpl(quiche::QuicheBuffer buffer);
   QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
 
   // Constructs a QuicheMemSliceImpl from a Buffer::Instance with first |length| bytes in it.

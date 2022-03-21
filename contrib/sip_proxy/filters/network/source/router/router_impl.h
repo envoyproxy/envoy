@@ -333,7 +333,6 @@ public:
     UNREFERENCED_PARAMETER(metadata);
     return *this;
   }
-  absl::string_view getLocalIp() override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -379,14 +378,6 @@ public:
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
   void write(Buffer::Instance& data, bool end_stream) {
     return conn_data_->connection().write(data, end_stream);
-  }
-
-  absl::string_view localAddress() {
-    return conn_data_->connection()
-        .connectionInfoProvider()
-        .localAddress()
-        ->ip()
-        ->addressAsString();
   }
 
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
