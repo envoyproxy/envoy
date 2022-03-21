@@ -179,6 +179,9 @@ static const char *method_strings[] =
   };
 
 
+#define PERMISSIVE_PARSING() (settings && settings->permissive_parsing)
+
+
 /* Tokens as defined by rfc 2616. Also lowercases them.
  *        token       = 1*<any CHAR except CTLs or separators>
  *     separators     = "(" | ")" | "<" | ">" | "@"
@@ -233,18 +236,11 @@ static const int8_t unhex[256] =
   };
 
 
-#if HTTP_PARSER_STRICT
-# define T(v) 0
-#else
-# define T(v) v
-#endif
-
-
 static const uint8_t normal_url_char[32] = {
 /*   0 nul    1 soh    2 stx    3 etx    4 eot    5 enq    6 ack    7 bel  */
         0    |   0    |   0    |   0    |   0    |   0    |   0    |   0,
 /*   8 bs     9 ht    10 nl    11 vt    12 np    13 cr    14 so    15 si   */
-        0    | T(2)   |   0    |   0    | T(16)  |   0    |   0    |   0,
+        0    |   0    |   0    |   0    |   0    |   0    |   0    |   0,
 /*  16 dle   17 dc1   18 dc2   19 dc3   20 dc4   21 nak   22 syn   23 etb */
         0    |   0    |   0    |   0    |   0    |   0    |   0    |   0,
 /*  24 can   25 em    26 sub   27 esc   28 fs    29 gs    30 rs    31 us  */
@@ -429,18 +425,9 @@ enum http_host_state
   (c) == '$' || (c) == ',')
 
 #define STRICT_TOKEN(c)     ((c == ' ') ? 0 : tokens[(unsigned char)c])
-
-#if HTTP_PARSER_STRICT
-#define TOKEN(c)            STRICT_TOKEN(c)
 #define IS_URL_CHAR(c)      (BIT_AT(normal_url_char, (unsigned char)c))
 #define IS_HOST_CHAR(c)     (IS_ALPHANUM(c) || (c) == '.' || (c) == '-')
-#else
-#define TOKEN(c)            tokens[(unsigned char)c]
-#define IS_URL_CHAR(c)                                                         \
-  (BIT_AT(normal_url_char, (unsigned char)c) || ((c) & 0x80))
-#define IS_HOST_CHAR(c)                                                        \
-  (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '_')
-#endif
+#define TOKEN(c, permissive) ((c == ' ' && !permissive) ? 0 : tokens[(unsigned char)c])
 
 /**
  * Verify that a char is a valid visible (printable) US-ASCII
@@ -451,21 +438,15 @@ enum http_host_state
 
 #define start_state (parser->type == HTTP_REQUEST ? s_start_req : s_start_res)
 
-
-#if HTTP_PARSER_STRICT
-# define STRICT_CHECK(cond)                                          \
+# define STRICT_CHECK(cond, permissive)                                          \
 do {                                                                 \
-  if (cond) {                                                        \
+  if ((cond) && !permissive) {                       \
     SET_ERRNO(HPE_STRICT);                                           \
     goto error;                                                      \
   }                                                                  \
 } while (0)
-# define NEW_MESSAGE() (http_should_keep_alive(parser) ? start_state : s_dead)
-#else
-# define STRICT_CHECK(cond)
-# define NEW_MESSAGE() start_state
-#endif
 
+# define NEW_MESSAGE(permissive) (http_should_keep_alive(parser) || permissive ? start_state : s_dead)
 
 /* Map errno values to strings for human-readable output */
 #define HTTP_STRERROR_GEN(n, s) { "HPE_" #n, s },
@@ -491,17 +472,15 @@ int http_message_needs_eof(const http_parser *parser);
  * URL and non-URL states by looking for these.
  */
 static enum state
-parse_url_char(enum state s, const char ch)
+parse_url_char(enum state s, const char ch, int permissive)
 {
   if (ch == ' ' || ch == '\r' || ch == '\n') {
     return s_dead;
   }
 
-#if HTTP_PARSER_STRICT
-  if (ch == '\t' || ch == '\f') {
+  if (!permissive && (ch == '\t' || ch == '\f')) {
     return s_dead;
   }
-#endif
 
   switch (s) {
     case s_req_spaces_before_url:
@@ -571,7 +550,7 @@ parse_url_char(enum state s, const char ch)
       break;
 
     case s_req_path:
-      if (IS_URL_CHAR(ch)) {
+      if (IS_URL_CHAR(ch) || (permissive && (ch & 0x80))) {
         return s;
       }
 
@@ -656,6 +635,8 @@ size_t http_parser_execute (http_parser *parser,
   const unsigned int allow_chunked_length = parser->allow_chunked_length;
 
   uint32_t nread = parser->nread;
+
+  const int permissive = settings ? settings->permissive_parsing : 0;
 
   /* We're in an error state. Don't bother doing anything. */
   if (HTTP_PARSER_ERRNO(parser) != HPE_OK) {
@@ -786,22 +767,22 @@ reexecute:
       }
 
       case s_res_H:
-        STRICT_CHECK(ch != 'T');
+        STRICT_CHECK(ch != 'T', permissive);
         UPDATE_STATE(s_res_HT);
         break;
 
       case s_res_HT:
-        STRICT_CHECK(ch != 'T');
+        STRICT_CHECK(ch != 'T', permissive);
         UPDATE_STATE(s_res_HTT);
         break;
 
       case s_res_HTT:
-        STRICT_CHECK(ch != 'P');
+        STRICT_CHECK(ch != 'P', permissive);
         UPDATE_STATE(s_res_HTTP);
         break;
 
       case s_res_HTTP:
-        STRICT_CHECK(ch != '/');
+        STRICT_CHECK(ch != '/', permissive);
         UPDATE_STATE(s_res_http_major);
         break;
 
@@ -920,7 +901,7 @@ reexecute:
         break;
 
       case s_res_line_almost_done:
-        STRICT_CHECK(ch != LF);
+        STRICT_CHECK(ch != LF, permissive);
         UPDATE_STATE(s_header_field_start);
         break;
 
@@ -1030,7 +1011,7 @@ reexecute:
           UPDATE_STATE(s_req_server_start);
         }
 
-        UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch));
+        UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch, permissive));
         if (UNLIKELY(CURRENT_STATE() == s_dead)) {
           SET_ERRNO(HPE_INVALID_URL);
           goto error;
@@ -1052,7 +1033,7 @@ reexecute:
             SET_ERRNO(HPE_INVALID_URL);
             goto error;
           default:
-            UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch));
+            UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch, permissive));
             if (UNLIKELY(CURRENT_STATE() == s_dead)) {
               SET_ERRNO(HPE_INVALID_URL);
               goto error;
@@ -1085,7 +1066,7 @@ reexecute:
             CALLBACK_DATA(url);
             break;
           default:
-            UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch));
+            UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch, permissive));
             if (UNLIKELY(CURRENT_STATE() == s_dead)) {
               SET_ERRNO(HPE_INVALID_URL);
               goto error;
@@ -1114,32 +1095,32 @@ reexecute:
         break;
 
       case s_req_http_H:
-        STRICT_CHECK(ch != 'T');
+        STRICT_CHECK(ch != 'T', permissive);
         UPDATE_STATE(s_req_http_HT);
         break;
 
       case s_req_http_HT:
-        STRICT_CHECK(ch != 'T');
+        STRICT_CHECK(ch != 'T', permissive);
         UPDATE_STATE(s_req_http_HTT);
         break;
 
       case s_req_http_HTT:
-        STRICT_CHECK(ch != 'P');
+        STRICT_CHECK(ch != 'P', permissive);
         UPDATE_STATE(s_req_http_HTTP);
         break;
 
       case s_req_http_I:
-        STRICT_CHECK(ch != 'C');
+        STRICT_CHECK(ch != 'C', permissive);
         UPDATE_STATE(s_req_http_IC);
         break;
 
       case s_req_http_IC:
-        STRICT_CHECK(ch != 'E');
+        STRICT_CHECK(ch != 'E', permissive);
         UPDATE_STATE(s_req_http_HTTP);  /* Treat "ICE" as "HTTP". */
         break;
 
       case s_req_http_HTTP:
-        STRICT_CHECK(ch != '/');
+        STRICT_CHECK(ch != '/', permissive);
         UPDATE_STATE(s_req_http_major);
         break;
 
@@ -1217,7 +1198,7 @@ reexecute:
           REEXECUTE();
         }
 
-        c = TOKEN(ch);
+        c = TOKEN(ch, permissive);
 
         if (UNLIKELY(!c)) {
           SET_ERRNO(HPE_INVALID_HEADER_TOKEN);
@@ -1258,7 +1239,7 @@ reexecute:
         const char* start = p;
         for (; p != data + len; p++) {
           ch = *p;
-          c = TOKEN(ch);
+          c = TOKEN(ch, permissive);
 
           if (!c)
             break;
@@ -1267,7 +1248,7 @@ reexecute:
             case h_general: {
               size_t left = data + len - p;
               const char* pe = p + MIN(left, max_header_size);
-              while (p+1 < pe && TOKEN(p[1])) {
+              while (p+1 < pe && TOKEN(p[1], permissive)) {
                 p++;
               }
               break;
@@ -1751,7 +1732,7 @@ reexecute:
 
       case s_header_value_discard_ws_almost_done:
       {
-        STRICT_CHECK(ch != LF);
+        STRICT_CHECK(ch != LF, permissive);
         UPDATE_STATE(s_header_value_discard_lws);
         break;
       }
@@ -1794,7 +1775,7 @@ reexecute:
 
       case s_headers_almost_done:
       {
-        STRICT_CHECK(ch != LF);
+        STRICT_CHECK(ch != LF, permissive);
 
         if (parser->flags & F_TRAILING) {
           /* End of a chunked request */
@@ -1874,7 +1855,7 @@ reexecute:
       case s_headers_done:
       {
         int hasBody;
-        STRICT_CHECK(ch != LF);
+        STRICT_CHECK(ch != LF, permissive);
 
         parser->nread = 0;
         nread = 0;
@@ -1884,13 +1865,13 @@ reexecute:
         if (parser->upgrade && (parser->method == HTTP_CONNECT ||
                                 (parser->flags & F_SKIPBODY) || !hasBody)) {
           /* Exit, the rest of the message is in a different protocol. */
-          UPDATE_STATE(NEW_MESSAGE());
+          UPDATE_STATE(NEW_MESSAGE(permissive));
           CALLBACK_NOTIFY(message_complete);
           RETURN((p - data) + 1);
         }
 
         if (parser->flags & F_SKIPBODY) {
-          UPDATE_STATE(NEW_MESSAGE());
+          UPDATE_STATE(NEW_MESSAGE(permissive));
           CALLBACK_NOTIFY(message_complete);
         } else if (parser->flags & F_CHUNKED) {
           /* chunked encoding - ignore Content-Length header,
@@ -1921,7 +1902,7 @@ reexecute:
         } else {
           if (parser->content_length == 0) {
             /* Content-Length header given but zero: Content-Length: 0\r\n */
-            UPDATE_STATE(NEW_MESSAGE());
+            UPDATE_STATE(NEW_MESSAGE(permissive));
             CALLBACK_NOTIFY(message_complete);
           } else if (parser->content_length != ULLONG_MAX) {
             /* Content-Length header given and non-zero */
@@ -1929,7 +1910,7 @@ reexecute:
           } else {
             if (!http_message_needs_eof(parser)) {
               /* Assume content-length 0 - read the next */
-              UPDATE_STATE(NEW_MESSAGE());
+              UPDATE_STATE(NEW_MESSAGE(permissive));
               CALLBACK_NOTIFY(message_complete);
             } else {
               /* Read body until EOF */
@@ -1985,7 +1966,7 @@ reexecute:
         break;
 
       case s_message_done:
-        UPDATE_STATE(NEW_MESSAGE());
+        UPDATE_STATE(NEW_MESSAGE(permissive));
         CALLBACK_NOTIFY(message_complete);
         if (parser->upgrade) {
           /* Exit, the rest of the message is in a different protocol. */
@@ -2060,7 +2041,7 @@ reexecute:
       case s_chunk_size_almost_done:
       {
         assert(parser->flags & F_CHUNKED);
-        STRICT_CHECK(ch != LF);
+        STRICT_CHECK(ch != LF, permissive);
 
         parser->nread = 0;
         nread = 0;
@@ -2101,14 +2082,14 @@ reexecute:
       case s_chunk_data_almost_done:
         assert(parser->flags & F_CHUNKED);
         assert(parser->content_length == 0);
-        STRICT_CHECK(ch != CR);
+        STRICT_CHECK(ch != CR, permissive);
         UPDATE_STATE(s_chunk_data_done);
         CALLBACK_DATA(body);
         break;
 
       case s_chunk_data_done:
         assert(parser->flags & F_CHUNKED);
-        STRICT_CHECK(ch != LF);
+        STRICT_CHECK(ch != LF, permissive);
         parser->nread = 0;
         nread = 0;
         UPDATE_STATE(s_chunk_size_start);
@@ -2251,7 +2232,7 @@ http_errno_description(enum http_errno err) {
 }
 
 static enum http_host_state
-http_parse_host_char(enum http_host_state s, const char ch) {
+http_parse_host_char(enum http_host_state s, const char ch, int permissive) {
   switch(s) {
     case s_http_userinfo:
     case s_http_userinfo_start:
@@ -2269,14 +2250,14 @@ http_parse_host_char(enum http_host_state s, const char ch) {
         return s_http_host_v6_start;
       }
 
-      if (IS_HOST_CHAR(ch)) {
+      if (IS_HOST_CHAR(ch) || (permissive && (ch == '_'))) {
         return s_http_host;
       }
 
       break;
 
     case s_http_host:
-      if (IS_HOST_CHAR(ch)) {
+      if (IS_HOST_CHAR(ch) || (permissive && (ch == '_'))) {
         return s_http_host;
       }
 
@@ -2333,7 +2314,7 @@ http_parse_host_char(enum http_host_state s, const char ch) {
 }
 
 static int
-http_parse_host(const char * buf, struct http_parser_url *u, int found_at) {
+http_parse_host(const char * buf, struct http_parser_url *u, int found_at, int permissive) {
   enum http_host_state s;
 
   const char *p;
@@ -2346,7 +2327,7 @@ http_parse_host(const char * buf, struct http_parser_url *u, int found_at) {
   s = found_at ? s_http_userinfo_start : s_http_host_start;
 
   for (p = buf + u->field_data[UF_HOST].off; p < buf + buflen; p++) {
-    enum http_host_state new_s = http_parse_host_char(s, *p);
+    enum http_host_state new_s = http_parse_host_char(s, *p, permissive);
 
     if (new_s == s_http_host_dead) {
       return 1;
@@ -2421,7 +2402,7 @@ http_parser_url_init(struct http_parser_url *u) {
 
 int
 http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
-                      struct http_parser_url *u)
+                      struct http_parser_url *u, int permissive)
 {
   enum state s;
   const char *p;
@@ -2437,7 +2418,7 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
   old_uf = UF_MAX;
 
   for (p = buf; p < buf + buflen; p++) {
-    s = parse_url_char(s, *p);
+    s = parse_url_char(s, *p, permissive);
 
     /* Figure out the next field that we're operating on */
     switch (s) {
@@ -2502,7 +2483,7 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
   }
 
   if (u->field_set & (1 << UF_HOST)) {
-    if (http_parse_host(buf, u, found_at) != 0) {
+    if (http_parse_host(buf, u, found_at, permissive) != 0) {
       return 1;
     }
   }
