@@ -833,6 +833,7 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
 void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   switch (event) {
   case ConnectionEvent::ConnectedZeroRtt:
+    // The transport socket is still connecting, so skip changing connect state.
     break;
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
