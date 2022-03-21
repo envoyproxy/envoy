@@ -4,6 +4,7 @@
 
 #include "source/common/secret/secret_manager_impl.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
@@ -37,6 +38,7 @@ public:
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
@@ -45,6 +47,7 @@ public:
   testing::NiceMock<Stats::MockStore> store_;
   testing::NiceMock<Server::MockOptions> options_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 } // namespace Configuration
 } // namespace Server

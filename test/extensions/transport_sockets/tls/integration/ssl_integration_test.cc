@@ -41,7 +41,11 @@ void SslIntegrationTestBase::initialize() {
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
-                                  .setExpectClientEcdsaCert(client_ecdsa_cert_));
+                                  .setExpectClientEcdsaCert(client_ecdsa_cert_)
+                                  .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
+                                                      keylog_local_negative_,
+                                                      keylog_remote_negative_, keylog_path_,
+                                                      keylog_multiple_ips_, version_));
 
   HttpIntegrationTest::initialize();
 
@@ -86,6 +90,92 @@ void SslIntegrationTestBase::checkStats() {
   EXPECT_EQ(expected_handshakes, counter->value());
   counter->reset();
 }
+
+class SslKeyLogTest : public SslIntegrationTest {
+public:
+  void setLogPath() {
+    keylog_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  }
+  void setLocalFilter() {
+    keylog_local_ = true;
+    keylog_remote_ = false;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = false;
+  }
+  void setRemoteFilter() {
+    keylog_remote_ = true;
+    keylog_local_ = false;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = false;
+  }
+  void setBothLocalAndRemoteFilter() {
+    keylog_local_ = true;
+    keylog_remote_ = true;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = false;
+  }
+  void setNegative() {
+    keylog_local_ = true;
+    keylog_remote_ = true;
+    keylog_local_negative_ = true;
+    keylog_remote_negative_ = true;
+  }
+  void setLocalNegative() {
+    keylog_local_ = true;
+    keylog_remote_ = true;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = true;
+  }
+  void setRemoteNegative() {
+    keylog_local_ = true;
+    keylog_remote_ = true;
+    keylog_local_negative_ = true;
+    keylog_remote_negative_ = false;
+  }
+  void setMultipleIps() {
+    keylog_local_ = true;
+    keylog_remote_ = true;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = false;
+    keylog_multiple_ips_ = true;
+  }
+  void logCheck() {
+    EXPECT_TRUE(api_->fileSystem().fileExists(keylog_path_));
+    std::string log = waitForAccessLog(keylog_path_);
+    if (server_tlsv1_3_) {
+      /** The key log for TLS1.3 is as follows:
+       * CLIENT_HANDSHAKE_TRAFFIC_SECRET
+         c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         b335f2ce9079d824a7d2f5ef9af6572d43942d6803bac1ae9de1e840c15c993ae4efdf4ac087877031d1936d5bb858e3
+         SERVER_HANDSHAKE_TRAFFIC_SECRET
+         c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         f498c03446c936d8a17f31669dd54cee2d9bc8d5b7e1a658f677b5cd6e0965111c2331fcc337c01895ec9a0ed12be34a
+         CLIENT_TRAFFIC_SECRET_0 c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         0bbbb2056f3d35a3b610c5cc8ae0b9b63a120912ff25054ee52b853fefc59e12e9fdfebc409347c737394457bfd36bde
+         SERVER_TRAFFIC_SECRET_0 c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         bd3e1757174d82c308515a0c02b981084edda53e546df551ddcf78043bff831c07ff93c7ab3e8ef9e2206c8319c25331
+         EXPORTER_SECRET c62fe86cb3a714451abc7496062251e16862ca3dfc1487c97ab4b291b83a1787
+         6bd19fbdd12e6710159bcb406fd42a580c41236e2d53072dba3064f9b3ff214662081f023e9b22325e31fee5bb11b172
+       */
+      EXPECT_THAT(log, testing::HasSubstr("CLIENT_TRAFFIC_SECRET"));
+      EXPECT_THAT(log, testing::HasSubstr("SERVER_TRAFFIC_SECRET"));
+      EXPECT_THAT(log, testing::HasSubstr("CLIENT_HANDSHAKE_TRAFFIC_SECRET"));
+      EXPECT_THAT(log, testing::HasSubstr("SERVER_HANDSHAKE_TRAFFIC_SECRET"));
+      EXPECT_THAT(log, testing::HasSubstr("EXPORTER_SECRET"));
+    } else {
+      /** The key log for TLS1.1/1.2 is as follows:
+       * CLIENT_RANDOM 5a479a50fe3e85295840b84e298aeb184cecc34ced22d963e16b01dc48c9530f
+         d6840f8100e4ceeb282946cdd72fe403b8d0724ee816ab2d0824b6d6b5033d333ec4b2e77f515226f5d829e137855ef1
+       */
+      EXPECT_THAT(log, testing::HasSubstr("CLIENT_RANDOM"));
+    }
+  }
+  void negativeCheck() {
+    EXPECT_TRUE(api_->fileSystem().fileExists(keylog_path_));
+    auto size = api_->fileSystem().fileSize(keylog_path_);
+    EXPECT_EQ(size, 0);
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -853,6 +943,115 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   EXPECT_TRUE(traces[1].socket_streamed_trace_segment().event().write().data().truncated());
   EXPECT_EQ(traces[2].socket_streamed_trace_segment().event().read().data().as_bytes(), "HTTP/");
   EXPECT_TRUE(traces[2].socket_streamed_trace_segment().event().read().data().truncated());
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslKeyLogTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(SslKeyLogTest, SetLocalFilter) {
+  setLogPath();
+  setLocalFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  logCheck();
+}
+
+TEST_P(SslKeyLogTest, SetRemoteFilter) {
+  setLogPath();
+  setRemoteFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  logCheck();
+}
+
+TEST_P(SslKeyLogTest, SetLocalAndRemoteFilter) {
+  setLogPath();
+  setBothLocalAndRemoteFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  logCheck();
+}
+
+TEST_P(SslKeyLogTest, SetLocalAndRemoteFilterNegative) {
+  setLogPath();
+  setNegative();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  negativeCheck();
+}
+
+TEST_P(SslKeyLogTest, SetLocalNegative) {
+  setLogPath();
+  setLocalNegative();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  negativeCheck();
+}
+
+TEST_P(SslKeyLogTest, SetRemoteNegative) {
+  setLogPath();
+  setRemoteNegative();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  negativeCheck();
+}
+
+TEST_P(SslKeyLogTest, SetMultipleIps) {
+  setLogPath();
+  setMultipleIps();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  logCheck();
 }
 
 } // namespace Ssl

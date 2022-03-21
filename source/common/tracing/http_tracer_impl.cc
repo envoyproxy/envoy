@@ -84,10 +84,45 @@ static void addGrpcRequestTags(Span& span, const Http::RequestHeaderMap& headers
 template <class T> static void addGrpcResponseTags(Span& span, const T& headers) {
   addTagIfNotNull(span, Tracing::Tags::get().GrpcStatusCode, headers.GrpcStatus());
   addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
-  // Set error tag when status is not OK.
+  // Set error tag when Grpc status code represents an upstream error. See
+  // https://github.com/envoyproxy/envoy/issues/18877.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
-  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    if (grpc_status_code.has_value()) {
+      const auto& status = grpc_status_code.value();
+      if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
+        switch (status) {
+        // Each case below is considered to be a client side error, therefore should not be
+        // tagged as an upstream error. See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+        // for more details about how each Grpc status code is defined and whether it is an
+        // upstream error or a client error.
+        case Grpc::Status::WellKnownGrpcStatus::Ok:
+        case Grpc::Status::WellKnownGrpcStatus::Canceled:
+        case Grpc::Status::WellKnownGrpcStatus::InvalidArgument:
+        case Grpc::Status::WellKnownGrpcStatus::NotFound:
+        case Grpc::Status::WellKnownGrpcStatus::AlreadyExists:
+        case Grpc::Status::WellKnownGrpcStatus::PermissionDenied:
+        case Grpc::Status::WellKnownGrpcStatus::FailedPrecondition:
+        case Grpc::Status::WellKnownGrpcStatus::Aborted:
+        case Grpc::Status::WellKnownGrpcStatus::OutOfRange:
+        case Grpc::Status::WellKnownGrpcStatus::Unauthenticated:
+          break;
+        case Grpc::Status::WellKnownGrpcStatus::Unknown:
+        case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
+        case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
+        case Grpc::Status::WellKnownGrpcStatus::ResourceExhausted:
+        case Grpc::Status::WellKnownGrpcStatus::Internal:
+        case Grpc::Status::WellKnownGrpcStatus::Unavailable:
+        case Grpc::Status::WellKnownGrpcStatus::DataLoss:
+          span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+          break;
+        }
+      }
+    }
+  } else {
+    if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
+      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    }
   }
 }
 

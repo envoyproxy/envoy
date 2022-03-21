@@ -54,7 +54,6 @@ public:
 
   // SipProxy::DecoderCallbacks
   MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, (MessageMetadataSharedPtr));
-  MOCK_METHOD(absl::string_view, getLocalIp, ());
   MOCK_METHOD(std::string, getDomainMatchParamName, ());
   MOCK_METHOD(void, setMetadata, (MessageMetadataSharedPtr metadata));
   MOCK_METHOD(std::shared_ptr<SipSettings>, settings, (), (const));

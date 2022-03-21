@@ -209,14 +209,15 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     AlternateProtocolsCacheSharedPtr alternate_protocols, ConnectivityOptions connectivity_options,
-    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope)
+    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), http3_status_tracker_(dispatcher_),
       alternate_protocols_(alternate_protocols), quic_stat_names_(quic_stat_names), scope_(scope),
       origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
-              host_->address()->ip()->port()) {
+              host_->address()->ip()->port()),
+      quic_info_(quic_info) {
   std::chrono::milliseconds rtt =
       std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
   if (rtt.count() != 0) {
@@ -254,10 +255,10 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
   ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                   transport_socket_options_, state_, quic_stat_names_,
-                                   *alternate_protocols_, scope_,
-                                   makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this));
+    pool = Http3::allocateConnPool(
+        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
+        state_, quic_stat_names_, *alternate_protocols_, scope_,
+        makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                    options_, transport_socket_options_, state_);

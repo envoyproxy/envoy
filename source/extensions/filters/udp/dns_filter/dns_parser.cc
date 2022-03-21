@@ -201,7 +201,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   if (context->header_.questions != 1) {
     context->response_code_ = DNS_RESPONSE_CODE_FORMAT_ERROR;
     ENVOY_LOG(debug, "Unexpected number [{}] of questions in DNS query",
-              context->header_.questions);
+              static_cast<int>(context->header_.questions));
     return false;
   }
 
@@ -214,7 +214,8 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   // Almost always, we will have only one query here. Per the RFC, QDCOUNT is usually 1
   context->queries_.reserve(context->header_.questions);
   for (auto index = 0; index < context->header_.questions; index++) {
-    ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, context->header_.questions);
+    ENVOY_LOG(trace, "Parsing [{}/{}] questions", index,
+              static_cast<int>(context->header_.questions));
     auto rec = parseDnsQueryRecord(buffer, offset);
     if (rec == nullptr) {
       context->counters_.query_parsing_failure.inc();
@@ -303,6 +304,7 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsARecord(DnsAnswerCtx& ctx) {
   case DNS_RECORD_TYPE_A:
     if (ctx.available_bytes_ >= sizeof(uint32_t)) {
       sockaddr_in sa4;
+      memset(&sa4, 0, sizeof(sa4));
       sa4.sin_addr.s_addr = ctx.buffer_->peekLEInt<uint32_t>(ctx.offset_);
       ip_addr = std::make_shared<Network::Address::Ipv4Instance>(&sa4);
       ctx.offset_ += ctx.data_length_;
@@ -311,6 +313,7 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsARecord(DnsAnswerCtx& ctx) {
   case DNS_RECORD_TYPE_AAAA:
     if (ctx.available_bytes_ >= sizeof(absl::uint128)) {
       sockaddr_in6 sa6;
+      memset(&sa6, 0, sizeof(sa6));
       uint8_t* address6_bytes = reinterpret_cast<uint8_t*>(&sa6.sin6_addr.s6_addr);
       static constexpr size_t count = sizeof(absl::uint128) / sizeof(uint8_t);
       for (size_t index = 0; index < count; index++) {

@@ -27,6 +27,9 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_mem_slice.h"
+#include "quiche/common/platform/api/quiche_system_event_loop.h"
+#include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -36,15 +39,11 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mem_slice.h"
-#include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
-#include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
-#include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
@@ -55,6 +54,9 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using quiche::GetLogger;
+using quiche::getVerbosityLogThreshold;
+using quiche::setVerbosityLogThreshold;
 using testing::_;
 using testing::HasSubstr;
 
@@ -75,7 +77,7 @@ protected:
     GetLogger().set_level(log_level_);
   }
 
-  const QuicLogLevel log_level_;
+  const quiche::QuicheLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
 
@@ -197,8 +199,6 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
-
 TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {
   public:
@@ -248,7 +248,7 @@ TEST_F(QuicPlatformTest, QuicThread) {
         t3.Start();
         t3.waitForRun();
       },
-      "QuicThread should be joined before destruction");
+      "QuicheThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
@@ -430,7 +430,7 @@ TEST_F(QuicPlatformTest, QuicNotification) {
 }
 
 TEST_F(QuicPlatformTest, QuicTestOutput) {
-  Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
+  Envoy::TestEnvironment::setEnvVar("QUICHE_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
   GetLogger().set_level(spdlog::level::info);
@@ -600,11 +600,11 @@ TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
 TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // These two interfaces are no-op in Envoy. The test just makes sure they
   // build.
-  QuicRunSystemEventLoopIteration();
-  QuicSystemEventLoop("dummy");
+  quiche::QuicheRunSystemEventLoopIteration();
+  quiche::QuicheSystemEventLoop("dummy");
 }
 
-TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
+TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -615,14 +615,14 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
+  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0{quiche::QuicheMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
   buffer.add(str2);
   EXPECT_EQ(1u, buffer.getRawSlices().size());
   buffer.addBufferFragment(fragment);
 
-  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
+  quiche::QuicheMemSlice slice1{quiche::QuicheMemSliceImpl(buffer, str2.length())};
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
   std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
@@ -632,7 +632,7 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_EQ(nullptr, slice1.data());
   EXPECT_EQ(str2_old, str2);
 
-  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
+  quiche::QuicheMemSlice slice2{quiche::QuicheMemSliceImpl(buffer, str.length())};
   EXPECT_EQ(0, buffer.length());
   EXPECT_EQ(str.data(), slice2.data());
   EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));

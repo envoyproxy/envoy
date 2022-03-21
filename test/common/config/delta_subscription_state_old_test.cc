@@ -38,8 +38,8 @@ protected:
     // Disable the explicit wildcard resource feature, so OldDeltaSubscriptionState will be picked
     // up.
     {
-      TestScopedRuntime scoped_runtime_;
-      Runtime::LoaderSingleton::getExisting()->mergeValues({
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({
           {"envoy.restart_features.explicit_wildcard_resource", "false"},
       });
       state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(type_url, callbacks_,

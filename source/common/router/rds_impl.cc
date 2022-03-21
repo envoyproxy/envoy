@@ -219,14 +219,6 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
-ProtoTraitsImpl::ProtoTraitsImpl()
-    : resource_type_(
-          Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>()) {}
-
-ProtobufTypes::MessagePtr ProtoTraitsImpl::createEmptyProto() const {
-  return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-}
-
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
     : manager_(admin, "routes", proto_traits_) {}
 

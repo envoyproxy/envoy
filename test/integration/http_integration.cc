@@ -30,7 +30,6 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -169,11 +168,12 @@ void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
 }
 
 std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
+IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
+                                     bool header_only_request) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false).IgnoreError();
+  encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }
@@ -247,11 +247,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   auto& quic_transport_socket_factory_ref =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
   return Quic::createQuicNetworkConnection(
-      *quic_connection_persistent_info_,
-      std::make_shared<quic::QuicCryptoClientConfig>(
-          std::make_unique<Quic::EnvoyQuicProofVerifier>(
-              quic_transport_socket_factory_ref.sslCtx()),
-          std::make_unique<quic::QuicClientSessionCache>()),
+      *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),
@@ -354,14 +350,15 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig();
+  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_);
 
   BaseIntegrationTest::initialize();
-  registerTestServerPorts({"http"});
+  registerTestServerPorts({"http"}, test_server_);
 
   // Needs to outlive all QUIC connections.
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
-      std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher_, 0);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

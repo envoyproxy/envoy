@@ -139,7 +139,7 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -235,6 +235,7 @@ private:
   Stats::Scope& scope_;
   // The origin for this pool.
   AlternateProtocolsCache::Origin origin_;
+  Http::PersistentQuicInfo& quic_info_;
 };
 
 } // namespace Http
