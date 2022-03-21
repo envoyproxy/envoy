@@ -220,17 +220,15 @@ TEST_F(AlternateProtocolsCacheImplTest, MaxEntries) {
 
 TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   initialize();
-  auto testAltSvc = [&](const std::string& original_alt_svc, const std::string& expected_alt_svc,
-                        bool expect_h3_broken) -> void {
+  auto testAltSvc = [&](const std::string& original_alt_svc,
+                        const std::string& expected_alt_svc) -> void {
     absl::optional<AlternateProtocolsCacheImpl::OriginData> origin_data =
-        AlternateProtocolsCacheImpl::originDataFromString(
-            AlternateProtocolsCache::Origin("https", "hostname1", 1), original_alt_svc, dispatcher_,
-            *protocols_, true);
+        AlternateProtocolsCacheImpl::originDataFromString(original_alt_svc,
+                                                          dispatcher_.timeSource(), true);
     ASSERT(origin_data.has_value());
     std::vector<AlternateProtocolsCache::AlternateProtocol>& protocols =
         origin_data.value().protocols;
     ASSERT_GE(protocols.size(), 1);
-
     AlternateProtocolsCache::AlternateProtocol& protocol = protocols[0];
     EXPECT_EQ("h3-29", protocol.alpn_);
     EXPECT_EQ("", protocol.hostname_);
@@ -238,7 +236,6 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
     auto duration = std::chrono::duration_cast<std::chrono::seconds>(
         protocol.expiration_ - dispatcher_.timeSource().monotonicTime());
     EXPECT_EQ(86400, duration.count());
-
     if (protocols.size() == 2) {
       AlternateProtocolsCache::AlternateProtocol& protocol2 = protocols[1];
       EXPECT_EQ("h3", protocol2.alpn_);
@@ -248,74 +245,45 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
           protocol2.expiration_ - dispatcher_.timeSource().monotonicTime());
       EXPECT_EQ(60, duration.count());
     }
-    ASSERT_NE(nullptr, origin_data->h3_status_tracker) << original_alt_svc;
 
-    EXPECT_EQ(expect_h3_broken, origin_data->h3_status_tracker->isHttp3Broken());
-
-    std::string alt_svc =
-        AlternateProtocolsCacheImpl::originDataToStringForCache(origin_data.value());
+    std::string alt_svc = AlternateProtocolsCacheImpl::originDataToStringForCache(
+        protocols, origin_data.value().srtt);
     EXPECT_EQ(expected_alt_svc, alt_svc);
   };
 
-  testAltSvc("h3-29=\":443\"; ma=86400|0|Broken;300", "h3-29=\":443\"; ma=86400|0|Broken;300",
-             true);
-  testAltSvc("h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2|Confirmed",
-             "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2|Confirmed", false);
+  testAltSvc("h3-29=\":443\"; ma=86400|0", "h3-29=\":443\"; ma=86400|0");
+  testAltSvc("h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2",
+             "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2");
 
   // Test once more to make sure we handle time advancing correctly.
   // the absolute expiration time in testAltSvc is expected to be 86400 so add
   // 60s to the default max age.
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(60));
-
-  testAltSvc("h3-29=\":443\"; ma=86460|2000", "h3-29=\":443\"; ma=86460|2000", false);
-  testAltSvc("h3-29=\":443\"; ma=86460|2000|Broken;50", "h3-29=\":443\"; ma=86460|2000|Pending",
-             false);
+  testAltSvc("h3-29=\":443\"; ma=86460|2000", "h3-29=\":443\"; ma=86460|2000");
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
   initialize();
-  AlternateProtocolsCache::Origin origin("https", "hostname", 1);
   // Too many numbers
-  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
-                   origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", dispatcher_,
-                   *protocols_, true)
-                   .has_value());
-  // Non-numeric rtt
   EXPECT_FALSE(
       AlternateProtocolsCacheImpl::originDataFromString(
-          origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", dispatcher_, *protocols_, true)
+          "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", dispatcher_.timeSource(), true)
           .has_value());
+  // Non-numeric rtt
+  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
+                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", dispatcher_.timeSource(), true)
+                   .has_value());
 
   // Standard entry with rtt.
-  EXPECT_TRUE(
-      AlternateProtocolsCacheImpl::originDataFromString(
-          origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1", dispatcher_, *protocols_, true)
-          .has_value());
+  EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
+                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1", dispatcher_.timeSource(), true)
+                  .has_value());
   // Standard entry without rtt.
-  EXPECT_TRUE(
-      AlternateProtocolsCacheImpl::originDataFromString(
-          origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", dispatcher_, *protocols_, true)
-          .has_value());
-
-  // Standard entry with h3 status.
   EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
-                  origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|Pending", dispatcher_,
-                  *protocols_, true)
+                  "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", dispatcher_.timeSource(), true)
                   .has_value());
-  EXPECT_TRUE(AlternateProtocolsCacheImpl::originDataFromString(
-                  origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|Broken;300", dispatcher_,
-                  *protocols_, true)
-                  .has_value());
-  // Standard entry with bad h3 status.
-  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
-                   origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|Unknown", dispatcher_,
-                   *protocols_, true)
-                   .has_value());
-  EXPECT_FALSE(AlternateProtocolsCacheImpl::originDataFromString(
-                   origin, "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|Broken", dispatcher_,
-                   *protocols_, true)
-                   .has_value());
 }
+
 TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
@@ -324,7 +292,8 @@ TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {
 
   // When the cache is created, there should be a warning log for the bad cache
   // entry.
-  EXPECT_LOG_CONTAINS("warn", "Unable to parse cache entry with key: foo", { initialize(); });
+  EXPECT_LOG_CONTAINS("warn", "Unable to parse cache entry with key: foo value: bar",
+                      { initialize(); });
 
   EXPECT_CALL(*store_, addOrUpdate(_, _)).Times(0);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =

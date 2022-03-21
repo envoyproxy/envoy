@@ -27,7 +27,6 @@ namespace Http {
 // Secondarily, it maps origins to srtt information, useful for
 // tuning 0-rtt timeouts if the alternate protocol is HTTP/3.
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
-                                    public Http3StatusTrackerCallback,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
   AlternateProtocolsCacheImpl(Event::Dispatcher& dispatcher, std::unique_ptr<KeyValueStore>&& store,
@@ -57,17 +56,15 @@ public:
   // normalization will simply not be read from cache.
   // The string format is:
   // protocols|rtt|h3_status
-  static std::string originDataToStringForCache(const OriginData& origin_data);
+  static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
+                                                std::chrono::microseconds srtt);
   // Parse an origin data into structured data, or absl::nullopt
   // if it is empty or invalid.
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
   // rather than relative time.
-  static absl::optional<OriginData> originDataFromString(const Origin& origin,
-                                                         absl::string_view origin_data,
-                                                         Event::Dispatcher& dispatcher,
-                                                         Http3StatusTrackerCallback& callback,
-                                                         bool from_cache);
+  static absl::optional<OriginData> originDataFromString(absl::string_view origin_data,
+                                                         TimeSource& time_source, bool from_cache);
   // Parse an alt-svc string into a vector of structured data.
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
@@ -83,9 +80,6 @@ public:
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
   Http3StatusTrackerSharedPtr getHttp3StatusTracker(const Origin& origin) override;
-
-  // Http3StatusTrackerCallback
-  void onHttp3StatusChanged(const AlternateProtocolsCache::Origin&) override;
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);

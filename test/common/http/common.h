@@ -70,12 +70,4 @@ public:
   static void addDefaultHeaders(Http::RequestHeaderMap& headers, bool overwrite = true);
 };
 
-namespace Http {
-class MockHttp3StatusTrackerCallback : public Http3StatusTrackerCallback {
-public:
-  MOCK_METHOD(void, onHttp3StatusChanged, (const AlternateProtocolsCache::Origin& origin));
-};
-
-} // namespace Http
-
 } // namespace Envoy

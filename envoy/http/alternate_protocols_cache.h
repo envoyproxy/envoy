@@ -99,8 +99,6 @@ public:
     virtual void markHttp3Broken() PURE;
     // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.
     virtual void markHttp3Confirmed() PURE;
-    // Returns string form of the HTTP/3 status.
-    virtual std::string statusToStringForCache() PURE;
   };
 
   virtual ~AlternateProtocolsCache() = default;
