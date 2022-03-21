@@ -208,7 +208,7 @@ protected:
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                                     int upstream_index,
                                                     const std::string& path = "/test/long/url",
-                                                    const std::string& authority = "host");
+                                                    const std::string& overwrite_authority = "");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterVirtualClusters();
@@ -221,7 +221,7 @@ protected:
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
-                                              const std::string& authority = "host");
+                                              const std::string& overwrite_authority = "");
   void testRequestAndResponseShutdownWithActiveConnection();
 
   // Disconnect tests
@@ -290,8 +290,10 @@ protected:
   Http::RequestEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestResponseHeaderMapImpl default_response_headers_{{":status", "200"}};
-  Http::TestRequestHeaderMapImpl default_request_headers_{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl default_request_headers_{{":method", "GET"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "sni.lyft.com"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecType downstream_protocol_{Http::CodecType::HTTP1};
   std::string access_log_name_;

@@ -233,6 +233,8 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  // The origin for this pool.
+  AlternateProtocolsCache::Origin origin_;
 };
 
 } // namespace Http

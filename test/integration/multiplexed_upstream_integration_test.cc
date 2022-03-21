@@ -124,7 +124,7 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -196,7 +196,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreamingReset) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -255,7 +255,7 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
         {":method", "POST"},
         {":path", "/test/long/url"},
         {":scheme", "http"},
-        {":authority", "host"},
+        {":authority", "sni.lyft.com"},
         {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(response_bytes[i])},
         {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_bytes)}};
     if (i % 2 == 0) {
@@ -362,7 +362,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStream
         codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                    {":path", "/test/long/url"},
                                                                    {":scheme", "http"},
-                                                                   {":authority", "host"}});
+                                                                   {":authority", "sni.lyft.com"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
 
@@ -448,7 +448,7 @@ typed_config:
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"te", "trailers"}});
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -557,7 +557,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"},
                                      {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
@@ -596,7 +596,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {AutonomousStream::NO_END_STREAM, "true"}});
   // Wait until the response is sent to ensure the SETTINGS frame has been read
   // by Envoy.
@@ -670,7 +670,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
   Http::TestRequestHeaderMapImpl request{{":method", "GET"},
                                          {":path", "/test/long/url"},
                                          {":scheme", "http"},
-                                         {":authority", "host"},
+                                         {":authority", "sni.lyft.com"},
                                          {"Early-Data", "1"}};
   auto response2 = codec_client_->makeHeaderOnlyRequest(request);
   waitForNextUpstreamRequest(0);

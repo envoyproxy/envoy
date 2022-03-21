@@ -105,7 +105,9 @@ namespace {
 class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   ConnectivityGridTest()
-      : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
+      : transport_socket_options_(
+            std::make_shared<Network::TransportSocketOptionsImpl>("hostname")),
+        options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {}
 
