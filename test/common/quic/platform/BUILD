@@ -84,6 +84,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quiche_common_platform_epoll_impl_lib",
     hdrs = ["quiche_epoll_impl.h"],
+    include_prefix = "quiche_platform_impl",
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:epoll_server_lib"],
 )
