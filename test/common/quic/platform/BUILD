@@ -35,7 +35,6 @@ envoy_cc_test(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
-        ":quic_platform_epoll_clock_lib",
         "//source/common/memory:stats_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "//test/common/buffer:utility_lib",
@@ -47,6 +46,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:epoll_server_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
+        "@com_github_google_quiche//:quic_core_quic_epoll_clock_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",
         "@com_github_google_quiche//:quic_platform_mock_log",
@@ -82,26 +82,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_epoll_clock_lib",
-    srcs = select({
-        "//bazel:linux": ["quic_epoll_clock.cc"],
-        "//conditions:default": [],
-    }),
-    hdrs = select({
-        "//bazel:linux": ["quic_epoll_clock.h"],
-        "//conditions:default": [],
-    }),
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quic_core_clock_lib",
-        "@com_github_google_quiche//:quic_platform",
-        "@com_github_google_quiche//:quic_platform_epoll_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_epoll_impl_lib",
-    hdrs = ["quic_epoll_impl.h"],
+    name = "quiche_common_platform_epoll_impl_lib",
+    hdrs = ["quiche_epoll_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:epoll_server_lib"],
 )
