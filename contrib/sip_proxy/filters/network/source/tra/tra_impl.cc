@@ -24,6 +24,19 @@ GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client
                                const absl::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout) {}
 
+GrpcClientImpl::~GrpcClientImpl() {
+  // Avoid to call virtual functions during destruction
+  // error: Call to virtual method 'GrpcClientImpl::cancel' during destruction bypasses virtual
+  // dispatch [clang-analyzer-optin.cplusplus.VirtualCall,-warnings-as-errors]
+  if (request_) {
+    request_->cancel();
+  }
+
+  if (stream_ != nullptr) {
+    stream_.closeStream();
+  }
+}
+
 void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {
   // ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -31,13 +44,26 @@ void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {
 
 void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
-  request_->cancel();
+  if (request_) {
+    request_->cancel();
+    request_ = nullptr;
+  }
   // callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::closeStream() {
   ASSERT(callbacks_ != nullptr);
-  stream_.closeStream();
+  if (stream_ != nullptr) {
+    stream_.closeStream();
+  }
+}
+
+void GrpcClientImpl::resetStream() {
+  ASSERT(callbacks_ != nullptr);
+  if (stream_ != nullptr) {
+    stream_.resetStream();
+    stream_ = nullptr;
+  }
 }
 
 void GrpcClientImpl::createTrafficRoutingAssistant(
