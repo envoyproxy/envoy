@@ -83,14 +83,14 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   config_helper_.addConfigModifier(configureProxyStatus());
-  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  auto host = config_helper_.createVirtualHost("foo.lyft.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
       envoy::config::route::v3::RouteAction::NOT_FOUND);
   config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.lyft.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_EQ(response->headers().getProxyStatusValue(),
@@ -99,7 +99,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 
 TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
-  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  auto host = config_helper_.createVirtualHost("foo.lyft.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
       envoy::config::route::v3::RouteAction::NOT_FOUND);
   config_helper_.addVirtualHost(host);
@@ -107,7 +107,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":authority", " foo.com "}, {":path", "/unknown"}});
+      {":method", "GET"}, {":authority", " foo.lyft.com "}, {":path", "/unknown"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -126,14 +126,14 @@ TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
-  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  auto host = config_helper_.createVirtualHost("foo.lyft.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
       envoy::config::route::v3::RouteAction::SERVICE_UNAVAILABLE);
   config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.lyft.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
@@ -349,7 +349,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"}});
+                                     {":authority", "sni.lyft.com"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"host", "host"}}, true);
@@ -369,7 +369,7 @@ TEST_P(ProtocolIntegrationTest, Upstream304ResponseWithContentLength) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"if-none-match", "\"1234567890\""}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "304"},
@@ -390,7 +390,7 @@ TEST_P(ProtocolIntegrationTest, Upstream304ResponseWithContentLength) {
       Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"if-none-match", "\"1234567890\""}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "304"},
@@ -415,7 +415,7 @@ TEST_P(ProtocolIntegrationTest, 304ResponseWithoutContentLength) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"if-none-match", "\"1234567890\""}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
@@ -437,7 +437,7 @@ TEST_P(ProtocolIntegrationTest, 304HeadResponseWithoutContentLength) {
       Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"if-none-match", "\"1234567890\""}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
@@ -457,7 +457,7 @@ TEST_P(ProtocolIntegrationTest, 200HeadResponseWithContentLength) {
       Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"if-none-match", "\"1234567890\""}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
@@ -488,7 +488,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"remove-method", "yes"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -500,7 +500,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"remove-path", "yes"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -550,7 +550,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"remove-method", "yes"},
                                      {"send-reply", "yes"}});
   ASSERT_TRUE(response->waitForEndStream());
@@ -571,13 +571,13 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"remove-method", "yes"},
                                      {"send-reply", "yes"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 80, 71, 46),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
                                        BytesCountExpectation(0, 58, 0, 58),
                                        BytesCountExpectation(7, 10, 7, 8));
 }
@@ -594,7 +594,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesC
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"remove-method", "yes"},
                                      {"send-reply", "yes"}});
   ASSERT_TRUE(response->waitForEndStream());
@@ -612,14 +612,14 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing method
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                        {":path", "/test/long/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "host"},
-                                                                        {"remove-method", "yes"},
-                                                                        {"send-reply", "yes"}},
-                                         1024);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"remove-method", "yes"},
+                                     {"send-reply", "yes"}},
+      1024);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -634,18 +634,18 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesC
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing method
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                        {":path", "/test/long/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "host"},
-                                                                        {"remove-method", "yes"},
-                                                                        {"send-reply", "yes"}},
-                                         1024);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"remove-method", "yes"},
+                                     {"send-reply", "yes"}},
+      1024);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1144, 90, 73),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1152, 90, 81),
                                        BytesCountExpectation(0, 58, 0, 58),
                                        BytesCountExpectation(7, 10, 7, 8));
 }
@@ -663,7 +663,7 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"longrequestvalue", long_header_value_with_inner_lws}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(long_header_value_with_inner_lws, upstream_request_->headers()
@@ -701,7 +701,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
@@ -755,8 +755,8 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   // The two requests are sent with https scheme rather than http for QUIC downstream.
   const size_t quic_https_extra_bytes = (downstreamProtocol() == Http::CodecType::HTTP3 ? 2u : 0u);
   expectUpstreamBytesSentAndReceived(
-      BytesCountExpectation(2550 + quic_https_extra_bytes, 635, 414 + quic_https_extra_bytes, 54),
-      BytesCountExpectation(2262, 548, 184, 27), BytesCountExpectation(2204, 520, 150, 6));
+      BytesCountExpectation(2566 + quic_https_extra_bytes, 635, 430 + quic_https_extra_bytes, 54),
+      BytesCountExpectation(2262, 548, 196, 27), BytesCountExpectation(2204, 520, 150, 6));
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -766,7 +766,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreaming) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"x-forwarded-for", "10.0.0.1"},
                                                                  {"x-envoy-retry-on", "5xx"}});
   auto& encoder = encoder_decoder.first;
@@ -823,7 +823,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"x-forwarded-for", "10.0.0.1"},
                                                                  {"x-envoy-retry-on", "5xx"}});
   auto& encoder = encoder_decoder.first;
@@ -896,7 +896,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"x-forwarded-for", "10.0.0.1"},
                                                                  {"x-envoy-retry-on", "5xx"}});
   auto& encoder = encoder_decoder.first;
@@ -936,7 +936,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
 // downstream response, and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
-  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("sni.lyft.com", "/test_retry");
   host.set_include_request_attempt_count(true);
   host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
@@ -946,7 +946,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test_retry"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
@@ -989,7 +989,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
   // Add route with custom retry policy
-  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("sni.lyft.com", "/test_retry");
   host.set_include_request_attempt_count(true);
   auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
   retry_policy->mutable_retry_priority()->set_name(factory.name());
@@ -1017,7 +1017,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test_retry"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
@@ -1060,7 +1060,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
   // Add route with custom retry policy
-  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("sni.lyft.com", "/test_retry");
   host.set_include_request_attempt_count(true);
   auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
   retry_policy->add_retry_host_predicate()->set_name(predicate_factory.name());
@@ -1083,7 +1083,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test_retry"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
@@ -1125,7 +1125,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024 * 65);
@@ -1143,7 +1143,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
 
 // Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
 TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
-  auto host = config_helper_.createVirtualHost("nobody.com", "/");
+  auto host = config_helper_.createVirtualHost("routelimit.lyft.com", "/");
   host.mutable_per_request_buffer_limit_bytes()->set_value(0);
   config_helper_.addVirtualHost(host);
   initialize();
@@ -1153,7 +1153,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/"},
                                      {":scheme", "http"},
-                                     {":authority", "nobody.com"},
+                                     {":authority", "routelimit.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1);
@@ -1182,7 +1182,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/dynamo/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024 * 65);
@@ -1356,9 +1356,13 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
-  Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
-      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
-      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
+  Http::TestRequestHeaderMapImpl retriable_header =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}};
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1401,9 +1405,13 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
-  Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
-      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
-      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
+  Http::TestRequestHeaderMapImpl retriable_header =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}};
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1454,7 +1462,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"foo_bar", "baz"}});
   waitForNextUpstreamRequest();
 
@@ -1493,7 +1501,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"foo_bar", "baz"}});
   waitForNextUpstreamRequest();
 
@@ -1521,7 +1529,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"foo_bar", "baz"}});
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
@@ -1545,7 +1553,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "sni.lyft.com"},
                                                  {"content-length", "0"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
@@ -1689,7 +1697,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "sni.lyft.com"},
                                                  {"content-length", "0"}};
   std::vector<std::string> cookie_pieces;
   cookie_pieces.reserve(7000);
@@ -1721,7 +1729,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "sni.lyft.com"},
                                                  {"content-length", "0"}};
   for (int i = 0; i < 2000; i++) {
     request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
@@ -1740,7 +1748,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -1778,7 +1786,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -1804,7 +1812,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -1837,7 +1845,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
@@ -1869,7 +1877,7 @@ name: local-reply-during-encode
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"}});
+                                     {":authority", "sni.lyft.com"}});
 
   // Wait for the upstream request and begin sending a response with end_stream = false.
   waitForNextUpstreamRequest();
@@ -2052,7 +2060,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendTrailers(*request_encoder_, *request_trailers);
@@ -2087,7 +2095,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
   const Http::TestRequestHeaderMapImpl request_headers{{":method", long_method},
                                                        {":path", "/test/long/url"},
                                                        {":scheme", "http"},
-                                                       {":authority", "host"}};
+                                                       {":authority", "sni.lyft.com"}};
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2358,9 +2366,10 @@ TEST_P(ProtocolIntegrationTest, MultipleCookiesAndSetCookies) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},  {":path", "/dynamo/url"},
-                                                 {":scheme", "http"}, {":authority", "host"},
-                                                 {"cookie", "a=b"},   {"cookie", "c=d"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":path", "/dynamo/url"},
+      {":scheme", "http"}, {":authority", "sni.lyft.com"},
+      {"cookie", "a=b"},   {"cookie", "c=d"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"set-cookie", "foo"}, {"set-cookie", "bar"}};
 
@@ -2400,7 +2409,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTr
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -2680,8 +2689,8 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "CONNECT"}, {":authority", "sni.lyft.com.com:80"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -2703,11 +2712,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
   }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                                                 {":protocol", "bytestream"},
-                                                                 {":path", "/"},
-                                                                 {":authority", "host.com:80"}});
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
+                                     {":protocol", "bytestream"},
+                                     {":path", "/"},
+                                     {":authority", "sni.lyft.com.com:80"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -2735,7 +2744,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host"}});
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "sni.lyft.com"}});
 
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(codec_client_->disconnected());
@@ -2801,7 +2810,7 @@ TEST_P(ProtocolIntegrationTest, EnableStripTrailingHostDot) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         virtual_host->clear_domains();
-        virtual_host->add_domains("host");
+        virtual_host->add_domains("sni.lyft.com");
       });
 
   initialize();
@@ -2810,7 +2819,7 @@ TEST_P(ProtocolIntegrationTest, EnableStripTrailingHostDot) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host."}});
+                                     {":authority", "sni.lyft.com."}});
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -2830,7 +2839,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         virtual_host->clear_domains();
-        virtual_host->add_domains("host");
+        virtual_host->add_domains("sni.lyft.com");
       });
 
   initialize();
@@ -2839,7 +2848,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host."}});
+                                     {":authority", "sni.lyft.com."}});
   // Expect local reply as request host fails to match configured domains.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -2894,7 +2903,7 @@ TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/found"}, {":scheme", "http"}, {":authority", "foo.com"}};
+      {":method", "GET"}, {":path", "/found"}, {":scheme", "http"}, {":authority", "foo.lyft.com"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0, 0,
                                                 TestUtility::DefaultTimeout);
@@ -3052,7 +3061,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeData) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":scheme", "http"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto request_encoder = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -3094,7 +3103,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeDataCon
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":scheme", "http"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto request_encoder = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -3130,7 +3139,7 @@ TEST_P(DownstreamProtocolIntegrationTest,
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":scheme", "http"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto request_encoder = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -3178,7 +3187,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeTrailer
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":scheme", "http"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto request_encoder = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -3215,7 +3224,7 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"content-length", "10"},
                                      {"response_size_bytes", absl::StrCat(response_size)}});
   auto& encoder = encoder_decoder.first;
@@ -3236,9 +3245,9 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(251, 38, 219, 18),
-                                     BytesCountExpectation(168, 13, 168, 13),
-                                     BytesCountExpectation(153, 5, 155, 3));
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(167, 38, 136, 18),
+                                     BytesCountExpectation(120, 13, 120, 13),
+                                     BytesCountExpectation(116, 5, 116, 3));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
@@ -3248,9 +3257,9 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(124, 111, 105, 75),
-                                       BytesCountExpectation(68, 64, 68, 64),
-                                       BytesCountExpectation(8, 10, 8, 8));
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(124, 51, 105, 19),
+                                       BytesCountExpectation(68, 34, 68, 34),
+                                       BytesCountExpectation(8, 10, 8, 6));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
@@ -3261,9 +3270,9 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(371, 158, 228, 27),
-                                     BytesCountExpectation(277, 122, 168, 13),
-                                     BytesCountExpectation(256, 109, 153, 3));
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
+                                     BytesCountExpectation(229, 122, 120, 13),
+                                     BytesCountExpectation(219, 109, 116, 3));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
@@ -3274,9 +3283,9 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 231, 114, 84),
-                                       BytesCountExpectation(177, 173, 68, 64),
-                                       BytesCountExpectation(111, 113, 8, 8));
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 190, 114, 46),
+                                       BytesCountExpectation(177, 173, 68, 34),
+                                       BytesCountExpectation(111, 113, 8, 6));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseDownstream) {
@@ -3297,15 +3306,15 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseDownstream) {
   auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
   checkSimpleRequestSuccess(request_size, response_size, response_one.get());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
-                                       BytesCountExpectation(177, 137, 68, 28),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 190, 114, 46),
+                                       BytesCountExpectation(177, 137, 68, 34),
                                        BytesCountExpectation(111, 137, 8, 6), 0);
 
   // Reuse connection, send the second request on the connection.
   auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
   checkSimpleRequestSuccess(request_size, response_size, response_two.get());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 190, 114, 46),
                                        BytesCountExpectation(148, 137, 15, 27),
                                        BytesCountExpectation(111, 137, 8, 6), 1);
 }
@@ -3328,15 +3337,15 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
   // Send to the same upstream from the two clients.
   auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
-                                     BytesCountExpectation(223, 122, 114, 13),
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
+                                     BytesCountExpectation(223, 122, 120, 13),
                                      BytesCountExpectation(223, 108, 114, 3), 0);
 
   // Swap clients so the other connection is used to send the request.
   std::swap(codec_client_, second_client);
   auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
                                      BytesCountExpectation(167, 119, 58, 10),
                                      BytesCountExpectation(114, 108, 11, 3), 1);
   second_client->close();
@@ -3354,7 +3363,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
 
   testTrailers(10, 20, true, true);
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(248, 120, 196, 67),
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(256, 120, 204, 67),
                                      BytesCountExpectation(172, 81, 154, 52),
                                      BytesCountExpectation(154, 33, 142, 7));
 }
@@ -3371,7 +3380,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
 
   testTrailers(10, 20, true, true);
 
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(206, 132, 156, 76),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(206, 140, 156, 84),
                                        BytesCountExpectation(136, 86, 107, 67),
                                        BytesCountExpectation(36, 26, 14, 10));
 }
@@ -3386,9 +3395,9 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
 
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(187, 0, 156, 0),
-                                     BytesCountExpectation(114, 0, 114, 0),
-                                     BytesCountExpectation(114, 0, 114, 0));
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 0, 164, 0),
+                                     BytesCountExpectation(120, 0, 120, 0),
+                                     BytesCountExpectation(120, 0, 120, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountDownstream) {
@@ -3401,8 +3410,8 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
 
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 71, 0, 38),
-                                       BytesCountExpectation(0, 28, 0, 28),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 79, 0, 46),
+                                       BytesCountExpectation(0, 34, 0, 34),
                                        BytesCountExpectation(0, 8, 0, 6));
 }
 
@@ -3416,9 +3425,9 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
 
   testRouterUpstreamDisconnectBeforeRequestComplete();
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(187, 0, 156, 0),
-                                     BytesCountExpectation(114, 0, 114, 0),
-                                     BytesCountExpectation(114, 0, 114, 0));
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 0, 164, 0),
+                                     BytesCountExpectation(120, 0, 120, 0),
+                                     BytesCountExpectation(120, 0, 120, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCountUpstream) {
@@ -3431,8 +3440,8 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
 
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(159, 47, 128, 27),
-                                     BytesCountExpectation(113, 13, 113, 13),
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(167, 47, 136, 27),
+                                     BytesCountExpectation(120, 13, 120, 13),
                                      BytesCountExpectation(113, 5, 113, 3));
 }
 
@@ -3461,11 +3470,9 @@ TEST_P(DownstreamProtocolIntegrationTest, PathWithFragmentRejectedByDefault) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/some/path#fragment"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "foo.com"}};
-  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(request_headers, 10);
+  default_request_headers_.setPath("/some/path#fragment");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, 10);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
@@ -3477,11 +3484,8 @@ TEST_P(ProtocolIntegrationTest, FragmentStrippedFromPathWithOverride) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/some/path?p1=v1#fragment"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "foo.com"}};
-  Http::TestRequestHeaderMapImpl expected_request_headers{request_headers};
+  default_request_headers_.setPath("/some/path?p1=v1#fragment");
+  Http::TestRequestHeaderMapImpl expected_request_headers{default_request_headers_};
   expected_request_headers.setPath("/some/path?p1=v1");
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   auto response = sendRequestAndWaitForResponse(expected_request_headers, 0, response_headers, 0, 0,
@@ -3545,13 +3549,13 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                        {":path", "/test/long/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "host"},
-                                                                        {"content-length", "123"}},
-                                         1024);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-length", "123"}},
+      1024);
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     waitForNextUpstreamRequest();
     // HTTP/1.x requests get the payload length from Content-Length header. The remaining bytes is
@@ -3578,13 +3582,13 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                        {":path", "/test/long/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "host"},
-                                                                        {"content-length", "1025"}},
-                                         1024);
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-length", "1025"}},
+      1024);
 
   // Inconsistency in content-length header and the actually body length should be treated as a
   // stream error.
@@ -3739,7 +3743,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"foo\nname", "foo_value"}});
   auto response = std::move(encoder_decoder.second);
 

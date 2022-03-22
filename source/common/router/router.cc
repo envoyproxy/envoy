@@ -103,14 +103,11 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
     return false;
   }
 
-  if (policy.defaultValue().numerator() > 0) {
+  if (!policy.runtimeKey().empty()) {
+    // The default is 0/100, which means that the default for a key set but no default value
+    // explicitly set is 0% mirrored.
     return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
                                              stable_random);
-  }
-
-  if (!policy.runtimeKey().empty() &&
-      !runtime.snapshot().featureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
-    return false;
   }
 
   return true;

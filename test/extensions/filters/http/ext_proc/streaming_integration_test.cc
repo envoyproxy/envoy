@@ -31,7 +31,7 @@ static const uint32_t BufferSize = 100000;
 // for the external processor. This lets us more fully exercise all the things that happen
 // with larger, streamed payloads.
 class StreamingIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+                                 public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
 
 protected:
   StreamingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
@@ -85,6 +85,10 @@ protected:
 
     // Make sure that we have control over when buffers will fill up.
     config_helper_.setBufferLimits(BufferSize, BufferSize);
+    // Parameterize with defer processing to prevent bit rot as filter made
+    // assumptions of data flow, prior relying on eager processing.
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                      deferredProcessing() ? "true" : "false");
 
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -136,8 +140,10 @@ protected:
 };
 
 // Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
-INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    StreamingProtocols, StreamingIntegrationTest,
+    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
+    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
 // Send a body that's larger than the buffer limit, and have the processor return immediately
 // after the headers come in. Also check the metadata in this test.

@@ -116,7 +116,7 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, "sds_cluster", fake_upstreams_.back()->localAddress());
+    setGrpcService(*grpc_service, "sds_cluster.lyft.com", fake_upstreams_.back()->localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
@@ -210,13 +210,15 @@ public:
               envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
             configToUseSds(common_tls_context);
           });
+      // The SNI of the certificates loaded in this test.
+      default_request_headers_.setHost("www.lyft.com");
     });
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      sds_cluster->set_name("sds_cluster");
+      sds_cluster->set_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
@@ -515,7 +517,7 @@ public:
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      sds_cluster->set_name("sds_cluster");
+      sds_cluster->set_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
 
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context;
@@ -709,6 +711,8 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
 class SdsDynamicUpstreamIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   void initialize() override {
+    // The SNI of the certificates loaded in this test.
+    default_request_headers_.setHost("www.lyft.com");
     if (test_quic_) {
       upstream_tls_ = true;
       setUpstreamProtocol(Http::CodecType::HTTP3);
@@ -717,7 +721,7 @@ public:
       // add sds cluster first.
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      sds_cluster->set_name("sds_cluster");
+      sds_cluster->set_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
 
       // Unwind Quic for sds cluster.
@@ -862,7 +866,7 @@ public:
       // Then add sds cluster.
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      sds_cluster->set_name("sds_cluster");
+      sds_cluster->set_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
 
       const std::string cds_yaml = R"EOF(
