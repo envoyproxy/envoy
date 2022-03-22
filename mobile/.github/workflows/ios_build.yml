@@ -68,6 +68,74 @@ jobs:
       - run: cat /tmp/envoy.log
         if: ${{ failure() || cancelled() }}
         name: 'Log app run'
+  swiftbaselineapp:
+    name: swift_baseline_app
+    needs: iosbuild
+    runs-on: macos-11
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - uses: actions/cache@v2
+        id: check-cache
+        with:
+          key: framework-${{ github.sha }}
+          path: dist/Envoy.framework
+        name: 'Download framework'
+      - run: exit 1
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        name: 'Short-circuit'
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./bazelw build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/apps/baseline:app
+        name: 'Build swift app'
+      # Run the app in the background and redirect logs.
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./bazelw run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/apps/baseline:app &> /tmp/envoy.log &
+        name: 'Run swift app'
+      - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+        name: 'Check connectivity'
+      - run: cat /tmp/envoy.log
+        if: ${{ failure() || cancelled() }}
+        name: 'Log app run'
+  swiftexperimentalapp:
+    name: swift_experimental_app
+    needs: iosbuild
+    runs-on: macos-11
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - uses: actions/cache@v2
+        id: check-cache
+        with:
+          key: framework-${{ github.sha }}
+          path: dist/Envoy.framework
+        name: 'Download framework'
+      - run: exit 1
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        name: 'Short-circuit'
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./bazelw build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/apps/experimental:app
+        name: 'Build swift app'
+      # Run the app in the background and redirect logs.
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./bazelw run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/apps/experimental:app &> /tmp/envoy.log &
+        name: 'Run swift app'
+      - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+        name: 'Check connectivity'
+      - run: cat /tmp/envoy.log
+        if: ${{ failure() || cancelled() }}
+        name: 'Log app run'
   swiftasyncawait:
     name: swift_async_await
     needs: iosbuild

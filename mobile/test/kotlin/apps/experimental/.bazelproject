@@ -1,0 +1,22 @@
+workspace_type: android
+
+directories:
+  -bazel-bin
+  -bazel-instant-android
+  -bazel-out
+  -bazel-testlogs
+  -buck-out
+  -build
+  examples/kotlin/hello_world
+
+import_run_configurations:
+  examples/kotlin/hello_world/tools/android-studio-run-configurations/run_configuration_example_debug_x86.xml
+
+targets:
+  //examples/kotlin/hello_world:hello_envoy_kt
+
+additional_languages:
+  kotlin
+  java
+  android
+  c
