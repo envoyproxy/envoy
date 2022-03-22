@@ -750,67 +750,67 @@ envoy.http.stateful_session.cookie:
   - envoy.http.stateful_session
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.request-headers:
+envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.request-trailers:
+envoy.matching.inputs.request_trailers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.response-headers:
+envoy.matching.inputs.response_headers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.response-trailers:
+envoy.matching.inputs.response_trailers:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.destination-ip:
+envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.destination-port:
+envoy.matching.inputs.destination_port:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.source-ip:
+envoy.matching.inputs.source_ip:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.source-port:
+envoy.matching.inputs.source_port:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.direct-source-ip:
+envoy.matching.inputs.direct_source_ip:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.source-type:
+envoy.matching.inputs.source_type:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.server-name:
+envoy.matching.inputs.server_name:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.transport-protocol:
+envoy.matching.inputs.transport_protocol:
   categories:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.application-protocol:
+envoy.matching.inputs.application_protocol:
   categories:
   - envoy.matching.network.input
   security_posture: unknown

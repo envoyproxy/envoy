@@ -30,10 +30,10 @@ HTTP Input Functions
 
 These input functions are available for matching HTTP requests:
 
-* :ref:`Request header value <extension_envoy.matching.inputs.request-headers>`.
-* :ref:`Request trailer value <extension_envoy.matching.inputs.request-trailers>`.
-* :ref:`Response header value <extension_envoy.matching.inputs.response-headers>`.
-* :ref:`Response trailer value <extension_envoy.matching.inputs.response-trailers>`.
+* :ref:`Request header value <extension_envoy.matching.inputs.request_headers>`.
+* :ref:`Request trailer value <extension_envoy.matching.inputs.request_trailers>`.
+* :ref:`Response header value <extension_envoy.matching.inputs.response_headers>`.
+* :ref:`Response trailer value <extension_envoy.matching.inputs.response_trailers>`.
 
 .. _extension_category_envoy.matching.network.input:
 
@@ -42,15 +42,15 @@ Network Input Functions
 
 These input functions are available for matching TCP connections:
 
-* :ref:`Destination IP <extension_envoy.matching.inputs.destination-ip>`.
-* :ref:`Destination port <extension_envoy.matching.inputs.destination-port>`.
-* :ref:`Source IP <extension_envoy.matching.inputs.source-ip>`.
-* :ref:`Direct source IP <extension_envoy.matching.inputs.direct-source-ip>`.
-* :ref:`Source port <extension_envoy.matching.inputs.source-port>`.
-* :ref:`Source type <extension_envoy.matching.inputs.source-type>`.
-* :ref:`Server name <extension_envoy.matching.inputs.server-name>`.
-* :ref:`Transport protocol <extension_envoy.matching.inputs.transport-protocol>`.
-* :ref:`Application protocol <extension_envoy.matching.inputs.application-protocol>`.
+* :ref:`Destination IP <extension_envoy.matching.inputs.destination_ip>`.
+* :ref:`Destination port <extension_envoy.matching.inputs.destination_port>`.
+* :ref:`Source IP <extension_envoy.matching.inputs.source_ip>`.
+* :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
+* :ref:`Source port <extension_envoy.matching.inputs.source_port>`.
+* :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
+* :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
+* :ref:`Transport protocol <extension_envoy.matching.inputs.transport_protocol>`.
+* :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
 
 Common Input Functons
 *********************

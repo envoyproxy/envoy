@@ -85,7 +85,7 @@ class HttpRequestHeadersDataInputFactory
     : public HttpHeadersDataInputFactoryBase<
           HttpRequestHeadersDataInput, envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
 public:
-  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request-headers") {}
+  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_headers") {}
 };
 
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
@@ -102,7 +102,7 @@ class HttpResponseHeadersDataInputFactory
     : public HttpHeadersDataInputFactoryBase<
           HttpResponseHeadersDataInput, envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
 public:
-  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-headers") {}
+  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_headers") {}
 };
 
 class HttpRequestTrailersDataInput : public HttpHeadersDataInputBase<RequestTrailerMap> {
@@ -119,7 +119,7 @@ class HttpRequestTrailersDataInputFactory
     : public HttpHeadersDataInputFactoryBase<
           HttpRequestTrailersDataInput, envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
 public:
-  HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request-trailers") {}
+  HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_trailers") {}
 };
 
 class HttpResponseTrailersDataInput : public HttpHeadersDataInputBase<ResponseTrailerMap> {
@@ -137,7 +137,7 @@ class HttpResponseTrailersDataInputFactory
     : public HttpHeadersDataInputFactoryBase<
           HttpRequestTrailersDataInput, envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
 public:
-  HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-trailers") {}
+  HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };
 } // namespace Matching
 } // namespace Http
