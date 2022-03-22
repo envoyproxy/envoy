@@ -66,6 +66,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+  // Allow extension lookup by name in the integration tests.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.prefer_extension_type_url", "false");
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
