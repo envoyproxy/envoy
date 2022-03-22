@@ -134,6 +134,7 @@ FREEBIND
 FUZZER
 FUZZERS
 dereferencing
+differentially
 dnsresolvers
 guarddog
 GC

@@ -55,3 +55,14 @@ envoy_cc_benchmark_binary(
         "//source/common/protobuf:utility_lib",
     ],
 )
+
+envoy_cc_fuzz_test(
+    name = "json_sanitizer_fuzz_test",
+    srcs = ["json_sanitizer_fuzz_test.cc"],
+    corpus = "json_sanitizer_corpus",
+    deps = [
+        "//source/common/json:json_sanitizer_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/fuzz:utility_lib",
+    ],
+)
