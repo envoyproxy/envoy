@@ -52,7 +52,8 @@ void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
     // If a previous connected callback closed the connection, don't raise any further connected
     // events. There was already recursion raising closed events.
-    if (event == ConnectionEvent::Connected && state() != State::Open) {
+    if (event != ConnectionEvent::LocalClose && event != ConnectionEvent::RemoteClose &&
+        state() != State::Open) {
       return;
     }
 
