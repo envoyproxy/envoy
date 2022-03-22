@@ -413,10 +413,9 @@ private:
                                  bool last_filter_in_filter_chain,
                                  const std::string& filter_chain_type,
                                  const std::string& stat_prefix) override {
-    auto provider = std::make_unique<HttpDynamicFilterConfigProviderImpl>(
+    return std::make_unique<HttpDynamicFilterConfigProviderImpl>(
         subscription, require_type_urls, factory_context, std::move(default_config),
         last_filter_in_filter_chain, filter_chain_type, stat_prefix);
-    return provider;
   }
 };
 
