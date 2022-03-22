@@ -25,6 +25,7 @@ cat <<EOF >sed_commands
 /^#include/ s!"quiche_platform_impl/quiche_mock_log_impl.h!"test/common/quic/platform/quiche_mock_log_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_test_output_impl.h!"test/common/quic/platform/quiche_test_output_impl.h!
 /^#include/ s!"quiche_platform_impl/quiche_thread_impl.h!"test/common/quic/platform/quiche_thread_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_epoll_impl.h!"test/common/quic/platform/quiche_epoll_impl.h!
 
 
 # Rewrite include directives for platform impl files.
