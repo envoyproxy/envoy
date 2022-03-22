@@ -70,6 +70,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `specifying min DNS refresh overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addDNSMinRefreshSeconds(1234)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.dnsMinRefreshSeconds).isEqualTo(1234)
+  }
+
+  @Test
   fun `specifying DNS refresh overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -138,6 +148,16 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration!!.h2ConnectionKeepaliveTimeoutSeconds).isEqualTo(1234)
+  }
+
+  @Test
+  fun `specifying max connections per host overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.setMaxConnectionsPerHost(1234)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.maxConnectionsPerHost).isEqualTo(1234)
   }
 
   @Test

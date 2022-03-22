@@ -34,15 +34,17 @@ open class EngineBuilder(
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
-  private var dnsQueryTimeoutSeconds = 25
-  private var dnsPreresolveHostnames = "[]"
   private var dnsFallbackNameservers = listOf<String>()
   private var dnsFilterUnroutableFamilies = false
+  private var dnsQueryTimeoutSeconds = 25
+  private var dnsMinRefreshSeconds = 60
+  private var dnsPreresolveHostnames = "[]"
   private var enableHappyEyeballs = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
   private var h2RawDomains = listOf<String>()
+  private var maxConnectionsPerHost = 7
   private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
   private var perTryIdleTimeoutSeconds = 15
@@ -109,9 +111,9 @@ open class EngineBuilder(
   }
 
   /**
-   * Add a rate at which to refresh DNS.
+   * Add a default rate at which to refresh DNS.
    *
-   * @param dnsRefreshSeconds rate in seconds to refresh DNS.
+   * @param dnsRefreshSeconds default rate in seconds at which to refresh DNS.
    *
    * @return this builder.
    */
@@ -143,6 +145,19 @@ open class EngineBuilder(
    */
   fun addDNSQueryTimeoutSeconds(dnsQueryTimeoutSeconds: Int): EngineBuilder {
     this.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds
+    return this
+  }
+
+  /**
+   * Add the minimum rate at which to refresh DNS. Once DNS has been resolved for a host, DNS TTL
+   * will be respected, subject to this minimum. Defaults to 60 seconds.
+   *
+   * @param dnsMinRefreshSeconds minimum rate in seconds at which to refresh DNS.
+   *
+   * @return this builder.
+   */
+  fun addDNSMinRefreshSeconds(dnsMinRefreshSeconds: Int): EngineBuilder {
+    this.dnsMinRefreshSeconds = dnsMinRefreshSeconds
     return this
   }
 
@@ -241,6 +256,18 @@ open class EngineBuilder(
    */
   fun addH2RawDomains(h2RawDomains: List<String>): EngineBuilder {
     this.h2RawDomains = h2RawDomains
+    return this
+  }
+
+  /**
+   * Set the maximum number of connections to open to a single host. Default is 7.
+   *
+   * @param maxConnectionsPerHost the maximum number of connections per host.
+   *
+   * @return this builder.
+   */
+  fun setMaxConnectionsPerHost(maxConnectionsPerHost: Int): EngineBuilder {
+    this.maxConnectionsPerHost = maxConnectionsPerHost
     return this
   }
 
@@ -435,38 +462,42 @@ open class EngineBuilder(
    */
   @Suppress("LongMethod")
   fun build(): Engine {
+    val engineConfiguration = EnvoyConfiguration(
+      adminInterfaceEnabled,
+      grpcStatsDomain,
+      statsDPort,
+      connectTimeoutSeconds,
+      dnsRefreshSeconds,
+      dnsFailureRefreshSecondsBase,
+      dnsFailureRefreshSecondsMax,
+      dnsQueryTimeoutSeconds,
+      dnsMinRefreshSeconds,
+      dnsPreresolveHostnames,
+      dnsFallbackNameservers,
+      dnsFilterUnroutableFamilies,
+      enableHappyEyeballs,
+      enableInterfaceBinding,
+      h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      h2ConnectionKeepaliveTimeoutSeconds,
+      h2RawDomains,
+      maxConnectionsPerHost,
+      statsFlushSeconds,
+      streamIdleTimeoutSeconds,
+      perTryIdleTimeoutSeconds,
+      appVersion,
+      appId,
+      trustChainVerification,
+      virtualClusters,
+      nativeFilterChain,
+      platformFilterChain,
+      stringAccessors
+    )
+
     return when (configuration) {
       is Custom -> {
         EngineImpl(
           engineType(),
-          EnvoyConfiguration(
-            adminInterfaceEnabled,
-            grpcStatsDomain,
-            statsDPort,
-            connectTimeoutSeconds,
-            dnsRefreshSeconds,
-            dnsFailureRefreshSecondsBase,
-            dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds,
-            dnsPreresolveHostnames,
-            dnsFallbackNameservers,
-            dnsFilterUnroutableFamilies,
-            enableHappyEyeballs,
-            enableInterfaceBinding,
-            h2ConnectionKeepaliveIdleIntervalMilliseconds,
-            h2ConnectionKeepaliveTimeoutSeconds,
-            h2RawDomains,
-            statsFlushSeconds,
-            streamIdleTimeoutSeconds,
-            perTryIdleTimeoutSeconds,
-            appVersion,
-            appId,
-            trustChainVerification,
-            virtualClusters,
-            nativeFilterChain,
-            platformFilterChain,
-            stringAccessors
-          ),
+          engineConfiguration,
           configuration.yaml,
           logLevel
         )
@@ -474,34 +505,7 @@ open class EngineBuilder(
       is Standard -> {
         EngineImpl(
           engineType(),
-          EnvoyConfiguration(
-            adminInterfaceEnabled,
-            grpcStatsDomain,
-            statsDPort,
-            connectTimeoutSeconds,
-            dnsRefreshSeconds,
-            dnsFailureRefreshSecondsBase,
-            dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds,
-            dnsPreresolveHostnames,
-            dnsFallbackNameservers,
-            dnsFilterUnroutableFamilies,
-            enableHappyEyeballs,
-            enableInterfaceBinding,
-            h2ConnectionKeepaliveIdleIntervalMilliseconds,
-            h2ConnectionKeepaliveTimeoutSeconds,
-            h2RawDomains,
-            statsFlushSeconds,
-            streamIdleTimeoutSeconds,
-            perTryIdleTimeoutSeconds,
-            appVersion,
-            appId,
-            trustChainVerification,
-            virtualClusters,
-            nativeFilterChain,
-            platformFilterChain,
-            stringAccessors
-          ),
+          engineConfiguration,
           logLevel
         )
       }

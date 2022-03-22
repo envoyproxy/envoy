@@ -332,17 +332,19 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, assign) BOOL adminInterfaceEnabled;
 @property (nonatomic, strong, nullable) NSString *grpcStatsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
-@property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 dnsQueryTimeoutSeconds;
+@property (nonatomic, assign) UInt32 dnsMinRefreshSeconds;
 @property (nonatomic, strong) NSString *dnsPreresolveHostnames;
+@property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, strong) NSArray<NSString *> *h2RawDomains;
+@property (nonatomic, assign) UInt32 maxConnectionsPerHost;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
 @property (nonatomic, assign) UInt32 perTryIdleTimeoutSeconds;
@@ -365,6 +367,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
+                             dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -373,6 +376,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
                                      h2RawDomains:(NSArray<NSString *> *)h2RawDomains
+                            maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
