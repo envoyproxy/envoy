@@ -26,6 +26,8 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+  void setStreamInfoIntoSpan(const StreamInfo::StreamInfo&) override {}
+
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }

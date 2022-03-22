@@ -46,6 +46,7 @@ public:
 
   // TODO: This method is unimplemented for OpenTracing.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  void setStreamInfoIntoSpan(const StreamInfo::StreamInfo&) override{};
 
 private:
   OpenTracingDriver& driver_;

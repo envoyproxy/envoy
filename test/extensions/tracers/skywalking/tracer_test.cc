@@ -67,6 +67,7 @@ protected:
   SkyWalkingTracerStats tracing_stats_{
       SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TracerPtr tracer_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Test that the basic functionality of Tracer is working, including creating Span, using Span to
@@ -145,8 +146,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     EXPECT_EQ("TestChild", first_child_span->spanEntity()->operationName());
 
+    first_child_span->setStreamInfoIntoSpan(stream_info_);
     first_child_span->finishSpan();
     EXPECT_NE(0, first_child_span->spanEntity()->endTime());
+    EXPECT_EQ("10.0.0.1:443", first_child_span->spanEntity()->peer());
 
     Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
 

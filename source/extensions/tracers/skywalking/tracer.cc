@@ -39,6 +39,12 @@ void Span::setSampled(bool do_sample) {
 
 void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPTY_STRING, event); }
 
+void Span::setStreamInfoIntoSpan(const StreamInfo::StreamInfo& stream_info) {
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+    span_entity_->setPeer(stream_info.upstreamInfo()->upstreamHost()->address()->asString());
+  }
+}
+
 void Span::finishSpan() {
   span_entity_->endSpan();
   parent_tracer_.sendSegment(tracing_context_);

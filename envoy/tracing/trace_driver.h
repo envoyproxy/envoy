@@ -93,6 +93,13 @@ public:
    * @return trace ID as a hex string
    */
   virtual std::string getTraceIdAsHex() const PURE;
+
+  /**
+   * To set some fields in Span exclude tags, which needs additional info related with current
+   * stream.
+   * @param stream_info stream info
+   */
+  virtual void setStreamInfoIntoSpan(const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 /**

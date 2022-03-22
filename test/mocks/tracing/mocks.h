@@ -41,7 +41,7 @@ public:
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
   MOCK_METHOD(std::string, getTraceIdAsHex, (), (const));
-
+  MOCK_METHOD(void, setStreamInfoIntoSpan, (const StreamInfo::StreamInfo& stream_info));
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {
     return SpanPtr{spawnChild_(config, name, start_time)};

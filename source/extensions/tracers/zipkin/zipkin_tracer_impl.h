@@ -85,6 +85,8 @@ public:
   // TODO: This method is unimplemented for Zipkin.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
+  void setStreamInfoIntoSpan(const StreamInfo::StreamInfo&) override{};
+
   /**
    * @return a reference to the Zipkin::Span object.
    */
