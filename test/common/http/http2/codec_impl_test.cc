@@ -162,6 +162,9 @@ public:
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
           return request_decoder_;
         }));
+
+    ON_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty())
+        .WillByDefault(Return(true));
   }
 
   void setupDefaultConnectionMocks() {
@@ -1366,7 +1369,6 @@ TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcess
   server_->getStream(1)->readDisable(false);
   EXPECT_TRUE(process_buffered_data_callback->enabled_);
 
-  EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
   EXPECT_CALL(server_connection_.dispatcher_, pushTrackedObject(_))
       .WillOnce(Invoke([&](const ScopeTrackedObject* tracked_object) {
         EXPECT_CALL(server_connection_, dumpState(_, _))
@@ -1659,7 +1661,6 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
 
   if (defer_processing_backedup_streams_) {
     EXPECT_TRUE(process_buffered_data_callback->enabled_);
-    EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
     process_buffered_data_callback->invokeCallback();
   }
 
@@ -3358,7 +3359,6 @@ TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTra
   // Now invoke the deferred processing callback.
   {
     InSequence seq;
-    EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
     EXPECT_CALL(request_decoder_, decodeData(_, false));
     EXPECT_CALL(request_decoder_, decodeTrailers_(_));
     process_buffered_data_callback->invokeCallback();
@@ -3400,7 +3400,6 @@ TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyNoEndstream) {
   // Now invoke the deferred processing callback.
   {
     InSequence seq;
-    EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
     EXPECT_CALL(request_decoder_, decodeData(_, false));
     process_buffered_data_callback->invokeCallback();
   }
@@ -3444,7 +3443,6 @@ TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyWithEndStream) {
   // Now invoke the deferred processing callback.
   {
     InSequence seq;
-    EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
     EXPECT_CALL(request_decoder_, decodeData(_, true));
     process_buffered_data_callback->invokeCallback();
   }
@@ -3487,7 +3485,6 @@ TEST_P(Http2CodecImplTest,
   // Deferred processing callback should have nothing to consume.
   {
     InSequence seq;
-    EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillOnce(Return(true));
     EXPECT_CALL(request_decoder_, decodeData(_, _)).Times(0);
     EXPECT_CALL(request_decoder_, decodeTrailers_(_)).Times(0);
     process_buffered_data_callback->invokeCallback();
@@ -3527,8 +3524,6 @@ TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
 
     {
       InSequence seq;
-      EXPECT_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty())
-          .WillOnce(Return(true));
       EXPECT_CALL(request_decoder_, decodeData(_, end_stream));
       process_buffered_data_callback->invokeCallback();
       EXPECT_FALSE(process_buffered_data_callback->enabled_);
