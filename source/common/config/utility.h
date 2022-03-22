@@ -314,8 +314,8 @@ public:
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_extension_type_url")) {
       if (factory == nullptr && !is_optional) {
         ExceptionUtil::throwEnvoyException(
-            fmt::format("Didn't find a registered implementation for type URL: '{}'",
-                        getFactoryType(message.typed_config())));
+            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                        message.name(), getFactoryType(message.typed_config())));
       }
       return factory;
     } else if (factory != nullptr) {

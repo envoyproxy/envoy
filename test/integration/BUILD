@@ -605,6 +605,11 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "test_host_predicate_proto",
+    srcs = ["test_host_predicate.proto"],
+)
+
 envoy_cc_test_library(
     name = "test_host_predicate_lib",
     srcs = [
@@ -612,6 +617,7 @@ envoy_cc_test_library(
         "test_host_predicate_config.h",
     ],
     deps = [
+        ":test_host_predicate_proto_cc_proto",
         "//envoy/upstream:retry_interface",
     ],
 )
