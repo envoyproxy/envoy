@@ -533,7 +533,7 @@ bool RouterCheckTool::matchHeaderField(
 
   header_match_failure.mutable_header_matcher()->CopyFrom(header);
   const Http::LowerCaseString header_key(header.name());
-  auto header_value = header_map.get(header_key);
+  const auto header_value = header_map.get(header_key);
   header_match_failure.mutable_actual_header_value()->set_value(
       header_value.empty() ? "" : ::toString(header_value));
 
