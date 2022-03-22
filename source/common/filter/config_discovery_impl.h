@@ -64,7 +64,7 @@ protected:
 /**
  * Implementation of a filter config provider using discovery subscriptions.
  **/
-template <class Factory, class FactoryCb>
+template <class FactoryCb>
 class DynamicFilterConfigProviderImpl : public DynamicFilterConfigProviderImplBase,
                                         public DynamicFilterConfigProvider<FactoryCb> {
 public:
@@ -159,8 +159,7 @@ private:
 
 // Implementation of a HTTP dynamic filter config provider.
 class HttpDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<Server::Configuration::NamedHttpFilterConfigFactory,
-                                             Http::FilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<Http::FilterFactoryCb> {
 public:
   using DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl;
   void validateMessage(const std::string& config_name, const Protobuf::Message& message,
@@ -305,7 +304,7 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb>
+template <class FactoryCb>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb>,
                                         public Singleton::Instance {
@@ -376,7 +375,7 @@ protected:
                    const absl::flat_hash_set<std::string>& require_type_urls) const PURE;
 
 private:
-  virtual std::unique_ptr<DynamicFilterConfigProviderImpl<Factory, FactoryCb>>
+  virtual std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>
   createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
                                  const absl::flat_hash_set<std::string>& require_type_urls,
                                  Server::Configuration::FactoryContext& factory_context,
@@ -387,8 +386,7 @@ private:
 };
 
 class HttpFilterConfigProviderManagerImpl
-    : public FilterConfigProviderManagerImpl<Server::Configuration::NamedHttpFilterConfigFactory,
-                                             Http::FilterFactoryCb> {
+    : public FilterConfigProviderManagerImpl<Http::FilterFactoryCb> {
 public:
   std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
@@ -404,8 +402,7 @@ protected:
                    const absl::flat_hash_set<std::string>& require_type_urls) const override;
 
 private:
-  std::unique_ptr<DynamicFilterConfigProviderImpl<
-      Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb>>
+  std::unique_ptr<DynamicFilterConfigProviderImpl<Http::FilterFactoryCb>>
   createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
                                  const absl::flat_hash_set<std::string>& require_type_urls,
                                  Server::Configuration::FactoryContext& factory_context,
