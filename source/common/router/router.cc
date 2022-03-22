@@ -655,9 +655,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Inject the active span's tracing context into the request headers.
-  // If envoy will generate child span, it ignores to inject header and delegate it to upstream
-  // request.
+  // If configured to generate a child span, delegate injecting headers to the upstream request
+  // which generates the child span?
+  // TODO(shikugawa): Add integration test to check whether the headers are injected or not.
   if (!config_.start_child_span_) {
     callbacks_->activeSpan().injectContext(headers);
   }
