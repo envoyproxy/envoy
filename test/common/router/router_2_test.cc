@@ -309,7 +309,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span, injectContext(_));
+            EXPECT_CALL(*child_span, injectContext(_, _));
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -357,7 +357,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span, injectContext(_));
+            EXPECT_CALL(*child_span, injectContext(_, _));
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -409,7 +409,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
                            const Http::ConnectionPool::Instance::StreamOptions&)
                            -> Http::ConnectionPool::Cancellable* {
-        EXPECT_CALL(*child_span, injectContext(_));
+        EXPECT_CALL(*child_span, injectContext(_, _));
         callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);
         return nullptr;
@@ -455,7 +455,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span_1, injectContext(_));
+            EXPECT_CALL(*child_span_1, injectContext(_, _));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -499,7 +499,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span_2, injectContext(_));
+            EXPECT_CALL(*child_span_2, injectContext(_, _));
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);

@@ -68,8 +68,8 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options)
-    : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
-      callbacks_(callbacks), options_(options) {}
+    : options_(options), parent_(parent), service_full_name_(service_full_name),
+      method_name_(method_name), callbacks_(callbacks) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
@@ -254,7 +254,7 @@ void AsyncRequestImpl::cancel() {
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata);
+  current_span_->injectContext(metadata, *options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

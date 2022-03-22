@@ -67,6 +67,7 @@ protected:
   SkyWalkingTracerStats tracing_stats_{
       SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TracerPtr tracer_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Test that the basic functionality of Tracer is working, including creating Span, using Span to
@@ -150,7 +151,36 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
 
-    first_child_span->injectContext(first_child_headers);
+    first_child_span->injectContext(first_child_headers, stream_info_);
+    auto sp = createSpanContext(first_child_headers.get_("sw8"));
+    EXPECT_EQ("CURR#SERVICE", sp->service());
+    EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
+    EXPECT_EQ("TEST_OP", sp->endpoint());
+    EXPECT_EQ("10.0.0.1:443", sp->targetAddress());
+  }
+
+  {
+    Envoy::Tracing::SpanPtr org_first_child_span =
+        org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
+
+    Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
+
+    EXPECT_TRUE(first_child_span->spanEntity()->spanType() == skywalking::v3::SpanType::Exit);
+
+    EXPECT_FALSE(first_child_span->spanEntity()->skipAnalysis());
+    EXPECT_EQ(2, first_child_span->spanEntity()->spanId());
+    EXPECT_EQ(0, first_child_span->spanEntity()->parentSpanId());
+
+    EXPECT_EQ("TestChild", first_child_span->spanEntity()->operationName());
+
+    first_child_span->finishSpan();
+    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
+
+    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstream_info_->setUpstreamHost(nullptr);
+
+    first_child_span->injectContext(first_child_headers, stream_info);
     auto sp = createSpanContext(first_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
@@ -167,7 +197,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     // SkipAnalysis is true by default with calling setSkipAnalysis() on segment_context.
     EXPECT_TRUE(second_child_span->spanEntity()->skipAnalysis());
-    EXPECT_EQ(2, second_child_span->spanEntity()->spanId());
+    EXPECT_EQ(3, second_child_span->spanEntity()->spanId());
     EXPECT_EQ(0, second_child_span->spanEntity()->parentSpanId());
 
     second_child_span->finishSpan();

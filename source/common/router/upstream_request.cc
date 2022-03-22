@@ -485,7 +485,7 @@ void UpstreamRequest::onPoolReady(
   }
 
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders());
+    span_->injectContext(*parent_.downstreamHeaders(), stream_info_);
   }
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());

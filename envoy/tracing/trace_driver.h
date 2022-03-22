@@ -50,8 +50,10 @@ public:
    * Mutate the provided headers with the context necessary to propagate this
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
+   * @param stream_info current stream info
    */
-  virtual void injectContext(TraceContext& trace_conext) PURE;
+  virtual void injectContext(TraceContext& trace_conext,
+                             const StreamInfo::StreamInfo& stream_info) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.

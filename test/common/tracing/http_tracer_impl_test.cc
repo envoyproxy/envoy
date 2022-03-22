@@ -739,7 +739,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
-
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   SpanPtr span_ptr =
       null_tracer.startSpan(config, request_headers, stream_info, {Reason::Sampling, true});
   EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
@@ -749,7 +749,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   span_ptr->setBaggage("key", "value");
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
-  span_ptr->injectContext(request_headers);
+  span_ptr->injectContext(request_headers, stream_info);
   span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));

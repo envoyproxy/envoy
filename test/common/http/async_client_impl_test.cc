@@ -227,7 +227,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   EXPECT_CALL(*child_span, setSampled(true));
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
@@ -280,7 +280,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
                                             .setChildSpanName(child_span_name_)
                                             .setSampled(false);
   EXPECT_CALL(*child_span, setSampled(false));
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
@@ -331,7 +331,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpanKeepParentSampling) {
                                             .setChildSpanName(child_span_name_)
                                             .setSampled(absl::nullopt);
   EXPECT_CALL(*child_span, setSampled(_)).Times(0);
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
@@ -1245,7 +1245,7 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   EXPECT_CALL(*child_span, setSampled(true));
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
   EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _))
       .WillOnce(Invoke([](Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
         span.setTag("onBeforeFinalizeUpstreamSpan", "called");
@@ -1331,7 +1331,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   EXPECT_CALL(*child_span, setSampled(true));
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
@@ -1531,7 +1531,7 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
                                             .setParentSpan(parent_span_)
                                             .setTimeout(std::chrono::milliseconds(40));
   EXPECT_CALL(*child_span, setSampled(true));
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);

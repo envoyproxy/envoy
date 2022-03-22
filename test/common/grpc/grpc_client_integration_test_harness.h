@@ -385,7 +385,7 @@ public:
         .Times(AtMost(1));
     EXPECT_CALL(*request->child_span_,
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-    EXPECT_CALL(*request->child_span_, injectContext(_));
+    EXPECT_CALL(*request->child_span_, injectContext(_, _));
 
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
                                                 active_span, Http::AsyncClient::RequestOptions());

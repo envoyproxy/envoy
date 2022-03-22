@@ -65,6 +65,7 @@ public:
   NiceMock<Tracing::MockConfig> config_;
   std::unique_ptr<MockDaemonBroker> broker_;
   std::unique_ptr<TraceProperties> expected_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   void commonAsserts(daemon::Segment& s);
 };
 
@@ -458,7 +459,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
-  span->injectContext(request_headers);
+  span->injectContext(request_headers, stream_info_);
   auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_FALSE(header.empty());
   EXPECT_NE(header[0]->value().getStringView().find("Root="), absl::string_view::npos);
@@ -479,7 +480,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
       tracer.createNonSampledSpan(config_, "ingress" /*operation name*/,
                                   server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
-  span->injectContext(request_headers);
+  span->injectContext(request_headers, stream_info_);
   auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_FALSE(header.empty());
   EXPECT_NE(header[0]->value().getStringView().find("Root="), absl::string_view::npos);

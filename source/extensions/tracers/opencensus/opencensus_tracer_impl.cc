@@ -69,7 +69,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Tracing::TraceContext& trace_context) override;
+  void injectContext(Tracing::TraceContext& trace_context, const StreamInfo::StreamInfo&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -201,7 +201,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Tracing::TraceContext& trace_context) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const StreamInfo::StreamInfo&) {
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {

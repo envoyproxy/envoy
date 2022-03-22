@@ -158,9 +158,9 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                                              absl::string_view method_name,
                                              RawAsyncStreamCallbacks& callbacks,
                                              const Http::AsyncClient::StreamOptions& options)
-    : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
-      service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
-      options_(options) {}
+    : options_(options), parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_),
+      stub_(parent_.stub_), service_full_name_(service_full_name), method_name_(method_name),
+      callbacks_(callbacks) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -455,7 +455,7 @@ void GoogleAsyncRequestImpl::cancel() {
 }
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata);
+  current_span_->injectContext(metadata, *options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
