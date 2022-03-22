@@ -121,7 +121,7 @@ public:
   /*
    * Adds to the http request annotation field of the Span.
    */
-  void addToHttpRequestAnnotations(absl::string_view key, ProtobufWkt::Value value) {
+  void addToHttpRequestAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
     http_request_annotations_.emplace(std::string(key), value);
   }
 
@@ -135,7 +135,7 @@ public:
   /*
    * Adds to the http response annotation field of the Span.
    */
-  void addToHttpResponseAnnotations(absl::string_view key, ProtobufWkt::Value value) {
+  void addToHttpResponseAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
     http_response_annotations_.emplace(std::string(key), value);
   }
 
