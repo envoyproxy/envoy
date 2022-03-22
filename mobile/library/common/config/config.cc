@@ -125,6 +125,7 @@ const char* config_template = R"(
         connection_keepalive:
           connection_idle_interval: *h2_connection_keepalive_idle_interval
           timeout: *h2_connection_keepalive_timeout
+        max_concurrent_streams: 100
     upstream_http_protocol_options:
       auto_sni: true
       auto_san_validation: true
