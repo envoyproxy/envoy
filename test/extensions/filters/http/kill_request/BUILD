@@ -55,7 +55,7 @@ envoy_cc_test(
     name = "crash_integration_test",
     size = "large",
     srcs = ["crash_integration_test.cc"],
-    shard_count = 2,
+    shard_count = 16,  # This is really slow on coverage.
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",
