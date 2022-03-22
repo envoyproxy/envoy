@@ -47,6 +47,8 @@ routing PRs, questions, etc. to the right place.
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Performance, Dubbo.
 
 
 # Senior extension maintainers
@@ -61,6 +63,8 @@ without further review.
   * Thrift
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Dubbo
 
 # Envoy security team
 

@@ -11,10 +11,8 @@
 #include "source/common/memory/stats.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/quic/platform/quiche_flags_impl.h"
 
 #include "test/common/buffer/utility.h"
-#include "test/common/quic/platform/quic_epoll_clock.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -31,6 +29,7 @@
 #include "quiche/common/platform/api/quiche_system_event_loop.h"
 #include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
+#include "quiche/quic/core/quic_epoll_clock.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
@@ -47,6 +46,7 @@
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple

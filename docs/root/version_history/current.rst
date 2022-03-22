@@ -18,6 +18,7 @@ Minor Behavior Changes
 * cryptomb: remove RSA PKCS1 v1.5 padding support.
 * decompressor: decompressor does not duplicate `accept-encoding` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.
 * dynamic_forward_proxy: if a DNS resolution fails, failing immediately with a specific resolution error, rather than finishing up all local filters and failing to select an upstream host.
+* ecds: changed to use ``http_filter`` stat prefix as the metrics root for ECDS subscriptions. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.top_level_ecds_stats`` to false.
 * ext_authz: added requested server name in ext_authz network filter for auth review.
 * file: changed disk based files to truncate files which are not being appended to. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.append_or_truncate`` to false.
 * grpc: flip runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to be default enabled. async grpc client created through getOrCreateRawAsyncClient will be cached by default.
@@ -31,6 +32,7 @@ Minor Behavior Changes
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 * ratelimit: the :ref:`header_value_match <envoy_v3_api_msg_config.route.v3.ratelimit.action.HeaderValueMatch>` support custom descriptor_key.
 * router: record upstream request timeouts for all the cases and not just for those requests which are awaiting headers. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` to false.
+* runtime: deprecated runtime flags set via configuration files or xDS will now ENVOY_BUG, rather than silently resulting in unexpected behavior on the data plane by no longer applying removed code paths.
 * runtime: removed global runtime as Envoy default. This behavioral change can be reverted by setting runtime guard ``envoy.restart_features.no_runtime_singleton`` to false.
 * sip-proxy: add customized affinity support by adding :ref:`tra_service_config <envoy_v3_api_msg_extensions.filters.network.sip_proxy.tra.v3alpha.TraServiceConfig>` and :ref:`customized_affinity <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity>`.
 * sip-proxy: add support for the ``503`` response code. When there is something wrong occurred, send ``503 Service Unavailable`` back to downstream.
@@ -47,6 +49,11 @@ Bug Fixes
 * eds: fix the eds cluster update by allowing update on the locality of the cluster endpoints. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` to false.
 * jwt_authn: fixed a bug where a JWT with empty "iss" is passed even the field :ref:`issuer <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.issuer>` is specified. If the "issuer" field is specified, "iss" in the JWT should match it.
 * jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
+* router: fixed mirror policy :ref:`runtime_fraction <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.runtime_fraction>` to
+  correctly allow reading from a fractional percent value stored in runtime in all cases. Previously
+  it would only do this if the default numerator was above 0, otherwise it would use the integer
+  variant with a default of 0. The default of 0 is retained, but runtime lookup will happen in
+  all cases and recognize a stored fractional percent.
 * tcp_proxy: fix a crash that occurs when configured for :ref:`upstream tunneling <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` and the downstream connection disconnects while the the upstream connection or http/2 stream is still being established.
 * tls: fix a bug while matching a certificate SAN with an exact value in ``match_typed_subject_alt_names`` of a listener where wildcard ``*`` character is not the only character of the dns label. Example, ``baz*.example.net`` and ``*baz.example.net`` and ``b*z.example.net`` will match ``baz1.example.net`` and ``foobaz.example.net`` and ``buzz.example.net``, respectively.
 * upstream: cluster slow start config add ``min_weight_percent`` field to avoid too big EDF deadline which cause slow start endpoints receiving no traffic, default 10%. This fix is releted to `issue#19526 <https://github.com/envoyproxy/envoy/issues/19526>`_.
