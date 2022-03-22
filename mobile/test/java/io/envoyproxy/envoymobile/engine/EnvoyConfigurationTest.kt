@@ -29,9 +29,9 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving with default configuration resolves with values`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8"), true,
-      true, true, 222, 333, listOf("h2-raw.domain"), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
-      TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, 12, "[hostname]", listOf("8.8.8.8"),
+      true, true, true, 222, 333, listOf("h2-raw.domain"), 543, 567, 678, 910, "v1.2.3",
+      "com.mydomain.myapp", TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")), emptyList(), emptyMap()
     )
 
@@ -49,6 +49,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_query_timeout 321s")
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
+    assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.cares")
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": true}")
@@ -62,6 +63,9 @@ class EnvoyConfigurationTest {
 
     // H2 Hostnames
     assertThat(resolvedTemplate).contains("&h2_raw_domains [\"h2-raw.domain\"]")
+
+    // Per Host Limits
+    assertThat(resolvedTemplate).contains("&max_connections_per_host 543")
 
     // Metadata
     assertThat(resolvedTemplate).contains("os: Android")
@@ -89,8 +93,8 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving with alternate values also sets appropriate config`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false,
-      false, false, 222, 333, emptyList(), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, 12, "[hostname]", emptyList(), false,
+      false, false, 222, 333, emptyList(), 543, 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
       TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")), emptyList(), emptyMap()
     )
@@ -111,8 +115,8 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolve templates with invalid templates will throw on build`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false,
-      false, false, 123, 123, emptyList(), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, 12, "[hostname]", emptyList(), false,
+      false, false, 123, 123, emptyList(), 543, 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
       TrustChainVerification.ACCEPT_UNTRUSTED, "[test]", emptyList(), emptyList(), emptyMap()
     )
 
@@ -127,8 +131,8 @@ class EnvoyConfigurationTest {
   @Test
   fun `cannot configure both statsD and gRPC stat sink`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", 5050, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false,
-      false, false, 123, 123, emptyList(), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
+      false, "stats.foo.com", 5050, 123, 234, 345, 456, 321, 12, "[hostname]", emptyList(), false,
+      false, false, 123, 123, emptyList(), 543, 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
       TrustChainVerification.ACCEPT_UNTRUSTED, "[test]", emptyList(), emptyList(), emptyMap()
     )
 
@@ -143,9 +147,9 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving multiple h2 raw domains`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8"), true,
-      true, true, 222, 333, listOf("h2-raw.domain", "h2-raw.domain2"), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
-      TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, 12, "[hostname]", listOf("8.8.8.8"), true,
+      true, true, 222, 333, listOf("h2-raw.domain", "h2-raw.domain2"), 543, 567, 678, 910, "v1.2.3",
+      "com.mydomain.myapp", TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")), emptyList(), emptyMap()
     )
 
@@ -159,8 +163,9 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving multiple dns fallback nameservers`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8", "1.1.1.1"), true,
-      true, true, 222, 333, listOf("h2-raw.domain", "h2-raw.domain2"), 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, 12, "[hostname]",
+      listOf("8.8.8.8", "1.1.1.1"), true, true, true, 222, 333,
+      listOf("h2-raw.domain", "h2-raw.domain2"), 543, 567, 678, 910, "v1.2.3", "com.mydomain.myapp",
       TrustChainVerification.ACCEPT_UNTRUSTED, "[test]",
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")), emptyList(), emptyMap()
     )

@@ -34,19 +34,21 @@ const char* route_cache_reset_filter_insert = R"(
 const std::string config_header = R"(
 !ignore default_defs:
 - &connect_timeout 30s
-- &dns_refresh_rate 60s
 - &dns_fail_base_interval 2s
 - &dns_fail_max_interval 10s
 - &dns_query_timeout 25s
 - &dns_lookup_family V4_PREFERRED
+- &dns_min_refresh_rate 60s
 - &dns_multiple_addresses false
 - &dns_preresolve_hostnames []
+- &dns_refresh_rate 60s
 - &dns_resolver_name envoy.network.dns_resolver.cares
 - &dns_resolver_config {"@type":"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig"}
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
 - &h2_raw_domains []
+- &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
 - &stats_flush_interval 60s
@@ -280,6 +282,7 @@ R"(
                 // There is no way to disable so the value below is equivalent to 24 hours.
 R"(
                 host_ttl: 86400s
+                dns_min_refresh_rate: *dns_min_refresh_rate
                 dns_refresh_rate: *dns_refresh_rate
                 dns_failure_refresh_rate:
                   base_interval: *dns_fail_base_interval
@@ -333,17 +336,15 @@ R"(
         keepalive_time: 10
     circuit_breakers: &circuit_breakers_settings
       thresholds:
-        - priority: DEFAULT
-          # Don't impose limits on concurrent retries.
-          retry_budget:
-            budget_percent:
-              value: 100
-            min_retry_concurrency: 0xffffffff # uint32 max
-)"  // Used to reap dead connections. In mobile devices it is less important to keep a "host" ejected
-    // a long period and more important to be able to cycle connections assigned to given hosts.
-    // Therefore, the ejection time is short and the interval for unejection is tight, but not too
-    // tight to cause unnecessary churn.
-R"(
+      - priority: DEFAULT
+        # Don't impose limits on concurrent retries.
+        retry_budget:
+          budget_percent:
+            value: 100
+          min_retry_concurrency: 0xffffffff # uint32 max
+      per_host_thresholds:
+      - priority: DEFAULT
+        max_connections: *max_connections_per_host
     typed_extension_protocol_options: *alpn_protocol_options
   - name: base_clear
     connect_timeout: *connect_timeout

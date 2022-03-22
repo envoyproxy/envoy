@@ -56,6 +56,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mDnsFailureRefreshSecondsBase = 2;
   private int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 25;
+  private int mDnsMinRefreshSeconds = 60;
   private String mDnsPreresolveHostnames = "[]";
   private List<String> mDnsFallbackNameservers = Collections.emptyList();
   private boolean mEnableDnsFilterUnroutableFamilies = false;
@@ -64,6 +65,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000;
   private int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private List<String> mH2RawDomains = Collections.emptyList();
+  private int mMaxConnectionsPerHost = 7;
   private int mStatsFlushSeconds = 60;
   private int mStreamIdleTimeoutSeconds = 15;
   private int mPerTryIdleTimeoutSeconds = 15;
@@ -118,11 +120,12 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mStatsDPort, mConnectTimeoutSeconds,
         mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
-        mDnsQueryTimeoutSeconds, mDnsPreresolveHostnames, mDnsFallbackNameservers,
-        mEnableDnsFilterUnroutableFamilies, mEnableHappyEyeballs, mEnableInterfaceBinding,
-        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
-        mH2RawDomains, mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds,
-        mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters, nativeFilterChain,
-        platformFilterChain, stringAccessors);
+        mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames,
+        mDnsFallbackNameservers, mEnableDnsFilterUnroutableFamilies, mEnableHappyEyeballs,
+        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
+        mH2ConnectionKeepaliveTimeoutSeconds, mH2RawDomains, mMaxConnectionsPerHost,
+        mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
+        mAppId, mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
+        stringAccessors);
   }
 }
