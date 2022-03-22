@@ -387,6 +387,7 @@ public:
     resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
                                                (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
   }
+  bool isCaresDefaultTheOnlyNameserver() { return resolver_->isCaresDefaultTheOnlyNameserver(); }
 
 private:
   DnsResolverImpl* resolver_;
@@ -477,7 +478,12 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
   EXPECT_EQ(resolvers->family, AF_INET);
-  EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  if (peer->isCaresDefaultTheOnlyNameserver()) {
+    // If cares default is the only name server, the resolver will use the fallback option.
+    EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  } else {
+    EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  }
   ares_free_data(resolvers);
 }
 

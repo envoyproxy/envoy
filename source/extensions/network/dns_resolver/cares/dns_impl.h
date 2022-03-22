@@ -165,6 +165,9 @@ private:
   const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
+  // Latch the value of isCaresDefaultTheOnlyNameserver as failover resolvers
+  // break the lookup function.
+  absl::optional<bool> only_has_cares_default_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

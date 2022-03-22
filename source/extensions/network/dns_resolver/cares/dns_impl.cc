@@ -85,6 +85,9 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
 }
 
 bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
+  if (only_has_cares_default_.has_value()) {
+    return only_has_cares_default_.value();
+  }
   struct ares_addr_port_node* servers{};
   int result = ares_get_servers_ports(channel_, &servers);
   RELEASE_ASSERT(result == ARES_SUCCESS, "failure in ares_get_servers_ports");
@@ -96,6 +99,7 @@ bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
   if (servers != nullptr) {
     ares_free_data(servers);
   }
+  only_has_cares_default_ = has_only_default_nameserver;
   return has_only_default_nameserver;
 }
 
