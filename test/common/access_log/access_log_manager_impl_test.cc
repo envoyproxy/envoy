@@ -442,7 +442,7 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
     }
   }
   waitForCounterEq("filesystem.reopen_failed", 1);
-  waitForGaugeEq("filesystem.write_total_buffered",0);
+  waitForGaugeEq("filesystem.write_total_buffered", 0);
 }
 
 TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
