@@ -1222,7 +1222,7 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_server_stats",
         ":quiche_common_platform_testvalue",
-        "@envoy//source/common/quic/platform:quic_platform_base_impl_lib",
+        "@envoy//source/common/quic/platform:quic_base_impl_lib",
     ],
 )
 
@@ -1243,7 +1243,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        "@envoy//test/common/quic/platform:quiche_common_platform_test_helpers_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
     ],
 )
 
@@ -1362,7 +1362,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_test",
-        "@envoy//test/common/quic/platform:quiche_common_platform_test_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
 )
 
@@ -2332,7 +2332,7 @@ envoy_cc_library(
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
-        "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
     ],
 )
 
@@ -4272,7 +4272,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
     ],
 )
 
@@ -4286,7 +4286,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_logging_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
     ],
 )
 
@@ -4357,7 +4357,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_hostname_utils_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_hostname_utils_impl_lib",
     ],
 )
 
@@ -4370,7 +4370,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_platform_thread_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
     ],
 )
 
@@ -4383,7 +4383,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_platform_test_output_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
     ],
 )
 
@@ -4410,7 +4410,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_platform_expect_bug_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
     ],
 )
 
@@ -4423,7 +4423,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_platform_mock_log_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_mock_log_impl_lib",
     ],
 )
 
@@ -4437,7 +4437,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_error_code_wrappers_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_error_code_wrappers_impl_lib",
     ],
 )
 
@@ -4452,7 +4452,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_udp_socket_platform_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_udp_socket_platform_impl_lib",
     ],
 )
 
@@ -4466,7 +4466,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_server_stats_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_server_stats_impl_lib",
     ],
 )
 
@@ -4480,7 +4480,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_stack_trace_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib",
     ],
 )
 
@@ -4555,7 +4555,7 @@ envoy_cc_library(
         ":quiche_common_platform_testvalue_impl_lib",
         ":quiche_common_platform_thread_local_impl_lib",
         ":quiche_common_platform_time_utils_impl_lib",
-        "@envoy//source/common/quic/platform:quiche_common_platform_mem_slice_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
     ],
 )
 
@@ -4638,7 +4638,7 @@ envoy_cc_test_library(
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_platform",
-        "@envoy//test/common/quic/platform:quiche_common_platform_test_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
 )
 
@@ -4668,7 +4668,7 @@ envoy_cc_test_library(
         ":quiche_common_platform",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
-        "@envoy//test/common/quic/platform:quiche_common_platform_test_impl_lib",
+        "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
 )
 
