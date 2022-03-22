@@ -181,11 +181,12 @@ protected:
   // Set the required idle callback on the pool.
   void setupPool(ConnectionPool::Instance& pool);
 
-  // Return origin if the remote host has IP address.
-  absl::optional<AlternateProtocolsCache::Origin> originFromHost() const;
-
 private:
   friend class ConnectivityGridForTest;
+
+  // Return origin of the remote host. If the host doesn't have an IP address,
+  // the port of the origin will be 0.
+  AlternateProtocolsCache::Origin getOrigin() const;
 
   // Called by each pool as it idles. The grid is responsible for calling
   // idle_callbacks_ once all pools have idled.

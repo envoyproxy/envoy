@@ -9,7 +9,6 @@
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/common/http/common.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -243,18 +242,14 @@ protected:
     }
   }
 
-  int getSrtt(std::string alt_svc) {
-    NiceMock<Http::MockHttp3StatusTrackerCallback> callback_;
-    auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(
-        Http::AlternateProtocolsCache::Origin("https", "hostname", 12345), alt_svc, *dispatcher_,
-        callback_, true);
-    return data.has_value() ? data.value().srtt.count() : 0;
-  }
-
-protected:
   bool use_http2_{false};
 };
 
+int getSrtt(std::string alt_svc, TimeSource& time_source) {
+  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source,
+                                                                      /*from_cache=*/false);
+  return data.has_value() ? data.value().srtt.count() : 0;
+}
 // Test auto-config with a pre-populated HTTP/3 alt-svc entry. The upstream request will
 // occur over HTTP/3.
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
@@ -267,12 +262,12 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
     // Make sure that srtt is updated.
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     alt_svc = TestEnvironment::readFileToStringForTest(filename);
-    if (getSrtt(alt_svc) != 0) {
+    if (getSrtt(alt_svc, timeSystem()) != 0) {
       break;
     }
     timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   }
-  EXPECT_NE(getSrtt(alt_svc), 0) << alt_svc;
+  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << alt_svc;
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

@@ -92,9 +92,11 @@ public:
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
 
   bool isHttp3Confirmed() const {
-    absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
+    ASSERT(host_->address()->type() == Network::Address::Type::Ip);
+    AlternateProtocolsCache::Origin origin{"https", host_->hostname(),
+                                           host_->address()->ip()->port()};
     OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
-        alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+        alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
     ASSERT(http3_status_tracker.has_value());
     return http3_status_tracker->isHttp3Confirmed();
   }

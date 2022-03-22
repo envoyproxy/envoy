@@ -1,5 +1,7 @@
 #include "source/common/http/conn_pool_grid.h"
 
+#include <cstdint>
+
 #include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
 
@@ -349,29 +351,28 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-absl::optional<AlternateProtocolsCache::Origin> ConnectivityGrid::originFromHost() const {
+AlternateProtocolsCache::Origin ConnectivityGrid::getOrigin() const {
+  uint32_t port{0};
   if (host_->address()->type() != Network::Address::Type::Ip) {
     ENVOY_LOG_MISC(error, "Address is not an IP address");
     ASSERT(false);
-    return absl::nullopt;
+  } else {
+    port = host_->address()->ip()->port();
   }
-  uint32_t port = host_->address()->ip()->port();
   // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
   return AlternateProtocolsCache::Origin("https", host_->hostname(), port);
 }
 
 bool ConnectivityGrid::isHttp3Broken() const {
-  absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
   OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
-      alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+      alternate_protocols_->getOrCreateHttp3StatusTracker(getOrigin());
   ASSERT(http3_status_tracker.has_value());
   return http3_status_tracker->isHttp3Broken();
 }
 
 void ConnectivityGrid::markHttp3Broken() {
-  absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
   OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
-      alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+      alternate_protocols_->getOrCreateHttp3StatusTracker(getOrigin());
   if (!http3_status_tracker.has_value()) {
     return;
   }
@@ -379,9 +380,8 @@ void ConnectivityGrid::markHttp3Broken() {
 }
 
 void ConnectivityGrid::markHttp3Confirmed() {
-  absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
   OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
-      alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+      alternate_protocols_->getOrCreateHttp3StatusTracker(getOrigin());
   if (!http3_status_tracker.has_value()) {
     return;
   }

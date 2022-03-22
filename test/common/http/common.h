@@ -5,7 +5,6 @@
 #include "envoy/http/conn_pool.h"
 
 #include "source/common/http/codec_client.h"
-#include "source/common/http/http3_status_tracker_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -69,5 +68,4 @@ class HttpTestUtility {
 public:
   static void addDefaultHeaders(Http::RequestHeaderMap& headers, bool overwrite = true);
 };
-
 } // namespace Envoy
