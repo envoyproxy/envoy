@@ -13,6 +13,10 @@ if readelf -hW "${ENVOY_BIN}" | grep "Type" | grep -o "DYN (Shared object file)"
   echo "${ENVOY_BIN} is a PIE!"
   exit 0
 fi
+if readelf -hW "${ENVOY_BIN}" | grep "Type" | grep -o "DYN (Position-Independent Executable file)"; then
+  echo "${ENVOY_BIN} is a PIE!"
+  exit 0
+fi
 
 echo "${ENVOY_BIN} is not a PIE!"
 exit 1
