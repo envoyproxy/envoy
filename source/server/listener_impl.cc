@@ -671,7 +671,7 @@ void ListenerImpl::buildSocketOptions() {
       if (config_.connection_balance_config().has_exact_balance()) {
         connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
       } else if (config_.connection_balance_config().has_extend_balance()) {
-        //TODO(@daixiang0) implement extend balancer.
+        // TODO(@daixiang0) implement extend balancer.
       }
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
