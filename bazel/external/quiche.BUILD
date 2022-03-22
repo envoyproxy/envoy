@@ -4397,7 +4397,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        ":quiche_common_platform_stream_buffer_allocator_impl",
+        ":quiche_common_platform_stream_buffer_allocator_impl_lib",
     ],
 )
 
@@ -4509,7 +4509,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_stream_buffer_allocator_impl",
+    name = "quiche_common_platform_stream_buffer_allocator_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_stream_buffer_allocator_impl.h",
     ],
