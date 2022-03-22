@@ -54,15 +54,22 @@ Example of the default Envoy access log format:
   [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
   "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
 
-For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`, some :ref:`command operators <config_access_log_command_operators>`
-are reused to record stats. Recommended access log format for UDP proxy:
+For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`, :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`
+is used to record stats. Recommended access log format for UDP proxy:
 
 .. code-block:: none
 
-  [%START_TIME%] %ROUTE_NAME% %BYTES_SENT% %BYTES_RECEIVED% %DOWNSTREAM_HEADER_BYTES_SENT%
-  %DOWNSTREAM_HEADER_BYTES_RECEIVED% %DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED%
-  %UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT%
-  %UPSTREAM_WIRE_BYTES_RECEIVED%\n
+  [%START_TIME%] %DYNAMIC_METADATA(udp.proxy:cluster_name)%
+  %DYNAMIC_METADATA(udp.proxy:bytes_sent)%
+  %DYNAMIC_METADATA(udp.proxy:bytes_received)%
+  %DYNAMIC_METADATA(udp.proxy:errors_sent)%
+  %DYNAMIC_METADATA(udp.proxy:errors_received)%
+  %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
+  %DYNAMIC_METADATA(udp.proxy:datagrams_received)%
+  %DYNAMIC_METADATA(udp.proxy:sess_total)%
+  %DYNAMIC_METADATA(udp.proxy:idle_timeout)%
+  %DYNAMIC_METADATA(udp.proxy:none_healthy)%
+  %DYNAMIC_METADATA(udp.proxy:no_route)%\n
 
 .. _config_access_log_format_dictionaries:
 
@@ -191,7 +198,7 @@ The following command operators are supported:
     Downstream bytes received on connection.
 
   UDP
-    Total number of downstream bytes received from the upstream.
+    Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
 
@@ -258,7 +265,7 @@ The following command operators are supported:
     Downstream bytes sent on connection.
 
   UDP
-    Total number of downstream bytes sent to the upstream.
+    Not implemented (0).
 
 %UPSTREAM_REQUEST_ATTEMPT_COUNT%
   HTTP
@@ -278,81 +285,57 @@ The following command operators are supported:
   HTTP
     Total number of bytes sent to the upstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of downstream datagrams with no healthy host found in the upstream cluster. (reused operator for udp proxy).
 
 %UPSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
     Total number of bytes received from the upstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of downstream datagrams with no route found. (reused operator for udp proxy).
 
 %UPSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of header bytes sent to the upstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Total number of sessions. (reused operator for udp proxy).
 
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the upstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of times that session idle timeout. (reused operator for udp proxy).
 
 %DOWNSTREAM_WIRE_BYTES_SENT%
   HTTP
     Total number of bytes sent to the downstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of datagrams sent to the upstream successfully. (reused operator for udp proxy).
 
 %DOWNSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
     Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of datagrams received from the upstream successfully. (reused operator for udp proxy).
 
 %DOWNSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of header bytes sent to the downstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of errors that have occurred When sending datagrams to the upstream. (reused operator for udp proxy).
 
 %DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the downstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
-
-  UDP
-    Number of errors that have occurred When receiving datagrams from the upstream. (reused operator for udp proxy).
 
   Renders a numeric value in typed JSON logs.
 
@@ -450,7 +433,7 @@ The following command operators are supported:
     Name of the route.
 
   UDP
-    Name of the cluster (reused operator for udp proxy).
+    Not implemented ("-").
 
 %VIRTUAL_CLUSTER_NAME%
   HTTP*/gRPC
@@ -638,8 +621,24 @@ The following command operators are supported:
     * %DYNAMIC_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
 
-  TCP/UDP
+  TCP
     Not implemented ("-").
+
+  UDP
+    For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
+    NAMESPACE should be always set to "udp.proxy", optional KEYs are as followed:
+
+    * ``cluster_name``: Name of the cluster.
+    * ``bytes_sent``: Total number of downstream bytes sent to the upstream.
+    * ``bytes_received``: Total number of downstream bytes received from the upstream.
+    * ``errors_sent``: Number of errors that have occurred When sending datagrams to the upstream.
+    * ``errors_received``: Number of errors that have occurred When receiving datagrams from the upstream.
+    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully.
+    * ``datagrams_received``: Number of datagrams received from the upstream successfully.
+    * ``sess_total``: Total number of sessions.
+    * ``idle_timeout``: Number of times that session idle timeout.
+    * ``none_healthy``: Number of downstream datagrams with no healthy host found in the upstream cluster.
+    * ``no_route``: Number of downstream datagrams with no route found.
 
   .. note::
 
