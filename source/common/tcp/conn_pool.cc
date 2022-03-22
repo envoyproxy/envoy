@@ -65,7 +65,7 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     connection_->readDisable(true);
   }
-  ENVOY_BUG(event != Network::ConnectionEvent::ConnectedZeroRtt, "Unexpected 0-RTT event.");
+  ENVOY_BUG(event != Network::ConnectionEvent::ConnectedZeroRtt, "Unexpected 0-RTT event from the underlying TCP connection.");
   parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.
