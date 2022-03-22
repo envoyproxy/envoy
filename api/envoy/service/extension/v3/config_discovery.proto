@@ -17,6 +17,7 @@ option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Extension Config Discovery Service (ECDS)]
+// Extension config discovery :ref:`architecture overview <config_overview_extension_discovery>`
 
 // Return extension configurations.
 service ExtensionConfigDiscoveryService {
