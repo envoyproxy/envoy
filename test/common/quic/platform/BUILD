@@ -4,6 +4,10 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load(
+    "quiche.bzl",
+    "envoy_quiche_platform_impl_cc_test_library",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -81,14 +85,14 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_common_platform_epoll_impl_lib",
     hdrs = ["quiche_epoll_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:epoll_server_lib"],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_platform_expect_bug_impl_lib",
     hdrs = ["quiche_expect_bug_impl.h"],
     tags = ["nofips"],
@@ -98,14 +102,14 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_platform_mock_log_impl_lib",
     hdrs = ["quiche_mock_log_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:quic_platform_base"],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_platform_thread_impl_lib",
     hdrs = ["quiche_thread_impl.h"],
     tags = ["nofips"],
@@ -116,7 +120,7 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_platform_test_output_impl_lib",
     srcs = ["quiche_test_output_impl.cc"],
     hdrs = ["quiche_test_output_impl.h"],
@@ -128,13 +132,13 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_common_platform_test_impl_lib",
     hdrs = ["quiche_test_impl.h"],
     deps = ["//source/common/common:assert_lib"],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_common_platform_test_helpers_impl_lib",
     hdrs = ["quiche_test_helpers_impl.h"],
     deps = [

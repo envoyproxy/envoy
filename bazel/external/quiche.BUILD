@@ -7,6 +7,11 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
 )
+load(
+    "@envoy//bazel/external:quiche.bzl",
+    "envoy_quiche_platform_impl_cc_library",
+    "envoy_quiche_platform_impl_cc_test_library",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -22,18 +27,10 @@ licenses(["notice"])  # Apache 2
 #    "Platform impl", and must be provided by the codebase that embeds QUICHE.
 #
 # Concretely, header files in group 2 (the Platform API) #include header and
-# source files in group 3 (the Platform impl). Unfortunately, QUICHE does not
-# yet provide a built-in way to customize this dependency, e.g. to override the
-# directory or namespace in which Platform impl types are defined. Hence the
-# gross hacks in quiche.genrule_cmd, invoked from here to tweak QUICHE source
-# files into a form usable by Envoy.
-#
-# The mechanics of this will change as QUICHE evolves, supplies its own Bazel
-# buildfiles, and provides a built-in way to override platform impl directory
-# location. However, the end result (QUICHE files placed under
-# quiche/{http2,quic,spdy}/, with the Envoy-specific implementation of the
-# QUICHE platform APIs in //source/common/quic/platform/,
-# should remain largely the same.
+# source files in group 3 (the Platform impl). The #include path for these
+# files is always "quiche_platform_impl/". The files in type 3 are placed in
+# //source/common/quic/platform/ or //test/common/quic/platform/ and are
+# defined with include_prefix set to "quiche_platform_impl".
 
 src_files = glob([
     "**/*.h",
@@ -2319,14 +2316,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quiche_flag_utils_impl_lib",
-    hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    tags = ["nofips"],
-)
-
-envoy_cc_library(
     name = "quiche_common_buffer_allocator_lib",
     srcs = [
         "quiche/common/quiche_buffer_allocator.cc",
@@ -4228,21 +4217,35 @@ envoy_cc_library(
     name = "quiche_common_platform_client_stats",
     hdrs = [
         "quiche/common/platform/api/quiche_client_stats.h",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_client_stats_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [":quiche_common_platform_client_stats_impl"],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_client_stats_impl",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_client_stats_impl.h",
+    ],
 )
 
 envoy_cc_test_library(
     name = "quiche_common_platform_system_event_loop",
     hdrs = [
         "quiche/common/platform/api/quiche_system_event_loop.h",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_system_event_loop_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
+    deps = [":quiche_common_platform_system_event_loop_impl"],
+)
+
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_common_platform_system_event_loop_impl",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_system_event_loop_impl.h",
+    ],
 )
 
 envoy_cc_library(
@@ -4292,11 +4295,21 @@ envoy_cc_library(
     name = "quiche_common_platform_prefetch",
     hdrs = [
         "quiche/common/platform/api/quiche_prefetch.h",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_prefetch_impl",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_prefetch_impl",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
+    ],
     deps = [
         ":quiche_common_platform_export",
     ],
@@ -4306,15 +4319,27 @@ envoy_cc_library(
     name = "quiche_common_platform_mutex",
     srcs = [
         "quiche/common/platform/api/quiche_mutex.cc",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
     ],
     hdrs = [
         "quiche/common/platform/api/quiche_mutex.h",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_mutex_impl",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_mutex_impl",
+    srcs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
+    ],
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.h",
+    ],
     deps = [
         ":quiche_common_platform_export",
     ],
@@ -4464,11 +4489,21 @@ envoy_cc_library(
     name = "quiche_common_platform_containers",
     hdrs = [
         "quiche/common/platform/api/quiche_containers.h",
-        "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_containers_impl",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_containers_impl",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
+    ],
     deps = [
         ":quiche_common_platform_export",
     ],
@@ -4511,18 +4546,16 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_export_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_thread_local_impl.h",
     ],
-    repository = "@envoy",
-    tags = ["nofips"],
 )
 
-envoy_cc_library(
+envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_lib",
     srcs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.cc",
@@ -4532,8 +4565,6 @@ envoy_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_testvalue_impl.h",
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.h",
     ],
-    repository = "@envoy",
-    tags = ["nofips"],
     deps = [
         ":quic_platform_export",
         ":quiche_common_platform_export",

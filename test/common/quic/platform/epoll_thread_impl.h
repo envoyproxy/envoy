@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "test/common/quic/platform/quiche_thread_impl.h"
+#include "quiche_platform_impl/quiche_thread_impl.h"
 
 namespace epoll_server {
 
