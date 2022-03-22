@@ -1027,6 +1027,17 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
       },
       "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
       "ConnectionImpl::StreamImpl.*ConnectionImpl");
+
+  // Clean up
+  write_matcher_->setResumeWrites();
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_TRUE(upstream_request->complete());
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 1);
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest,
@@ -1086,6 +1097,15 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
       },
       "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
       "ConnectionImpl::StreamImpl.*ConnectionImpl");
+
+  // Clean up
+  write_matcher_->setResumeWrites();
+
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_TRUE(upstream_request->complete());
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 1);
 }
 
 } // namespace Envoy
