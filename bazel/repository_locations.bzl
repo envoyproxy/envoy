@@ -15,10 +15,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Gazelle",
         project_desc = "Bazel BUILD file generator for Go projects",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = "0.22.2",
-        sha256 = "b85f48fa105c4403326e9525ad2b2cc437babaa6e15a3fc0b1dbab0ab064bc7c",
+        version = "0.24.0",
+        sha256 = "de69a09dc70417580aabf20a28619bb3ef60d038470c7cf8442fafcf627c21cb",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
-        release_date = "2020-10-02",
+        release_date = "2021-10-11",
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
@@ -963,7 +963,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/edenhill/librdkafka/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.network.kafka_mesh"],
-        release_date = "2021-05-10",
+        release_date = "2021-05-06",
         cpe = "N/A",
     ),
     kafka_server_binary = dict(
