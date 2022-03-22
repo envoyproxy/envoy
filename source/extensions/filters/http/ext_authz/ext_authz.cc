@@ -43,24 +43,20 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
-  // If metadata_context_namespaces is specified, pass matching filter metadata to
-  // the ext_authz service.
+  // If metadata_context_namespaces is specified, pass matching filter metadata and
+  // typed filter metadata to the ext_authz service.
   envoy::config::core::v3::Metadata metadata_context;
   const auto& request_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  for (const auto& context_key : config_->metadataContextNamespaces()) {
-    const auto& metadata_it = request_metadata.find(context_key);
-    if (metadata_it != request_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    }
-  }
-  // If metadata_context_namespaces is specified, pass matching typed filter metadata to
-  // the ext_authz service as well.
   const auto& request_typed_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
-    const auto& metadata_it = request_typed_metadata.find(context_key);
-    if (metadata_it != request_typed_metadata.end()) {
+    if (const auto& metadata_it = request_metadata.find(context_key);
+        metadata_it != request_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+    if (const auto& metadata_it = request_typed_metadata.find(context_key);
+        metadata_it != request_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
