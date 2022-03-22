@@ -173,5 +173,35 @@ private:
   std::list<CallbackListEntry> callbacks_ ABSL_GUARDED_BY(lock_);
 };
 
+template <typename... CallbackArgs>
+class LazyCallbackManager : public CallbackManager<CallbackArgs...> {
+public:
+  using Callback = std::function<void(CallbackArgs...)>;
+
+  ABSL_MUST_USE_RESULT CallbackHandlePtr add(Callback callback) {
+    if (cb_manager_ == nullptr) {
+      cb_manager_ = std::make_unique<CallbackManager<CallbackArgs...>>();
+    }
+    return cb_manager_->add(callback);
+  }
+
+  void runCallbacks(CallbackArgs... args) {
+    if (cb_manager_ != nullptr) {
+      cb_manager_->runCallbacks(args...);
+    }
+  }
+
+  void runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
+    if (cb_manager_ != nullptr) {
+      cb_manager_->runCallbacksWith(run_with);
+    }
+  }
+
+  size_t size() const noexcept { return cb_manager_ != nullptr ? cb_manager_->size() : 0; }
+
+private:
+  std::unique_ptr<CallbackManager<CallbackArgs...>> cb_manager_;
+};
+
 } // namespace Common
 } // namespace Envoy
