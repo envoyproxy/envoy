@@ -55,7 +55,7 @@ public:
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-             const Server::Options& options);
+             const Server::Options& options, AccessLog::AccessLogManager& access_log_manager);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -108,6 +108,7 @@ private:
   HealthCheckerMap health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   TimeSource& time_source_;
+  AccessLog::AccessLogManager& access_log_manager_;
 
   void updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,

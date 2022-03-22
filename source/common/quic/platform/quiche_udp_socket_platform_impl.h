@@ -8,7 +8,7 @@
 
 #include <sys/socket.h>
 
-namespace quic {
+namespace quiche {
 
 const size_t kCmsgSpaceForGooglePacketHeaderImpl = 0;
 
@@ -22,4 +22,4 @@ inline bool GetGooglePacketHeadersFromControlMessageImpl(struct ::cmsghdr* /*cms
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline void SetGoogleSocketOptionsImpl(int /*fd*/) {}
 
-} // namespace quic
+} // namespace quiche

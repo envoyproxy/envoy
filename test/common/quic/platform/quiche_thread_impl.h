@@ -16,26 +16,27 @@
 
 #include "absl/synchronization/notification.h"
 
-namespace quic {
+namespace quiche {
 
-// A class representing a thread of execution in QUIC.
-class QuicThreadImpl {
+// A class representing a thread of execution in QUICHE.
+class QuicheThreadImpl {
 public:
-  QuicThreadImpl(const std::string& /*name*/)
+  QuicheThreadImpl(const std::string& /*name*/)
       : thread_factory_(Envoy::Thread::threadFactoryForTest()) {}
 
-  QuicThreadImpl(const QuicThreadImpl&) = delete;
-  QuicThreadImpl& operator=(const QuicThreadImpl&) = delete;
+  QuicheThreadImpl(const QuicheThreadImpl&) = delete;
+  QuicheThreadImpl& operator=(const QuicheThreadImpl&) = delete;
 
-  virtual ~QuicThreadImpl() {
+  virtual ~QuicheThreadImpl() {
     if (thread_ != nullptr) {
-      PANIC("QuicThread should be joined before destruction.");
+      PANIC("QuicheThread should be joined before destruction.");
     }
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Start() {
     if (thread_ != nullptr || thread_is_set_.HasBeenNotified()) {
-      PANIC("QuicThread can only be started once.");
+      PANIC("QuicheThread can only be started once.");
     }
     thread_ = thread_factory_.createThread([this]() {
       thread_is_set_.WaitForNotification();
@@ -44,9 +45,10 @@ public:
     thread_is_set_.Notify();
   }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Join() {
     if (thread_ == nullptr) {
-      PANIC("QuicThread has not been started.");
+      PANIC("QuicheThread has not been started.");
     }
     thread_->join();
     thread_ = nullptr;
@@ -59,7 +61,7 @@ protected:
     // but has not called Run() yet.
     // 2. The destructor of the derived class is called, but not the destructor
     // of this base class.
-    // 3. The child thread calls QuicThreadImpl::Run()(this function), since the destructor of the
+    // 3. The child thread calls QuicheThreadImpl::Run()(this function), since the destructor of the
     // derived class has been called.
   }
 
@@ -69,4 +71,4 @@ private:
   absl::Notification thread_is_set_; // Whether |thread_| is set in parent.
 };
 
-} // namespace quic
+} // namespace quiche
