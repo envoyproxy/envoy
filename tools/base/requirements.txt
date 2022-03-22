@@ -4,8 +4,6 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes requirements.in
 #
---index-url https://artifacts-prod-use1.pinadmin.com/artifactory/api/pypi/pinterest-python-pip-prod-virtual/simple/
-
 abstracts==0.0.12 \
     --hash=sha256:acc01ff56c8a05fb88150dff62e295f9071fc33388c42f1dfc2787a8d1c755ff
     # via
