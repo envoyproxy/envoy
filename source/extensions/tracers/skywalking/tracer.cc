@@ -54,6 +54,8 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
   if (sw8_header.has_value()) {
     trace_context.setByReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
   }
+
+  // span_entity_->setOperationName(trace_context.path());
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name, SystemTime) {
