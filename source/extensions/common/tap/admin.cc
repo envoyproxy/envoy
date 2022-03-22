@@ -160,6 +160,8 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(TraceWrapperPtr&& trace,
     // Take temporary ownership - extend lifetime
     std::shared_ptr<AttachedRequest> attached_request = weak_attached_request.lock();
     if (!attached_request) {
+      // NOTE: Cannot do much here in response to the failed post as an HTTP response code has already
+      // been sent on completion of AdminHandler::handler.
       ENVOY_LOG(debug, "attached request does not exist, not streaming trace");
       return; // No attached request, flushed already
     }
@@ -179,8 +181,12 @@ void AdminHandler::BufferedPerTapSinkHandle::submitTrace(
     // Take temporary ownership - extend lifetime
     std::shared_ptr<AttachedRequest> attached_request = weak_attached_request.lock();
     if (!attached_request) {
+      // NOTE: Cannot do much here in response to the failed post as an HTTP response code has already
+      // been sent on completion of AdminHandler::handler. Additionally we probably don't want to take
+      // any action in this event as this case may be hit in "normal" usage, depending on when the
+      // destruction of attached_request_ occurs.
       ENVOY_LOG(debug, "attached request does not exist, not buffering trace");
-      return; // No attached request, flushed already
+      return; // No attached request, flushed already.
     }
     TraceBuffer* trace_buffer = attached_request->traceBuffer();
 
@@ -239,8 +245,12 @@ void AdminHandler::AttachedRequestBuffered::onTimeout(
     // Take temporary ownership - extend lifetime
     std::shared_ptr<AttachedRequest> attached_request = weak_attached_request.lock();
     if (!attached_request) {
+      // NOTE: Cannot do much here in response to the failed post as an HTTP response code has already
+      // been sent on completion of AdminHandler::handler. Additionally we probably don't want to take
+      // any action in this event as this case may be hit in "normal" usage, depending on when the
+      // destruction of attached_request_ occurs.
       ENVOY_LOG(debug, "Timer Expiry after admin tap request completion");
-      return; // No attached request, flushed already
+      return; // No attached request, flushed already.
     }
     TraceBuffer* trace_buffer = attached_request->traceBuffer();
 
@@ -254,8 +264,8 @@ void AdminHandler::AttachedRequestBuffered::onTimeout(
     ENVOY_LOG(debug, "Timer Expiry, admin flushing buffered traces to response");
 
     // Serialize writes to the stream
-    for (const auto& el : buffer) {
-      attached_request->streamMsg(el);
+    for (const auto& trace : buffer) {
+      attached_request->streamMsg(trace);
     }
     attached_request->endStream();
   });
