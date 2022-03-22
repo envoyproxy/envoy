@@ -4397,7 +4397,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-	":quiche_common_platform_stream_buffer_allocator_impl",
+        ":quiche_common_platform_stream_buffer_allocator_impl",
     ],
 )
 
