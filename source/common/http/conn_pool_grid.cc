@@ -1,5 +1,6 @@
 #include "source/common/http/conn_pool_grid.h"
 
+#include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/http/spdy_utils.h"
@@ -348,19 +349,43 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
+absl::optional<AlternateProtocolsCache::Origin> ConnectivityGrid::originFromHost() const {
+  if (host_->address()->type() != Network::Address::Type::Ip) {
+    ENVOY_LOG_MISC(error, "Address is not an IP address");
+    ASSERT(false);
+    return absl::nullopt;
+  }
+  uint32_t port = host_->address()->ip()->port();
+  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
+  return AlternateProtocolsCache::Origin("https", host_->hostname(), port);
+}
+
 bool ConnectivityGrid::isHttp3Broken() const {
-  ASSERT(http3_status_tracker_);
-  return http3_status_tracker_->isHttp3Broken();
+  absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
+  OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
+      alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+  ASSERT(http3_status_tracker.has_value());
+  return http3_status_tracker->isHttp3Broken();
 }
 
 void ConnectivityGrid::markHttp3Broken() {
-  ASSERT(http3_status_tracker_);
-  http3_status_tracker_->markHttp3Broken();
+  absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
+  OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
+      alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+  if (!http3_status_tracker.has_value()) {
+    return;
+  }
+  http3_status_tracker->markHttp3Broken();
 }
 
 void ConnectivityGrid::markHttp3Confirmed() {
-  ASSERT(http3_status_tracker_);
-  http3_status_tracker_->markHttp3Confirmed();
+  absl::optional<AlternateProtocolsCache::Origin> origin = originFromHost();
+  OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
+      alternate_protocols_->getOrCreateHttp3StatusTracker(*origin);
+  if (!http3_status_tracker.has_value()) {
+    return;
+  }
+  http3_status_tracker->markHttp3Confirmed();
 }
 
 bool ConnectivityGrid::isIdle() const {
@@ -401,11 +426,9 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
               host_->hostname());
     return false;
   }
-  if (http3_status_tracker_ == nullptr) {
-    http3_status_tracker_ = alternate_protocols_->getHttp3StatusTracker(origin);
-    ASSERT(http3_status_tracker_ != nullptr);
-  }
-  if (http3_status_tracker_->isHttp3Broken()) {
+  OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
+      alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
+  if (http3_status_tracker->isHttp3Broken()) {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
     return false;
   }

@@ -40,7 +40,7 @@ public:
     // The last smoothed round trip time, if available.
     std::chrono::microseconds srtt;
     // The last connectivity status of HTTP/3, if available.
-    Http3StatusTrackerSharedPtr h3_status_tracker;
+    Http3StatusTrackerPtr h3_status_tracker;
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
@@ -79,7 +79,8 @@ public:
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
-  Http3StatusTrackerSharedPtr getHttp3StatusTracker(const Origin& origin) override;
+  OptRef<AlternateProtocolsCache::Http3StatusTracker>
+  getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);

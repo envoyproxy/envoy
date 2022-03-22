@@ -220,16 +220,16 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
 
-Http3StatusTrackerSharedPtr
-AlternateProtocolsCacheImpl::getHttp3StatusTracker(const Origin& origin) {
+OptRef<AlternateProtocolsCache::Http3StatusTracker>
+AlternateProtocolsCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
-    return nullptr;
+    return {};
   }
   if (entry_it->second.h3_status_tracker == nullptr) {
-    entry_it->second.h3_status_tracker = std::make_shared<Http3StatusTrackerImpl>(dispatcher_);
+    entry_it->second.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
   }
-  return entry_it->second.h3_status_tracker;
+  return makeOptRefFromPtr(entry_it->second.h3_status_tracker.get());
 }
 
 } // namespace Http
