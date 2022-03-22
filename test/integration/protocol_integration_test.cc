@@ -3298,7 +3298,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   testRouterRequestAndResponseWithBody(100, 100, false);
   const size_t header_bytes_received =
       (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 10 : 13;
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 168, 27),
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
                                      BytesCountExpectation(229, 122, 120, header_bytes_received),
                                      BytesCountExpectation(219, 109, 116, 3));
 }
