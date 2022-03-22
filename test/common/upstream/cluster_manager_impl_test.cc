@@ -474,6 +474,9 @@ public:
 };
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   AlpnTestConfigFactory alpn_factory;
   Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
       registered_factory(alpn_factory);
@@ -1090,6 +1093,9 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
@@ -4343,6 +4349,9 @@ public:
 
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
       factory);

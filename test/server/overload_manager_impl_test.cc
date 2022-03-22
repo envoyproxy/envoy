@@ -18,6 +18,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -206,7 +207,9 @@ protected:
         factory5_("envoy.resource_monitors.global_downstream_max_connections"),
         register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
         register_factory4_(factory4_), register_factory5_(factory5_),
-        api_(Api::createApiForTest(stats_)) {}
+        api_(Api::createApiForTest(stats_)) {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  }
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
@@ -246,6 +249,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 constexpr char kRegularStateConfig[] = R"YAML(

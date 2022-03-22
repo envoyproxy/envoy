@@ -7,6 +7,7 @@
 
 #include "source/common/config/utility.h"
 
+#include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
@@ -97,7 +98,9 @@ ConfigImpl::ConfigImpl(
     ENVOY_LOG(debug, "using default router filter");
 
     envoy::extensions::filters::network::sip_proxy::v3alpha::SipFilter router;
+    envoy::extensions::filters::network::sip_proxy::router::v3alpha::Router default_router;
     router.set_name(SipFilters::SipFilterNames::get().ROUTER);
+    router.mutable_typed_config()->PackFrom(default_router);
     processFilter(router);
   } else {
     for (const auto& filter : config.sip_filters()) {

@@ -271,7 +271,8 @@ TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithInvalidType
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
-      Envoy::EnvoyException, "Didn't find a registered implementation for type URL: 'foo'");
+      Envoy::EnvoyException,
+      "Didn't find a registered implementation for 'bar' with type URL: 'foo'");
 }
 
 } // namespace Network

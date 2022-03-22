@@ -7,6 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
@@ -912,6 +913,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   // We copy by value first then override if necessary.
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
     transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 

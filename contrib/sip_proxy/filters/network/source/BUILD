@@ -35,6 +35,7 @@ envoy_cc_contrib_extension(
         "//envoy/registry",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha:pkg_cc_proto",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],
 )

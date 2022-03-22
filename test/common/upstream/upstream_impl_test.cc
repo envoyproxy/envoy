@@ -2184,6 +2184,9 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
 
 // load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2225,6 +2228,9 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
 // load_balancing_policy should also be used when lb_policy is set to something else besides
 // LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -2265,6 +2271,9 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
 
 // load_balancing_policy should also be used when lb_policy is omitted.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -4017,6 +4026,8 @@ TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcher) {
       name: insecure-mode
       transport_socket:
         name: envoy.transport_sockets.raw_buffer
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:

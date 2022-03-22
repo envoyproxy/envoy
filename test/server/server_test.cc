@@ -31,6 +31,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -438,6 +439,9 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -785,6 +789,9 @@ TEST_P(ServerStatsTest, FlushStats) {
 }
 
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   auto server_thread =
@@ -811,6 +818,9 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 }
 
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -1393,9 +1403,10 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
 }
 
 TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
-      "Didn't find a registered implementation for type URL: 'test.common.config.DummyConfig'");
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/bootstrap_extensions.yaml"),
+                          EnvoyException,
+                          "Didn't find a registered implementation for 'envoy_test.bootstrap.foo' "
+                          "with type URL: 'test.common.config.DummyConfig'");
 }
 
 // Insufficient support on Windows.
@@ -1568,6 +1579,9 @@ public:
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+
   CallbacksStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
