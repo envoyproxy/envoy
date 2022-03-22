@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.thrift_proxy.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 
@@ -58,7 +59,7 @@ enum ProtocolType {
   COMPACT = 3;
 
   // The Thrift proxy will use the Thrift "Twitter" protocol implemented by the finagle library.
-  TWITTER = 4;
+  TWITTER = 4 [deprecated = true];;
 }
 
 message Trds {

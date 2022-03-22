@@ -21,9 +21,7 @@ py_binary(
     python_version = "PY2",
     deps = [
         "//test/extensions/filters/network/thrift_proxy/driver/fbthrift:fbthrift_lib",
-        "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
-        requirement("twitter.common.rpc"),
         requirement("six"),
     ],
 )
@@ -34,9 +32,7 @@ py_binary(
     python_version = "PY2",
     deps = [
         "//test/extensions/filters/network/thrift_proxy/driver/fbthrift:fbthrift_lib",
-        "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
-        requirement("twitter.common.rpc"),
         requirement("six"),
     ],
 )
