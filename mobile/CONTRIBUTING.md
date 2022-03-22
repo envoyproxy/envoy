@@ -95,6 +95,8 @@ root and run:
 ./envoy/support/bootstrap
 ```
 
+(Note, you will need to have git submodules initialized first `git submodule update --init --recursive`)
+
 From here, simply commit as normal, and you will see the signoff at the bottom
 of each commit.
 
