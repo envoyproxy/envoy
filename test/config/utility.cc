@@ -150,6 +150,7 @@ std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
     return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 )EOF";
   }
 
@@ -175,7 +176,9 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
           delayed_close_timeout:
             nanos: 10000000
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP1
           access_log:
             name: accesslog
@@ -206,13 +209,17 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
       filters:
         name: http
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP3
           access_log:
             name: file_access_log
@@ -341,7 +348,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP2
           route_config:
             name: route_config_0
@@ -615,7 +624,10 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
               config_source:
                 resource_api_version: V3
                 ads: {{}}
-            http_filters: [{{ name: envoy.filters.http.router }}]
+            http_filters:
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     )EOF",
       stat_prefix, route_config);
   return buildBaseListener(name, address, hcm);
