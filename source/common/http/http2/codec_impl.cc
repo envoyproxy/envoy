@@ -27,8 +27,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "absl/container/fixed_array.h"
 #include "absl/cleanup/cleanup.h"
+#include "absl/container/fixed_array.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 
@@ -363,6 +363,14 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   ASSERT(dispatcher.trackedObjectStackIsEmpty());
   Envoy::ScopeTrackedObjectStack stack;
   stack.add(parent_.connection_);
+
+  absl::Cleanup clear_current_stream_id = [this]() { parent_.current_stream_id_.reset(); };
+  // TODO(kbaichoo): When we add support to *ConnectionImpl::getStream* for
+  // deferred closed streams we can use their stream id here.
+  if (!stream_manager_.buffered_on_stream_close_) {
+    ASSERT(!parent_.current_stream_id_.has_value());
+    parent_.current_stream_id_.emplace(stream_id_);
+  }
 
   stack.add(parent_);
   ScopeTrackerScopeState scope{&stack, dispatcher};

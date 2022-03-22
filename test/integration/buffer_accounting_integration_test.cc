@@ -974,4 +974,118 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
                                  0);
 }
 
+TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProcessingBufferedData) {
+  config_helper_.setBufferLimits(1000, 1000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
+  initialize();
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+  codec_client_->sendData(request_encoder, 1000, false);
+  // Wait for an upstream request to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+
+  codec_client_->sendData(request_encoder, 1000, true);
+
+  // Verify codec received but is buffered as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(2000);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.request_body_.length(), 1000);
+  }));
+
+  // Set the filter to crash when processing the deferred bytes.
+  auto crash_if_over_1000 =
+      [](StreamTee& tee, Http::StreamDecoderFilterCallbacks*)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    if (tee.request_body_.length() > 1000) {
+      RELEASE_ASSERT(false, "Crashing as request body over 1000!");
+    }
+    return Http::FilterDataStatus::Continue;
+  };
+
+  // Allow draining to the upstream, and complete the stream.
+  EXPECT_DEATH(
+      {
+        EXPECT_TRUE(tee_filter_factory_.setDecodeDataCallback(0, crash_if_over_1000));
+        write_matcher_->setResumeWrites();
+        waitForNextUpstreamRequest();
+        FakeStreamPtr upstream_request = std::move(upstream_request_);
+        ASSERT_TRUE(upstream_request->complete());
+      },
+      "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
+      "ConnectionImpl::StreamImpl.*ConnectionImpl");
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest,
+       CanDumpCrashInformationWhenProcessingBufferedDataOfDeferredCloseStream) {
+  config_helper_.setBufferLimits(1000, 1000);
+  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
+                                    "true");
+  initialize();
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+  codec_client_->sendData(request_encoder, 100, true);
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request = std::move(upstream_request_);
+
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request->encodeData(1000, false);
+
+  // Wait for an upstream response to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+
+  upstream_request->encodeData(500, true);
+  ASSERT_TRUE(upstream_request->complete());
+
+  // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
+  buffer_factory_->waitUntilTotalBufferedExceeds(1500);
+  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 0);
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    absl::MutexLock l{&tee.mutex_};
+    EXPECT_EQ(tee.response_body_.length(), 1000);
+  }));
+
+  // Set the filter to crash when processing the deferred bytes.
+  auto crash_if_over_1000 =
+      [](StreamTee& tee, Http::StreamEncoderFilterCallbacks*)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    if (tee.response_body_.length() > 1000) {
+      RELEASE_ASSERT(false, "Crashing as response body over 1000!");
+    }
+    return Http::FilterDataStatus::Continue;
+  };
+
+  EXPECT_DEATH(
+      {
+        EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(0, crash_if_over_1000));
+        write_matcher_->setResumeWrites();
+        ASSERT_TRUE(response_decoder->waitForEndStream());
+      },
+      "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
+      "ConnectionImpl::StreamImpl.*ConnectionImpl");
+}
+
 } // namespace Envoy
