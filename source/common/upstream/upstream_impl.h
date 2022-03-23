@@ -485,21 +485,18 @@ public:
   addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
   }
+
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addPriorityUpdateCb(PriorityUpdateCb callback) const override {
     if (lazy_host_sets_cbs_ == nullptr) {
       lazy_host_sets_cbs_ = std::make_unique<HostSetCbLazyWrapper>();
       for (const std::unique_ptr<HostSet>& host_set : host_sets_) {
-        lazy_host_sets_cbs_->priority_update_cbs_.push_back(
-            static_cast<const HostSetImpl*>(host_set.get())
-                ->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                             const HostVector& hosts_removed) {
-                  runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
-                }));
+        addHostSetInt(static_cast<HostSetImpl*>(host_set.get()));
       }
     }
     return lazy_host_sets_cbs_->priority_update_helper_.add(callback);
   }
+
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
     return host_sets_;
   }
@@ -529,15 +526,16 @@ protected:
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-      member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   }
+
   virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                            const HostVector& hosts_removed) const {
     if (lazy_host_sets_cbs_ != nullptr) {
-      lazy_host_sets_cbs_->priority_update_helper_.runCallbacks(priority, hosts_added,
-                                                                hosts_removed);
+      runReferenceUpdateCallbacksInt(priority, hosts_added, hosts_removed);
     }
   }
+
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
@@ -545,6 +543,25 @@ protected:
 
   // Read only all host map for fast host searching. This will never be null.
   mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
+
+private:
+  void addHostSet(HostSetImpl* host_set) const {
+    if (lazy_host_sets_cbs_ != nullptr) {
+      addHostSetInt(host_set);
+    }
+  }
+
+  void addHostSetInt(HostSetImpl* host_set) const {
+    lazy_host_sets_cbs_->priority_update_cbs_.push_back(host_set->addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+          runReferenceUpdateCallbacksInt(priority, hosts_added, hosts_removed);
+        }));
+  }
+
+  void runReferenceUpdateCallbacksInt(uint32_t priority, const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) const {
+    lazy_host_sets_cbs_->priority_update_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  }
 
 private:
   // TODO(mattklein123): Remove mutable.
