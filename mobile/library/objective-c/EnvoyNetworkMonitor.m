@@ -35,7 +35,7 @@ static void _start_path_monitor() {
       dispatch_queue_create("io.envoyproxy.envoymobile.EnvoyNetworkMonitor", attrs);
   nw_path_monitor_set_queue(_path_monitor, queue);
 
-  __block envoy_status_t previousNetworkType = -1;
+  __block envoy_network_t previousNetworkType = -1;
   nw_path_monitor_set_update_handler(_path_monitor, ^(nw_path_t _Nonnull path) {
     BOOL isSatisfied = nw_path_get_status(path) == nw_path_status_satisfied;
     if (!isSatisfied) {
@@ -50,7 +50,7 @@ static void _start_path_monitor() {
     }
 
     BOOL isCellular = nw_path_uses_interface_type(path, nw_interface_type_cellular);
-    envoy_status_t network = ENVOY_NET_WWAN;
+    envoy_network_t network = ENVOY_NET_WWAN;
     if (!isCellular) {
       BOOL isWifi = nw_path_uses_interface_type(path, nw_interface_type_wifi);
       network = isWifi ? ENVOY_NET_WLAN : ENVOY_NET_GENERIC;
