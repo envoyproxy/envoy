@@ -33,6 +33,7 @@ HTTP filters
   ip_tagging_filter
   jwt_authn_filter
   kill_request_filter
+  language_filter
   local_rate_limit_filter
   lua_filter
   oauth2_filter
