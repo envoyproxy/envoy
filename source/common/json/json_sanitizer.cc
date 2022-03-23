@@ -80,7 +80,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
       auto [unicode, consumed] = decodeUtf8(reinterpret_cast<const uint8_t*>(&str[i]), n - i);
       if (consumed != 0) {
         index = unicode;
-        ENVOY_LOG_MISC(error, "unicode={}, consumed={}", unicode, consumed);
+        //ENVOY_LOG_MISC(error, "unicode={}, consumed={}", unicode, consumed);
         i += consumed - 1;
         if (index >= NumEscapes) {
           continue;
@@ -182,7 +182,7 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
     unicode = (unicode << Utf8_Shift) | (bytes[3] & ~Utf8_ContinueMask);
     consumed = 4;
   }
-  return std::make_pair(unicode, consumed);
+  return UnicodeSizePair(unicode, consumed);
 }
 
 #if 0
@@ -203,6 +203,25 @@ bool JsonSanitizer::decodeUtf8SecondByte(uint32_t byte, uint32_t& index) {
   return false;
 }
 #endif
+
+bool JsonSanitizer::isValidUtf8(absl::string_view in) {
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(in.data());
+  uint32_t size = in.size();
+  while (size != 0) {
+    if ((*data & 0x80) == 0) {
+      ++data;
+      --size;
+    } else {
+      auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(data, size);
+      if (consumed == 0) {
+        return false;
+      }
+      data += consumed;
+      size -= consumed;
+    }
+  }
+  return true;
+}
 
 } // namespace Json
 } // namespace Envoy

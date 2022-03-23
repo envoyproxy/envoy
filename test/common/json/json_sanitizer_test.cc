@@ -12,16 +12,20 @@ namespace {
 class JsonSanitizerTest : public testing::Test {
 protected:
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
+    EXPECT_TRUE(JsonSanitizer::isValidUtf8(str)) << "str=" << str;
     absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, str);
     std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::stringValue(std::string(str)), false, true);
-    //ENVOY_LOG_MISC(error, "hand_sanitized.size()={}", hand_sanitized.size());
     EXPECT_EQ(stripDoubleQuotes(proto_sanitized), hand_sanitized) << "str=" << str;
     return hand_sanitized;
   }
 
   void expectUnchanged(absl::string_view str) {
     EXPECT_EQ(str, sanitizeAndCheckAgainstProtobufJson(str));
+  }
+
+  std::pair<uint32_t, uint32_t> decode(absl::string_view str) {
+    return JsonSanitizer::decodeUtf8(reinterpret_cast<const uint8_t*>(str.data()), str.size());
   }
 
   JsonSanitizer sanitizer_;
@@ -35,6 +39,7 @@ TEST_F(JsonSanitizerTest, NoEscape) {
   expectUnchanged("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
   expectUnchanged("1234567890");
   expectUnchanged(" `~!@#$%^&*()_+-={}|[]");
+  expectUnchanged("Hello world, Καλημέρα κόσμε, コンニチハ");
 }
 
 TEST_F(JsonSanitizerTest, SlashChars) {
@@ -106,6 +111,17 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
       sanitizeAndCheckAgainstProtobufJson(utf8);
     }
   }
+}
+
+TEST_F(JsonSanitizerTest, MultiByteUtf8) {
+  using UnicodeSizePair = JsonSanitizer::UnicodeSizePair;
+  EXPECT_EQ(UnicodeSizePair(955, 2), decode("λ"));
+  EXPECT_EQ(UnicodeSizePair(8057, 3), decode("ό"));
+
+  // It's hard to find large unicode characters, but to test the utf8 decoder
+  // there are some in https://unicode-table.com/en/blocks/musical-symbols/
+  // with reference utf8 encoding from https://unicode-table.com/en/1D11E/
+  EXPECT_EQ(UnicodeSizePair(0x1d11e, 4), decode("\xf0\x9d\x84\x9e")); // treble clef
 }
 
 } // namespace

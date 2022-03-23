@@ -60,6 +60,17 @@ public:
    */
   absl::string_view sanitize(std::string& buffer, absl::string_view str) const;
 
+  /**
+   * Determines whether the input string is valid utf8. This is used for testing,
+   * to avoid trying to do differentials against Protobuf json sanitization, which
+   * produces noisy error messages and empty strings when presented with invalid
+   * utf8.
+   */
+  static bool isValidUtf8(absl::string_view in);
+
+  using UnicodeSizePair = std::pair<uint32_t, uint32_t>;
+  static UnicodeSizePair decodeUtf8(const uint8_t* bytes, uint32_t size);
+
 private:
   static constexpr uint32_t NumEscapes = 1 << 11; // 2^11=2048 codes possible in 2-byte utf8.
 
@@ -74,10 +85,8 @@ private:
     char chars_[7]; // No need to initialize char data, as we are not null-terminating.
   };
 
-  static bool decodeUtf8FirstByte(uint32_t& index);
-  static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
-
-  static std::pair<uint32_t, uint32_t> decodeUtf8(const uint8_t* bytes, uint32_t size);
+  //static bool decodeUtf8FirstByte(uint32_t& index);
+  //static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
 
   static uint32_t char2uint32(char c) { return static_cast<uint32_t>(static_cast<uint8_t>(c)); }
 
