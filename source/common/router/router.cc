@@ -103,14 +103,11 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
     return false;
   }
 
-  if (!policy.runtimeKey().empty()) {
-    // The default is 0/100, which means that the default for a key set but no default value
-    // explicitly set is 0% mirrored.
-    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
-                                             stable_random);
-  }
-
-  return true;
+  // The policy's default value is set correctly regardless of whether there is a runtime key
+  // or not, thus this call is sufficient for all cases (100% if no runtime set, otherwise
+  // using the default value within the runtime fractional percent setting).
+  return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
+                                           stable_random);
 }
 
 FilterUtility::TimeoutData
