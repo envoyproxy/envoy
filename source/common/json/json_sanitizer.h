@@ -21,6 +21,28 @@ namespace Json {
 //
 class JsonSanitizer {
 public:
+  // https://stackoverflow.com/questions/68835028/utf-8-hex-to-unicode-code-point-only-math
+  static constexpr uint32_t Utf8Byte1Mask    = 0b11100000;
+  static constexpr uint32_t Utf8Byte1Pattern = 0b11000000;
+  static constexpr uint32_t Utf8Byte1Shift   = 6;
+  static constexpr uint32_t Utf8ContinueMask    = 0b11000000;
+  static constexpr uint32_t Utf8ContinuePattern = 0b10000000;
+
+  static constexpr uint32_t Utf8_2ByteMask       = 0b11100000;
+  static constexpr uint32_t Utf8_2BytePattern    = 0b11000000;
+
+  static constexpr uint32_t Utf8_3ByteMask       = 0b11110000;
+  static constexpr uint32_t Utf8_3BytePattern    = 0b11100000;
+
+  static constexpr uint32_t Utf8_4ByteMask       = 0b11111000;
+  static constexpr uint32_t Utf8_4BytePattern    = 0b11110000;
+
+  static constexpr uint32_t Utf8_ContinueMask    = 0b11000000;
+  static constexpr uint32_t Utf8_ContinuePattern = 0b10000000;
+
+  static constexpr uint32_t Utf8_Shift           = 6;
+
+
   // Constructing the sanitizer fills in a table with all escape-sequences,
   // indexed by character. To make this perform well, you should instantiate the
   // sanitizer in a context that lives across a large number of sanitizations.
@@ -39,6 +61,8 @@ public:
   absl::string_view sanitize(std::string& buffer, absl::string_view str) const;
 
 private:
+  static constexpr uint32_t NumEscapes = 1 << 11; // 2^11=2048 codes possible in 2-byte utf8.
+
   // Character-indexed array of translation strings. If an entry is nullptr then
   // the character does not require substitution. This strategy is dependent on
   // the property of UTF-8 where all two-byte characters have the high-order bit
@@ -49,7 +73,15 @@ private:
     uint8_t size_{0};
     char chars_[7]; // No need to initialize char data, as we are not null-terminating.
   };
-  Escape char_escapes_[256];
+
+  static bool decodeUtf8FirstByte(uint32_t& index);
+  static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
+
+  std::pair<uint32_t, uint32_t> decodeUtf8(const uint8_t* bytes, uint32_t size);
+
+  static uint32_t char2uint32(char c) { return static_cast<uint32_t>(static_cast<uint8_t>(c)); }
+
+  Escape char_escapes_[NumEscapes];
 };
 
 } // namespace Json

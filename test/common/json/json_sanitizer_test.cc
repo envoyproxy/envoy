@@ -1,6 +1,8 @@
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/common/json/json_sanitizer_test_util.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -13,7 +15,8 @@ protected:
     absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, str);
     std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::stringValue(std::string(str)), false, true);
-    EXPECT_EQ(proto_sanitized, absl::StrCat("\"", hand_sanitized, "\"")) << "str=" << str;
+    //ENVOY_LOG_MISC(error, "hand_sanitized.size()={}", hand_sanitized.size());
+    EXPECT_EQ(stripDoubleQuotes(proto_sanitized), hand_sanitized) << "str=" << str;
     return hand_sanitized;
   }
 
@@ -70,15 +73,16 @@ TEST_F(JsonSanitizerTest, SevenBitAscii) {
   }
 }
 
+
 TEST_F(JsonSanitizerTest, Utf8) {
   // reference; https://www.charset.org/utf-8
   auto unicode = [](std::vector<uint8_t> chars) -> std::string {
     return std::string(reinterpret_cast<const char*>(&chars[0]), chars.size());
   };
 
-  expectUnchanged(unicode({0xc2, 0xa2})); // Cent.
-  expectUnchanged(unicode({0xc2, 0xa9})); // Copyright.
-  expectUnchanged(unicode({0xc3, 0xa0})); // 'a' with accent grave.
+  sanitizeAndCheckAgainstProtobufJson(unicode({0xc2, 0xa2})); // Cent.
+  sanitizeAndCheckAgainstProtobufJson(unicode({0xc2, 0xa9})); // Copyright.
+  sanitizeAndCheckAgainstProtobufJson(unicode({0xc3, 0xa0})); // 'a' with accent grave.
 }
 
 TEST_F(JsonSanitizerTest, Interspersed) {
@@ -89,6 +93,19 @@ TEST_F(JsonSanitizerTest, Interspersed) {
   EXPECT_EQ("ac\\b", sanitizeAndCheckAgainstProtobufJson("ac\b"));
   EXPECT_EQ("ac\\b", sanitizeAndCheckAgainstProtobufJson("ac\b"));
   EXPECT_EQ("\\ra\\f", sanitizeAndCheckAgainstProtobufJson("\ra\f"));
+}
+
+TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
+  char buf[2];
+  absl::string_view utf8(buf, 2);
+  for (uint32_t byte1 = 2; byte1 < 32; ++byte1) {
+    buf[0] = byte1 | JsonSanitizer::Utf8Byte1Pattern;
+    for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
+      buf[1] = byte2 | JsonSanitizer::Utf8Byte2Pattern;
+      //ENVOY_LOG_MISC(error, "byte1={}, byte2={}", byte1, byte2);
+      sanitizeAndCheckAgainstProtobufJson(utf8);
+    }
+  }
 }
 
 } // namespace

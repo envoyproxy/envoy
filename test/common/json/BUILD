@@ -3,6 +3,7 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -42,6 +43,7 @@ envoy_cc_test(
     name = "json_sanitizer_test",
     srcs = ["json_sanitizer_test.cc"],
     deps = [
+        ":json_sanitizer_test_util_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
     ],
@@ -61,8 +63,16 @@ envoy_cc_fuzz_test(
     srcs = ["json_sanitizer_fuzz_test.cc"],
     corpus = "json_sanitizer_corpus",
     deps = [
+        ":json_sanitizer_test_util_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
         "//test/fuzz:utility_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "json_sanitizer_test_util_lib",
+    srcs = ["json_sanitizer_test_util.cc"],
+    hdrs = ["json_sanitizer_test_util.h"],
+    deps = ["//source/common/json:json_sanitizer_lib"],
 )
