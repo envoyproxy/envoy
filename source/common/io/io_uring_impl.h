@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/thread_local/thread_local.h"
+
 #include "source/common/io/io_uring.h"
 
 #include "liburing.h"
@@ -7,35 +9,19 @@
 namespace Envoy {
 namespace Io {
 
-class IoUringFactoryImpl : public IoUringFactoryBase {
+class IoUringFactoryImpl : public IoUringFactory {
 public:
-  void initialize();
+  IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
+                     ThreadLocal::SlotAllocator& tls);
 
   // IoUringFactory
   IoUring& getOrCreate() const override;
-
-  // Server::Configuration::BootstrapExtensionFactory
-  Server::BootstrapExtensionPtr
-  createBootstrapExtension(const Protobuf::Message& config,
-                           Server::Configuration::ServerFactoryContext& context) override;
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return "envoy.extensions.io.io_uring"; };
+  void onServerInitialized() override;
 
 private:
-  uint32_t io_uring_size_{};
-  bool use_submission_queue_polling_{};
+  const uint32_t io_uring_size_{};
+  const bool use_submission_queue_polling_{};
   ThreadLocal::SlotPtr tls_;
-};
-
-class IoUringExtension : public Server::BootstrapExtension {
-public:
-  IoUringExtension(IoUringFactoryImpl& factory) : factory_(factory) {}
-
-  // Server::BootstrapExtension
-  void onServerInitialized() override { factory_.initialize(); }
-
-protected:
-  IoUringFactoryImpl& factory_;
 };
 
 class IoUringImpl : public IoUring, public ThreadLocal::ThreadLocalObject {
@@ -64,8 +50,6 @@ private:
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
 };
-
-DECLARE_FACTORY(IoUringFactoryImpl);
 
 } // namespace Io
 } // namespace Envoy

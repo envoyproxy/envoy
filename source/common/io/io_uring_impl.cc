@@ -2,44 +2,21 @@
 
 #include <sys/eventfd.h>
 
-#include "envoy/extensions/io/io_uring/v3/io_uring.pb.h"
-#include "envoy/extensions/io/io_uring/v3/io_uring.pb.validate.h"
-
-#include "source/common/common/utility.h"
-
 namespace Envoy {
 namespace Io {
 
-namespace {
-
-constexpr uint32_t DefaultIoUringSize = 300;
-
-} // namespace
+IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
+                                       ThreadLocal::SlotAllocator& tls)
+    : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
+      tls_(tls.allocateSlot()) {}
 
 IoUring& IoUringFactoryImpl::getOrCreate() const { return tls_->getTyped<IoUringImpl>(); }
 
-Server::BootstrapExtensionPtr
-IoUringFactoryImpl::createBootstrapExtension(const Protobuf::Message& config,
-                                             Server::Configuration::ServerFactoryContext& context) {
-  auto typed_config =
-      MessageUtil::downcastAndValidate<const envoy::extensions::io::io_uring::v3::IoUring&>(
-          config, context.messageValidationContext().staticValidationVisitor());
-  io_uring_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, io_uring_size, DefaultIoUringSize);
-  use_submission_queue_polling_ = typed_config.use_submission_queue_polling();
-
-  tls_ = context.threadLocal().allocateSlot();
-  return std::make_unique<IoUringExtension>(*this);
-}
-
-void IoUringFactoryImpl::initialize() {
+void IoUringFactoryImpl::onServerInitialized() {
   tls_->set([io_uring_size = io_uring_size_,
              use_submission_queue_polling = use_submission_queue_polling_](Event::Dispatcher&) {
     return std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
   });
-}
-
-ProtobufTypes::MessagePtr IoUringFactoryImpl::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::io::io_uring::v3::IoUring>();
 }
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
@@ -151,8 +128,6 @@ IoUringResult IoUringImpl::submit() {
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
 }
-
-REGISTER_FACTORY(IoUringFactoryImpl, Server::Configuration::BootstrapExtensionFactory);
 
 } // namespace Io
 } // namespace Envoy

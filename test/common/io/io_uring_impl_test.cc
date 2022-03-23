@@ -1,5 +1,3 @@
-#include "envoy/extensions/io/io_uring/v3/io_uring.pb.h"
-
 #include "source/common/io/io_uring_impl.h"
 
 #include "test/mocks/server/mocks.h"
@@ -14,11 +12,8 @@ namespace {
 
 class IoUringBaseTest : public ::testing::Test {
 public:
-  IoUringBaseTest() : api_(Api::createApiForTest()) {
-    envoy::extensions::io::io_uring::v3::IoUring config;
-    config.mutable_io_uring_size()->set_value(2);
-    extension_ = factory_.createBootstrapExtension(config, context_);
-    extension_->onServerInitialized();
+  IoUringBaseTest() : api_(Api::createApiForTest()), factory_(2, false, context_.threadLocal()) {
+    factory_.onServerInitialized();
   }
 
   void TearDown() override {
@@ -28,10 +23,9 @@ public:
     }
   }
 
-  IoUringFactoryImpl factory_;
   Api::ApiPtr api_;
-  Server::BootstrapExtensionPtr extension_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  IoUringFactoryImpl factory_;
 };
 
 class IoUringImplParamTest
@@ -111,16 +105,6 @@ TEST_F(IoUringImplTest, Instantiate) {
   auto& uring1 = factory_.getOrCreate();
   auto& uring2 = factory_.getOrCreate();
   EXPECT_EQ(&uring1, &uring2);
-}
-
-TEST_F(IoUringImplTest, EmptyConfig) {
-  auto factory =
-      dynamic_cast<const IoUringFactoryBase*>(ioUringFactory("envoy.extensions.io.io_uring"));
-  ASSERT_NE(factory, nullptr);
-
-  ProtobufTypes::MessagePtr config =
-      const_cast<IoUringFactoryBase*>(factory)->createEmptyConfigProto();
-  EXPECT_NE(dynamic_cast<envoy::extensions::io::io_uring::v3::IoUring*>(config.get()), nullptr);
 }
 
 TEST_F(IoUringImplTest, RegisterEventfd) {
