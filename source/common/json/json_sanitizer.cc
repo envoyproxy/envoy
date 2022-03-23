@@ -74,7 +74,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
   size_t past_escape = absl::string_view::npos;
   const uint8_t* first = reinterpret_cast<const uint8_t*>(str.data());
   const uint8_t* data = first;
-  for (uint32_t n = str.size(); n > 0; ++data, --n) {
+  for (uint32_t n = str.size(); n != 0; ++data, --n) {
     const Escape* escape = &char_escapes_[*data];
     if (escape->size_ != 0) {
       uint32_t start_of_escape = data - first;

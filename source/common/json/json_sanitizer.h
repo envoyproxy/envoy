@@ -11,23 +11,18 @@ namespace Json {
 // through protobufs, but is more than 10x faster. From
 // test/common/json/json_sanitizer_speed_test.cc:
 //
-// ---------------------------------------------------------------------
-// Benchmark                           Time             CPU   Iterations
-// ---------------------------------------------------------------------
-// BM_ProtoEncoderNoEscape          1102 ns         1102 ns       542926
-// BM_JsonSanitizerNoEscape         12.0 ns         12.0 ns     57347682
-// BM_ProtoEncoderWithEscape        1377 ns         1377 ns       507363
-// BM_JsonSanitizerWithEscape       77.3 ns         77.3 ns      8729626
+// ---------------------------------------------------------------------------
+// Benchmark                                 Time             CPU   Iterations
+// ---------------------------------------------------------------------------
+// BM_ProtoEncoderNoEscape                1089 ns         1089 ns       547657
+// BM_JsonSanitizerNoEscape               17.6 ns         17.6 ns     39777516
+// BM_StaticJsonSanitizerNoEscape         18.6 ns         18.6 ns     37789666
+// BM_ProtoEncoderWithEscape              1308 ns         1308 ns       533386
+// BM_JsonSanitizerWithEscape             96.0 ns         96.0 ns      7291029
+// BM_StaticJsonSanitizerWithEscape       96.7 ns         96.7 ns      7236032
 //
 class JsonSanitizer {
 public:
-  // https://stackoverflow.com/questions/68835028/utf-8-hex-to-unicode-code-point-only-math
-  static constexpr uint32_t Utf8Byte1Mask = 0b11100000;
-  static constexpr uint32_t Utf8Byte1Pattern = 0b11000000;
-  static constexpr uint32_t Utf8Byte1Shift = 6;
-  static constexpr uint32_t Utf8ContinueMask = 0b11000000;
-  static constexpr uint32_t Utf8ContinuePattern = 0b10000000;
-
   static constexpr uint32_t Utf8_2ByteMask = 0b11100000;
   static constexpr uint32_t Utf8_2BytePattern = 0b11000000;
 
