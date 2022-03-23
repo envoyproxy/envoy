@@ -22,26 +22,25 @@ namespace Json {
 class JsonSanitizer {
 public:
   // https://stackoverflow.com/questions/68835028/utf-8-hex-to-unicode-code-point-only-math
-  static constexpr uint32_t Utf8Byte1Mask    = 0b11100000;
+  static constexpr uint32_t Utf8Byte1Mask = 0b11100000;
   static constexpr uint32_t Utf8Byte1Pattern = 0b11000000;
-  static constexpr uint32_t Utf8Byte1Shift   = 6;
-  static constexpr uint32_t Utf8ContinueMask    = 0b11000000;
+  static constexpr uint32_t Utf8Byte1Shift = 6;
+  static constexpr uint32_t Utf8ContinueMask = 0b11000000;
   static constexpr uint32_t Utf8ContinuePattern = 0b10000000;
 
-  static constexpr uint32_t Utf8_2ByteMask       = 0b11100000;
-  static constexpr uint32_t Utf8_2BytePattern    = 0b11000000;
+  static constexpr uint32_t Utf8_2ByteMask = 0b11100000;
+  static constexpr uint32_t Utf8_2BytePattern = 0b11000000;
 
-  static constexpr uint32_t Utf8_3ByteMask       = 0b11110000;
-  static constexpr uint32_t Utf8_3BytePattern    = 0b11100000;
+  static constexpr uint32_t Utf8_3ByteMask = 0b11110000;
+  static constexpr uint32_t Utf8_3BytePattern = 0b11100000;
 
-  static constexpr uint32_t Utf8_4ByteMask       = 0b11111000;
-  static constexpr uint32_t Utf8_4BytePattern    = 0b11110000;
+  static constexpr uint32_t Utf8_4ByteMask = 0b11111000;
+  static constexpr uint32_t Utf8_4BytePattern = 0b11110000;
 
-  static constexpr uint32_t Utf8_ContinueMask    = 0b11000000;
+  static constexpr uint32_t Utf8_ContinueMask = 0b11000000;
   static constexpr uint32_t Utf8_ContinuePattern = 0b10000000;
 
-  static constexpr uint32_t Utf8_Shift           = 6;
-
+  static constexpr uint32_t Utf8_Shift = 6;
 
   // Constructing the sanitizer fills in a table with all escape-sequences,
   // indexed by character. To make this perform well, you should instantiate the
@@ -68,7 +67,17 @@ public:
    */
   static bool isValidUtf8(absl::string_view in);
 
+  /** The Unicode code-point and the number of utf8-bytes consumed */
   using UnicodeSizePair = std::pair<uint32_t, uint32_t>;
+
+  /**
+   * Decodes a byte-stream of UTF8, returning the resulting unicode and the
+   * number of bytes consumed as a pair.
+   *
+   * @param bytes The data with utf8 bytes.
+   * @param size The number of bytes available in data
+   * @return UnicodeSizePair(unicode, consumed) -- if the decode fails consumed will be 0.
+   */
   static UnicodeSizePair decodeUtf8(const uint8_t* bytes, uint32_t size);
 
 private:
@@ -85,8 +94,8 @@ private:
     char chars_[7]; // No need to initialize char data, as we are not null-terminating.
   };
 
-  //static bool decodeUtf8FirstByte(uint32_t& index);
-  //static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
+  // static bool decodeUtf8FirstByte(uint32_t& index);
+  // static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
 
   static uint32_t char2uint32(char c) { return static_cast<uint32_t>(static_cast<uint8_t>(c)); }
 

@@ -78,7 +78,6 @@ TEST_F(JsonSanitizerTest, SevenBitAscii) {
   }
 }
 
-
 TEST_F(JsonSanitizerTest, Utf8) {
   // reference; https://www.charset.org/utf-8
   auto unicode = [](std::vector<uint8_t> chars) -> std::string {
@@ -107,7 +106,6 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
     buf[0] = byte1 | JsonSanitizer::Utf8_2BytePattern;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
       buf[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
-      //ENVOY_LOG_MISC(error, "byte1={}, byte2={}", byte1, byte2);
       sanitizeAndCheckAgainstProtobufJson(utf8);
     }
   }

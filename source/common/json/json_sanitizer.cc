@@ -3,7 +3,6 @@
 #include <utility>
 
 #include "source/common/common/assert.h"
-#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -13,7 +12,7 @@ namespace Json {
 
 namespace {
 
-const uint8_t Utf8PassThrough = 0xff;
+const uint8_t Utf8PassThroughSentinel = 0xff;
 
 } // namespace
 
@@ -42,7 +41,7 @@ JsonSanitizer::JsonSanitizer() {
     memcpy(escape.chars_, escape_str.data(), escape_str.size()); // NOLINT(safe-memcpy)
   };
 
-  for (char ch : { '\0', '<', '>', '\177' }) {
+  for (char ch : {'\0', '<', '>', '\177'}) {
     unicode_escape(char2uint32(ch));
   }
 
@@ -61,11 +60,12 @@ JsonSanitizer::JsonSanitizer() {
 
   // Most high numbered unicode characters are passed through literally.
   for (uint32_t i = 0x00a0; i <= NumEscapes; ++i) {
-    char_escapes_[i].size_ = Utf8PassThrough;
+    char_escapes_[i].size_ = Utf8PassThroughSentinel;
   }
 
-  // There are a few high numbered unicode characters that protobufs quote.
-  for (uint32_t i : { 0x00ad, 0x0600, 0x0601, 0x0602, 0x0603, 0x06dd, 0x070f }) {
+  // There are a few high numbered unicode characters that protobufs quote, so
+  // we do likewise here to make differential testing/fuzzing easier.
+  for (uint32_t i : {0x00ad, 0x0600, 0x0601, 0x0602, 0x0603, 0x06dd, 0x070f}) {
     unicode_escape(i);
   }
 }
@@ -87,7 +87,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
           continue; // 3-byte and 4-byte utf-8 code-points are not in table.
         }
         escape = &char_escapes_[unicode];
-        if (escape->size_ == Utf8PassThrough) {
+        if (escape->size_ == Utf8PassThroughSentinel) {
           continue; // Most code-points are not escaped.
         }
       }
@@ -137,22 +137,19 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
   uint32_t consumed = 0;
 
   // See table in https://en.wikipedia.org/wiki/UTF-8, "Encoding" section.
-  if (size >= 2 &&
-      (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
+  if (size >= 2 && (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
       (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_2ByteMask;
     unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
     consumed = 2;
-  } else if (size >= 3 &&
-             (bytes[0] & Utf8_3ByteMask) == Utf8_3BytePattern &&
+  } else if (size >= 3 && (bytes[0] & Utf8_3ByteMask) == Utf8_3BytePattern &&
              (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
              (bytes[2] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_3ByteMask;
     unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
     unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
     consumed = 3;
-  } else if (size >= 4 &&
-             (bytes[0] & Utf8_4ByteMask) == Utf8_4BytePattern &&
+  } else if (size >= 4 && (bytes[0] & Utf8_4ByteMask) == Utf8_4BytePattern &&
              (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
              (bytes[2] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
              (bytes[3] & Utf8_ContinueMask) == Utf8_ContinuePattern) {

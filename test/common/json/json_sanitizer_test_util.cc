@@ -1,8 +1,8 @@
+#include "test/common/json/json_sanitizer_test_util.h"
+
 #include <string>
 
 #include "source/common/json/json_sanitizer.h"
-
-#include "test/common/json/json_sanitizer_test_util.h"
 
 namespace Envoy {
 namespace Json {

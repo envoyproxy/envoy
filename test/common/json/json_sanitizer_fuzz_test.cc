@@ -1,5 +1,3 @@
-#include <ostream>
-
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
 
@@ -27,14 +25,13 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // Protobuf JSON sanitizer. Otherwise we are simply ensuring that the
     // sanitizer does not crash.
     if (Envoy::Json::JsonSanitizer::isValidUtf8(input)) {
-      buffer2 = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(input), false, true);
+      buffer2 =
+          MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(input), false, true);
       absl::string_view proto_sanitized = Envoy::Json::stripDoubleQuotes(buffer2);
       if (hand_sanitized != proto_sanitized) {
         std::cerr << hand_sanitized << " != " << proto_sanitized << std::endl;
       }
       FUZZ_ASSERT(hand_sanitized == proto_sanitized);
-    } else {
-      std::cout << "Skipping differential\n";
     }
   }
 }
