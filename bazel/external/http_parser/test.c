@@ -26,8 +26,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-#define HTTP_PARSER_STRICT 1
-
 #if defined(__APPLE__)
 # undef strlncpy
 #endif  /* defined(__APPLE__) */
@@ -792,55 +790,6 @@ const struct message requests[] =
   ,.body= ""
   }
 
-#if !HTTP_PARSER_STRICT
-#define UTF8_PATH_REQ 27
-, {.name= "utf-8 path request"
-  ,.type= HTTP_REQUEST
-  ,.raw= "GET /δ¶/δt/pope?q=1#narf HTTP/1.1\r\n"
-         "Host: github.com\r\n"
-         "\r\n"
-  ,.should_keep_alive= TRUE
-  ,.message_complete_on_eof= FALSE
-  ,.http_major= 1
-  ,.http_minor= 1
-  ,.method= HTTP_GET
-  ,.query_string= "q=1"
-  ,.fragment= "narf"
-  ,.request_path= "/δ¶/δt/pope"
-  ,.request_url= "/δ¶/δt/pope?q=1#narf"
-  ,.content_length= -1
-  ,.num_headers= 1
-  ,.headers= { {"Host", "github.com" }
-             }
-  ,.body= ""
-  }
-
-#define HOSTNAME_UNDERSCORE 28
-, {.name = "hostname underscore"
-  ,.type= HTTP_REQUEST
-  ,.raw= "CONNECT home_0.netscape.com:443 HTTP/1.0\r\n"
-         "User-agent: Mozilla/1.1N\r\n"
-         "Proxy-authorization: basic aGVsbG86d29ybGQ=\r\n"
-         "\r\n"
-  ,.should_keep_alive= FALSE
-  ,.message_complete_on_eof= FALSE
-  ,.http_major= 1
-  ,.http_minor= 0
-  ,.method= HTTP_CONNECT
-  ,.query_string= ""
-  ,.fragment= ""
-  ,.request_path= ""
-  ,.request_url= "home_0.netscape.com:443"
-  ,.content_length= -1
-  ,.num_headers= 2
-  ,.upgrade=""
-  ,.headers= { { "User-agent", "Mozilla/1.1N" }
-             , { "Proxy-authorization", "basic aGVsbG86d29ybGQ=" }
-             }
-  ,.body= ""
-  }
-#endif  /* !HTTP_PARSER_STRICT */
-
 /* see https://github.com/ry/http-parser/issues/47 */
 #define EAT_TRAILING_CRLF_NO_CONNECTION_CLOSE 29
 , {.name = "eat CRLF between requests, no \"Connection: close\" header"
@@ -1326,6 +1275,30 @@ const struct message requests[] =
   ,.body= "hello world"
   ,.num_chunks_complete= 3
   ,.chunk_lengths= { 5, 6 }
+  }
+};
+
+const struct message permissive_requests[] = {
+#define UTF8_PATH_REQ 0
+ {.name= "utf-8 path request"
+  ,.type= HTTP_REQUEST
+  ,.raw= "GET /δ¶/δt/pope?q=1#narf HTTP/1.1\r\n"
+         "Host: github.com\r\n"
+         "\r\n"
+  ,.should_keep_alive= TRUE
+  ,.message_complete_on_eof= FALSE
+  ,.http_major= 1
+  ,.http_minor= 1
+  ,.method= HTTP_GET
+  ,.query_string= "q=1"
+  ,.fragment= "narf"
+  ,.request_path= "/δ¶/δt/pope"
+  ,.request_url= "/δ¶/δt/pope?q=1#narf"
+  ,.content_length= -1
+  ,.num_headers= 1
+  ,.headers= { {"Host", "github.com" }
+             }
+  ,.body= ""
   }
 };
 
@@ -1846,42 +1819,6 @@ const struct message responses[] =
   ,.num_chunks_complete= 1
   }
 
-#if !HTTP_PARSER_STRICT
-#define SPACE_IN_FIELD_RES 19
-/* Should handle spaces in header fields */
-, {.name= "field space"
-  ,.type= HTTP_RESPONSE
-  ,.raw= "HTTP/1.1 200 OK\r\n"
-         "Server: Microsoft-IIS/6.0\r\n"
-         "X-Powered-By: ASP.NET\r\n"
-         "en-US Content-Type: text/xml\r\n" /* this is the problem */
-         "Content-Type: text/xml\r\n"
-         "Content-Length: 16\r\n"
-         "Date: Fri, 23 Jul 2010 18:45:38 GMT\r\n"
-         "Connection: keep-alive\r\n"
-         "\r\n"
-         "<xml>hello</xml>" /* fake body */
-  ,.should_keep_alive= TRUE
-  ,.message_complete_on_eof= FALSE
-  ,.http_major= 1
-  ,.http_minor= 1
-  ,.status_code= 200
-  ,.response_status= "OK"
-  ,.content_length= 16
-  ,.num_headers= 7
-  ,.headers=
-    { { "Server",  "Microsoft-IIS/6.0" }
-    , { "X-Powered-By", "ASP.NET" }
-    , { "en-US Content-Type", "text/xml" }
-    , { "Content-Type", "text/xml" }
-    , { "Content-Length", "16" }
-    , { "Date", "Fri, 23 Jul 2010 18:45:38 GMT" }
-    , { "Connection", "keep-alive" }
-    }
-  ,.body= "<xml>hello</xml>"
-  }
-#endif /* !HTTP_PARSER_STRICT */
-
 #define AMAZON_COM 20
 , {.name= "amazon.com"
   ,.type= HTTP_RESPONSE
@@ -2155,6 +2092,42 @@ const struct message responses[] =
              }
   ,.body= "2\r\nOK\r\n0\r\n\r\n"
   ,.num_chunks_complete= 0
+  }
+};
+
+const struct message permissive_responses[] = {
+#define SPACE_IN_FIELD_RES 0
+ /* Should handle spaces in header fields */
+ {.name= "field space"
+  ,.type= HTTP_RESPONSE
+  ,.raw= "HTTP/1.1 200 OK\r\n"
+         "Server: Microsoft-IIS/6.0\r\n"
+         "X-Powered-By: ASP.NET\r\n"
+         "en-US Content-Type: text/xml\r\n" /* this is the problem */
+         "Content-Type: text/xml\r\n"
+         "Content-Length: 16\r\n"
+         "Date: Fri, 23 Jul 2010 18:45:38 GMT\r\n"
+         "Connection: keep-alive\r\n"
+         "\r\n"
+         "<xml>hello</xml>" /* fake body */
+  ,.should_keep_alive= TRUE
+  ,.message_complete_on_eof= FALSE
+  ,.http_major= 1
+  ,.http_minor= 1
+  ,.status_code= 200
+  ,.response_status= "OK"
+  ,.content_length= 16
+  ,.num_headers= 7
+  ,.headers=
+    { { "Server",  "Microsoft-IIS/6.0" }
+    , { "X-Powered-By", "ASP.NET" }
+    , { "en-US Content-Type", "text/xml" }
+    , { "Content-Type", "text/xml" }
+    , { "Content-Length", "16" }
+    , { "Date", "Fri, 23 Jul 2010 18:45:38 GMT" }
+    , { "Connection", "keep-alive" }
+    }
+  ,.body= "<xml>hello</xml>"
   }
 };
 
@@ -2761,7 +2734,7 @@ do {                                                                 \
 } while(0)
 
 int
-message_eq (int index, int connect, const struct message *expected)
+message_eq (int index, int connect, const struct message *expected, int permissive)
 {
   int i;
   struct message *m = &messages[index];
@@ -2796,7 +2769,7 @@ message_eq (int index, int connect, const struct message *expected)
   if (*m->request_url && m->method != HTTP_CONNECT) {
     struct http_parser_url u;
 
-    if (http_parser_parse_url(m->request_url, strlen(m->request_url), 0, &u, 0)) {
+    if (http_parser_parse_url(m->request_url, strlen(m->request_url), 0, &u, permissive)) {
       fprintf(stderr, "\n\n*** failed to parse URL %s ***\n\n",
         m->request_url);
       abort();
@@ -3483,8 +3456,6 @@ const struct url_test url_tests[] =
   ,.rv=1
   }
 
-#if HTTP_PARSER_STRICT
-
 , {.name="tab in URL"
   ,.url="/foo\tbar/"
   ,.rv=1 /* s_dead */
@@ -3495,9 +3466,14 @@ const struct url_test url_tests[] =
   ,.rv=1 /* s_dead */
   }
 
-#else /* !HTTP_PARSER_STRICT */
+, {.name="underscore in hostname"
+  ,.url="http://home_0.netscape.com:443"
+  ,.rv=1 /* s_dead */
+  }
+};
 
-, {.name="tab in URL"
+const struct url_test permissive_urls[] = {
+  {.name="tab in URL (permissive)"
   ,.url="/foo\tbar/"
   ,.u=
     {.field_set=(1 << UF_PATH)
@@ -3514,7 +3490,7 @@ const struct url_test url_tests[] =
   ,.rv=0
   }
 
-, {.name="form feed in URL"
+, {.name="form feed in URL (permissive)"
   ,.url="/foo\fbar/"
   ,.u=
     {.field_set=(1 << UF_PATH)
@@ -3530,7 +3506,24 @@ const struct url_test url_tests[] =
     }
   ,.rv=0
   }
-#endif
+
+, {.name="underscore in hostname (permissive)"
+  ,.url="http://home_0.netscape.com:443/"
+  ,.u=
+    {.field_set=(1 << UF_SCHEMA) | (1<<UF_HOST) | (1<<UF_PORT) | (1<<UF_PATH)
+    ,.port=443
+    ,.field_data=
+      {{  0,  4 } /* UF_SCHEMA */
+      ,{  7,  19 } /* UF_HOST */
+      ,{  27,  3 } /* UF_PORT */
+      ,{  30,  1 } /* UF_PATH */
+      ,{  0,  0 } /* UF_QUERY */
+      ,{  0,  0 } /* UF_FRAGMENT */
+      ,{  0,  0 } /* UF_USERINFO */
+      }
+    }
+  ,.rv=0
+  }
 };
 
 void
@@ -3554,50 +3547,59 @@ dump_url (const char *url, const struct http_parser_url *u)
   }
 }
 
+void test_parse_url_case(const struct url_test *test) {
+  struct http_parser_url u;
+  int rv;
+
+  memset(&u, 0, sizeof(u));
+
+  rv = http_parser_parse_url(test->url,
+                              test->url ? strlen(test->url) : 0,
+                              test->is_connect,
+                              &u, settings.permissive_parsing);
+
+  if (test->rv == 0) {
+    if (rv != 0) {
+      printf("\n*** http_parser_parse_url(\"%s\") \"%s\" test failed, "
+              "unexpected rv %d ***\n\n", test->url, test->name, rv);
+      abort();
+    }
+
+    if (memcmp(&u, &test->u, sizeof(u)) != 0) {
+      printf("\n*** http_parser_parse_url(\"%s\") \"%s\" failed ***\n",
+              test->url, test->name);
+
+      printf("target http_parser_url:\n");
+      dump_url(test->url, &test->u);
+      printf("result http_parser_url:\n");
+      dump_url(test->url, &u);
+
+      abort();
+    }
+  } else {
+    /* test->rv != 0 */
+    if (rv == 0) {
+      printf("\n*** http_parser_parse_url(\"%s\") \"%s\" test failed, "
+              "unexpected rv %d ***\n\n", test->url, test->name, rv);
+      abort();
+    }
+  }
+}
+
 void
 test_parse_url (void)
 {
-  struct http_parser_url u;
-  const struct url_test *test;
   unsigned int i;
-  int rv;
 
   for (i = 0; i < (sizeof(url_tests) / sizeof(url_tests[0])); i++) {
-    test = &url_tests[i];
-    memset(&u, 0, sizeof(u));
-
-    rv = http_parser_parse_url(test->url,
-                               test->url ? strlen(test->url) : 0,
-                               test->is_connect,
-                               &u, 0);
-
-    if (test->rv == 0) {
-      if (rv != 0) {
-        printf("\n*** http_parser_parse_url(\"%s\") \"%s\" test failed, "
-               "unexpected rv %d ***\n\n", test->url, test->name, rv);
-        abort();
-      }
-
-      if (memcmp(&u, &test->u, sizeof(u)) != 0) {
-        printf("\n*** http_parser_parse_url(\"%s\") \"%s\" failed ***\n",
-               test->url, test->name);
-
-        printf("target http_parser_url:\n");
-        dump_url(test->url, &test->u);
-        printf("result http_parser_url:\n");
-        dump_url(test->url, &u);
-
-        abort();
-      }
-    } else {
-      /* test->rv != 0 */
-      if (rv == 0) {
-        printf("\n*** http_parser_parse_url(\"%s\") \"%s\" test failed, "
-               "unexpected rv %d ***\n\n", test->url, test->name, rv);
-        abort();
-      }
-    }
+    test_parse_url_case(&url_tests[i]);
   }
+
+  settings.permissive_parsing = 1;
+  for (i = 0; i < ARRAY_SIZE(permissive_urls); ++i) {
+    test_parse_url_case(&permissive_urls[i]);
+  }
+  settings.permissive_parsing = 0;
 }
 
 void
@@ -3681,7 +3683,7 @@ test_message (const struct message *message)
       abort();
     }
 
-    if(!message_eq(0, 0, message)) abort();
+    if(!message_eq(0, 0, message, settings.permissive_parsing)) abort();
   }
 }
 
@@ -3716,7 +3718,7 @@ test_message_count_body (const struct message *message)
     abort();
   }
 
-  if(!message_eq(0, 0, message)) abort();
+  if(!message_eq(0, 0, message, settings_count_body.permissive_parsing)) abort();
 }
 
 void
@@ -3735,11 +3737,7 @@ test_simple_type (const char *buf,
   /* In strict mode, allow us to pass with an unexpected HPE_STRICT as
    * long as the caller isn't expecting success.
    */
-#if HTTP_PARSER_STRICT
-  if (err_expected != err && err_expected != HPE_OK && err != HPE_STRICT) {
-#else
-  if (err_expected != err) {
-#endif
+  if (err_expected != err && (settings.permissive_parsing || (err_expected != HPE_OK && err != HPE_STRICT))) {
     fprintf(stderr, "\n*** test_simple expected %s, but saw %s ***\n\n%s\n",
         http_errno_name(err_expected), http_errno_name(err), buf);
     abort();
@@ -4108,9 +4106,9 @@ test:
     abort();
   }
 
-  if (!message_eq(0, 0, r1)) abort();
-  if (message_count > 1 && !message_eq(1, 0, r2)) abort();
-  if (message_count > 2 && !message_eq(2, 0, r3)) abort();
+  if (!message_eq(0, 0, r1, 0)) abort();
+  if (message_count > 1 && !message_eq(1, 0, r2, 0)) abort();
+  if (message_count > 2 && !message_eq(2, 0, r3, 0)) abort();
 }
 
 /* SCAN through every possible breaking to make sure the
@@ -4212,17 +4210,17 @@ test:
           goto error;
         }
 
-        if (!message_eq(0, 0, r1)) {
+        if (!message_eq(0, 0, r1, 0)) {
           fprintf(stderr, "\n\nError matching messages[0] in test_scan.\n");
           goto error;
         }
 
-        if (message_count > 1 && !message_eq(1, 0, r2)) {
+        if (message_count > 1 && !message_eq(1, 0, r2, 0)) {
           fprintf(stderr, "\n\nError matching messages[1] in test_scan.\n");
           goto error;
         }
 
-        if (message_count > 2 && !message_eq(2, 0, r3)) {
+        if (message_count > 2 && !message_eq(2, 0, r3, 0)) {
           fprintf(stderr, "\n\nError matching messages[2] in test_scan.\n");
           goto error;
         }
@@ -4321,7 +4319,7 @@ test:
     abort();
   }
 
-  if(!message_eq(0, 0, msg)) abort();
+  if(!message_eq(0, 0, msg, settings_pause.permissive_parsing)) abort();
 }
 
 /* Verify that body and next message won't be parsed in responses to CONNECT */
@@ -4340,7 +4338,7 @@ test_message_connect (const struct message *msg)
     abort();
   }
 
-  if(!message_eq(0, 1, msg)) abort();
+  if(!message_eq(0, 1, msg, settings_connect.permissive_parsing)) abort();
 }
 
 int run_tests_c()
@@ -4473,6 +4471,24 @@ int run_tests_c()
       }
     }
   }
+
+  settings.permissive_parsing = 1;
+  for (i = 0; i < ARRAY_SIZE(permissive_responses); i++) {
+    test_message(&permissive_responses[i]);
+  }
+  settings.permissive_parsing = 0;
+
+  settings_pause.permissive_parsing = 1;
+  for (i = 0; i < ARRAY_SIZE(permissive_responses); i++) {
+    test_message_pause(&permissive_responses[i]);
+  }
+  settings_pause.permissive_parsing = 0;
+
+  settings_connect.permissive_parsing = 1;
+  for (i = 0; i < ARRAY_SIZE(permissive_responses); i++) {
+    test_message_connect(&permissive_responses[i]);
+  }
+  settings_connect.permissive_parsing = 0;
 
   test_message_count_body(&responses[NO_HEADERS_NO_BODY_404]);
   test_message_count_body(&responses[TRAILING_SPACE_ON_CHUNKED_BODY]);
@@ -4739,6 +4755,23 @@ int run_tests_c()
            );
 
   // puts("requests okay");
+
+  test_simple(permissive_requests[UTF8_PATH_REQ].raw, HPE_INVALID_URL);
+
+
+  settings.permissive_parsing = 1;
+  for (i = 0; i < ARRAY_SIZE(permissive_requests); i++) {
+    test_message(&permissive_requests[i]);
+  }
+  settings.permissive_parsing = 0;
+
+  settings_pause.permissive_parsing = 1;
+  for (i = 0; i < ARRAY_SIZE(permissive_requests); i++) {
+    test_message_pause(&permissive_requests[i]);
+  }
+  settings_pause.permissive_parsing = 0;
+
+  
 
   return 0;
 }
