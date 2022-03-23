@@ -1,5 +1,7 @@
 #include "source/common/json/json_sanitizer.h"
 
+#include <utility>
+
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
@@ -71,10 +73,26 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
   size_t past_escape = absl::string_view::npos;
   for (uint32_t i = 0, n = str.size(); i < n; ++i) {
     uint32_t index = char2uint32(str[i]);
-    const Escape& escape = char_escapes_[index];
-    if (escape.size_ != 0) {
+    const Escape* escape = &char_escapes_[index];
+    if (escape->size_ != 0) {
       uint32_t start_of_escape = i;
       absl::string_view escape_view;
+      auto [unicode, consumed] = decodeUtf8(reinterpret_cast<const uint8_t*>(&str[i]), n - i);
+      if (consumed != 0) {
+        index = unicode;
+        ENVOY_LOG_MISC(error, "unicode={}, consumed={}", unicode, consumed);
+        i += consumed - 1;
+        if (index >= NumEscapes) {
+          continue;
+        }
+        escape = &char_escapes_[index];
+        if (escape->size_ == Utf8PassThrough) {
+          continue;
+        }
+      }
+      escape_view = absl::string_view(escape->chars_, escape->size_);
+
+      /*
       if (decodeUtf8FirstByte(index)) {
         if ((i + 1) == n || !decodeUtf8SecondByte(char2uint32(str[i + 1]), index)) {
           // str contains only the first byte of 2-byte utf8 sequence. We will
@@ -93,6 +111,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
       } else {
         escape_view = absl::string_view(escape.chars_, escape.size_);
       }
+      */
 
       if (past_escape == absl::string_view::npos) {
         // We only initialize buffer when we first learn we need to add an
@@ -142,15 +161,15 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
       (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
       (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_2ByteMask;
-    unicode = (unicode << Utf8_Shift) | (bytes[1] & Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
     consumed = 2;
   } else if (size >= 3 &&
              (bytes[0] & Utf8_3ByteMask) == Utf8_3BytePattern &&
              (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
              (bytes[2] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_3ByteMask;
-    unicode = (unicode << Utf8_Shift) | (bytes[1] & Utf8_ContinueMask);
-    unicode = (unicode << Utf8_Shift) | (bytes[2] & Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
     consumed = 3;
   } else if (size >= 4 &&
              (bytes[0] & Utf8_4ByteMask) == Utf8_4BytePattern &&
@@ -158,14 +177,15 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
              (bytes[2] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
              (bytes[3] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_4ByteMask;
-    unicode = (unicode << Utf8_Shift) | (bytes[1] & Utf8_ContinueMask);
-    unicode = (unicode << Utf8_Shift) | (bytes[2] & Utf8_ContinueMask);
-    unicode = (unicode << Utf8_Shift) | (bytes[3] & Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[3] & ~Utf8_ContinueMask);
     consumed = 4;
   }
-  return std:;make_pair(unicode, consumed);
+  return std::make_pair(unicode, consumed);
 }
 
+#if 0
 bool JsonSanitizer::decodeUtf8FirstByte(uint32_t& index) {
   if ((index & Utf8Byte1Mask) == Utf8Byte1Pattern) {
     index &= ~Utf8Byte1Mask;
@@ -182,6 +202,7 @@ bool JsonSanitizer::decodeUtf8SecondByte(uint32_t byte, uint32_t& index) {
   }
   return false;
 }
+#endif
 
 } // namespace Json
 } // namespace Envoy

@@ -77,7 +77,7 @@ private:
   static bool decodeUtf8FirstByte(uint32_t& index);
   static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
 
-  std::pair<uint32_t, uint32_t> decodeUtf8(const uint8_t* bytes, uint32_t size);
+  static std::pair<uint32_t, uint32_t> decodeUtf8(const uint8_t* bytes, uint32_t size);
 
   static uint32_t char2uint32(char c) { return static_cast<uint32_t>(static_cast<uint8_t>(c)); }
 

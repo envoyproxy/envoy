@@ -99,9 +99,9 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
   char buf[2];
   absl::string_view utf8(buf, 2);
   for (uint32_t byte1 = 2; byte1 < 32; ++byte1) {
-    buf[0] = byte1 | JsonSanitizer::Utf8Byte1Pattern;
+    buf[0] = byte1 | JsonSanitizer::Utf8_2BytePattern;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
-      buf[1] = byte2 | JsonSanitizer::Utf8Byte2Pattern;
+      buf[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
       //ENVOY_LOG_MISC(error, "byte1={}, byte2={}", byte1, byte2);
       sanitizeAndCheckAgainstProtobufJson(utf8);
     }
