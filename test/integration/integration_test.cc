@@ -717,6 +717,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
+  config_helper_.disableDelayClose();
   initialize();
 
   // Make sure the http parser rejects having content-length and transfer-encoding: chunked
@@ -1106,13 +1107,13 @@ TEST_P(IntegrationTest, Pipeline) {
       });
   // First response should be success.
   while (response.find("200") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
 
   // Second response should be 400 (no host)
   while (response.find("400") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   connection->close();
@@ -1155,14 +1156,14 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
   // First response should be success.
   size_t pos;
   while ((pos = response.find("200")) == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
   while (response.find("200", pos + 1) == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   while (response.find("400") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
 
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
@@ -1188,12 +1189,12 @@ TEST_P(IntegrationTest, PipelineInline) {
       });
 
   while (response.find("400") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 
   while (response.find("426") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
   connection->close();

@@ -18,6 +18,7 @@ public:
   OriginalIPDetectionIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void runTest(const std::string& ip) {
+    autonomous_upstream_ = true;
     useAccessLog("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

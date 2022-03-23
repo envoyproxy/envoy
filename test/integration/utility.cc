@@ -267,12 +267,14 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
     : dispatcher_(dispatcher), remaining_bytes_to_send_(0) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  callbacks_ = std::make_unique<ConnectionCallbacks>([this, write_request_callback]() {
-    Buffer::OwnedImpl buffer;
-    const bool close_after = write_request_callback(buffer);
-    remaining_bytes_to_send_ += buffer.length();
-    client_->write(buffer, close_after);
-  });
+  callbacks_ = std::make_unique<ConnectionCallbacks>(
+      [this, write_request_callback]() {
+        Buffer::OwnedImpl buffer;
+        const bool close_after = write_request_callback(buffer);
+        remaining_bytes_to_send_ += buffer.length();
+        client_->write(buffer, close_after);
+      },
+      dispatcher);
 
   if (transport_socket == nullptr) {
     transport_socket = Network::Test::createRawBufferSocket();
@@ -307,7 +309,19 @@ void RawConnectionDriver::waitForConnection() {
   }
 }
 
-void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_.run(run_type); }
+testing::AssertionResult RawConnectionDriver::run(Event::Dispatcher::RunType run_type,
+                                                  std::chrono::milliseconds timeout) {
+  Event::TimerPtr timeout_timer = dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); });
+  timeout_timer->enableTimer(timeout);
+
+  dispatcher_.run(run_type);
+
+  if (timeout_timer->enabled()) {
+    timeout_timer->disableTimer();
+    return testing::AssertionSuccess();
+  }
+  return testing::AssertionFailure();
+}
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 

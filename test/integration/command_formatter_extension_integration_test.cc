@@ -17,6 +17,7 @@ public:
 };
 
 TEST_F(CommandFormatterExtensionIntegrationTest, BasicExtension) {
+  autonomous_upstream_ = true;
   TestCommandFactory factory;
   Registry::InjectFactory<CommandParserFactory> command_register(factory);
   std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters;
