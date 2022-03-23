@@ -109,8 +109,6 @@ envoy_quiche_platform_impl_cc_library(
         "abseil_node_hash_set",
     ],
     tags = ["nofips"],
-    deps = [
-    ],
 )
 
 envoy_quiche_platform_impl_cc_library(
@@ -129,17 +127,6 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_stream_buffer_allocator_impl_lib",
-    hdrs = [
-        "quiche_stream_buffer_allocator_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
     ],
 )
 
