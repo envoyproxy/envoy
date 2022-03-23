@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",

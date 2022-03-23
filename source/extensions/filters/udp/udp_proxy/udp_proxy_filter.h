@@ -11,6 +11,7 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
@@ -78,7 +79,8 @@ public:
         use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
         stats_(generateStats(config.stat_prefix(), context.scope())),
         // Default prefer_gro to true for upstream client traffic.
-        upstream_socket_config_(config.upstream_socket_config(), true) {
+        upstream_socket_config_(config.upstream_socket_config(), true),
+        random_(context.api().randomGenerator()){
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
@@ -103,6 +105,7 @@ public:
   const Udp::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
+  Random::RandomGenerator& randomGenerator() const { return random_; }
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
     return upstream_socket_config_;
   }
@@ -126,6 +129,7 @@ private:
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  Random::RandomGenerator& random_;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -183,6 +187,13 @@ private:
   private:
     void onIdleTimer();
     void onReadReady();
+    void fillStreamInfo();
+
+    UdpProxyDownstreamStats generateStats(Stats::Scope& scope) {
+      const auto final_prefix = absl::StrCat("udp.", cluster_.filter_.config_->randomGenerator().uuid());
+      return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                            POOL_GAUGE_PREFIX(scope, final_prefix))};
+    }
 
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -198,7 +209,7 @@ private:
       // TODO(mattklein123) change this to a reasonable number if needed.
       return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
     }
-
+    
     ClusterInfo& cluster_;
     const bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
@@ -213,6 +224,9 @@ private:
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     const Network::SocketPtr socket_;
+
+    UdpProxyDownstreamStats session_stats_;
+    absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
@@ -354,16 +368,12 @@ private:
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
   void onClusterRemoval(const std::string& cluster_name) override;
 
-  void fillStreamInfo();
-
   const UdpProxyFilterConfigSharedPtr config_;
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
   // Right now we support a single cluster to route to. It is highly likely in the future that
   // we will support additional routing options either using filter chain matching, weighting,
   // etc.
   absl::optional<ClusterInfoPtr> cluster_info_;
-
-  absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
 };
 
 } // namespace UdpProxy

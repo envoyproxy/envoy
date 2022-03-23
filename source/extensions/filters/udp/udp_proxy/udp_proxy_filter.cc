@@ -14,11 +14,6 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-  if (!config->accessLogs().empty()) {
-    udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(config->timeSource(), nullptr));
-    ASSERT(udp_sess_stats_.has_value());
-  }
-
   Upstream::ThreadLocalCluster* cluster =
       config->clusterManager().getThreadLocalCluster(config->cluster());
   if (cluster != nullptr) {
@@ -66,42 +61,6 @@ Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) 
 }
 
 UdpProxyFilter::~UdpProxyFilter() {
-  if (!config_->accessLogs().empty()) {
-    fillStreamInfo();
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
-    }
-  }
-}
-
-void UdpProxyFilter::fillStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
-  auto& fields_map = *stats_obj.mutable_fields();
-  if (cluster_info_.has_value()) {
-    fields_map["cluster_name"] =
-        ValueUtil::stringValue(cluster_info_.value()->cluster_.info()->name());
-    fields_map["none_healthy"] = ValueUtil::numberValue(
-        cluster_info_.value()->cluster_.info()->stats().upstream_cx_none_healthy_.value());
-  }
-  fields_map["bytes_sent"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_tx_bytes_.value());
-  fields_map["bytes_received"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_rx_bytes_.value());
-  fields_map["errors_sent"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_tx_errors_.value());
-  fields_map["errors_received"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_rx_errors_.value());
-  fields_map["datagrams_sent"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_tx_datagrams_.value());
-  fields_map["datagrams_received"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_rx_datagrams_.value());
-
-  fields_map["sess_total"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_total_.value());
-  fields_map["idle_timeout"] = ValueUtil::numberValue(config_->stats().idle_timeout_.value());
-  fields_map["no_route"] =
-      ValueUtil::numberValue(config_->stats().downstream_sess_no_route_.value());
-  udp_sess_stats_.value().setDynamicMetadata("udp.proxy", stats_obj);
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
@@ -270,12 +229,17 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
     : cluster_(cluster), use_original_src_ip_(cluster_.filter_.config_->usingOriginalSrcIp()),
-      addresses_(std::move(addresses)), host_(host),
+      addresses_(std::move(addresses)), host_(host), 
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      socket_(cluster.filter_.createSocket(host)) {
+      socket_(cluster.filter_.createSocket(host)),
+      session_stats_(generateStats(cluster.cluster_.info()->statsScope())){
+  if (!cluster_.filter_.config_->accessLogs().empty()) {
+    udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
+    ASSERT(udp_sess_stats_.has_value());
+  }
 
   socket_->ioHandle().initializeFileEvent(
       cluster.filter_.read_callbacks_->udpListener().dispatcher(),
@@ -318,6 +282,36 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       ->resourceManager(Upstream::ResourcePriority::Default)
       .connections()
       .dec();
+
+  if (!cluster_.filter_.config_->accessLogs().empty()) {
+    fillStreamInfo();
+    for (const auto& access_log : cluster_.filter_.config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
+    }
+  }
+}
+
+void UdpProxyFilter::ActiveSession::fillStreamInfo() {
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
+  fields_map["cluster_name"] =
+      ValueUtil::stringValue(cluster_.cluster_.info()->name());
+  fields_map["bytes_sent"] =
+      ValueUtil::numberValue(session_stats_.downstream_sess_tx_bytes_.value());
+  fields_map["bytes_received"] =
+      ValueUtil::numberValue(session_stats_.downstream_sess_rx_bytes_.value());
+  fields_map["errors_sent"] =
+      ValueUtil::numberValue(session_stats_.downstream_sess_tx_errors_.value());
+  // TODO(giantcroc): Since downstream_sess_rx_errors_ is counted in onReceiveError, it seems that 
+  // no way to distinguish the number of receiving errors that occurred in each session.
+  fields_map["errors_received"] =
+      ValueUtil::numberValue(cluster_.filter_.config_->stats().downstream_sess_rx_errors_.value());
+  fields_map["datagrams_sent"] =
+      ValueUtil::numberValue(session_stats_.downstream_sess_tx_datagrams_.value());
+  fields_map["datagrams_received"] =
+      ValueUtil::numberValue(session_stats_.downstream_sess_rx_datagrams_.value());
+
+  udp_sess_stats_.value().setDynamicMetadata("udp.proxy", stats_obj);
 }
 
 void UdpProxyFilter::ActiveSession::onIdleTimer() {
@@ -353,7 +347,9 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
             host_->address()->asStringView());
   const uint64_t buffer_length = buffer.length();
   cluster_.filter_.config_->stats().downstream_sess_rx_bytes_.add(buffer_length);
+  session_stats_.downstream_sess_rx_bytes_.add(buffer_length);
   cluster_.filter_.config_->stats().downstream_sess_rx_datagrams_.inc();
+  session_stats_.downstream_sess_rx_datagrams_.inc();
 
   idle_timer_->enableTimer(cluster_.filter_.config_->sessionTimeout());
 
@@ -388,9 +384,12 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
   if (!rc.ok()) {
     cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
+    session_stats_.downstream_sess_tx_errors_.inc();
   } else {
     cluster_.filter_.config_->stats().downstream_sess_tx_bytes_.add(buffer_length);
+    session_stats_.downstream_sess_tx_bytes_.add(buffer_length);
     cluster_.filter_.config_->stats().downstream_sess_tx_datagrams_.inc();
+    session_stats_.downstream_sess_tx_datagrams_.inc();
   }
 }
 

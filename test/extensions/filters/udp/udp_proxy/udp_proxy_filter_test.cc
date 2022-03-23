@@ -366,8 +366,7 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
   const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
                                         "%DYNAMIC_METADATA(udp.proxy:datagrams_received)% "
                                         "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:sess_total)%";
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -400,21 +399,17 @@ upstream_socket_config:
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "17 3 17 3 1");
+  EXPECT_EQ(access_log_data_.value(), "17 3 17 3");
 }
 
 // Idle timeout flow.
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:sess_total)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:idle_timeout)%";
-
-  setup(accessLogConfig(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF",
-                        access_log_format));
+  )EOF"));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -431,9 +426,6 @@ cluster: fake_cluster
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-
-  filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "2 1");
 }
 
 // Verify downstream send and receive error handling.
@@ -446,8 +438,7 @@ TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
                                         "%DYNAMIC_METADATA(udp.proxy:errors_sent)% "
                                         "%DYNAMIC_METADATA(udp.proxy:errors_received)% "
                                         "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:sess_total)%";
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -493,63 +484,46 @@ cluster: fake_cluster
              ->value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 10 1 1 0 2 1");
+  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 10 1 1 0 2");
 }
 
 // No upstream host handling.
 TEST_F(UdpProxyFilterTest, NoUpstreamHost) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:none_healthy)%";
-
-  setup(accessLogConfig(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF",
-                        access_log_format));
+  )EOF"));
 
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(nullptr));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_none_healthy_.value());
-  filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "1");
 }
 
 // No cluster at filter creation.
 TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:no_route)%";
-
-  setup(accessLogConfig(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF",
-                        access_log_format),
-        false);
+  )EOF"), false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
-
-  filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "1");
 }
 
 // Dynamic cluster addition and removal handling.
 TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:sess_total)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:no_route)%";
-
-  setup(accessLogConfig(R"EOF(
+  setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF",
-                        access_log_format),
-        false);
+  )EOF"), false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
@@ -581,9 +555,6 @@ cluster: fake_cluster
   // Remove the cluster we do care about. This should purge all sessions.
   cluster_update_callbacks_->onClusterRemoval("fake_cluster");
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
-
-  filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "1 2");
 }
 
 // Hitting the maximum per-cluster connection/session circuit breaker.

@@ -65,11 +65,7 @@ is used to record stats. Recommended access log format for UDP proxy:
   %DYNAMIC_METADATA(udp.proxy:errors_sent)%
   %DYNAMIC_METADATA(udp.proxy:errors_received)%
   %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
-  %DYNAMIC_METADATA(udp.proxy:datagrams_received)%
-  %DYNAMIC_METADATA(udp.proxy:sess_total)%
-  %DYNAMIC_METADATA(udp.proxy:idle_timeout)%
-  %DYNAMIC_METADATA(udp.proxy:none_healthy)%
-  %DYNAMIC_METADATA(udp.proxy:no_route)%\n
+  %DYNAMIC_METADATA(udp.proxy:datagrams_received)%\n
 
 .. _config_access_log_format_dictionaries:
 
@@ -629,16 +625,12 @@ The following command operators are supported:
     NAMESPACE should be always set to "udp.proxy", optional KEYs are as followed:
 
     * ``cluster_name``: Name of the cluster.
-    * ``bytes_sent``: Total number of downstream bytes sent to the upstream.
-    * ``bytes_received``: Total number of downstream bytes received from the upstream.
-    * ``errors_sent``: Number of errors that have occurred When sending datagrams to the upstream.
-    * ``errors_received``: Number of errors that have occurred When receiving datagrams from the upstream.
-    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully.
-    * ``datagrams_received``: Number of datagrams received from the upstream successfully.
-    * ``sess_total``: Total number of sessions.
-    * ``idle_timeout``: Number of times that session idle timeout.
-    * ``none_healthy``: Number of downstream datagrams with no healthy host found in the upstream cluster.
-    * ``no_route``: Number of downstream datagrams with no route found.
+    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
+    * ``bytes_received``: Total number of downstream bytes received from the upstream in the session.
+    * ``errors_sent``: Number of errors that have occurred When sending datagrams to the upstream in the session.
+    * ``errors_received``: Number of errors that have occurred When receiving datagrams from the upstream in UDP proxy.
+    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
+    * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
 
   .. note::
 
