@@ -361,8 +361,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       per_host_thresholds:
       - priority: DEFAULT
         max_connections: 1
+        max_requests: 2
       - priority: HIGH
         max_connections: 990
+        max_requests: 995
     max_requests_per_connection: 3
     protocol_selection: USE_DOWNSTREAM_PROTOCOL
     http2_protocol_options:
@@ -420,6 +422,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
             cluster.info()->http1Settings().header_key_format_);
   EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
   EXPECT_EQ(990U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
+  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
+  EXPECT_EQ(995U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());

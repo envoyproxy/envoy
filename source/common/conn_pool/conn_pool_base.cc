@@ -256,12 +256,16 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     return nullptr;
   }
 
-  if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
+  auto action = host_->canCreateRequest(priority_);
+  if (action == Upstream::HostDescriptionImpl::CreateAction::FAIL) {
     ENVOY_LOG(debug, "max pending streams overflow");
     onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
                   context);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
+  } else if (action == Upstream::HostDescriptionImpl::CreateAction::QUEUE) {
+    ENVOY_LOG(debug, "queueing stream");
+    return newPendingStream(context, can_send_early_data);
   }
 
   ConnectionPool::Cancellable* pending = newPendingStream(context, can_send_early_data);
@@ -279,8 +283,10 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
                 (result == ConnectionResult::NoConnectionRateLimited ||
                  result == ConnectionResult::FailedToCreateConnection),
             fmt::format("Failed to create expected connection: {}", *this));
+
   if (result == ConnectionResult::FailedToCreateConnection) {
     // This currently only happens for HTTP/3 if secrets aren't yet loaded.
+
     // Trigger connection failure.
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
     onPoolFailure(nullptr, absl::string_view(),

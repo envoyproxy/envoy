@@ -637,7 +637,7 @@ TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
 
 // Make sure if there are more HTTP/1.1 streams in flight than connections allowed by cluster
 // circuit breakers, that excess streams are queued.
-TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
+TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnConnectionLimitCircuitBreakers) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP1);
   upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
@@ -689,5 +689,58 @@ TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
 }
 
+// Make sure if there are more HTTP/1.1 streams in flight than requests allowed by cluster
+// circuit breakers, that excess streams are queued.
+TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnRequestLimitCircuitBreakers) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      auto* per_host_thresholds = cluster->mutable_circuit_breakers()->add_per_host_thresholds();
+      per_host_thresholds->mutable_max_requests()->set_value(1);
+    }
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start sending the request, but ensure no end stream will be sent, so the
+  // stream will stay in use.
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // Make sure the headers are received.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Start another request.
+  IntegrationStreamDecoderPtr response2 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Make sure the stream is received, but no new connection is established.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 2);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+
+  // Finish the first stream.
+  codec_client_->sendData(*request_encoder_, 0, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // This should allow the second stream to complete on the original connection.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
 } // namespace
 } // namespace Envoy

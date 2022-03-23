@@ -97,6 +97,9 @@ public:
   bool canCreateConnection(Upstream::ResourcePriority priority) const override {
     return logical_host_->canCreateConnection(priority);
   }
+  CreateAction canCreateRequest(Upstream::ResourcePriority priority) const override {
+    return logical_host_->canCreateRequest(priority);
+  }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     return logical_host_->outlierDetector();

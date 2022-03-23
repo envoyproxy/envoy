@@ -155,7 +155,7 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
 
   // Test retry budgets disable remaining_retries gauge (it should always be 0).
   ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
-                         1, 0, 3, 100, stats, 20.0, 5);
+                         1, 0, 3, 100, 200, stats, 20.0, 5);
 
   EXPECT_EQ(5U, rm.retries().max());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
@@ -164,6 +164,7 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   EXPECT_EQ(1U, rm.retries().count());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
   EXPECT_EQ(100u, rm.maxConnectionsPerHost());
+  EXPECT_EQ(200u, rm.maxRequestsPerHost());
   rm.retries().dec();
 }
 } // namespace

@@ -46,6 +46,13 @@ MockHostDescription::MockHostDescription()
       .WillByDefault(Invoke([this](Upstream::ResourcePriority pri) -> bool {
         return cluster().resourceManager(pri).connections().canCreate();
       }));
+  ON_CALL(*this, canCreateRequest(_))
+      .WillByDefault(Invoke([this](Upstream::ResourcePriority pri) -> CreateAction {
+        if (cluster().resourceManager(pri).pendingRequests().canCreate()) {
+          return CREATE;
+        }
+        return FAIL;
+      }));
 }
 
 MockHostDescription::~MockHostDescription() = default;

@@ -124,6 +124,18 @@ public:
    */
   virtual bool canCreateConnection(Upstream::ResourcePriority priority) const PURE;
 
+  enum CreateAction {
+    CREATE = 1,
+    QUEUE = 2,
+    FAIL = 3,
+  };
+
+  /**
+   * @return true if the cluster can create a new request for this priority, false otherwise.
+   * @param priority the priority the connection would have.
+   */
+  virtual CreateAction canCreateRequest(Upstream::ResourcePriority priority) const PURE;
+
   /**
    * @return the host's outlier detection monitor.
    */

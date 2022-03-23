@@ -77,8 +77,8 @@ public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
                       uint64_t max_connections, uint64_t max_pending_requests,
                       uint64_t max_requests, uint64_t max_retries, uint64_t max_connection_pools,
-                      uint64_t max_connections_per_host, ClusterCircuitBreakersStats cb_stats,
-                      absl::optional<double> budget_percent,
+                      uint64_t max_connections_per_host, uint64_t max_requests_per_host,
+                      ClusterCircuitBreakersStats cb_stats, absl::optional<double> budget_percent,
                       absl::optional<uint32_t> min_retry_concurrency)
       : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_,
                      cb_stats.remaining_cx_),
@@ -89,6 +89,7 @@ public:
         connection_pools_(max_connection_pools, runtime, runtime_key + "max_connection_pools",
                           cb_stats.cx_pool_open_, cb_stats.remaining_cx_pools_),
         max_connections_per_host_(max_connections_per_host),
+        max_requests_per_host_(max_requests_per_host),
         retries_(budget_percent, min_retry_concurrency, max_retries, runtime,
                  runtime_key + "retry_budget.", runtime_key + "max_retries",
                  cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_,
@@ -101,6 +102,7 @@ public:
   ResourceLimit& retries() override { return retries_; }
   ResourceLimit& connectionPools() override { return connection_pools_; }
   uint64_t maxConnectionsPerHost() override { return max_connections_per_host_; }
+  uint64_t maxRequestsPerHost() override { return max_requests_per_host_; }
 
 private:
   class RetryBudgetImpl : public ResourceLimit {
@@ -192,6 +194,7 @@ private:
   ManagedResourceImpl requests_;
   ManagedResourceImpl connection_pools_;
   uint64_t max_connections_per_host_;
+  uint64_t max_requests_per_host_;
   RetryBudgetImpl retries_;
 };
 

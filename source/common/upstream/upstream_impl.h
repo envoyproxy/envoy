@@ -144,6 +144,17 @@ public:
     return cluster().resourceManager(priority).connections().canCreate();
   }
 
+  CreateAction canCreateRequest(Upstream::ResourcePriority priority) const override {
+    if (stats().rq_active_.value() >= cluster().resourceManager(priority).maxRequestsPerHost()) {
+      return QUEUE;
+    }
+
+    if (cluster().resourceManager(priority).pendingRequests().canCreate()) {
+      return CREATE;
+    }
+    return FAIL;
+  }
+
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;

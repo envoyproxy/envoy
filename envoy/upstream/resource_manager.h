@@ -71,6 +71,11 @@ public:
    * @return uint64_t the max number of connections per host.
    */
   virtual uint64_t maxConnectionsPerHost() PURE;
+
+  /**
+   * @return uint64_t the max number of requests per host.
+   */
+  virtual uint64_t maxRequestsPerHost() PURE;
 };
 
 } // namespace Upstream
