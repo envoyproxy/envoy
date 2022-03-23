@@ -1162,6 +1162,9 @@ TEST_F(HttpFilterTest, MetadataContext) {
   - rock.guitar
   - hiphop.drums
   - blues.piano
+  typed_metadata_context_namespaces:
+  - jazz.sax
+  - blues.piano
   )EOF");
 
   const std::string yaml = R"EOF(
