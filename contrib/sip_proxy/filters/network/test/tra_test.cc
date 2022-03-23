@@ -193,6 +193,8 @@ TEST_F(SipTraTest, GrpcClientCancel) {
 
   auto grpc_client =
       TrafficRoutingAssistant::GrpcClientImpl(async_client, std::chrono::milliseconds(2000));
+  NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
+  grpc_client.setRequestCallbacks(request_callbacks);
 
   absl::flat_hash_map<std::string, std::string> data;
   data.emplace(std::make_pair("S1F1", "10.0.0.1"));
@@ -207,6 +209,8 @@ TEST_F(SipTraTest, GrpcClientCloseStream) {
 
   auto grpc_client =
       TrafficRoutingAssistant::GrpcClientImpl(async_client, std::chrono::milliseconds(2000));
+  NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
+  grpc_client.setRequestCallbacks(request_callbacks);
 
   grpc_client.subscribeTrafficRoutingAssistant("lskpmc", span_, stream_info_);
   grpc_client.closeStream();
