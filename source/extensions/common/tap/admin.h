@@ -157,6 +157,7 @@ private:
     const envoy::config::tap::v3::TapConfig config_;
     const Server::AdminStream* admin_stream_;
     Event::Dispatcher& main_thread_dispatcher_;
+    friend class BaseAdminHandlerTest;
   };
 
   /**
@@ -177,6 +178,7 @@ private:
     Event::TimerPtr timer_;
     // Pointer to buffered traces, only exists if the sink type requires buffering multiple traces
     std::unique_ptr<TraceBuffer> trace_buffer_;
+    friend class BufferedAdminHandlerTest; // For testing Purposes
   };
 
   struct AdminPerTapSinkHandle : public PerTapSinkHandle {
@@ -210,6 +212,8 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   absl::node_hash_map<std::string, absl::node_hash_set<ExtensionConfig*>> config_id_map_;
   std::shared_ptr<AttachedRequest> attached_request_;
+  friend class BaseAdminHandlerTest;     // For testing purposes
+  friend class BufferedAdminHandlerTest; // For testing Purposes
 };
 
 } // namespace Tap
