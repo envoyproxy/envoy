@@ -91,11 +91,11 @@ typedef int (*http_cb)(http_parser*);
   XX(200, OK, OK)                                                                                  \
   XX(201, CREATED, Created)                                                                        \
   XX(202, ACCEPTED, Accepted)                                                                      \
-  XX(203, NON_AUTHORITATIVE_INFORMATION, Non - Authoritative Information)                          \
+  XX(203, NON_AUTHORITATIVE_INFORMATION, Non-Authoritative Information)                          \
   XX(204, NO_CONTENT, No Content)                                                                  \
   XX(205, RESET_CONTENT, Reset Content)                                                            \
   XX(206, PARTIAL_CONTENT, Partial Content)                                                        \
-  XX(207, MULTI_STATUS, Multi - Status)                                                            \
+  XX(207, MULTI_STATUS, Multi-Status)                                                            \
   XX(208, ALREADY_REPORTED, Already Reported)                                                      \
   XX(226, IM_USED, IM Used)                                                                        \
   XX(300, MULTIPLE_CHOICES, Multiple Choices)                                                      \
@@ -181,7 +181,7 @@ enum http_status {
   XX(22, CHECKOUT, CHECKOUT)                                                                       \
   XX(23, MERGE, MERGE)                                                                             \
   /* upnp */                                                                                       \
-  XX(24, MSEARCH, M - SEARCH)                                                                      \
+  XX(24, MSEARCH, M-SEARCH)                                                                      \
   XX(25, NOTIFY, NOTIFY)                                                                           \
   XX(26, SUBSCRIBE, SUBSCRIBE)                                                                     \
   XX(27, UNSUBSCRIBE, UNSUBSCRIBE)                                                                 \

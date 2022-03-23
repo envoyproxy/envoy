@@ -425,9 +425,10 @@ enum http_host_state
   (c) == '$' || (c) == ',')
 
 #define STRICT_TOKEN(c)     ((c == ' ') ? 0 : tokens[(unsigned char)c])
-#define IS_URL_CHAR(c)      (BIT_AT(normal_url_char, (unsigned char)c))
-#define IS_HOST_CHAR(c)     (IS_ALPHANUM(c) || (c) == '.' || (c) == '-')
-#define TOKEN(c, permissive) ((c == ' ' && !permissive) ? 0 : tokens[(unsigned char)c])
+#define IS_URL_CHAR(c, permissive)      (BIT_AT(normal_url_char, (unsigned char)c) || \
+  (permissive && (((c) & 0x80) || ((c) == '\t') || ((c) == 0x0c))))
+#define IS_HOST_CHAR(c, permissive)     (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (permissive && (c) == '_'))
+#define TOKEN(c, permissive) (((c) == ' ' && !permissive) ? 0 : tokens[(unsigned char)c])
 
 /**
  * Verify that a char is a valid visible (printable) US-ASCII
@@ -550,7 +551,7 @@ parse_url_char(enum state s, const char ch, int permissive)
       break;
 
     case s_req_path:
-      if (IS_URL_CHAR(ch) || (permissive && (ch & 0x80))) {
+      if (IS_URL_CHAR(ch, permissive)) {
         return s;
       }
 
@@ -566,7 +567,7 @@ parse_url_char(enum state s, const char ch, int permissive)
 
     case s_req_query_string_start:
     case s_req_query_string:
-      if (IS_URL_CHAR(ch)) {
+      if (IS_URL_CHAR(ch, permissive)) {
         return s_req_query_string;
       }
 
@@ -582,7 +583,7 @@ parse_url_char(enum state s, const char ch, int permissive)
       break;
 
     case s_req_fragment_start:
-      if (IS_URL_CHAR(ch)) {
+      if (IS_URL_CHAR(ch, permissive)) {
         return s_req_fragment;
       }
 
@@ -597,7 +598,7 @@ parse_url_char(enum state s, const char ch, int permissive)
       break;
 
     case s_req_fragment:
-      if (IS_URL_CHAR(ch)) {
+      if (IS_URL_CHAR(ch, permissive)) {
         return s;
       }
 
@@ -2250,14 +2251,14 @@ http_parse_host_char(enum http_host_state s, const char ch, int permissive) {
         return s_http_host_v6_start;
       }
 
-      if (IS_HOST_CHAR(ch) || (permissive && (ch == '_'))) {
+      if (IS_HOST_CHAR(ch, permissive)) {
         return s_http_host;
       }
 
       break;
 
     case s_http_host:
-      if (IS_HOST_CHAR(ch) || (permissive && (ch == '_'))) {
+      if (IS_HOST_CHAR(ch, permissive)) {
         return s_http_host;
       }
 
