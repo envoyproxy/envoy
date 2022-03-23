@@ -40,6 +40,8 @@ static_resources:
                       {}
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           http_protocol_options: {}
           upgrade_configs:
           - upgrade_type: CONNECT

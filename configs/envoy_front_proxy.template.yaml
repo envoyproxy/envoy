@@ -71,6 +71,8 @@
                 envoy_grpc:
                   cluster_name: ratelimit
         - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         add_user_agent: true
         {% if tracing %}
         tracing:

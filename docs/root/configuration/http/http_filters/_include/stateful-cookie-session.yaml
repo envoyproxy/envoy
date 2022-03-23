@@ -40,6 +40,8 @@ static_resources:
                     path: /path
                     ttl: 120s
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
   - name: service1

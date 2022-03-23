@@ -24,9 +24,13 @@ static_resources:
                   cluster: cluster1
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: AUTO
     listener_filters:
     - name: envoy.filters.listener.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   clusters:
   - name: cluster1
     type: ORIGINAL_DST

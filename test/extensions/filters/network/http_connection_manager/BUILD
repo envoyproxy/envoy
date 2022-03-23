@@ -37,6 +37,7 @@ envoy_extension_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

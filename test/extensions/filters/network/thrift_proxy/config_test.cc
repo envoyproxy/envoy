@@ -141,6 +141,8 @@ route_config:
       cluster_header: A
 thrift_filters:
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
@@ -160,6 +162,8 @@ route_config:
   name: local_route
 thrift_filters:
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
@@ -176,6 +180,8 @@ route_config:
 thrift_filters:
   - name: no_such_filter
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
@@ -198,6 +204,8 @@ thrift_filters:
       value:
         key: value
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   ThriftFilters::MockFilterConfigFactory factory;
@@ -221,6 +229,8 @@ route_config:
   name: local_route
 thrift_filters:
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
