@@ -8,11 +8,6 @@ protocol.
 
 When the files are changed on the filesystem, Envoy will automatically update its configuration.
 
-.. note::
-
-Now Enovy only get the changes when write to temporary file and rename into place, ignore overwritten directly.
-The purpose is  that atomic renames are the only way to achieve consistency.
-
 At a minimum, you will need to start Envoy configured with the following sections:
 
 - :ref:`node <start_quick_start_dynamic_fs_node>` to uniquely identify the proxy node.
@@ -29,6 +24,11 @@ retrieve stats or configuration information.
 
 The following sections walk through the dynamic configuration provided in the
 :download:`demo dynamic filesystem configuration file <_include/envoy-dynamic-filesystem-demo.yaml>`.
+
+.. note::
+
+Now Enovy only get the changes when write to temporary file and rename into place, ignore overwritten directly.
+The purpose is  that atomic renames are the only way to achieve consistency.
 
 .. _start_quick_start_dynamic_fs_node:
 
