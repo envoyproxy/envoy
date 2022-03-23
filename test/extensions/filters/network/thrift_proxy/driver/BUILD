@@ -18,21 +18,17 @@ filegroup(
 py_binary(
     name = "client",
     srcs = ["client.py"],
-    python_version = "PY2",
     deps = [
         "//test/extensions/filters/network/thrift_proxy/driver/fbthrift:fbthrift_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
-        requirement("six"),
     ],
 )
 
 py_binary(
     name = "server",
     srcs = ["server.py"],
-    python_version = "PY2",
     deps = [
         "//test/extensions/filters/network/thrift_proxy/driver/fbthrift:fbthrift_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
-        requirement("six"),
     ],
 )
