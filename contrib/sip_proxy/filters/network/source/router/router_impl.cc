@@ -638,7 +638,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "upstream local close");
     break;
   default:
-    // Connected is consumed by the connection pool.
+    // Connected and ConnectedZeroRtt is consumed by the connection pool.
     return;
   }
 
