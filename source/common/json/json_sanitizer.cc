@@ -46,14 +46,15 @@ JsonSanitizer::JsonSanitizer() {
     unicode_escape(char2uint32(ch));
   }
 
-  // Control-characters below 32 that don't have symbolic escapes.
+  // Add unicode escapes for control-characters below 32 that don't have symbolic escapes.
   for (uint32_t i = 0; i < ' '; ++i) {
     if (char_escapes_[i].size_ == 0) {
       unicode_escape(i);
     }
   }
 
-  // There's a range of low-numbered 8-bit unicode characters that are escaped.
+  // There's a range of low-numbered 8-bit unicode characters that are unicode escaped
+  // by the protobuf library, so we match behavior.
   for (uint32_t i = 0x0080; i < 0x00a0; ++i) {
     unicode_escape(i);
   }
@@ -63,7 +64,7 @@ JsonSanitizer::JsonSanitizer() {
     char_escapes_[i].size_ = Utf8PassThrough;
   }
 
-  // There are a few high numbered unicode characters that protobufs quote, for some reason.
+  // There are a few high numbered unicode characters that protobufs quote.
   for (uint32_t i : { 0x00ad, 0x0600, 0x0601, 0x0602, 0x0603, 0x06dd, 0x070f }) {
     unicode_escape(i);
   }
@@ -71,47 +72,26 @@ JsonSanitizer::JsonSanitizer() {
 
 absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view str) const {
   size_t past_escape = absl::string_view::npos;
-  for (uint32_t i = 0, n = str.size(); i < n; ++i) {
-    uint32_t index = char2uint32(str[i]);
-    const Escape* escape = &char_escapes_[index];
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(str.data());
+  for (uint32_t i = 0, n = str.size(); i < n; ++i, ++data) {
+    const Escape* escape = &char_escapes_[*data];
     if (escape->size_ != 0) {
       uint32_t start_of_escape = i;
       absl::string_view escape_view;
-      auto [unicode, consumed] = decodeUtf8(reinterpret_cast<const uint8_t*>(&str[i]), n - i);
+      auto [unicode, consumed] = decodeUtf8(data, n - i);
       if (consumed != 0) {
-        index = unicode;
-        //ENVOY_LOG_MISC(error, "unicode={}, consumed={}", unicode, consumed);
-        i += consumed - 1;
-        if (index >= NumEscapes) {
-          continue;
+        --consumed;
+        i += consumed;
+        data += consumed;
+        if (unicode >= NumEscapes) {
+          continue; // 3-byte and 4-byte utf-8 code-points are not in table.
         }
-        escape = &char_escapes_[index];
+        escape = &char_escapes_[unicode];
         if (escape->size_ == Utf8PassThrough) {
-          continue;
+          continue; // Most code-points are not escaped.
         }
       }
       escape_view = absl::string_view(escape->chars_, escape->size_);
-
-      /*
-      if (decodeUtf8FirstByte(index)) {
-        if ((i + 1) == n || !decodeUtf8SecondByte(char2uint32(str[i + 1]), index)) {
-          // str contains only the first byte of 2-byte utf8 sequence. We will
-          // sipmly treat this as a "\u0000" which matches protobuf behavior,
-          // more or less.
-          escape_view = absl::string_view(char_escapes_[0].chars_, char_escapes_[0].size_);
-        } else {
-          ASSERT(index < NumEscapes);
-          ++i;  // Pass through both first and second bytes of the utf-8 sequence.
-          const Escape& escape = char_escapes_[index];
-          if (escape.size_ == Utf8PassThrough) {
-            continue;
-          }
-          escape_view = absl::string_view(escape.chars_, escape.size_);
-        }
-      } else {
-        escape_view = absl::string_view(escape.chars_, escape.size_);
-      }
-      */
 
       if (past_escape == absl::string_view::npos) {
         // We only initialize buffer when we first learn we need to add an
@@ -184,25 +164,6 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
   }
   return UnicodeSizePair(unicode, consumed);
 }
-
-#if 0
-bool JsonSanitizer::decodeUtf8FirstByte(uint32_t& index) {
-  if ((index & Utf8Byte1Mask) == Utf8Byte1Pattern) {
-    index &= ~Utf8Byte1Mask;
-    index <<= Utf8Byte1Shift;
-    return true;
-  }
-  return false;
-}
-
-bool JsonSanitizer::decodeUtf8SecondByte(uint32_t byte, uint32_t& index) {
-  if ((byte & Utf8Byte2Mask) == Utf8Byte2Pattern) {
-    index |= byte & ~Utf8Byte2Mask;
-    return true;
-  }
-  return false;
-}
-#endif
 
 bool JsonSanitizer::isValidUtf8(absl::string_view in) {
   const uint8_t* data = reinterpret_cast<const uint8_t*>(in.data());
