@@ -58,9 +58,10 @@ HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
-                                Http::ConnectionPool::Callbacks& callbacks) {
+                                Http::ConnectionPool::Callbacks& callbacks,
+                                const Instance::StreamOptions& options) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return newStreamImpl(context);
+  return newStreamImpl(context, options.can_send_early_data_);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
@@ -68,12 +69,13 @@ bool HttpConnPoolImplBase::hasActiveConnections() const {
 }
 
 ConnectionPool::Cancellable*
-HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context) {
+HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                                       bool can_send_early_data) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
   ENVOY_LOG(debug, "queueing stream due to no available connections");
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
-      new HttpPendingStream(*this, decoder, callbacks));
+      new HttpPendingStream(*this, decoder, callbacks, can_send_early_data));
   return addPendingStream(std::move(pending_stream));
 }
 
@@ -96,11 +98,11 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state() != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
-      parent_.transitionActiveClientState(*this, ActiveClient::State::DRAINING);
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
     }
   }
 }
@@ -125,10 +127,10 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
           std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
 
       int64_t delta = old_unused_capacity - currentUnusedCapacity();
-      if (state() == ActiveClient::State::READY && currentUnusedCapacity() <= 0) {
-        parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
-      } else if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() > 0) {
-        parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
+      if (state() == ActiveClient::State::Ready && currentUnusedCapacity() <= 0) {
+        parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+      } else if (state() == ActiveClient::State::Busy && currentUnusedCapacity() > 0) {
+        parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
       }
 
       if (delta > 0) {
@@ -149,8 +151,8 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
       ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
       concurrent_stream_limit_ = settings.maxConcurrentStreams().value();
       int64_t delta = old_unused_capacity - currentUnusedCapacity();
-      if (state() == ActiveClient::State::READY && currentUnusedCapacity() <= 0) {
-        parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
+      if (state() == ActiveClient::State::Ready && currentUnusedCapacity() <= 0) {
+        parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
       }
       parent_.decrClusterStreamCapacity(delta);
       ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
@@ -158,7 +160,7 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
     // As we don't increase stream limits when maxConcurrentStreams goes up, treat
     // a stream limit of 0 as a GOAWAY.
     if (concurrent_stream_limit_ == 0) {
-      parent_.transitionActiveClientState(*this, ActiveClient::State::DRAINING);
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
     }
   }
 }

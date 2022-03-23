@@ -5,6 +5,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -22,19 +23,22 @@ public:
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+
+protected:
+  TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };
 
 private:
-  TransportSocketCallbacks* callbacks_{};
   bool shutdown_{};
+  TransportSocketCallbacks* callbacks_{};
 };
 
-class RawBufferSocketFactory : public TransportSocketFactory {
+class RawBufferSocketFactory : public CommonTransportSocketFactory {
 public:
   // Network::TransportSocketFactory
   TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
 };
 
 } // namespace Network

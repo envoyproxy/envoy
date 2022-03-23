@@ -33,9 +33,8 @@ using TrafficRoutingAssistantAsyncRequestCallbacks = Grpc::AsyncRequestCallbacks
 using TrafficRoutingAssistantAsyncStreamCallbacks = Grpc::AsyncStreamCallbacks<
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
 
-// TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
-// This will require support for more than one outstanding request per client (limit() assumes only
-// one today).
+// TODO: We should have only one client per thread, but today we create one per filter stack.
+// This will require support for more than one outstanding request per client.
 class GrpcClientImpl : public Client,
                        public TrafficRoutingAssistantAsyncRequestCallbacks,
                        public TrafficRoutingAssistantAsyncStreamCallbacks,
@@ -43,13 +42,15 @@ class GrpcClientImpl : public Client,
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GrpcClientImpl() override = default;
+  ~GrpcClientImpl() override;
 
   // Extensions::NetworkFilters::SipProxy::TrafficRoutingAssistant::Client
   void setRequestCallbacks(RequestCallbacks& callbacks) override;
   void cancel() override;
 
   void closeStream() override;
+
+  void resetStream() override;
 
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
@@ -106,7 +107,7 @@ private:
 };
 
 /**
- * Builds the Traffic Routing Assistant client.
+ * Builds the Tra client.
  */
 ClientPtr traClient(Server::Configuration::FactoryContext& context,
                     const envoy::config::core::v3::GrpcService& grpc_service,

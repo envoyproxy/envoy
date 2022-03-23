@@ -44,9 +44,8 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, Envoy::SystemTime start_time,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
+                                   const std::string& operation_name, Envoy::SystemTime,
                                    const Tracing::Decision decision) {
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
@@ -71,7 +70,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     }
   }
 
-  return tracer.startSpan(config, start_time, operation_name, tracing_context, nullptr);
+  return tracer.startSpan(operation_name, tracing_context);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
@@ -82,7 +81,7 @@ void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_con
                                       ? server_factory_context.localInfo().clusterName()
                                       : DEFAULT_SERVICE_AND_INSTANCE.data()));
   config_.set_instance_name(!client_config.instance_name().empty()
-                                ? client_config.service_name()
+                                ? client_config.instance_name()
                                 : (!server_factory_context.localInfo().nodeName().empty()
                                        ? server_factory_context.localInfo().nodeName()
                                        : DEFAULT_SERVICE_AND_INSTANCE.data()));

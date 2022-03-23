@@ -411,10 +411,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     break;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-    break;
   }
 }
 

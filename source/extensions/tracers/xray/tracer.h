@@ -26,6 +26,7 @@ namespace Tracers {
 namespace XRay {
 
 constexpr auto XRayTraceHeader = "x-amzn-trace-id";
+constexpr absl::string_view Subsegment = "subsegment";
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
 public:
@@ -102,6 +103,12 @@ public:
   }
 
   /**
+   * Sets the type of the Span. In X-Ray, an independent subsegment has a type of "subsegment".
+   * https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-subsegments
+   */
+  void setType(absl::string_view type) { type_ = std::string(type); }
+
+  /**
    * Sets the aws metadata field of the Span.
    */
   void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
@@ -155,6 +162,11 @@ public:
    * Gets this Span's direction.
    */
   const std::string& direction() const { return direction_; }
+
+  /**
+   * Gets this Span's type.
+   */
+  const std::string& type() const { return type_; }
 
   /**
    * Gets this Span's name.
@@ -216,6 +228,7 @@ private:
   std::string parent_segment_id_;
   std::string name_;
   std::string origin_;
+  std::string type_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
@@ -244,9 +257,11 @@ public:
    * Creates a Span that is marked as not-sampled.
    * This is useful when the sampling decision is done in Envoy's X-Ray and we want to avoid
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
-   * tracing.
+   * tracing. Also at the same time if X-Ray header is set then preserve its value.
    */
-  XRay::SpanPtr createNonSampledSpan() const;
+  XRay::SpanPtr createNonSampledSpan(const Tracing::Config&, const std::string& operation_name,
+                                     Envoy::SystemTime start_time,
+                                     const absl::optional<XRayHeader>& xray_header) const;
 
 private:
   const std::string segment_name_;

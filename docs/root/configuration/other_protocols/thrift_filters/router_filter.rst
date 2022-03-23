@@ -47,6 +47,7 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_rq_time, Histogram, total rq time from rq complete to resp complete; includes oneway messages.
   thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
   thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
+  thrift.upstream_cx_drain_close, Counter, Total upstream connections that were closed due to draining.
 
 If the service zone is available for both the local service (via :option:`--service-zone`)
 and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,

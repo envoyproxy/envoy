@@ -78,7 +78,7 @@ def _envoy_repo_impl(repository_ctx):
 
     """
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
-    version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
+    version = repository_ctx.read(repo_path.get_child("VERSION.txt")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
@@ -196,17 +196,20 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
+    _io_hyperscan()
     _io_opentracing_cpp()
+    _net_colm_open_source_ragel()
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
+    _org_boost()
     _org_brotli()
+    _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
-    external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
     external_http_archive("com_github_google_flatbuffers")
@@ -392,6 +395,16 @@ def _com_github_libevent_libevent():
         actual = "@envoy//bazel/foreign_cc:event",
     )
 
+def _net_colm_open_source_ragel():
+    external_http_archive(
+        name = "net_colm_open_source_ragel",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "ragel",
+        actual = "@envoy//bazel/foreign_cc:ragel",
+    )
+
 def _net_zlib():
     external_http_archive(
         name = "net_zlib",
@@ -417,6 +430,24 @@ def _com_github_zlib_ng_zlib_ng():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
+    )
+
+# Boost in general is not approved for Envoy use, and the header-only
+# dependency is only for the Hyperscan contrib package.
+def _org_boost():
+    external_http_archive(
+        name = "org_boost",
+        build_file_content = """
+filegroup(
+    name = "header",
+    srcs = glob([
+        "boost/**/*.h",
+        "boost/**/*.hpp",
+        "boost/**/*.ipp",
+    ]),
+    visibility = ["@envoy//contrib/hyperscan/matching/input_matchers/source:__pkg__"],
+)
+""",
     )
 
 # If you're looking for envoy-filter-example / envoy_filter_example
@@ -486,6 +517,14 @@ def _com_github_nghttp2_nghttp2():
         actual = "@envoy//bazel/foreign_cc:nghttp2",
     )
 
+def _io_hyperscan():
+    external_http_archive(
+        name = "io_hyperscan",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:hyperscan.patch"],
+    )
+
 def _io_opentracing_cpp():
     external_http_archive(
         name = "io_opentracing_cpp",
@@ -533,10 +572,6 @@ def _com_github_tencent_rapidjson():
         name = "com_github_tencent_rapidjson",
         build_file = "@envoy//bazel/external:rapidjson.BUILD",
     )
-    native.bind(
-        name = "rapidjson",
-        actual = "@com_github_tencent_rapidjson//:rapidjson",
-    )
 
 def _com_github_nlohmann_json():
     external_http_archive(
@@ -549,13 +584,9 @@ def _com_github_nlohmann_json():
     )
 
 def _com_github_nodejs_http_parser():
-    external_http_archive(
-        name = "com_github_nodejs_http_parser",
-        build_file = "@envoy//bazel/external:http-parser.BUILD",
-    )
     native.bind(
         name = "http_parser",
-        actual = "@com_github_nodejs_http_parser//:http_parser",
+        actual = "@envoy//bazel/external/http_parser",
     )
 
 def _com_github_alibaba_hessian2_codec():
@@ -696,6 +727,10 @@ def _com_google_absl():
         name = "abseil_status",
         actual = "@com_google_absl//absl/status",
     )
+    native.bind(
+        name = "abseil_cleanup",
+        actual = "@com_google_absl//absl/cleanup:cleanup",
+    )
 
 def _com_google_protobuf():
     external_http_archive(
@@ -780,7 +815,7 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        # Patch curl 7.74.0 due to CMake's problematic implementation of policy `CMP0091`
+        # Patch curl 7.74.0 and later due to CMake's problematic implementation of policy `CMP0091`
         # and introduction of libidn2 dependency which is inconsistently available and must
         # not be a dynamic dependency on linux.
         # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
@@ -913,11 +948,6 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
-        name = "re2",
-        actual = "@com_googlesource_code_re2//:re2",
-    )
-
-    native.bind(
         name = "upb_lib_descriptor",
         actual = "@upb//:descriptor_upb_proto",
     )
@@ -935,6 +965,14 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "upb_json_lib",
         actual = "@upb//:json",
+    )
+
+def _re2():
+    external_http_archive("com_googlesource_code_re2")
+
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
 
 def _upb():
@@ -959,7 +997,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.1 && ./emsdk activate --embedded 3.1.1; fi",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.7 && ./emsdk activate --embedded 3.1.7; fi",
         ],
     )
 
@@ -1069,6 +1107,13 @@ def _com_github_wasm_c_api():
     )
     native.bind(
         name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+    # This isn't needed in builds with a single Wasm engine, but "bazel query"
+    # complains about a missing dependency, so point it at the regular target.
+    native.bind(
+        name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 

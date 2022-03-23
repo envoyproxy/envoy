@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <regex>
 #include <string>
@@ -454,10 +455,19 @@ SubstitutionFormatParser::parse(const std::string& format,
   std::vector<FormatterProviderPtr> formatters;
   const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
-  for (size_t pos = 0; pos < format.length(); ++pos) {
+  for (size_t pos = 0; pos < format.size(); ++pos) {
     if (format[pos] != '%') {
       current_token += format[pos];
       continue;
+    }
+
+    // escape '%%'
+    if (format.size() > pos + 1) {
+      if (format[pos + 1] == '%') {
+        current_token += '%';
+        pos++;
+        continue;
+      }
     }
 
     if (!current_token.empty()) {
@@ -1490,10 +1500,7 @@ FilterStateFormatter::FilterStateFormatter(const std::string& key,
 const Envoy::StreamInfo::FilterState::Object*
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
   const StreamInfo::FilterState& filter_state = stream_info.filterState();
-  if (!filter_state.hasDataWithName(key_)) {
-    return nullptr;
-  }
-  return &filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
+  return filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
 }
 
 absl::optional<std::string> FilterStateFormatter::format(const Http::RequestHeaderMap&,

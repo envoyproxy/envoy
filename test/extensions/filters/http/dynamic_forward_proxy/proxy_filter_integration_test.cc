@@ -56,7 +56,10 @@ typed_config:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 
@@ -150,6 +153,23 @@ typed_config:
 
   void testConnectionTiming(IntegrationStreamDecoderPtr& response, bool cached_dns,
                             int64_t original_usec);
+
+  // Send bidirectional data for CONNECT termination with dynamic forward proxy test.
+  void sendBidirectionalData(FakeRawConnectionPtr& fake_raw_upstream_connection,
+                             IntegrationStreamDecoderPtr& response,
+                             const char* downstream_send_data = "hello",
+                             const char* upstream_received_data = "hello",
+                             const char* upstream_send_data = "there!",
+                             const char* downstream_received_data = "there!") {
+    // Send some data upstream.
+    codec_client_->sendData(*request_encoder_, downstream_send_data, false);
+    ASSERT_TRUE(fake_raw_upstream_connection->waitForData(
+        FakeRawConnection::waitForInexactMatch(upstream_received_data)));
+    // Send some data downstream.
+    ASSERT_TRUE(fake_raw_upstream_connection->write(upstream_send_data));
+    response->waitForBodyData(strlen(downstream_received_data));
+    EXPECT_EQ(downstream_received_data, response->body());
+  }
 
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
@@ -569,6 +589,98 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // This should allow the second stream to complete
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
+// Test Envoy CONNECT request termination works with dynamic forward proxy config.
+TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, true, false); });
+
+  enableHalfClose(true);
+  initializeWithArgs();
+
+  const Http::TestRequestHeaderMapImpl connect_headers{
+      {":method", "CONNECT"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  FakeRawConnectionPtr fake_raw_upstream_connection;
+  IntegrationStreamDecoderPtr response;
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_headers);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection));
+  response->waitForHeaders();
+
+  sendBidirectionalData(fake_raw_upstream_connection, response, "hello", "hello", "there!",
+                        "there!");
+  // Send a second set of data to make sure for example headers are only sent once.
+  sendBidirectionalData(fake_raw_upstream_connection, response, ",bye", "hello,bye", "ack",
+                        "there!ack");
+
+  // Send an end stream. This should result in half close upstream.
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection->waitForHalfClose());
+  // Now send a FIN from upstream. This should result in clean shutdown downstream.
+  ASSERT_TRUE(fake_raw_upstream_connection->close());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// Make sure if there are more HTTP/1.1 streams in flight than connections allowed by cluster
+// circuit breakers, that excess streams are queued.
+TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      auto* per_host_thresholds = cluster->mutable_circuit_breakers()->add_per_host_thresholds();
+      per_host_thresholds->mutable_max_connections()->set_value(1);
+    }
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start sending the request, but ensure no end stream will be sent, so the
+  // stream will stay in use.
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // Make sure the headers are received.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Start another request.
+  IntegrationStreamDecoderPtr response2 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Make sure the stream is received, but no new connection is established.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 2);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+
+  // Finish the first stream.
+  codec_client_->sendData(*request_encoder_, 0, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // This should allow the second stream to complete on the original connection.
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, true);

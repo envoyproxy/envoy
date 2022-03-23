@@ -112,8 +112,9 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
   int port = fake_upstreams_[1]->localAddress()->ip()->port();
   std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
@@ -137,6 +138,57 @@ TEST_P(FilterIntegrationTest, AltSvc) {
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+}
+
+TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"x-envoy-retry-on", "http3-post-connect-failure"}};
+  int port = fake_upstreams_[0]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request should go out over HTTP/2. The response includes an Alt-Svc header.
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0,
+                                                /*upstream_index=*/0, timeout);
+  checkSimpleRequestSuccess(0, response_size, response.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+
+  // Close the connection so the HTTP/2 connection will not be used.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  fake_upstream_connection_.reset();
+
+  // Second request should go out over HTTP/3 because of the Alt-Svc information.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+  // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  fake_upstream_connection_.reset();
+  upstream_request_.reset();
+
+  // The reset request should be retried over TCP.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  }
+
+  checkSimpleRequestSuccess(0, response_size, response2.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,

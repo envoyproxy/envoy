@@ -73,9 +73,9 @@ public:
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
-  void
-  verifyCertsAndSignature(const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
-                          const std::string& payload, const std::string& signature) {
+  void verifyCertsAndSignature(
+      const quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>& chain,
+      const std::string& payload, const std::string& signature) {
     const std::string& leaf = chain->certs[0];
     std::unique_ptr<quic::CertificateView> cert_view =
         quic::CertificateView::ParseSingleCertificate(leaf);
@@ -102,6 +102,7 @@ private:
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
+  NiceMock<Ssl::MockContextManager> tls_context_manager_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
@@ -143,7 +144,7 @@ public:
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
-        listener_config_.listenerScope(),
+        true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
@@ -197,7 +198,7 @@ protected:
 TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {
   expectCertChainAndPrivateKey(expected_certs_, true);
   bool cert_matched_sni;
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> chain =
       proof_source_.GetCertChain(server_address_, client_address_, hostname_, &cert_matched_sni);
   EXPECT_EQ(2, chain->certs.size());
 
