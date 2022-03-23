@@ -24,6 +24,16 @@
 namespace Envoy {
 namespace {
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define ASANITIZED /* Sanitized by Clang */
+#endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+#define ASANITIZED /* Sanitized by GCC */
+#endif
+
 using testing::HasSubstr;
 
 std::string protocolTestParamsAndBoolToString(
@@ -102,10 +112,15 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const bool enable_new_wrapper = std::get<2>(GetParam());
+    const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                       enable_new_wrapper ? "true" : "false");
+    config_helper_.addRuntimeOverride(
+        Runtime::defer_processing_backedup_streams,
+        protocol_test_params.defer_processing_backedup_streams ? "true" : "false");
+
     setServerBufferFactory(buffer_factory_);
-    setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
+    setUpstreamProtocol(protocol_test_params.upstream_protocol);
   }
 
 protected:
@@ -740,9 +755,10 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   config_helper_.setBufferLimits(1000, 1000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the upstream.
   write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -784,9 +800,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
   config_helper_.setBufferLimits(1000, 1000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -828,9 +845,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream) {
   config_helper_.setBufferLimits(1000, 1000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -872,9 +890,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream)
 TEST_P(Http2DeferredProcessingIntegrationTest,
        ShouldCloseDeferredUpstreamOnStreamCloseIfLocalReply) {
   config_helper_.setBufferLimits(9000, 9000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -930,9 +949,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 TEST_P(Http2DeferredProcessingIntegrationTest,
        ShouldCloseDeferredUpstreamOnStreamCloseIfResetByDownstream) {
   config_helper_.setBufferLimits(1000, 1000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -974,11 +994,21 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
                                  0);
 }
 
+// Insufficient support on Windows.
+#ifndef WIN32
+// ASAN hijacks the signal handlers, so the process will die but not output
+// the particular messages we expect.
+#ifndef ASANITIZED
+// If we don't install any signal handlers (i.e. due to compile options), we
+// won't get the crash report.
+#ifdef ENVOY_HANDLE_SIGNALS
+
 TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProcessingBufferedData) {
   config_helper_.setBufferLimits(1000, 1000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the upstream.
   write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -1043,9 +1073,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
 TEST_P(Http2DeferredProcessingIntegrationTest,
        CanDumpCrashInformationWhenProcessingBufferedDataOfDeferredCloseStream) {
   config_helper_.setBufferLimits(1000, 1000);
-  config_helper_.addRuntimeOverride(std::string(Runtime::defer_processing_backedup_streams),
-                                    "true");
   initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -1107,5 +1138,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  1);
 }
+
+#endif
+#endif
+#endif
 
 } // namespace Envoy
