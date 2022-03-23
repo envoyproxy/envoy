@@ -1558,9 +1558,9 @@ void Http2RawFrameIntegrationTest::startHttp2Session() {
   readFrame();
 }
 
-void Http2RawFrameIntegrationTest::beginSession() {
+void Http2RawFrameIntegrationTest::beginSession(Http::CodecType upstream_codec_type) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
-  setUpstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(upstream_codec_type);
   // set lower outbound frame limits to make tests run faster
   config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
   initialize();

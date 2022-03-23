@@ -3617,6 +3617,128 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 }
 
+// Verify detection of content-length mismatch after some DATA was already proxied.
+TEST_P(DownstreamProtocolIntegrationTest, MultipleChunksContentLengthLargerThanFirstDataFrame) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1.x case is covered by the ContentLengthSmallerThanPayload test.
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Set content-length to be larger than the first DATA frame, but smaller than the total amount in
+  // 2 DATA frames.
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":authority", "host"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {"content-length", "1048"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  std::string data1(1024, 'a');
+  Buffer::OwnedImpl send1(data1);
+  encoder.encodeData(send1, false);
+
+  // The first DATA frame should be successfully received
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1));
+
+  std::string data2(2024, 'b');
+  Buffer::OwnedImpl send2(data2);
+  encoder.encodeData(send2, true);
+
+  // Second DATA frame should fail content-length match check and generate stream level error.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+
+  // Upstream HTTP/1 connection should be disconnected to signal error.
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Validate that request body in multiple DATA frames with correct content-length is successfully
+// proxied.
+TEST_P(DownstreamProtocolIntegrationTest, MultipleChunksCorrectContentLength) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // This test does not apply to H/1 downstreams.
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":authority", "host"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {"content-length", "3048"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  std::string data1(1024, 'a');
+  Buffer::OwnedImpl send1(data1);
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1));
+
+  std::string data2(2024, 'b');
+  Buffer::OwnedImpl send2(data2);
+  encoder.encodeData(send2, true);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1 + data2));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Validate correct behavior when a stream timeout occurs after a portion of request body was
+// transmitted.
+TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamDurationWithData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(500));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  std::string data1(1024, 'a');
+  Buffer::OwnedImpl send1(data1);
+  // Send request body without end of stream flag and make sure it was received.
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1));
+
+  // Do not send any more data and since request is incomplete Envoy will abort it due to
+  // stream timeout.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+  } else {
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
 class NoUdpGso : public Api::OsSysCallsImpl {
 public:
   bool supportsUdpGso() const override { return false; }

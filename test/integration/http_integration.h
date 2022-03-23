@@ -311,7 +311,7 @@ protected:
   void startHttp2Session();
   Http2Frame readFrame();
   void sendFrame(const Http2Frame& frame);
-  virtual void beginSession();
+  void beginSession(Http::CodecType upstream_codec_type = Http::CodecType::HTTP2);
 
   IntegrationTcpClientPtr tcp_client_;
 };

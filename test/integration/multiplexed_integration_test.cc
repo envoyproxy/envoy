@@ -1817,6 +1817,28 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
   tcp_client_->close();
 }
 
+// Verify that Envoy correctly handles connection level errors after request headers have been
+// proxied.
+TEST_P(Http2FrameIntegrationTest, TwoHeaderFrames) {
+  beginSession(Http::CodecType::HTTP1);
+
+  const uint32_t client_stream_idx = 0;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(client_stream_idx), "host",
+                                        "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Send another HEADERS frame with the same stream ID. This should result in connection level
+  // error and disconnect both upstream and downstream connections.
+  sendFrame(Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(client_stream_idx), "host",
+                                        "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(1000)));
+
+  tcp_client_->waitForDisconnect();
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
