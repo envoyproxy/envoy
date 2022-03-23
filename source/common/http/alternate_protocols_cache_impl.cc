@@ -1,5 +1,7 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 
+#include <memory>
+
 #include "source/common/common/logger.h"
 
 #include "http3_status_tracker_impl.h"
@@ -179,12 +181,22 @@ void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
     protocols.erase(protocols.begin() + max_protocols, protocols.end());
   }
+  auto entry_it = protocols_.find(origin);
+  if (entry_it != protocols_.end()) {
+    entry_it->second.protocols = protocols;
+    return;
+  }
+  addOriginData(origin, OriginData{protocols, std::chrono::microseconds(0), nullptr});
+}
+
+void AlternateProtocolsCacheImpl::addOriginData(const Origin& origin, OriginData&& origin_data) {
+  ASSERT(protocols_.find(origin) == protocols_.end());
   while (protocols_.size() >= max_entries_) {
     auto iter = protocols_.begin();
     key_value_store_->remove(originToString(iter->first));
     protocols_.erase(iter);
   }
-  protocols_[origin] = OriginData{protocols, std::chrono::microseconds(0), nullptr};
+  protocols_[origin] = std::move(origin_data);
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
@@ -220,16 +232,20 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
 
-OptRef<AlternateProtocolsCache::Http3StatusTracker>
+AlternateProtocolsCache::Http3StatusTracker&
 AlternateProtocolsCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
-  if (entry_it == protocols_.end()) {
-    return {};
+  if (entry_it != protocols_.end()) {
+    if (entry_it->second.h3_status_tracker == nullptr) {
+      entry_it->second.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
+    }
+    return *entry_it->second.h3_status_tracker;
   }
-  if (entry_it->second.h3_status_tracker == nullptr) {
-    entry_it->second.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
-  }
-  return makeOptRefFromPtr(entry_it->second.h3_status_tracker.get());
+  OriginData origin_data{
+      {}, std::chrono::microseconds(0), std::make_unique<Http3StatusTrackerImpl>(dispatcher_)};
+  AlternateProtocolsCache::Http3StatusTracker& tracker = *(origin_data.h3_status_tracker);
+  addOriginData(origin, std::move(origin_data));
+  return tracker;
 }
 
 } // namespace Http

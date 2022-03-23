@@ -79,12 +79,14 @@ public:
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
-  OptRef<AlternateProtocolsCache::Http3StatusTracker>
+  AlternateProtocolsCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
+  void addOriginData(const Origin& origin, OriginData&& origin_data);
+
   // Time source used to check expiration of entries.
   Event::Dispatcher& dispatcher_;
 

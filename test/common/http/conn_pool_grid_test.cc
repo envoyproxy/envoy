@@ -95,10 +95,9 @@ public:
     ASSERT(host_->address()->type() == Network::Address::Type::Ip);
     AlternateProtocolsCache::Origin origin{"https", host_->hostname(),
                                            host_->address()->ip()->port()};
-    OptRef<AlternateProtocolsCache::Http3StatusTracker> http3_status_tracker =
+    AlternateProtocolsCache::Http3StatusTracker& http3_status_tracker =
         alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
-    ASSERT(http3_status_tracker.has_value());
-    return http3_status_tracker->isHttp3Confirmed();
+    return http3_status_tracker.isHttp3Confirmed();
   }
 
   StreamInfo::MockStreamInfo* info_;
@@ -407,15 +406,15 @@ TEST_F(ConnectivityGridTest, Http3BrokenWithoutAlternateProtocolsCacheEntry) {
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should wait on the other pool
   EXPECT_NE(grid_->callbacks(0), nullptr);
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  new NiceMock<MockTimer>(&dispatcher_);
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin_, protocols);
-  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
-  new NiceMock<MockTimer>(&dispatcher_);
-  EXPECT_FALSE(grid_->isHttp3Broken());
+  EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
 // Test that newStream() with HTTP/3 disabled.
@@ -681,7 +680,7 @@ TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   addHttp3AlternateProtocol();
   alternate_protocols_
       ->getOrCreateHttp3StatusTracker(AlternateProtocolsCache::Origin("https", "hostname", 9000))
-      ->markHttp3Broken();
+      .markHttp3Broken();
   EXPECT_EQ(grid_->first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'hostname', skipping.",
