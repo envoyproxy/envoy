@@ -4,11 +4,8 @@
 #include "envoy/extensions/network/socket_interface/v3/io_uring_socket_interface.pb.validate.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/extensions/io_socket/io_uring/io_handle_impl.h"
-
-#if defined(__linux__)
 #include "source/common/io/io_uring_impl.h"
-#endif
+#include "source/extensions/io_socket/io_uring/io_handle_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,9 +14,12 @@ namespace IoUring {
 
 namespace {
 
+constexpr uint32_t DefaultIoUringSize = 300;
 constexpr uint32_t DefaultReadBufferSize = 8192;
 
 } // namespace
+
+void SocketInterfaceExtension::onServerInitialized() { factory_.onServerInitialized(); }
 
 Network::IoHandlePtr
 SocketInterfaceImpl::socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
@@ -104,8 +104,10 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
       message, context.messageValidationContext().staticValidationVisitor());
   read_buffer_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, read_buffer_size, DefaultReadBufferSize);
-  io_uring_factory_ = Io::ioUringFactory("envoy.extensions.io.io_uring");
-  return std::make_unique<Network::SocketInterfaceExtension>(*this);
+  io_uring_factory_ = std::make_unique<Io::IoUringFactoryImpl>(
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, io_uring_size, DefaultIoUringSize),
+      config.use_submission_queue_polling(), context.threadLocal());
+  return std::make_unique<SocketInterfaceExtension>(*this, *io_uring_factory_);
 }
 
 ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {

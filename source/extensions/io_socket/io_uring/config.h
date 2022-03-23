@@ -14,6 +14,18 @@ namespace Extensions {
 namespace IoSocket {
 namespace IoUring {
 
+class SocketInterfaceExtension : public Network::SocketInterfaceExtension {
+public:
+  SocketInterfaceExtension(Network::SocketInterface& sock_interface, Io::IoUringFactory& factory)
+      : Network::SocketInterfaceExtension(sock_interface), factory_(factory) {}
+
+  // Server::BootstrapExtension
+  void onServerInitialized() override;
+
+protected:
+  Io::IoUringFactory& factory_;
+};
+
 class SocketInterfaceImpl : public Network::SocketInterfaceBase {
 public:
   // SocketInterface
@@ -37,7 +49,7 @@ public:
 
 private:
   uint32_t read_buffer_size_;
-  const Io::IoUringFactory* io_uring_factory_;
+  std::unique_ptr<Io::IoUringFactory> io_uring_factory_;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);
