@@ -8,7 +8,7 @@
 constexpr absl::string_view pass_through_encoding = "Now is the time for all good men";
 constexpr absl::string_view escaped_encoding = "Now <is the \"time\"> for all good men";
 
-const Envoy::Json::JsonSanitizer& static_sanitizer() {
+const Envoy::Json::JsonSanitizer& staticSanitizer() {
   CONSTRUCT_ON_FIRST_USE(Envoy::Json::JsonSanitizer);
 }
 
@@ -39,7 +39,7 @@ static void BM_StaticJsonSanitizerNoEscape(benchmark::State& state) {
   std::string buffer;
 
   for (auto _ : state) { // NOLINT
-    static_sanitizer().sanitize(buffer, pass_through_encoding);
+    staticSanitizer().sanitize(buffer, pass_through_encoding);
   }
 }
 BENCHMARK(BM_StaticJsonSanitizerNoEscape);
@@ -71,7 +71,7 @@ static void BM_StaticJsonSanitizerWithEscape(benchmark::State& state) {
   std::string buffer;
 
   for (auto _ : state) { // NOLINT
-    static_sanitizer().sanitize(buffer, escaped_encoding);
+    staticSanitizer().sanitize(buffer, escaped_encoding);
   }
 }
 BENCHMARK(BM_StaticJsonSanitizerWithEscape);

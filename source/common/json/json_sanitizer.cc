@@ -59,7 +59,7 @@ JsonSanitizer::JsonSanitizer() {
   }
 
   // Most high numbered unicode characters are passed through literally.
-  for (uint32_t i = 0x00a0; i <= NumEscapes; ++i) {
+  for (uint32_t i = 0x00a0; i < NumEscapes; ++i) {
     char_escapes_[i].size_ = Utf8PassThroughSentinel;
   }
 
@@ -138,6 +138,15 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
   uint32_t consumed = 0;
 
   // See table in https://en.wikipedia.org/wiki/UTF-8, "Encoding" section.
+  //
+  // See also https://en.cppreference.com/w/cpp/locale/codecvt_utf8 which is
+  // marked as deprecated. There is also support in Windows libraries and Boost,
+  // which can be discovered on StackOverflow. I could not find a usable OSS
+  // implementation. However it's easily derived from the spec on Wikipedia.
+  //
+  // Note that the code below could be optimized a bit, e.g. by factoring out
+  // repeated lookups of the same index in the bytes array and using SSE
+  // instructions for the multi-word bit hacking.
   if (size >= 2 && (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
       (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_2ByteMask;
