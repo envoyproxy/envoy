@@ -4220,11 +4220,11 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
-    deps = [":quiche_common_platform_client_stats_impl_lib"],
+    deps = [":quiche_common_platform_default_quiche_platform_impl_client_stats_impl_lib"],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_client_stats_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_client_stats_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_client_stats_impl.h",
     ],
@@ -4237,11 +4237,11 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [":quiche_common_platform_system_event_loop_impl_lib"],
+    deps = [":quiche_common_platform_default_quiche_platform_impl_system_event_loop_impl_lib"],
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_common_platform_system_event_loop_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_system_event_loop_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_system_event_loop_impl.h",
     ],
@@ -4300,12 +4300,12 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        ":quiche_common_platform_prefetch_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_prefetch_impl_lib",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_prefetch_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_prefetch_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
     ],
@@ -4327,12 +4327,12 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        ":quiche_common_platform_mutex_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_mutex_impl_lib",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_mutex_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_mutex_impl_lib",
     srcs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
     ],
@@ -4397,7 +4397,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        ":quiche_common_platform_stream_buffer_allocator_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_stream_buffer_allocator_impl_lib",
     ],
 )
 
@@ -4493,13 +4493,13 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_common_platform_containers_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_containers_impl_lib",
         ":quiche_common_platform_export",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_containers_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_containers_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_containers_impl.h",
     ],
@@ -4509,7 +4509,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_stream_buffer_allocator_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_stream_buffer_allocator_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_stream_buffer_allocator_impl.h",
     ],
@@ -4548,40 +4548,40 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
-        ":quiche_common_platform_flag_utils_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_flag_utils_impl_lib",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
-        ":quiche_common_platform_reference_counted_impl_lib",
-        ":quiche_common_platform_testvalue_impl_lib",
-        ":quiche_common_platform_thread_local_impl_lib",
-        ":quiche_common_platform_time_utils_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_reference_counted_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_thread_local_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_time_utils_impl_lib",
         "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_export_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_flag_utils_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_flag_utils_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_flag_utils_impl.h",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_thread_local_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_thread_local_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_thread_local_impl.h",
     ],
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_reference_counted_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_reference_counted_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_reference_counted_impl.h",
     ],
@@ -4591,7 +4591,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_testvalue_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_testvalue_impl.h",
     ],
@@ -4601,7 +4601,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_time_utils_impl_lib",
+    name = "quiche_common_platform_default_quiche_platform_impl_time_utils_impl_lib",
     srcs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.cc",
     ],
@@ -4622,7 +4622,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_common_platform_export_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
     ],
 )
 
