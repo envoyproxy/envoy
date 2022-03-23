@@ -72,17 +72,18 @@ JsonSanitizer::JsonSanitizer() {
 
 absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view str) const {
   size_t past_escape = absl::string_view::npos;
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(str.data());
-  for (uint32_t i = 0, n = str.size(); i < n; ++i, ++data) {
+  const uint8_t* first = reinterpret_cast<const uint8_t*>(str.data());
+  const uint8_t* data = first;
+  for (uint32_t n = str.size(); n > 0; ++data, --n) {
     const Escape* escape = &char_escapes_[*data];
     if (escape->size_ != 0) {
-      uint32_t start_of_escape = i;
+      uint32_t start_of_escape = data - first;
       absl::string_view escape_view;
-      auto [unicode, consumed] = decodeUtf8(data, n - i);
+      auto [unicode, consumed] = decodeUtf8(data, n);
       if (consumed != 0) {
         --consumed;
-        i += consumed;
         data += consumed;
+        n -= consumed;
         if (unicode >= NumEscapes) {
           continue; // 3-byte and 4-byte utf-8 code-points are not in table.
         }
@@ -115,7 +116,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
         absl::StrAppend(&buffer, str.substr(past_escape, start_of_escape - past_escape),
                         escape_view);
       }
-      past_escape = i + 1;
+      past_escape = data - first + 1;
     }
   }
 

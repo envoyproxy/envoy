@@ -35,18 +35,6 @@ static void BM_JsonSanitizerNoEscape(benchmark::State& state) {
 BENCHMARK(BM_JsonSanitizerNoEscape);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_JsonSanitizerNoEscapeWithClear(benchmark::State& state) {
-  Envoy::Json::JsonSanitizer sanitizer;
-  std::string buffer("Now is the time for all good men..."); // >22 chars
-
-  for (auto _ : state) { // NOLINT
-    buffer.clear();
-    sanitizer.sanitize(buffer, pass_through_encoding);
-  }
-}
-BENCHMARK(BM_JsonSanitizerNoEscapeWithClear);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StaticJsonSanitizerNoEscape(benchmark::State& state) {
   std::string buffer;
 

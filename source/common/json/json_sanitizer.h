@@ -94,9 +94,6 @@ private:
     char chars_[7]; // No need to initialize char data, as we are not null-terminating.
   };
 
-  // static bool decodeUtf8FirstByte(uint32_t& index);
-  // static bool decodeUtf8SecondByte(uint32_t byte, uint32_t& index);
-
   static uint32_t char2uint32(char c) { return static_cast<uint32_t>(static_cast<uint8_t>(c)); }
 
   Escape char_escapes_[NumEscapes];
