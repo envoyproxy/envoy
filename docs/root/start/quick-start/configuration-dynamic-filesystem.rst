@@ -8,7 +8,7 @@ protocol.
 
 When the files are changed on the filesystem, Envoy will automatically update its configuration.
 
-Notice:
+.. note::
 
 Now Enovy only get the changes when write to temporary file and rename into place, ignore overwritten directly.
 The purpose is  that atomic renames are the only way to achieve consistency.
