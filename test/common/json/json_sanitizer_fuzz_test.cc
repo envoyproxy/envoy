@@ -9,12 +9,12 @@
 namespace Envoy {
 namespace Fuzz {
 
-const Envoy::Json::JsonSanitizer& static_sanitizer() {
+const Envoy::Json::JsonSanitizer& staticSanitizer() {
   CONSTRUCT_ON_FIRST_USE(Envoy::Json::JsonSanitizer);
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  const Envoy::Json::JsonSanitizer& sanitizer = static_sanitizer();
+  const Envoy::Json::JsonSanitizer& sanitizer = staticSanitizer();
   FuzzedDataProvider provider(buf, len);
   std::string buffer1, buffer2;
   while (provider.remaining_bytes() != 0) {
