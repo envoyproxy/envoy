@@ -3,7 +3,6 @@
 
 #include <linux/tcp.h>
 
-#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "source/extensions/transport_sockets/tcp_stats/config.h"
@@ -295,6 +294,7 @@ TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
 
 #else // #if defined(__linux__)
 
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "test/mocks/server/transport_socket_factory_context.h"
