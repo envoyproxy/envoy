@@ -62,6 +62,18 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  void setupMockFilterMetadata(bool valid) {
+    // Set up mock filter metadata.
+    cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+    EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+    if (valid) {
+      (*(*metadata_.mutable_filter_metadata())[Envoy::Extensions::HttpFilters::GcpAuthn::FilterName]
+            .mutable_fields())[Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey]
+          .set_string_value("tests");
+    }
+    ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+  }
+
   void createClient(const std::string& config_str = DefaultConfig) {
     TestUtility::loadFromYaml(config_str, config_);
     client_ = std::make_unique<GcpAuthnClient>(config_, context_);
@@ -72,6 +84,7 @@ public:
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::Http::MockAsyncClientRequest> client_request_{
       &thread_local_cluster_.async_client_};
@@ -87,6 +100,7 @@ public:
   GcpAuthnFilterConfig config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 TEST_F(GcpAuthnFilterTest, Success) {
@@ -189,12 +203,23 @@ TEST_F(GcpAuthnFilterTest, NoRoute) {
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
 }
 
+TEST_F(GcpAuthnFilterTest, NoFilterMetadata) {
+  setupMockObjects();
+  setupFilterAndCallback();
+  // Set up mock filter metadata.
+  setupMockFilterMetadata(/*is_valid=*/false);
+
+  // decodeHeaders() is expected to return `Continue` because no filter metadata is specified
+  // in configuration.
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+}
+
 TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
   setupMockObjects();
   setupFilterAndCallback();
+  // Set up mock filter metadata.
+  setupMockFilterMetadata(/*is_valid=*/true);
 
-  // decodeHeaders() is expected to return `StopIteration` because none of complete functions(i.e.,
-  // onSuccess, onFailure, onDestroy, etc) has been called.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopIteration);
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
@@ -210,10 +235,9 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
 TEST_F(GcpAuthnFilterTest, DestoryFilter) {
   setupMockObjects();
   setupFilterAndCallback();
+  // Set up mock filter metadata.
+  setupMockFilterMetadata(/*is_valid=*/true);
 
-  const std::string upstream_cluster("cluster_0");
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_, clusterName())
-      .WillOnce(testing::ReturnRef(upstream_cluster));
   // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
   // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been
   // called.

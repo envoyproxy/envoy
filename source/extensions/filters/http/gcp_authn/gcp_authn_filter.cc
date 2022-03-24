@@ -15,14 +15,14 @@ using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  state_ = State::Calling;
-  initiating_call_ = true;
-
   Envoy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
-    // Nothing to do if no route
+    // Nothing to do if no route, continue the filter chain iteration.
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
+
+  state_ = State::Calling;
+  initiating_call_ = true;
 
   Envoy::Upstream::ThreadLocalCluster* cluster =
       context_.clusterManager().getThreadLocalCluster(route->routeEntry()->clusterName());
@@ -36,13 +36,22 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
       audience_str = filter_it->second.fields().find(AudienceKey)->second.string_value();
     }
   }
-  // Add the audience from the config to the final url.
-  // `[AUDIENCE]` field is substituted with real audience string from the config.
-  std::string final_url =
-      absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str}});
-  Http::RequestMessagePtr request = buildRequest("GET", final_url);
-  client_->fetchToken(*this, std::move(request));
-  initiating_call_ = false;
+
+  if (!audience_str.empty()) {
+    // Add the audience from the config to the final url.
+    // `[AUDIENCE]` field is substituted with real audience string from the config.
+    std::string final_url =
+        absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str}});
+    client_->fetchToken(*this, buildRequest("GET", final_url));
+    initiating_call_ = false;
+  } else {
+    // Audience is URL of receiving service that will performance authentication. So, there is no
+    // need to fetch the token if no audience is specified, because no authentication will be
+    // performed. Just continue the filter chain iteration.
+    ENVOY_LOG(error, "Failed to retrieve the audience from the configuration.");
+    state_ = State::Complete;
+  }
+
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopIteration;
 }
