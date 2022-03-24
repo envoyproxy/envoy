@@ -263,6 +263,40 @@ filter_chains:
       "error adding listener: 'bar' has duplicate address '192.168.0.1:1234' as existing listener");
 }
 
+// On Windows, this case will be rejected by the OS directly.
+#ifndef WIN32
+TEST_F(ListenerManagerImplWithRealFiltersTest, DuplicateIpv4MappedAddressOldBehavior) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  scoped_runtime_guard->mergeValues(
+      {{"envoy.reloadable_features.reject_duplicated_ipv4_mapped_address_and_ipv4_address",
+        "false"}});
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: ::FFFF:192.168.0.1
+    port_value: 1234
+    ipv4_compat: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 192.168.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml1), "", true);
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true);
+}
+#endif
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, DuplicateIpv4MappedAddress2) {
   const std::string yaml1 = R"EOF(
 name: foo
@@ -292,6 +326,40 @@ filter_chains:
                             "error adding listener: 'bar' has duplicate address "
                             "'[::ffff:192.168.0.1]:1234' as existing listener");
 }
+
+// On Windows, this case will be rejected by the OS directly.
+#ifndef WIN32
+TEST_F(ListenerManagerImplWithRealFiltersTest, DuplicateIpv4MappedAddressOldBehavior2) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  scoped_runtime_guard->mergeValues(
+      {{"envoy.reloadable_features.reject_duplicated_ipv4_mapped_address_and_ipv4_address",
+        "false"}});
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 192.168.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: ::FFFF:192.168.0.1
+    port_value: 1234
+    ipv4_compat: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml1), "", true);
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true);
+}
+#endif
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
