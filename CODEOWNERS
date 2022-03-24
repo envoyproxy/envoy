@@ -207,6 +207,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/compressor @rojkov @UNOWNED
 /*/extensions/compression/brotli @rojkov @UNOWNED
 /*/extensions/compression/common @UNOWNED @rojkov
+/*/extensions/compression/gzip/decompressor @rojkov @UNOWNED
+/*/extensions/compression/gzip/compressor @rojkov @UNOWNED
+/*/extensions/compression/gzip/common @rojkov @UNOWNED
 # cel
 /*/extensions/access_loggers/filters/cel @UNOWNED @douglas-reid
 # rbac
