@@ -263,8 +263,6 @@ filter_chains:
       "error adding listener: 'bar' has duplicate address '192.168.0.1:1234' as existing listener");
 }
 
-// On Windows, this case will be rejected by the OS directly.
-#ifndef WIN32
 TEST_F(ListenerManagerImplWithRealFiltersTest, DuplicateIpv4MappedAddressOldBehavior) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
   scoped_runtime_guard->mergeValues(
@@ -295,7 +293,6 @@ filter_chains:
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml1), "", true);
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true);
 }
-#endif
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, DuplicateIpv4MappedAddress2) {
   const std::string yaml1 = R"EOF(
@@ -327,8 +324,6 @@ filter_chains:
                             "'[::ffff:192.168.0.1]:1234' as existing listener");
 }
 
-// On Windows, this case will be rejected by the OS directly.
-#ifndef WIN32
 TEST_F(ListenerManagerImplWithRealFiltersTest, DuplicateIpv4MappedAddressOldBehavior2) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
   scoped_runtime_guard->mergeValues(
@@ -359,7 +354,6 @@ filter_chains:
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml1), "", true);
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true);
 }
-#endif
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
