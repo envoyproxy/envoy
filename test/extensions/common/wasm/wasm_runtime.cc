@@ -24,8 +24,10 @@ std::vector<std::string> sandboxRuntimes() {
 
 std::vector<std::string> languages(bool cpp_only) {
   std::vector<std::string> languages;
-#if defined(__x86_64__)
-  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
+#if ((defined(__linux__) && (defined(__x86_64__) || defined(__aarch64__))) ||                      \
+     (defined(__APPLE__) && (defined(__x86_64__) || defined(__arm64__))) ||                        \
+     (defined(_WIN64) && defined(_M_X64)))
+  // Emscripten ships binaries only for select platforms.
   languages.push_back("cpp");
 #endif
   if (!cpp_only) {
