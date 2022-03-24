@@ -381,6 +381,7 @@ envoy_cc_test(
     shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
+        ":socket_interface_swap_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
@@ -861,7 +862,6 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_client_lib",
-        "//source/common/http/http3:quic_client_connection_factory_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -1407,15 +1407,6 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "version_integration_test",
-    srcs = ["version_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/extensions/filters/http/ip_tagging:config",
     ],
 )
 

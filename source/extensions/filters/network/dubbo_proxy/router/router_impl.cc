@@ -196,6 +196,9 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
 void Router::onEvent(Network::ConnectionEvent event) {
   if (!upstream_request_ || upstream_request_->response_complete_) {
+    ENVOY_BUG(event == Network::ConnectionEvent::RemoteClose ||
+                  event == Network::ConnectionEvent::LocalClose,
+              "Unexpected event");
     // Client closed connection after completing response.
     ENVOY_LOG(debug, "dubbo upstream request: the upstream request had completed");
     return;
@@ -216,6 +219,7 @@ void Router::onEvent(Network::ConnectionEvent event) {
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   case Network::ConnectionEvent::Connected:
+  case Network::ConnectionEvent::ConnectedZeroRtt:
     // Connected is consumed by the connection pool.
     IS_ENVOY_BUG("unexpected");
   }

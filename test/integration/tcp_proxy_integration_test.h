@@ -24,6 +24,8 @@ public:
   }
 
   void initialize() override;
+  // Setup common byte metering parameters.
+  void setupByteMeterAccessLog();
 };
 
 class TcpProxySslIntegrationTest : public TcpProxyIntegrationTest {

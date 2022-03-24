@@ -579,7 +579,7 @@ TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
 
 TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime_guard->mergeValues(
       {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
   const std::string yaml = R"EOF(
     name: "foo"
@@ -644,7 +644,7 @@ TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
 
 TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime_guard->mergeValues(
       {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
   const std::string yaml = R"EOF(
     name: "foo"
