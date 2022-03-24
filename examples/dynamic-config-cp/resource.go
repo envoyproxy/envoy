@@ -119,8 +119,10 @@ func makeHTTPListener(listenerName string, route string) *listener.Listener {
 			},
 		},
 		HttpFilters: []*hcm.HttpFilter{{
-			Name:        wellknown.Router,
-			TypedConfig: routerpb,
+			Name: wellknown.Router,
+			ConfigType: &listener.Filter_TypedConfig{
+				TypedConfig: routerpb,
+			},
 		}},
 	}
 	pbst, err := ptypes.MarshalAny(manager)
