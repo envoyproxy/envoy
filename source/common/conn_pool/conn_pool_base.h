@@ -80,12 +80,12 @@ public:
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
-    CONNECTING, // Connection is not yet established.
-    READY,      // Additional streams may be immediately dispatched to this connection.
-    BUSY,       // Connection is at its concurrent stream limit.
-    DRAINING,   // No more streams can be dispatched to this connection, and it will be closed
+    Connecting, // Connection is not yet established.
+    Ready,      // Additional streams may be immediately dispatched to this connection.
+    Busy,       // Connection is at its concurrent stream limit.
+    Draining,   // No more streams can be dispatched to this connection, and it will be closed
     // when all streams complete.
-    CLOSED // Connection is closed and object is queued for destruction.
+    Closed // Connection is closed and object is queued for destruction.
   };
 
   State state() const { return state_; }
@@ -93,7 +93,7 @@ public:
   void setState(State state) {
     // If the client is transitioning to draining, update the remaining
     // streams and pool and cluster capacity.
-    if (state == State::DRAINING) {
+    if (state == State::Draining) {
       drain();
     }
     state_ = state;
@@ -102,7 +102,7 @@ public:
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
 
-  virtual bool hasHandshakeCompleted() const { return state_ != State::CONNECTING; }
+  virtual bool hasHandshakeCompleted() const { return state_ != State::Connecting; }
 
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
@@ -130,7 +130,7 @@ public:
   bool has_handshake_completed_{false};
 
 private:
-  State state_{State::CONNECTING};
+  State state_{State::Connecting};
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -344,17 +344,17 @@ protected:
   std::list<PendingStreamPtr> pending_streams_to_purge_;
 
   // Clients that are ready to handle additional streams.
-  // All entries are in state READY.
+  // All entries are in state Ready.
   std::list<ActiveClientPtr> ready_clients_;
 
-  // Clients that are not ready to handle additional streams due to being BUSY or DRAINING.
+  // Clients that are not ready to handle additional streams due to being Busy or Draining.
   std::list<ActiveClientPtr> busy_clients_;
 
-  // Clients that are not ready to handle additional streams because they are CONNECTING.
+  // Clients that are not ready to handle additional streams because they are Connecting.
   std::list<ActiveClientPtr> connecting_clients_;
 
   // The number of streams that can be immediately dispatched
-  // if all CONNECTING connections become connected.
+  // if all Connecting connections become connected.
   uint32_t connecting_stream_capacity_{0};
 
 private:

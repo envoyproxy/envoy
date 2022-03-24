@@ -342,12 +342,16 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
-
   cluster_ = config.cluster();
 
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
     default_value_ = config.runtime_fraction().default_value();
+  } else {
+    // If there is no runtime fraction specified, the default is 100% sampled. By leaving
+    // runtime_key_ empty and forcing the default to 100% this will yield the expected behavior.
+    default_value_.set_numerator(100);
+    default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   }
   trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
 }
@@ -1605,7 +1609,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       return nullptr;
     }
 
-    ENVOY_LOG(debug, "failed to match incoming request: {}", match.match_state_);
+    ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
 
     return nullptr;
   } else {

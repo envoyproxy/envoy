@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/http/alternate_protocols_cache.h"
 
 #include "source/common/http/alternate_protocols_cache_impl.h"
@@ -105,16 +107,26 @@ namespace {
 class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   ConnectivityGridTest()
-      : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
+      : transport_socket_options_(
+            std::make_shared<Network::TransportSocketOptionsImpl>("hostname")),
+        options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {}
 
   void initialize() {
+    quic_connection_persistent_info_ =
+#ifdef ENVOY_ENABLE_QUIC
+        std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher_, 0);
+#else
+        std::make_unique<PersistentQuicInfo>();
+#endif
+
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_,
         Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
         Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-        simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+        simTime(), alternate_protocols_, options_, quic_stat_names_, store_,
+        *quic_connection_persistent_info_);
     host_ = grid_->host();
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
@@ -149,6 +161,7 @@ public:
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_;
+  PersistentQuicInfoPtr quic_connection_persistent_info_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -798,10 +811,11 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
@@ -820,7 +834,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
@@ -842,10 +856,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
@@ -891,7 +906,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
@@ -913,10 +928,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
