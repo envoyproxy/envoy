@@ -22,7 +22,8 @@ def _protodoc_rule_impl(ctx):
                     depset([
                         x
                         for x in ctx.attr.deps[0][OutputGroupInfo].rst.to_list()
-                        if x.short_path.startswith("../envoy_api")
+                        if (x.short_path.startswith("../envoy_api") or
+                            x.short_path.startswith("../com_github_cncf_udpa"))
                     ]),
                 ],
             ),

@@ -15,7 +15,7 @@ protected:
   explicit BaseFactory(const std::string& name) : name_(name) {}
 
 public:
-  std::string name() const override { return name_; }
+  std::string name() const override { return "envoy.matching.inputs." + name_; }
 
   Matcher::DataInputFactoryCb<MatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -39,7 +39,7 @@ class DestinationIPInputFactory
           DestinationIPInput,
           envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput> {
 public:
-  DestinationIPInputFactory() : BaseFactory("destination-ip") {}
+  DestinationIPInputFactory() : BaseFactory("destination_ip") {}
 };
 
 class DestinationPortInput : public Matcher::DataInput<MatchingData> {
@@ -52,7 +52,7 @@ class DestinationPortInputFactory
           DestinationPortInput,
           envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput> {
 public:
-  DestinationPortInputFactory() : BaseFactory("destination-port") {}
+  DestinationPortInputFactory() : BaseFactory("destination_port") {}
 };
 
 class SourceIPInput : public Matcher::DataInput<MatchingData> {
@@ -64,7 +64,7 @@ class SourceIPInputFactory
     : public BaseFactory<SourceIPInput,
                          envoy::extensions::matching::common_inputs::network::v3::SourceIPInput> {
 public:
-  SourceIPInputFactory() : BaseFactory("source-ip") {}
+  SourceIPInputFactory() : BaseFactory("source_ip") {}
 };
 
 class SourcePortInput : public Matcher::DataInput<MatchingData> {
@@ -76,7 +76,7 @@ class SourcePortInputFactory
     : public BaseFactory<SourcePortInput,
                          envoy::extensions::matching::common_inputs::network::v3::SourcePortInput> {
 public:
-  SourcePortInputFactory() : BaseFactory("source-port") {}
+  SourcePortInputFactory() : BaseFactory("source_port") {}
 };
 
 class DirectSourceIPInput : public Matcher::DataInput<MatchingData> {
@@ -89,7 +89,7 @@ class DirectSourceIPInputFactory
           DirectSourceIPInput,
           envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput> {
 public:
-  DirectSourceIPInputFactory() : BaseFactory("direct-source-ip") {}
+  DirectSourceIPInputFactory() : BaseFactory("direct_source_ip") {}
 };
 
 class SourceTypeInput : public Matcher::DataInput<MatchingData> {
@@ -101,7 +101,7 @@ class SourceTypeInputFactory
     : public BaseFactory<SourceTypeInput,
                          envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput> {
 public:
-  SourceTypeInputFactory() : BaseFactory("source-type") {}
+  SourceTypeInputFactory() : BaseFactory("source_type") {}
 };
 
 class ServerNameInput : public Matcher::DataInput<MatchingData> {
@@ -113,7 +113,7 @@ class ServerNameInputFactory
     : public BaseFactory<ServerNameInput,
                          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput> {
 public:
-  ServerNameInputFactory() : BaseFactory("server-name") {}
+  ServerNameInputFactory() : BaseFactory("server_name") {}
 };
 
 class TransportProtocolInput : public Matcher::DataInput<MatchingData> {
@@ -126,7 +126,7 @@ class TransportProtocolInputFactory
           TransportProtocolInput,
           envoy::extensions::matching::common_inputs::network::v3::TransportProtocolInput> {
 public:
-  TransportProtocolInputFactory() : BaseFactory("transport-protocol") {}
+  TransportProtocolInputFactory() : BaseFactory("transport_protocol") {}
 };
 
 class ApplicationProtocolInput : public Matcher::DataInput<MatchingData> {
@@ -139,7 +139,7 @@ class ApplicationProtocolInputFactory
           ApplicationProtocolInput,
           envoy::extensions::matching::common_inputs::network::v3::ApplicationProtocolInput> {
 public:
-  ApplicationProtocolInputFactory() : BaseFactory("application-protocol") {}
+  ApplicationProtocolInputFactory() : BaseFactory("application_protocol") {}
 };
 
 } // namespace Matching

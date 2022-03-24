@@ -150,7 +150,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<xds::type::matcher::v3::IPMatcher>();
   }
-  std::string name() const override { return "trie-matcher"; }
+  std::string name() const override { return "envoy.matching.custom_matchers.trie_matcher"; }
 };
 
 class NetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::MatchingData> {};
