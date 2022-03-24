@@ -234,12 +234,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/network/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/network/echo @UNOWNED @UNOWNED
 /*/extensions/filters/network/redis_proxy @UNOWNED @UNOWNED
-/*/extensions/filters/network/kafka @UNOWNED @UNOWNED
-/*/extensions/filters/network/kafka/broker @UNOWNED @UNOWNED
-/*/extensions/filters/network/kafka/mesh @UNOWNED @UNOWNED
-/*/extensions/filters/network/kafka/mesh/command_handlers @UNOWNED @UNOWNED
-/*/extensions/filters/network/kafka/protocol @UNOWNED @UNOWNED
-/*/extensions/filters/network/kafka/serialization @UNOWNED @UNOWNED
 /*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common/redis @UNOWNED @UNOWNED
