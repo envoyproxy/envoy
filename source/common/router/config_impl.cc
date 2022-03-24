@@ -1451,7 +1451,7 @@ VirtualHostImpl::VirtualHostImpl(
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
-  // Inherit policies from the route config.
+  // Inherit policies from the global config.
   if (shadow_policies_.empty()) {
     shadow_policies_ = global_route_config_.shadowPolicies();
   }
