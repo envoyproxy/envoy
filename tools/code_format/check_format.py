@@ -1131,9 +1131,9 @@ if __name__ == "__main__":
     # error_messages.
     def owned_directories(error_messages):
         owned = []
-        maintainers = get_owners()
-
         try:
+            maintainers = get_owners()
+
             with open('./CODEOWNERS') as f:
                 for line in f:
                     # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
