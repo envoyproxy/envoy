@@ -188,6 +188,16 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
+# compression code
+/*/extensions/filters/http/decompressor @rojkov @kbaichoo
+/*/extensions/filters/http/gzip @gsagula @kbaichoo
+/*/extensions/filters/http/common/compressor @gsagula @rojkov @kbaichoo
+/*/extensions/filters/http/compressor @rojkov @kbaichoo
+/*/extensions/compression/brotli @rojkov @kbaichoo
+/*/extensions/compression/common @kbaichoo @rojkov
+/*/extensions/compression/gzip/decompressor @rojkov @kbaichoo
+/*/extensions/compression/gzip/compressor @rojkov @kbaichoo
+/*/extensions/compression/gzip/common @rojkov @kbaichoo
 
 # "Unowned extensions (without 1 maintainer or 2 owners)
 /*/extensions/formatter/req_without_query @UNOWNED @tsaarni
@@ -198,16 +208,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/http/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/network/ext_authz @esmet @gsagula @UNOWNED
-# compression code
-/*/extensions/filters/http/decompressor @rojkov @UNOWNED
-/*/extensions/filters/http/gzip @gsagula @UNOWNED
-/*/extensions/filters/http/common/compressor @gsagula @rojkov @UNOWNED
-/*/extensions/filters/http/compressor @rojkov @UNOWNED
-/*/extensions/compression/brotli @rojkov @UNOWNED
-/*/extensions/compression/common @UNOWNED @rojkov
-/*/extensions/compression/gzip/decompressor @rojkov @UNOWNED
-/*/extensions/compression/gzip/compressor @rojkov @UNOWNED
-/*/extensions/compression/gzip/common @rojkov @UNOWNED
 # cel
 /*/extensions/access_loggers/filters/cel @UNOWNED @douglas-reid
 # rbac
