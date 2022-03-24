@@ -98,13 +98,12 @@ public:
                 const StatNameTagVector& stat_name_tags)
       : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
         unit_(unit), parent_(parent) {}
-  ~HistogramImpl() override {
-    // We must explicitly free the StatName here in order to supply the
-    // SymbolTable reference. An RAII alternative would be to store a
-    // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
-    // per stat.
-    MetricImpl::clear(symbolTable());
-  }
+
+  // We must explicitly free the StatName here in order to supply the
+  // SymbolTable reference. An RAII alternative would be to store a
+  // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
+  // per stat.
+  ~HistogramImpl() override { MetricImpl::clear(symbolTable()); }
 
   // Stats::Histogram
   Unit unit() const override { return unit_; };
