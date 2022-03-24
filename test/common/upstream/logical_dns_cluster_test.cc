@@ -53,7 +53,7 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     cluster_ = std::make_shared<LogicalDnsCluster>(cluster_config, runtime_, dns_resolver_,
                                                    factory_context, std::move(scope), false);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -215,6 +215,7 @@ protected:
   Api::ApiPtr api_;
   Server::MockOptions options_;
   Common::CallbackHandlePtr priority_update_cb_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 using LogicalDnsConfigTuple =

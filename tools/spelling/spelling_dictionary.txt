@@ -163,6 +163,7 @@ HTML
 HTTP
 HTTPS
 HV
+Hyperscan
 IAM
 IANA
 IDL
@@ -257,6 +258,7 @@ OVFL
 PAYLOADLEN
 PB
 PCC
+PCRE
 PEERCRED
 PEM
 PERF
@@ -451,6 +453,7 @@ authlen
 authn
 auths
 authz
+automata
 autoscale
 backend
 backends
@@ -1343,3 +1346,6 @@ vhosts
 infos
 ElastiCache
 pinterest
+NSS
+SSLKEYLOGFILE
+

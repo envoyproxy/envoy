@@ -63,6 +63,8 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
+                                   std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;

@@ -107,7 +107,9 @@ namespace {
 class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   ConnectivityGridTest()
-      : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
+      : transport_socket_options_(
+            std::make_shared<Network::TransportSocketOptionsImpl>("hostname")),
+        options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {}
 
@@ -832,7 +834,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
@@ -904,7 +906,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
