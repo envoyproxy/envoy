@@ -1411,15 +1411,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "version_integration_test",
-    srcs = ["version_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/extensions/filters/http/ip_tagging:config",
-    ],
-)
-
-envoy_cc_test(
     name = "dynamic_validation_integration_test",
     srcs = ["dynamic_validation_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],

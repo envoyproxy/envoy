@@ -77,10 +77,10 @@ envoy_cc_test_library(
     ],
     external_deps = ["abseil_time"],
     deps = [
-        ":quiche_platform_expect_bug_impl_lib",
-        ":quiche_platform_thread_impl_lib",
+        ":quiche_expect_bug_impl_lib",
+        ":quiche_thread_impl_lib",
         "//envoy/network:address_interface",
-        "//source/common/quic/platform:quic_platform_base_impl_lib",
+        "//source/common/quic/platform:quic_base_impl_lib",
         "//test/test_common:environment_lib",
     ],
 )
@@ -93,7 +93,7 @@ envoy_quiche_platform_impl_cc_test_library(
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_platform_expect_bug_impl_lib",
+    name = "quiche_expect_bug_impl_lib",
     hdrs = ["quiche_expect_bug_impl.h"],
     tags = ["nofips"],
     deps = [
@@ -103,14 +103,14 @@ envoy_quiche_platform_impl_cc_test_library(
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_platform_mock_log_impl_lib",
+    name = "quiche_mock_log_impl_lib",
     hdrs = ["quiche_mock_log_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:quic_platform_base"],
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_platform_thread_impl_lib",
+    name = "quiche_thread_impl_lib",
     hdrs = ["quiche_thread_impl.h"],
     tags = ["nofips"],
     deps = [
@@ -121,7 +121,7 @@ envoy_quiche_platform_impl_cc_test_library(
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_platform_test_output_impl_lib",
+    name = "quiche_test_output_impl_lib",
     srcs = ["quiche_test_output_impl.cc"],
     hdrs = ["quiche_test_output_impl.h"],
     tags = ["nofips"],
@@ -133,15 +133,15 @@ envoy_quiche_platform_impl_cc_test_library(
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_common_platform_test_impl_lib",
+    name = "quiche_test_impl_lib",
     hdrs = ["quiche_test_impl.h"],
     deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_common_platform_test_helpers_impl_lib",
+    name = "quiche_test_helpers_impl_lib",
     hdrs = ["quiche_test_helpers_impl.h"],
     deps = [
-        ":quiche_platform_expect_bug_impl_lib",
+        ":quiche_expect_bug_impl_lib",
     ],
 )
