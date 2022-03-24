@@ -167,7 +167,7 @@ public:
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
             factory_name);
-    bool is_terminal_filter = factory->isTerminalFilterByProto(message, getFactoryContext());
+    const bool is_terminal_filter = factory->isTerminalFilterByProto(message, getFactoryContext());
     Config::Utility::validateTerminalFilters(config_name, factory_name, filter_chain_type_,
                                              is_terminal_filter, last_filter_in_filter_chain_);
   }
