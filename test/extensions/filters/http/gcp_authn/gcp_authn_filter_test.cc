@@ -21,6 +21,7 @@ namespace GcpAuthn {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
+using Envoy::Extensions::HttpFilters::GcpAuthn;
 using Server::Configuration::MockFactoryContext;
 using ::testing::_;
 using ::testing::Invoke;
@@ -67,8 +68,10 @@ public:
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
     if (valid) {
-      (*(*metadata_.mutable_filter_metadata())[Envoy::Extensions::HttpFilters::GcpAuthn::FilterName]
-            .mutable_fields())[Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey]
+      (*(*metadata_
+              .mutable_filter_metadata())[std::string(
+                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+            .mutable_fields())[std::string(Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey)]
           .set_string_value("tests");
     }
     ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
@@ -214,7 +217,7 @@ TEST_F(GcpAuthnFilterTest, NoFilterMetadata) {
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
 }
 
-TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
+TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
@@ -227,7 +230,8 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChain) {
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  // continueDecoding() is expected to be called to resume the filter chain after onSuccess().
+  // continueDecoding() is expected to be called to resume the filter chain iteration after
+  // onSuccess().
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   client_callback_->onSuccess(client_request_, std::move(response));
 }

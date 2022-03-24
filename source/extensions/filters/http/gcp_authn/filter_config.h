@@ -15,7 +15,7 @@ class GcpAuthnFilterFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig> {
 public:
-  GcpAuthnFilterFactory() : FactoryBase(FilterName) {}
+  GcpAuthnFilterFactory() : FactoryBase(std::string(FilterName)) {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,

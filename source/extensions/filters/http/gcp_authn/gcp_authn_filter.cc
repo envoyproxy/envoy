@@ -30,10 +30,11 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
   std::string audience_str;
   if (cluster != nullptr) {
     auto filter_metadata = cluster->info()->metadata().filter_metadata();
-    const auto filter_it = filter_metadata.find(FilterName);
+    const auto filter_it = filter_metadata.find(std::string(FilterName));
 
     if (filter_it != filter_metadata.end()) {
-      audience_str = filter_it->second.fields().find(AudienceKey)->second.string_value();
+      audience_str =
+          filter_it->second.fields().find(std::string(AudienceKey))->second.string_value();
     }
   }
 

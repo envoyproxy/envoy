@@ -49,9 +49,10 @@ public:
         // the destination cluster) is provided through the metadata.
         auto cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
         envoy::config::core::v3::Metadata* cluster_metadata = cluster_0->mutable_metadata();
-        (*(*cluster_metadata
-                ->mutable_filter_metadata())[Envoy::Extensions::HttpFilters::GcpAuthn::FilterName]
-              .mutable_fields())[Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey]
+        (*(*cluster_metadata->mutable_filter_metadata())
+              [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                  .mutable_fields())[std::string(
+                                         Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey)]
             .set_string_value(std::string(AudienceValue));
       }
 
@@ -60,7 +61,7 @@ public:
       auto& uri = *proto_config_.mutable_http_uri();
       uri.set_uri(std::string(Url));
       envoy::config::listener::v3::Filter gcp_authn_filter;
-      gcp_authn_filter.set_name(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName);
+      gcp_authn_filter.set_name(std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName));
       gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
 
       // Add the filter to the filter chain.
@@ -123,6 +124,7 @@ public:
   }
 
   IntegrationStreamDecoderPtr response_;
+  IntegrationStreamDecoderPtr gcp_response_;
   FakeHttpConnectionPtr fake_gcp_authn_connection_{};
   FakeStreamPtr request_{};
   const std::string default_config_ = R"EOF(
