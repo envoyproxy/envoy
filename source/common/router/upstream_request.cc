@@ -486,6 +486,10 @@ void UpstreamRequest::onPoolReady(
 
   if (span_ != nullptr) {
     span_->injectContext(*parent_.downstreamHeaders());
+  } else {
+    // No independent child span for current upstream request then inject the parent span's tracing
+    // context into the request headers.
+    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders());
   }
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());

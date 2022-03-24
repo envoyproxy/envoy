@@ -412,7 +412,6 @@ TEST_F(RouterTest, Http1Upstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, true));
-  EXPECT_CALL(span_, injectContext(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
 
@@ -432,7 +431,6 @@ TEST_F(RouterTest, Http2Upstream) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(span_, injectContext(_));
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
@@ -739,7 +737,6 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow));
-  EXPECT_CALL(span_, injectContext(_)).Times(0);
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -4556,7 +4553,6 @@ TEST_F(RouterTest, DirectResponse) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  EXPECT_CALL(span_, injectContext(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
@@ -4606,7 +4602,6 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "201"},
                                                    {"location", "http://host/"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  EXPECT_CALL(span_, injectContext(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
@@ -4630,7 +4625,6 @@ TEST_F(RouterTest, DirectResponseWithoutLocation) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  EXPECT_CALL(span_, injectContext(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
@@ -5653,7 +5647,6 @@ TEST_F(RouterTest, ApplicationProtocols) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(span_, injectContext(_));
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
