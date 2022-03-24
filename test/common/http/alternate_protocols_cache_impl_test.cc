@@ -309,7 +309,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
   initialize();
 }
 
-TEST_F(AlternateProtocolsCacheImplTest, getOrCreateHttp3StatusTracker) {
+TEST_F(AlternateProtocolsCacheImplTest, GetOrCreateHttp3StatusTracker) {
   max_entries_ = 1u;
   initialize();
   EXPECT_EQ(0u, protocols_->size());
