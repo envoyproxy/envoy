@@ -10,8 +10,8 @@ When the files are changed on the filesystem, Envoy will automatically update it
 
 .. note::
 
-   Now Enovy only get the changes when write to temporary file and rename into place, ignore overwritten directly.
-   The purpose is  that atomic renames are the only way to achieve consistency.
+   Envoy only updates when the configuration file is replaced, and not when the file is edited in place.
+   It is implemented this way to ensure configuration consistency.
 
 At a minimum, you will need to start Envoy configured with the following sections:
 
@@ -95,3 +95,8 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :linenos:
     :emphasize-lines: 11, 17-18, 22-23
+
+.. seealso::
+
+   :ref:`Atomic swap <_config_runtime_symbolic_link_swap>`
+      General explanation of how the atomic swap works.
