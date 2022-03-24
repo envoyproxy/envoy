@@ -146,8 +146,6 @@ public:
   /**
    * @param origin The origin to get HTTP/3 status tracker for.
    * @return the existing status tracker or creating a new one if there is none.
-   *         If the origin doesn't have a cached entry, creating the entry to hold the status
-   *         tracker as well.
    */
   virtual AlternateProtocolsCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) PURE;

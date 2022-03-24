@@ -186,7 +186,7 @@ private:
 
   // Return origin of the remote host. If the host doesn't have an IP address,
   // the port of the origin will be 0.
-  AlternateProtocolsCache::Origin getOrigin() const;
+  AlternateProtocolsCache::Http3StatusTracker& getHttp3StatusTracker() const;
 
   // Called by each pool as it idles. The grid is responsible for calling
   // idle_callbacks_ once all pools have idled.

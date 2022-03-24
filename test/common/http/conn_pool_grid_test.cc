@@ -375,7 +375,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
 
 // Test both connections happening in parallel and the second connecting before
 // the first eventually fails.
-TEST_F(ConnectivityGridTest, Http3BrokenWithoutAlternateProtocolsCacheEntry) {
+TEST_F(ConnectivityGridTest, Http3BrokenWithExpiredAlternateProtocolsCacheEntry) {
   initialize();
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_->first(), nullptr);
@@ -399,18 +399,21 @@ TEST_F(ConnectivityGridTest, Http3BrokenWithoutAlternateProtocolsCacheEntry) {
   grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
   EXPECT_FALSE(grid_->isHttp3Broken());
 
-  // Advance time so that the cache entry expires and be removed by a following fetching.
+  // Advance time so that the cache entry expires and alternatives removed by a following fetching.
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
   EXPECT_FALSE(alternate_protocols_->findAlternatives(origin_).has_value());
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should wait on the other pool
   EXPECT_NE(grid_->callbacks(0), nullptr);
-  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
-  new NiceMock<MockTimer>(&dispatcher_);
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
+  // The Broken state should be cached.
+  EXPECT_TRUE(grid_->isHttp3Broken());
+  EXPECT_FALSE(alternate_protocols_->findAlternatives(origin_).has_value());
+
+  // Updating the alternatives of the same origin shouldn't change its HTTP/3 status.
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin_, protocols);

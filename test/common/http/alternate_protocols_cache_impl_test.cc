@@ -38,7 +38,7 @@ public:
         dispatcher_, std::unique_ptr<KeyValueStore>(store_), max_entries_);
   }
 
-  const size_t max_entries_ = 10;
+  size_t max_entries_ = 10;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockKeyValueStore* store_;
@@ -131,7 +131,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_FALSE(protocols.has_value());
-  EXPECT_EQ(0, protocols_->size());
+  EXPECT_EQ(1u, protocols_->size());
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) {
@@ -307,6 +307,21 @@ TEST_F(AlternateProtocolsCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
     fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0");
   }));
   initialize();
+}
+
+TEST_F(AlternateProtocolsCacheImplTest, getOrCreateHttp3StatusTracker) {
+  max_entries_ = 1u;
+  initialize();
+  EXPECT_EQ(0u, protocols_->size());
+
+  protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
+  EXPECT_EQ(1u, protocols_->size());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+
+  // Fetch HTTP/3 status for another origin should overwrite the cache.
+  EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Broken());
+  EXPECT_EQ(1u, protocols_->size());
+  EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
 }
 
 } // namespace

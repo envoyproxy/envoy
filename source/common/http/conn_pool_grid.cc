@@ -351,35 +351,19 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-AlternateProtocolsCache::Origin ConnectivityGrid::getOrigin() const {
-  uint32_t port{0};
-  if (host_->address()->type() != Network::Address::Type::Ip) {
-    ENVOY_LOG_MISC(error, "Address is not an IP address");
-    ASSERT(false);
-  } else {
-    port = host_->address()->ip()->port();
-  }
+AlternateProtocolsCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
   // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-  return AlternateProtocolsCache::Origin("https", host_->hostname(), port);
+  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
+                                         host_->address()->ip()->port());
+  return alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
 }
 
-bool ConnectivityGrid::isHttp3Broken() const {
-  AlternateProtocolsCache::Http3StatusTracker& http3_status_tracker =
-      alternate_protocols_->getOrCreateHttp3StatusTracker(getOrigin());
-  return http3_status_tracker.isHttp3Broken();
-}
+bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Broken() {
-  AlternateProtocolsCache::Http3StatusTracker& http3_status_tracker =
-      alternate_protocols_->getOrCreateHttp3StatusTracker(getOrigin());
-  http3_status_tracker.markHttp3Broken();
-}
+void ConnectivityGrid::markHttp3Broken() { getHttp3StatusTracker().markHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Confirmed() {
-  AlternateProtocolsCache::Http3StatusTracker& http3_status_tracker =
-      alternate_protocols_->getOrCreateHttp3StatusTracker(getOrigin());
-  http3_status_tracker.markHttp3Confirmed();
-}
+void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }
 
 bool ConnectivityGrid::isIdle() const {
   // This is O(n) but the function is constant and there are no plans for n > 8.

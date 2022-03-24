@@ -216,7 +216,6 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
                   protocols.end());
 
   if (protocols.empty()) {
-    protocols_.erase(entry_it);
     if (key_value_store_) {
       key_value_store_->remove(originToString(origin));
     }
@@ -226,7 +225,6 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
     key_value_store_->addOrUpdate(originToString(origin),
                                   originDataToStringForCache(protocols, entry_it->second.srtt));
   }
-
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
 }
 
