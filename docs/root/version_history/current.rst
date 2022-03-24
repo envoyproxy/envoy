@@ -16,7 +16,7 @@ Minor Behavior Changes
 * build: ``VERSION`` and ``API_VERSION`` have been renamed to ``VERSION.txt`` and ``API_VERSION.txt`` respectively to avoid conflicts with the C++ ``<version>`` header.
 * config: warning messages for protobuf unknown fields now contain ancestors for easier troubleshooting.
 * cryptomb: remove RSA PKCS1 v1.5 padding support.
-* decompressor: decompressor does not duplicate `accept-encoding` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.
+* decompressor: decompressor does not duplicate ``accept-encoding`` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.
 * dynamic_forward_proxy: if a DNS resolution fails, failing immediately with a specific resolution error, rather than finishing up all local filters and failing to select an upstream host.
 * ecds: changed to use ``http_filter`` stat prefix as the metrics root for ECDS subscriptions. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.top_level_ecds_stats`` to false.
 * ext_authz: added requested server name in ext_authz network filter for auth review.
@@ -116,7 +116,7 @@ New Features
 * local_ratelimit: added support for X-RateLimit-* headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
-* redis: support for hostnames returned in ``cluster slots`` response is now available.
+* redis: support for hostnames returned in ``cluster_slots`` response is now available.
 * schema_validator_tool: added ``bootstrap`` checking to the
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`.
 * schema_validator_tool: added ``--fail-on-deprecated`` and ``--fail-on-wip`` to the
