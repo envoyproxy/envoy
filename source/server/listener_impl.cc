@@ -950,7 +950,21 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
 }
 
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
-  return *address() == *other.address() &&
+  bool reject_duplicated_v4_mapped_addr = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.reject_duplicated_ipv4_mapped_address_and_ipv4_address");
+  auto this_address =
+      reject_duplicated_v4_mapped_addr && config_.address().socket_address().ipv4_compat() &&
+              address_->type() == Network::Address::Type::Ip && !address_->ip()->isAnyAddress()
+          ? address_->ip()->ipv6()->v4CompatibleAddress()
+          : address_;
+  auto other_address = reject_duplicated_v4_mapped_addr &&
+                               other.config_.address().socket_address().ipv4_compat() &&
+                               other.address_->type() == Network::Address::Type::Ip &&
+                               !other.address_->ip()->isAnyAddress()
+                           ? other.address_->ip()->ipv6()->v4CompatibleAddress()
+                           : other.address_;
+
+  return *this_address == *other_address &&
          Network::Utility::protobufAddressSocketType(config_.address()) ==
              Network::Utility::protobufAddressSocketType(other.config_.address());
 }
