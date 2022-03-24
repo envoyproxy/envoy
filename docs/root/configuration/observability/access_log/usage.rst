@@ -257,14 +257,14 @@ The following command operators are supported:
     Total number of bytes sent to the upstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of bytes sent to the upstream by the tcp proxy.
 
 %UPSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
     Total number of bytes received from the upstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of bytes received from the upstream by the tcp proxy.
 
 %UPSTREAM_HEADER_BYTES_SENT%
   HTTP
@@ -285,14 +285,14 @@ The following command operators are supported:
     Total number of bytes sent to the downstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of bytes sent to the downstream by the tcp proxy.
 
 %DOWNSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
     Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
 
   TCP
-    Not implemented (0).
+    Total number of bytes received from the downstream by the tcp proxy.
 
 %DOWNSTREAM_HEADER_BYTES_SENT%
   HTTP

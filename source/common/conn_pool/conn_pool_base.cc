@@ -556,7 +556,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   case Network::ConnectionEvent::Connected: {
-    ASSERT(!client.has_handshake_completed_);
+    ASSERT(client.connect_timer_ != nullptr && !client.has_handshake_completed_);
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
 

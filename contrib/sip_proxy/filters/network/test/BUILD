@@ -21,6 +21,7 @@ envoy_cc_mock(
         "//contrib/sip_proxy/filters/network/source/filters:factory_base_lib",
         "//contrib/sip_proxy/filters/network/source/filters:filter_interface",
         "//contrib/sip_proxy/filters/network/source/router:router_interface",
+        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
@@ -81,6 +82,26 @@ envoy_cc_test(
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],
 )
+
+#envoy_cc_test(
+#    name = "tra_test",
+#    srcs = ["tra_test.cc"],
+#    deps = [
+#        ":mocks",
+#        ":utility_lib",
+#        "//contrib/sip_proxy/filters/network/source:config",
+#        "//contrib/sip_proxy/filters/network/source:conn_manager_lib",
+#        "//contrib/sip_proxy/filters/network/source/filters:filter_interface",
+#        "//contrib/sip_proxy/filters/network/source/router:config",
+#        "//contrib/sip_proxy/filters/network/source/router:router_interface",
+#        "//contrib/sip_proxy/filters/network/source/tra:tra_lib",
+#        "//test/mocks/network:network_mocks",
+#        "//test/mocks/server:factory_context_mocks",
+#        "//test/test_common:printers_lib",
+#        "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg_cc_proto",
+#        "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
+#    ],
+#)
 
 envoy_cc_test(
     name = "decoder_test",
