@@ -21,7 +21,6 @@ namespace GcpAuthn {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
-using Envoy::Extensions::HttpFilters::GcpAuthn;
 using Server::Configuration::MockFactoryContext;
 using ::testing::_;
 using ::testing::Invoke;
