@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -68,6 +69,7 @@ public:
 
 private:
   static constexpr uint32_t NumEscapes = 1 << 11; // 2^11=2048 codes possible in 2-byte utf8.
+  //static constexpr uint32_t NumEscapes = 256;
 
   // Character-indexed array of translation strings. If an entry is nullptr then
   // the character does not require substitution. This strategy is dependent on
@@ -83,6 +85,7 @@ private:
   static uint32_t char2uint32(char c) { return static_cast<uint32_t>(static_cast<uint8_t>(c)); }
 
   Escape char_escapes_[NumEscapes];
+  absl::flat_hash_set<uint32_t> unicode_escapes_;
 };
 
 } // namespace Json

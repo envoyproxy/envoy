@@ -131,7 +131,7 @@ TEST_F(JsonSanitizerTest, InvalidUtf8) {
 
   // Invalid 4-byte sequences
   EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xf0\x9d\x84")); // treble clef missing last char
-  //EXPECT_EQ("\xf0\x9d\x84", sanitizer_.sanitize(buffer_, "\xf0\x9d\x84"));
+  EXPECT_EQ("\\u00f0\\u009d\\u0084", sanitizer_.sanitize(buffer_, "\xf0\x9d\x84"));
   EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xf0\xfd\x84\x9e")); // treble clef with invalid 2nd byte
 
   // Invalid 3-byte sequences
