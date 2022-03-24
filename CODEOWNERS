@@ -213,9 +213,12 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/network/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/http/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/common/rbac @UNOWNED @UNOWNED
+# tap
+/*/extensions/filters/http/tap @mattklein123 @UNOWNED
+/*/extensions/common/tap @mattklein123 @UNOWNED
+/*/extensions/transport_sockets/tap @mattklein123 @UNOWNED
 /*/extensions/filters/network/local_ratelimit @mattklein123 @UNOWNED
 /*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
-/*/extensions/filters/http/tap @mattklein123 @UNOWNED
 /*/extensions/filters/http/health_check @UNOWNED @UNOWNED
 /*/extensions/filters/http/cors @UNOWNED @UNOWNED
 /*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
@@ -230,8 +233,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/stat_sinks/common/statsd @UNOWNED @UNOWNED
 /*/extensions/access_loggers/grpc @UNOWNED @UNOWNED
 /*/extensions/access_loggers/file @UNOWNED @UNOWNED
-/*/extensions/common/tap @UNOWNED @UNOWNED
-/*/extensions/transport_sockets/tap @UNOWNED @UNOWNED
 /*/extensions/tracers/zipkin @UNOWNED @UNOWNED
 /*/extensions/tracers/dynamic_ot @UNOWNED @UNOWNED
 /*/extensions/tracers/opencensus @UNOWNED @UNOWNED
