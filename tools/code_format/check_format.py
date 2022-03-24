@@ -1118,14 +1118,14 @@ if __name__ == "__main__":
 
     def get_owners():
         with open('./OWNERS.md') as f:
-          EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*github.com.(.*)\)\)')
-          maintainers = ["@UNOWNED"]
-          for line in f:
-            if "Senior extension maintainers" in line:
-              return maintainers
-            m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
-            if m is not None:
-              maintainers.append("@" + m.group(1).lower())
+            EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*github.com.(.*)\)\)')
+            maintainers = ["@UNOWNED"]
+            for line in f:
+                if "Senior extension maintainers" in line:
+                    return maintainers
+                m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+                if m is not None:
+                    maintainers.append("@" + m.group(1).lower())
 
     # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
     # error_messages.

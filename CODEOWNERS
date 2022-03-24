@@ -183,15 +183,13 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
-# DNS Resolver
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
+# DNS resolution
+/*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
+/*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
 
 # "Unowned extensions (without 1 maintainer or 2 owners)
-# DNS resolution
-/*/extensions/network/dns_resolver/cares @yanavlasov @UNOWNED
-/*/extensions/network/dns_resolver/apple @yanavlasov @UNOWNED
-
 /*/extensions/formatter/req_without_query @UNOWNED @tsaarni
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @UNOWNED
@@ -220,17 +218,15 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/tap @mattklein123 @UNOWNED
 /*/extensions/common/tap @mattklein123 @UNOWNED
 /*/extensions/transport_sockets/tap @mattklein123 @UNOWNED
+# rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @UNOWNED
 /*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
-/*/extensions/filters/http/health_check @UNOWNED @UNOWNED
+/*/extensions/filters/http/health_check @mattklein123 @UNOWNED
 /*/extensions/filters/http/cors @UNOWNED @UNOWNED
-/*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
-/*/extensions/filters/http/lua @UNOWNED @UNOWNED
-/*/extensions/filters/http/common @UNOWNED @UNOWNED
-/*/extensions/filters/common @UNOWNED @UNOWNED
-/*/extensions/filters/common/lua @UNOWNED @UNOWNED
+/*/extensions/filters/http/lua @mattklein123 @UNOWNED
+/*/extensions/filters/common/lua @mattklein123 @UNOWNED
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
-/*/extensions/filters/listener/proxy_protocol @UNOWNED @UNOWNED
+/*/extensions/filters/listener/proxy_protocol @ggreenway @UNOWNED
 /*/extensions/stat_sinks/statsd @UNOWNED @UNOWNED
 /*/extensions/stat_sinks/common @UNOWNED @UNOWNED
 /*/extensions/stat_sinks/common/statsd @UNOWNED @UNOWNED
@@ -239,14 +235,20 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/tracers/zipkin @UNOWNED @UNOWNED
 /*/extensions/tracers/dynamic_ot @UNOWNED @UNOWNED
 /*/extensions/tracers/opencensus @UNOWNED @UNOWNED
-/*/extensions/tracers/lightstep @UNOWNED @UNOWNED
 /*/extensions/tracers/common @UNOWNED @UNOWNED
 /*/extensions/tracers/common/ot @UNOWNED @UNOWNED
 /*/extensions/retry/host/previous_hosts @UNOWNED @UNOWNED
-/*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
-/*/extensions/filters/network/echo @UNOWNED @UNOWNED
 /*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
+
+# Intentionally exempt (treated as core code)
+/*/extensions/filters/common @UNOWNED @UNOWNED
+/*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
+
+# To be moved to Contrib
+/*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
+/*/extensions/tracers/lightstep @UNOWNED @UNOWNED
+/*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
