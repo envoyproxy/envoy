@@ -2587,7 +2587,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -2652,7 +2652,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -2722,7 +2722,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -2792,7 +2792,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -2857,7 +2857,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -2918,7 +2918,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     // TODO(kyessenov) Switch to using prefix/suffix/containment matching for ALPN.
     yaml = yaml + R"EOF(
     filter_chain_matcher:
@@ -2983,7 +2983,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3062,7 +3062,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3146,7 +3146,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3209,7 +3209,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3296,7 +3296,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSourceTyp
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     // TODO(kyessenov) Switch to using prefix/suffix/containment matching for ALPN.
     yaml = yaml + R"EOF(
     filter_chain_matcher:
@@ -3440,7 +3440,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3558,7 +3558,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3695,7 +3695,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3781,7 +3781,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNamesMatch) {
-  if (matcher_) {
+  if (use_matcher_) {
     GTEST_SKIP() << "Server name matching not implemented for unified matcher";
   }
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -3904,7 +3904,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -3952,18 +3952,17 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicationProtocolMatch) {
-  if (matcher_) {
-    GTEST_SKIP() << "ALPN list matching not implemented for unified matcher";
-  }
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
     filter_chains:
-    - filter_chain_match:
+    - name: foo
+      filter_chain_match:
         # empty
-    - filter_chain_match:
+    - name: bar
+      filter_chain_match:
         application_protocols: ["dummy", "h2"]
       transport_socket:
         name: tls
@@ -3974,7 +3973,31 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
-                                                       Network::Address::IpVersion::v4);
+                                                 Network::Address::IpVersion::v4);
+  if (use_matcher_) {
+    yaml = yaml + R"EOF(
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: transport
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'h2','http/1.1'":
+              action:
+                name: bar
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: bar
+      on_no_match:
+        action:
+          name: foo
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: foo
+    )EOF";
+  }
 
   EXPECT_CALL(server_.api_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
@@ -4002,7 +4025,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleRequirementsMatch) {
-  if (matcher_) {
+  if (use_matcher_) {
     GTEST_SKIP() << "ALPN list and server name matching not implemented for unified matcher";
   }
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -4165,7 +4188,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
   )EOF",
                                                  Network::Address::IpVersion::v4);
 
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
     filter_chain_matcher:
       matcher_tree:
@@ -4195,7 +4218,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServerNamesMatch) {
-  if (matcher_) {
+  if (use_matcher_) {
     GTEST_SKIP() << "Server name matching not implemented for unified matcher";
   }
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -4230,7 +4253,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  if (matcher_) {
+  if (use_matcher_) {
     EXPECT_NO_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
     return;
   }
@@ -4278,7 +4301,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  if (matcher_) {
+  if (use_matcher_) {
     EXPECT_NO_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
     return;
   }
@@ -5521,7 +5544,7 @@ api_listener:
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
-  if (matcher_) {
+  if (use_matcher_) {
     GTEST_SKIP() << "Filter chain match is auto-inserted in the config dump";
   }
   auto scoped_runtime = std::make_unique<TestScopedRuntime>();

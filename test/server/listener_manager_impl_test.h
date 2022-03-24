@@ -65,7 +65,7 @@ public:
 
 protected:
   ListenerManagerImplTest()
-      : api_(Api::createApiForTest(server_.api_.random_)), matcher_(GetParam()) {}
+      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -307,7 +307,7 @@ protected:
     // Automatically inject a matcher that always matches "foo" if not present.
     envoy::config::listener::v3::Listener listener;
     listener.MergeFrom(config);
-    if (matcher_ && !listener.has_filter_chain_matcher()) {
+    if (use_matcher_ && !listener.has_filter_chain_matcher()) {
       const std::string filter_chain_matcher = R"EOF(
         matcher_tree:
           input:
@@ -354,7 +354,7 @@ protected:
   bool enable_dispatcher_stats_{false};
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
-  bool matcher_;
+  bool use_matcher_;
 };
 } // namespace Server
 } // namespace Envoy

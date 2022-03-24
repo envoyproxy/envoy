@@ -1,5 +1,3 @@
-.. _arch_overview_matching:
-
 Generic Matching
 ================
 
@@ -7,4 +5,3 @@ Generic Matching
   :maxdepth: 2
 
   matching_api
-  inputs

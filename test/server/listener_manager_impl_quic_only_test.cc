@@ -72,7 +72,7 @@ udp_listener_config:
   quic_options: {}
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (matcher_) {
+  if (use_matcher_) {
     yaml = yaml + R"EOF(
 filter_chain_matcher:
   matcher_tree:
