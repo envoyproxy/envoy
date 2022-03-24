@@ -510,7 +510,8 @@ TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
   setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF"), false);
+  )EOF"),
+        false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
@@ -523,7 +524,8 @@ TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
   setup(readConfig(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF"), false);
+  )EOF"),
+        false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());

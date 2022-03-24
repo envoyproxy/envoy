@@ -60,8 +60,7 @@ Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) 
   return Network::FilterStatus::StopIteration;
 }
 
-UdpProxyFilter::~UdpProxyFilter() {
-}
+UdpProxyFilter::~UdpProxyFilter() {}
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                                          Upstream::ThreadLocalCluster& cluster,
@@ -229,15 +228,16 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
     : cluster_(cluster), use_original_src_ip_(cluster_.filter_.config_->usingOriginalSrcIp()),
-      addresses_(std::move(addresses)), host_(host), 
+      addresses_(std::move(addresses)), host_(host),
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
       socket_(cluster.filter_.createSocket(host)),
-      session_stats_(generateStats(cluster.cluster_.info()->statsScope())){
+      session_stats_(generateStats(cluster.cluster_.info()->statsScope())) {
   if (!cluster_.filter_.config_->accessLogs().empty()) {
-    udp_sess_stats_.emplace(StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
+    udp_sess_stats_.emplace(
+        StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
     ASSERT(udp_sess_stats_.has_value());
   }
 
@@ -294,16 +294,15 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 void UdpProxyFilter::ActiveSession::fillStreamInfo() {
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
-  fields_map["cluster_name"] =
-      ValueUtil::stringValue(cluster_.cluster_.info()->name());
+  fields_map["cluster_name"] = ValueUtil::stringValue(cluster_.cluster_.info()->name());
   fields_map["bytes_sent"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_tx_bytes_.value());
   fields_map["bytes_received"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_rx_bytes_.value());
   fields_map["errors_sent"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_tx_errors_.value());
-  // TODO(giantcroc): Since downstream_sess_rx_errors_ is counted in onReceiveError, it seems that 
-  // no way to distinguish the number of receiving errors that occurred in each session.
+  // TODO(giantcroc): Since the receiving errors are counted in onReceiveError, it seems that
+  // no way to distinguish the number of errors in each session.
   fields_map["errors_received"] =
       ValueUtil::numberValue(cluster_.filter_.config_->stats().downstream_sess_rx_errors_.value());
   fields_map["datagrams_sent"] =

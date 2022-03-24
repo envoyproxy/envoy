@@ -80,7 +80,7 @@ public:
         stats_(generateStats(config.stat_prefix(), context.scope())),
         // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true),
-        random_(context.api().randomGenerator()){
+        random_(context.api().randomGenerator()) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
@@ -190,9 +190,10 @@ private:
     void fillStreamInfo();
 
     UdpProxyDownstreamStats generateStats(Stats::Scope& scope) {
-      const auto final_prefix = absl::StrCat("udp.", cluster_.filter_.config_->randomGenerator().uuid());
+      const auto final_prefix =
+          absl::StrCat("udp.", cluster_.filter_.config_->randomGenerator().uuid());
       return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                            POOL_GAUGE_PREFIX(scope, final_prefix))};
+                                             POOL_GAUGE_PREFIX(scope, final_prefix))};
     }
 
     // Network::UdpPacketProcessor
@@ -209,7 +210,7 @@ private:
       // TODO(mattklein123) change this to a reasonable number if needed.
       return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
     }
-    
+
     ClusterInfo& cluster_;
     const bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
