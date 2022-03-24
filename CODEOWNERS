@@ -231,9 +231,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/network/ext_authz @esmet @gsagula @UNOWNED
 # rbac
-/*/extensions/filters/network/rbac @UNOWNED @UNOWNED
-/*/extensions/filters/http/rbac @UNOWNED @UNOWNED
-/*/extensions/filters/common/rbac @UNOWNED @UNOWNED
+/*/extensions/filters/network/rbac @yangminzhu @UNOWNED
+/*/extensions/filters/http/rbac @yangminzhu @UNOWNED
+/*/extensions/filters/common/rbac @yangminzhu @UNOWNED
 /*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
 /*/extensions/filters/http/cors @UNOWNED @UNOWNED
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
