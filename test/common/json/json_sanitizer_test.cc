@@ -11,6 +11,8 @@ namespace {
 
 class JsonSanitizerTest : public testing::Test {
 protected:
+  using UnicodeSizePair = JsonSanitizer::UnicodeSizePair;
+
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
     EXPECT_TRUE(isValidUtf8(str)) << "str=" << str;
     absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, str);
@@ -112,14 +114,33 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
 }
 
 TEST_F(JsonSanitizerTest, MultiByteUtf8) {
-  using UnicodeSizePair = JsonSanitizer::UnicodeSizePair;
-  EXPECT_EQ(UnicodeSizePair(955, 2), decode("λ"));
-  EXPECT_EQ(UnicodeSizePair(8057, 3), decode("ό"));
+  EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode("λ")); // lambda literal
+  EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode("\xce\xbb")); // lambda utf8
+  EXPECT_EQ(UnicodeSizePair(0x1f79, 3), decode("ό")); // Greek Small Letter Omicron with Oxia
+  EXPECT_EQ(UnicodeSizePair(0x1f79, 3), decode("\xe1\xbd\xb9")); // Omicron utf8
 
   // It's hard to find large unicode characters, but to test the utf8 decoder
   // there are some in https://unicode-table.com/en/blocks/musical-symbols/
   // with reference utf8 encoding from https://unicode-table.com/en/1D11E/
   EXPECT_EQ(UnicodeSizePair(0x1d11e, 4), decode("\xf0\x9d\x84\x9e")); // treble clef
+}
+
+TEST_F(JsonSanitizerTest, InvalidUtf8) {
+  // Tests invalid 2, 3, and 4-byte utf8 sequences, which we'll simply pass
+  // through as literals.
+
+  // Invalid 4-byte sequences
+  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xf0\x9d\x84")); // treble clef missing last char
+  //EXPECT_EQ("\xf0\x9d\x84", sanitizer_.sanitize(buffer_, "\xf0\x9d\x84"));
+  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xf0\xfd\x84\x9e")); // treble clef with invalid 2nd byte
+
+  // Invalid 3-byte sequences
+  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xe1\xbd")); // missing last char
+  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xe1\xfd\xb9")); // invalid second char
+
+  // Invalid 2-byte sequences
+  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xce")); // lambda missing final byte
+  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xce\xfb")); // lambda with second byte invalid
 }
 
 } // namespace
