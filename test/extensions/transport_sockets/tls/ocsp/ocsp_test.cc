@@ -189,33 +189,16 @@ TEST_F(Asn1OcspUtilityTest, ParseMethodWrongTagTest) {
   expectThrowOnWrongTag(Asn1OcspUtility::parseResponseStatus);
 }
 
-TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadVersionV2Test) {
+TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
       0x30,
       7,
       // invalid version
-      0xa1,
+      0xa0,
       0x02,
       1,
-      0,
-  };
-  CBS cbs;
-  CBS_init(&cbs, data.data(), data.size());
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseData(cbs), EnvoyException,
-                            "OCSP ResponseData version is not supported");
-}
-
-TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadVersionV3Test) {
-  std::vector<uint8_t> data = {
-      // SEQUENCE
-      0x30,
-      7,
-      // invalid version
-      0xa2,
-      0x02,
       1,
-      0,
   };
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
