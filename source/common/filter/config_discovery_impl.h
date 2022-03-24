@@ -349,7 +349,7 @@ public:
 
     auto provider = createFilterConfigProviderImpl(
         subscription, require_type_urls, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, stat_prefix);
+        last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
@@ -382,7 +382,7 @@ private:
                                  ProtobufTypes::MessagePtr&& default_config,
                                  bool last_filter_in_filter_chain,
                                  const std::string& filter_chain_type,
-                                 const std::string& stat_prefix) PURE;
+                                 absl::string_view stat_prefix) PURE;
 };
 
 class HttpFilterConfigProviderManagerImpl
@@ -409,7 +409,7 @@ private:
                                  ProtobufTypes::MessagePtr&& default_config,
                                  bool last_filter_in_filter_chain,
                                  const std::string& filter_chain_type,
-                                 const std::string& stat_prefix) override {
+                                 absl::string_view stat_prefix) override {
     return std::make_unique<HttpDynamicFilterConfigProviderImpl>(
         subscription, require_type_urls, factory_context, std::move(default_config),
         last_filter_in_filter_chain, filter_chain_type, stat_prefix);
