@@ -138,7 +138,6 @@ FilterConfig::FilterConfig(
           absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      disable_chunked_transfer_(proto_config.disable_chunked_transfer()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
       cookie_names_(proto_config.credentials().cookie_names()) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
@@ -373,7 +372,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                              *Http::ResponseTrailerMapImpl::create(),
                                              decoder_callbacks_->streamInfo(), "");
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     redirect_uri, config_->disableChunkedTransfer());
+                                     redirect_uri);
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;

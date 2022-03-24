@@ -26,8 +26,7 @@ namespace Oauth2 {
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                                   const std::string& secret, const std::string& cb_url,
-                                   const bool disable_chunked_transfer) PURE;
+                                   const std::string& secret, const std::string& cb_url) PURE;
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -52,8 +51,7 @@ public:
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                           const std::string& secret, const std::string& cb_url,
-                           const bool disable_chunked_transfer) override;
+                           const std::string& secret, const std::string& cb_url) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 

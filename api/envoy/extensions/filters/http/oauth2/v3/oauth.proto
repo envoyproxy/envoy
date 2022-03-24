@@ -62,7 +62,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message OAuth2Config {
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
@@ -101,9 +101,6 @@ message OAuth2Config {
   // Optional resource parameter for authorization request
   // RFC: https://tools.ietf.org/html/rfc8707
   repeated string resources = 10;
-
-  // Disable chunked transfer encoding when requesting an access token.
-  bool disable_chunked_transfer = 11;
 }
 
 // Filter config.
