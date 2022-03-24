@@ -12,8 +12,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Language {
 
-struct LocaleCmp {
-  bool operator()(icu::Locale const a, icu::Locale const b) const { return a != b; }
+struct LocaleHash {
+  size_t operator()(icu::Locale const value) const {
+    return absl::Hash<int32_t>{}(value.hashCode());
+  }
 };
 
 Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
@@ -26,7 +28,7 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
                                      proto_config.default_language().data()));
   }
 
-  std::set<icu::Locale, LocaleCmp> supported_languages({default_locale});
+  absl::flat_hash_set<icu::Locale, LocaleHash> supported_languages({default_locale});
 
   for (const auto& supported_language : proto_config.supported_languages()) {
     const auto locale = icu::Locale(supported_language.data());
