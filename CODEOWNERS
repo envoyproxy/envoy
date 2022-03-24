@@ -199,7 +199,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/compression/gzip/compressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/common @rojkov @kbaichoo
 # cel
-/*/extensions/access_loggers/filters/cel @kuat @douglas-reid @adisuissa
+/*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # Stateful session
