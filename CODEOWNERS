@@ -198,38 +198,45 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/compression/gzip/decompressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/compressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/common @rojkov @kbaichoo
+# cel
+/*/extensions/access_loggers/filters/cel @kuat @douglas-reid @adisuissa
 
-# "Unowned extensions (without 1 maintainer or 2 owners)
-/*/extensions/formatter/req_without_query @UNOWNED @tsaarni
+# "Underowned" extensions (no backup reviewers, please volunter!)
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @UNOWNED
 /*/extensions/filters/http/stateful_session @wbpcode @UNOWNED
+# tap
+/*/extensions/filters/http/tap @mattklein123 @UNOWNED
+/*/extensions/common/tap @mattklein123 @UNOWNED
+# rate limit
+/*/extensions/filters/network/local_ratelimit @mattklein123 @UNOWNED
+# tap
+/*/extensions/transport_sockets/tap @mattklein123 @UNOWNED
+# lua
+/*/extensions/filters/http/lua @mattklein123 @UNOWNED
+/*/extensions/filters/common/lua @mattklein123 @UNOWNED
+# health cehck
+/*/extensions/filters/http/health_check @mattklein123 @UNOWNED
+# stats
+/*/extensions/stat_sinks/statsd @mattklein123 @UNOWNED
+/*/extensions/stat_sinks/common @mattklein123 @UNOWNED
+/*/extensions/stat_sinks/common/statsd @mattklein123 @UNOWNED
+# proxy protocol
+/*/extensions/filters/listener/proxy_protocol @ggreenway @UNOWNED
+
+# "Unowned" extensions (currently without 1 maintainer or 2 owners)
+/*/extensions/formatter/req_without_query @UNOWNED @tsaarni
 # ext_authz
 /*/extensions/filters/common/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/http/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/network/ext_authz @esmet @gsagula @UNOWNED
-# cel
-/*/extensions/access_loggers/filters/cel @UNOWNED @douglas-reid
 # rbac
 /*/extensions/filters/network/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/http/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/common/rbac @UNOWNED @UNOWNED
-# tap
-/*/extensions/filters/http/tap @mattklein123 @UNOWNED
-/*/extensions/common/tap @mattklein123 @UNOWNED
-/*/extensions/transport_sockets/tap @mattklein123 @UNOWNED
-# rate limit
-/*/extensions/filters/network/local_ratelimit @mattklein123 @UNOWNED
 /*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
-/*/extensions/filters/http/health_check @mattklein123 @UNOWNED
 /*/extensions/filters/http/cors @UNOWNED @UNOWNED
-/*/extensions/filters/http/lua @mattklein123 @UNOWNED
-/*/extensions/filters/common/lua @mattklein123 @UNOWNED
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
-/*/extensions/filters/listener/proxy_protocol @ggreenway @UNOWNED
-/*/extensions/stat_sinks/statsd @UNOWNED @UNOWNED
-/*/extensions/stat_sinks/common @UNOWNED @UNOWNED
-/*/extensions/stat_sinks/common/statsd @UNOWNED @UNOWNED
 /*/extensions/access_loggers/grpc @UNOWNED @UNOWNED
 /*/extensions/access_loggers/file @UNOWNED @UNOWNED
 /*/extensions/tracers/zipkin @UNOWNED @UNOWNED
