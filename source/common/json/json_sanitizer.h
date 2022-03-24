@@ -24,12 +24,11 @@ namespace Json {
 class JsonSanitizer {
 public:
   static constexpr uint32_t Utf8_2ByteMask = 0b11100000;
-  static constexpr uint32_t Utf8_2BytePattern = 0b11000000;
-
   static constexpr uint32_t Utf8_3ByteMask = 0b11110000;
-  static constexpr uint32_t Utf8_3BytePattern = 0b11100000;
-
   static constexpr uint32_t Utf8_4ByteMask = 0b11111000;
+
+  static constexpr uint32_t Utf8_2BytePattern = 0b11000000;
+  static constexpr uint32_t Utf8_3BytePattern = 0b11100000;
   static constexpr uint32_t Utf8_4BytePattern = 0b11110000;
 
   static constexpr uint32_t Utf8_ContinueMask = 0b11000000;
