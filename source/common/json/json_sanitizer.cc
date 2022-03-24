@@ -34,6 +34,7 @@ JsonSanitizer::JsonSanitizer() {
 
   // Low characters (0-31) not listed above are encoded as unicode 4-digit hex.
   auto unicode_escape = [this](uint32_t index) {
+    RELEASE_ASSERT(index < NumEscapes, "index too high");
     Escape& escape = char_escapes_[index];
     std::string escape_str = absl::StrFormat("\\u%04x", index);
     escape.size_ = escape_str.size();
@@ -87,6 +88,14 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
         if (unicode >= NumEscapes) {
           continue; // 3-byte and 4-byte utf-8 code-points are not in table.
         }
+
+        // We are indexing into char_escapes_ two ways: by the original first
+        // byte of a utf-8 sequence, and then, if the size_ is non-zero, we
+        // decode the utf8 sequence and do another lookup into the array using
+        // the resolved unicode. This is OK because in the first lookup, the
+        // utf8 intro pattern lands us between 128 and 255, which will all be
+        // initialized in the constructor with non-zero size. Then if we decode
+        // we will find the correct Escape entry for the unicode.
         escape = &char_escapes_[unicode];
         if (escape->size_ == Utf8PassThroughSentinel) {
           continue; // Most code-points are not escaped.
