@@ -3,7 +3,6 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
-#include "source/common/http/http3_status_tracker.h"
 #include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -185,6 +184,10 @@ protected:
 private:
   friend class ConnectivityGridForTest;
 
+  // Return origin of the remote host. If the host doesn't have an IP address,
+  // the port of the origin will be 0.
+  AlternateProtocolsCache::Http3StatusTracker& getHttp3StatusTracker() const;
+
   // Called by each pool as it idles. The grid is responsible for calling
   // idle_callbacks_ once all pools have idled.
   void onIdleReceived();
@@ -207,7 +210,6 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  Http3StatusTracker http3_status_tracker_;
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created

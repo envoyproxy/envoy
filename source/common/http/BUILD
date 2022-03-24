@@ -150,12 +150,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http3_status_tracker",
-    srcs = ["http3_status_tracker.cc"],
-    hdrs = ["http3_status_tracker.h"],
+    name = "http3_status_tracker_impl_lib",
+    srcs = ["http3_status_tracker_impl.cc"],
+    hdrs = ["http3_status_tracker_impl.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/http:alternate_protocols_cache_interface",
     ],
 )
 
@@ -171,6 +172,7 @@ envoy_cc_library(
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        ":http3_status_tracker_impl_lib",
         "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:alternate_protocols_cache_interface",
@@ -192,7 +194,7 @@ envoy_cc_library(
     hdrs = ["conn_pool_grid.h"],
     deps = [
         ":alternate_protocols_cache",
-        ":http3_status_tracker",
+        ":http3_status_tracker_impl_lib",
         ":mixed_conn_pool",
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/quic:quic_stat_names_lib",

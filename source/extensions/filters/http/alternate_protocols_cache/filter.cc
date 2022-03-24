@@ -48,16 +48,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 
   std::vector<Http::AlternateProtocolsCache::AlternateProtocol> protocols;
   for (size_t i = 0; i < alt_svc.size(); ++i) {
-    absl::optional<Http::AlternateProtocolsCacheImpl::OriginData> origin_data =
-        Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc[i]->value().getStringView(),
-                                                                time_source_);
-    if (!origin_data.has_value()) {
+    std::vector<Http::AlternateProtocolsCache::AlternateProtocol> advertised_protocols =
+        Http::AlternateProtocolsCacheImpl::alternateProtocolsFromString(
+            alt_svc[i]->value().getStringView(), time_source_, false);
+    if (advertised_protocols.empty()) {
       ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
                 alt_svc[i]->value().getStringView());
       return Http::FilterHeadersStatus::Continue;
     }
-    std::vector<Http::AlternateProtocolsCache::AlternateProtocol>& advertised_protocols =
-        origin_data.value().protocols;
     protocols.insert(protocols.end(), std::make_move_iterator(advertised_protocols.begin()),
                      std::make_move_iterator(advertised_protocols.end()));
   }
