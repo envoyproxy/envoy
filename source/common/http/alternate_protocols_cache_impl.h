@@ -12,6 +12,7 @@
 #include "envoy/http/alternate_protocols_cache.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http3_status_tracker_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "quiche/common/quiche_linked_hash_map.h"
@@ -39,7 +40,7 @@ public:
     // The last smoothed round trip time, if available.
     std::chrono::microseconds srtt;
     // The last connectivity status of HTTP/3, if available.
-    std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker;
+    Http3StatusTrackerPtr h3_status_tracker;
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
@@ -63,8 +64,14 @@ public:
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
   // rather than relative time.
   static absl::optional<OriginData> originDataFromString(absl::string_view origin_data,
-                                                         TimeSource& time_source,
-                                                         bool from_cache = false);
+                                                         TimeSource& time_source, bool from_cache);
+  // Parse an alt-svc string into a vector of structured data.
+  // If from_cache is true, it is assumed the string was serialized using
+  // protocolsToStringForCache and the the ma fields will be parsed as absolute times
+  // rather than relative time.
+  static std::vector<Http::AlternateProtocolsCache::AlternateProtocol>
+  alternateProtocolsFromString(absl::string_view altsvc_str, TimeSource& time_source,
+                               bool from_cache);
 
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
@@ -72,15 +79,14 @@ public:
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
-  std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>
-  acquireHttp3StatusTracker(const Origin& origin) override;
-  void storeHttp3StatusTracker(
-      const Origin& origin,
-      std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker) override;
+  AlternateProtocolsCache::Http3StatusTracker&
+  getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
   void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
+  void addOriginData(const Origin& origin, OriginData&& origin_data);
+
   // Time source used to check expiration of entries.
   Event::Dispatcher& dispatcher_;
 

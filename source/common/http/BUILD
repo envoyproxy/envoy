@@ -172,6 +172,7 @@ envoy_cc_library(
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        ":http3_status_tracker_impl_lib",
         "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:alternate_protocols_cache_interface",

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/alternate_protocols_cache.h"

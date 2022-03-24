@@ -25,8 +25,10 @@ bool Http3StatusTrackerImpl::hasHttp3FailedRecently() const {
 void Http3StatusTrackerImpl::markHttp3Broken() {
   state_ = State::Broken;
   if (!expiration_timer_->enabled()) {
-    expiration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
-        DefaultExpirationTime * (1 << consecutive_broken_count_)));
+    std::chrono::minutes expiration_in_min =
+        DefaultExpirationTime * (1 << consecutive_broken_count_);
+    expiration_timer_->enableTimer(
+        std::chrono::duration_cast<std::chrono::milliseconds>(expiration_in_min));
     if (consecutive_broken_count_ < MaxConsecutiveBrokenCount) {
       ++consecutive_broken_count_;
     }

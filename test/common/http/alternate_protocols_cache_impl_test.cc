@@ -20,23 +20,27 @@ public:
           Envoy::Test::Global<Event::SingletonTimeSystemHelper> time_system;
           time_system.get().timeSystem(
               []() { return std::make_unique<Event::SimulatedTimeSystemHelper>(); });
-          return Event::MockDispatcher();
+          return NiceMock<Event::MockDispatcher>();
         }()),
         store_(new NiceMock<MockKeyValueStore>()),
         expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
         expiration2_(dispatcher_.timeSource().monotonicTime() + Seconds(10)),
         protocol1_(alpn1_, hostname1_, port1_, expiration1_),
         protocol2_(alpn2_, hostname2_, port2_, expiration2_), protocols1_({protocol1_}),
-        protocols2_({protocol2_}) {}
+        protocols2_({protocol2_}) {
+    ON_CALL(dispatcher_, approximateMonotonicTime()).WillByDefault(Invoke([this]() {
+      return dispatcher_.timeSource().monotonicTime();
+    }));
+  }
 
   void initialize() {
     protocols_ = std::make_unique<AlternateProtocolsCacheImpl>(
         dispatcher_, std::unique_ptr<KeyValueStore>(store_), max_entries_);
   }
 
-  const size_t max_entries_ = 10;
+  size_t max_entries_ = 10;
 
-  Event::MockDispatcher dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   MockKeyValueStore* store_;
   std::unique_ptr<AlternateProtocolsCacheImpl> protocols_;
 
@@ -127,7 +131,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_FALSE(protocols.has_value());
-  EXPECT_EQ(0, protocols_->size());
+  EXPECT_EQ(1u, protocols_->size());
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) {
@@ -224,7 +228,6 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
     std::vector<AlternateProtocolsCache::AlternateProtocol>& protocols =
         origin_data.value().protocols;
     ASSERT_GE(protocols.size(), 1);
-
     AlternateProtocolsCache::AlternateProtocol& protocol = protocols[0];
     EXPECT_EQ("h3-29", protocol.alpn_);
     EXPECT_EQ("", protocol.hostname_);
@@ -232,7 +235,6 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
     auto duration = std::chrono::duration_cast<std::chrono::seconds>(
         protocol.expiration_ - dispatcher_.timeSource().monotonicTime());
     EXPECT_EQ(86400, duration.count());
-
     if (protocols.size() == 2) {
       AlternateProtocolsCache::AlternateProtocol& protocol2 = protocols[1];
       EXPECT_EQ("h3", protocol2.alpn_);
@@ -280,6 +282,7 @@ TEST_F(AlternateProtocolsCacheImplTest, InvalidString) {
                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60", dispatcher_.timeSource(), true)
                   .has_value());
 }
+
 TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
@@ -304,6 +307,21 @@ TEST_F(AlternateProtocolsCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
     fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0");
   }));
   initialize();
+}
+
+TEST_F(AlternateProtocolsCacheImplTest, GetOrCreateHttp3StatusTracker) {
+  max_entries_ = 1u;
+  initialize();
+  EXPECT_EQ(0u, protocols_->size());
+
+  protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
+  EXPECT_EQ(1u, protocols_->size());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+
+  // Fetch HTTP/3 status for another origin should overwrite the cache.
+  EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Broken());
+  EXPECT_EQ(1u, protocols_->size());
+  EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
 }
 
 } // namespace

@@ -148,22 +148,15 @@ public:
   virtual size_t size() const PURE;
 
   /**
-   * Transfer the ownership of HTTP/3 status tracker, if there is one, to the caller.
-   * @param origin The origin to get HTTP/3 status for.
-   * @return the status tracker if there is one. Otherwise, nullptr.
+   * @param origin The origin to get HTTP/3 status tracker for.
+   * @return the existing status tracker or creating a new one if there is none.
    */
-  virtual std::unique_ptr<Http3StatusTracker> acquireHttp3StatusTracker(const Origin& origin) PURE;
-  /**
-   * Transfer the ownership of HTTP/3 status tracker to the cache if the origin exists in the cache.
-   * Otherwise this is a no-op
-   * @param origin The origin to store HTTP/3 status for.
-   * @param h3_status_tracker the status tracker to be stored.
-   */
-  virtual void storeHttp3StatusTracker(const Origin& origin,
-                                       std::unique_ptr<Http3StatusTracker> h3_status_tracker) PURE;
+  virtual AlternateProtocolsCache::Http3StatusTracker&
+  getOrCreateHttp3StatusTracker(const Origin& origin) PURE;
 };
 
 using AlternateProtocolsCacheSharedPtr = std::shared_ptr<AlternateProtocolsCache>;
+using Http3StatusTrackerPtr = std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>;
 
 /**
  * A manager for multiple alternate protocols caches.

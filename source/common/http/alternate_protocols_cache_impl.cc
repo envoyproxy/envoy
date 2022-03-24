@@ -1,7 +1,10 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 
+#include <memory>
+
 #include "source/common/common/logger.h"
 
+#include "http3_status_tracker_impl.h"
 #include "quiche/spdy/core/spdy_alt_svc_wire_format.h"
 #include "re2/re2.h"
 
@@ -47,7 +50,6 @@ std::string AlternateProtocolsCacheImpl::originDataToStringForCache(
       value.push_back(',');
     }
     absl::StrAppend(&value, protocol.alpn_, "=\"", protocol.hostname_, ":", protocol.port_, "\"");
-
     // Note this is _not_ actually the max age, but the absolute time at which
     // this entry will expire. protocolsFromString will convert back to ma.
     absl::StrAppend(
@@ -76,11 +78,19 @@ AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_
     // Handling raw alt-svc with no endpoint info
     data.srtt = std::chrono::microseconds(0);
   }
+  data.protocols = alternateProtocolsFromString(parts[0], time_source, from_cache);
+  return data;
+}
 
+std::vector<Http::AlternateProtocolsCache::AlternateProtocol>
+AlternateProtocolsCacheImpl::alternateProtocolsFromString(absl::string_view altsvc_str,
+                                                          TimeSource& time_source,
+                                                          bool from_cache) {
   spdy::SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
-  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(parts[0], &altsvc_vector)) {
+  if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(altsvc_str, &altsvc_vector)) {
     return {};
   }
+  std::vector<Http::AlternateProtocolsCache::AlternateProtocol> results;
   for (const auto& alt_svc : altsvc_vector) {
     MonotonicTime expiration;
     if (from_cache) {
@@ -95,11 +105,9 @@ AlternateProtocolsCacheImpl::originDataFromString(absl::string_view origin_data_
     } else {
       expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
     }
-    Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
-                                                              alt_svc.port, expiration);
-    data.protocols.push_back(protocol);
+    results.emplace_back(alt_svc.protocol_id, alt_svc.host, alt_svc.port, expiration);
   }
-  return data;
+  return results;
 }
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
@@ -173,12 +181,22 @@ void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
     protocols.erase(protocols.begin() + max_protocols, protocols.end());
   }
+  auto entry_it = protocols_.find(origin);
+  if (entry_it != protocols_.end()) {
+    entry_it->second.protocols = protocols;
+    return;
+  }
+  addOriginData(origin, OriginData{protocols, std::chrono::microseconds(0), nullptr});
+}
+
+void AlternateProtocolsCacheImpl::addOriginData(const Origin& origin, OriginData&& origin_data) {
+  ASSERT(protocols_.find(origin) == protocols_.end());
   while (protocols_.size() >= max_entries_) {
     auto iter = protocols_.begin();
     key_value_store_->remove(originToString(iter->first));
     protocols_.erase(iter);
   }
-  protocols_[origin] = OriginData{protocols, std::chrono::microseconds(0), nullptr};
+  protocols_[origin] = std::move(origin_data);
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
@@ -198,7 +216,6 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
                   protocols.end());
 
   if (protocols.empty()) {
-    protocols_.erase(entry_it);
     if (key_value_store_) {
       key_value_store_->remove(originToString(origin));
     }
@@ -208,29 +225,25 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
     key_value_store_->addOrUpdate(originToString(origin),
                                   originDataToStringForCache(protocols, entry_it->second.srtt));
   }
-
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
 }
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
 
-std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>
-AlternateProtocolsCacheImpl::acquireHttp3StatusTracker(const Origin& origin) {
+AlternateProtocolsCache::Http3StatusTracker&
+AlternateProtocolsCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
-  if (entry_it == protocols_.end()) {
-    return nullptr;
+  if (entry_it != protocols_.end()) {
+    if (entry_it->second.h3_status_tracker == nullptr) {
+      entry_it->second.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
+    }
+    return *entry_it->second.h3_status_tracker;
   }
-  return std::move(entry_it->second.h3_status_tracker);
-}
-
-void AlternateProtocolsCacheImpl::storeHttp3StatusTracker(
-    const Origin& origin,
-    std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker> h3_status_tracker) {
-  auto entry_it = protocols_.find(origin);
-  if (entry_it == protocols_.end()) {
-    return;
-  }
-  entry_it->second.h3_status_tracker = std::move(h3_status_tracker);
+  OriginData origin_data{
+      {}, std::chrono::microseconds(0), std::make_unique<Http3StatusTrackerImpl>(dispatcher_)};
+  AlternateProtocolsCache::Http3StatusTracker& tracker = *(origin_data.h3_status_tracker);
+  addOriginData(origin, std::move(origin_data));
+  return tracker;
 }
 
 } // namespace Http

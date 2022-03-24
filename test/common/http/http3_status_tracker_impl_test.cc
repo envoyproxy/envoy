@@ -1,5 +1,6 @@
 #include "source/common/http/http3_status_tracker_impl.h"
 
+#include "test/common/http/common.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 
@@ -14,10 +15,12 @@ namespace Envoy {
 namespace Http {
 
 namespace {
+
 class Http3StatusTrackerImplTest : public testing::Test {
 public:
   Http3StatusTrackerImplTest() : timer_(new MockTimer(&dispatcher_)), tracker_(dispatcher_) {}
 
+  AlternateProtocolsCache::Origin origin_{"https", "hostname", 1};
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockTimer* timer_; // Owned by tracker_;
   Http3StatusTrackerImpl tracker_;
@@ -142,7 +145,6 @@ TEST_F(Http3StatusTrackerImplTest, MarkBrokenThenExpiresThenConfirmedThenBroken)
   EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();
-
   timer_->invokeCallback();
 
   EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
@@ -163,7 +165,6 @@ TEST_F(Http3StatusTrackerImplTest, MarkBrokenThenConfirmed) {
   EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();
-
   timer_->invokeCallback();
 
   EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
