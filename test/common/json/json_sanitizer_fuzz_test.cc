@@ -24,7 +24,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // If the input is valid UTF-8 we can do a differential test against the
     // Protobuf JSON sanitizer. Otherwise we are simply ensuring that the
     // sanitizer does not crash.
-    if (Envoy::Json::JsonSanitizer::isValidUtf8(input)) {
+    if (Envoy::Json::isValidUtf8(input)) {
       buffer2 =
           MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(input), false, true);
       absl::string_view proto_sanitized = Envoy::Json::stripDoubleQuotes(buffer2);

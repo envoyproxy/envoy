@@ -13,5 +13,13 @@ namespace Json {
  */
 absl::string_view stripDoubleQuotes(absl::string_view str);
 
+/**
+ * Determines whether the input string is valid utf8. This is used for testing,
+ * to avoid trying to do differentials against Protobuf json sanitization, which
+ * produces noisy error messages and empty strings when presented with invalid
+ * utf8.
+ */
+bool isValidUtf8(absl::string_view in);
+
 } // namespace Json
 } // namespace Envoy

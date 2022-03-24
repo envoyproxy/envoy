@@ -12,7 +12,7 @@ namespace {
 class JsonSanitizerTest : public testing::Test {
 protected:
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
-    EXPECT_TRUE(JsonSanitizer::isValidUtf8(str)) << "str=" << str;
+    EXPECT_TRUE(isValidUtf8(str)) << "str=" << str;
     absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, str);
     std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::stringValue(std::string(str)), false, true);
