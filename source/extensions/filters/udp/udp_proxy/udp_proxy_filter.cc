@@ -60,8 +60,6 @@ Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) 
   return Network::FilterStatus::StopIteration;
 }
 
-UdpProxyFilter::~UdpProxyFilter() {}
-
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                                          Upstream::ThreadLocalCluster& cluster,
                                          SessionStorageType&& sessions)

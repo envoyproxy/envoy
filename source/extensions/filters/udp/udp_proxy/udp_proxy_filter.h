@@ -158,7 +158,6 @@ class UdpProxyFilter : public Network::UdpListenerReadFilter,
 public:
   UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                  const UdpProxyFilterConfigSharedPtr& config);
-  ~UdpProxyFilter() override;
 
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
