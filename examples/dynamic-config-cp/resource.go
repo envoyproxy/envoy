@@ -120,7 +120,7 @@ func makeHTTPListener(listenerName string, route string) *listener.Listener {
 		},
 		HttpFilters: []*hcm.HttpFilter{{
 			Name: wellknown.Router,
-			ConfigType: &listener.Filter_TypedConfig{
+			ConfigType: &hcm.HttpFilter_TypedConfig{
 				TypedConfig: routerpb,
 			},
 		}},
