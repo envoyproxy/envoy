@@ -64,6 +64,9 @@ extensions/filters/common/original_src @snowp @klarose
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @weisisea
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123 @weisisea
+/*/extensions/health_checkers/redis @weisisea @mattklein123
+/*/extensions/filters/network/redis_proxy @weisisea @mattklein123
+/*/extensions/filters/network/common/redis @weisisea @mattklein123
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
@@ -134,13 +137,11 @@ extensions/filters/common/original_src @snowp @klarose
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @lambdai
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @rojkov @delong-coder
-/*/extensions/filters/network/local_ratelimit @mattklein123 @junr03
 /*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy @tonya11en
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
+/*/extensions/filters/http/buffer @alyssawilk @mattklein123
+/*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
 # Compression
-/*/extensions/compression/common @junr03 @rojkov
-/*/extensions/compression/gzip @junr03 @rojkov
-/*/extensions/compression/brotli @junr03 @rojkov
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
 # Core upstream code
@@ -187,41 +188,49 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
 
 # "Unowned extensions (without 1 maintainer or 2 owners)
+# DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @UNOWNED
 /*/extensions/network/dns_resolver/apple @yanavlasov @UNOWNED
+
 /*/extensions/formatter/req_without_query @UNOWNED @tsaarni
+# Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @UNOWNED
+/*/extensions/filters/http/stateful_session @wbpcode @UNOWNED
+# ext_authz
 /*/extensions/filters/common/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/http/ext_authz @esmet @gsagula @UNOWNED
 /*/extensions/filters/network/ext_authz @esmet @gsagula @UNOWNED
-/*/extensions/filters/http/stateful_session @wbpcode @UNOWNED
+# compression code
 /*/extensions/filters/http/decompressor @rojkov @UNOWNED
 /*/extensions/filters/http/gzip @gsagula @UNOWNED
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @UNOWNED
 /*/extensions/filters/http/compressor @rojkov @UNOWNED
+/*/extensions/compression/brotli @rojkov @UNOWNED
+/*/extensions/compression/common @UNOWNED @rojkov
+# cel
 /*/extensions/access_loggers/filters/cel @UNOWNED @douglas-reid
-/*/extensions/filters/http/buffer @alyssawilk @UNOWNED
+# rbac
+/*/extensions/filters/network/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/http/rbac @UNOWNED @UNOWNED
+/*/extensions/filters/common/rbac @UNOWNED @UNOWNED
+/*/extensions/filters/network/local_ratelimit @mattklein123 @UNOWNED
 /*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
-/*/extensions/filters/http/tap @UNOWNED @UNOWNED
+/*/extensions/filters/http/tap @mattklein123 @UNOWNED
 /*/extensions/filters/http/health_check @UNOWNED @UNOWNED
 /*/extensions/filters/http/cors @UNOWNED @UNOWNED
 /*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
 /*/extensions/filters/http/lua @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/common @UNOWNED @UNOWNED
-/*/extensions/filters/common/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/common/lua @UNOWNED @UNOWNED
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
 /*/extensions/filters/listener/proxy_protocol @UNOWNED @UNOWNED
 /*/extensions/stat_sinks/statsd @UNOWNED @UNOWNED
 /*/extensions/stat_sinks/common @UNOWNED @UNOWNED
 /*/extensions/stat_sinks/common/statsd @UNOWNED @UNOWNED
-/*/extensions/health_checkers/redis @UNOWNED @UNOWNED
 /*/extensions/access_loggers/grpc @UNOWNED @UNOWNED
 /*/extensions/access_loggers/file @UNOWNED @UNOWNED
 /*/extensions/common/tap @UNOWNED @UNOWNED
-/*/extensions/transport_sockets/raw_buffer @UNOWNED @UNOWNED
 /*/extensions/transport_sockets/tap @UNOWNED @UNOWNED
 /*/extensions/tracers/zipkin @UNOWNED @UNOWNED
 /*/extensions/tracers/dynamic_ot @UNOWNED @UNOWNED
@@ -231,12 +240,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/tracers/common/ot @UNOWNED @UNOWNED
 /*/extensions/retry/host/previous_hosts @UNOWNED @UNOWNED
 /*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
-/*/extensions/filters/network/rbac @UNOWNED @UNOWNED
 /*/extensions/filters/network/echo @UNOWNED @UNOWNED
-/*/extensions/filters/network/redis_proxy @UNOWNED @UNOWNED
 /*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
-/*/extensions/filters/network/common/redis @UNOWNED @UNOWNED
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
