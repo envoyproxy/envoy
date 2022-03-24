@@ -360,7 +360,8 @@ absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
         interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
         break;
       default:
-        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}",
+                                     static_cast<int>(socket_address->ip()->version())));
       }
 
       if (socket_address_value == interface_address_value) {
@@ -394,7 +395,7 @@ Network::IoHandlePtr IoUringSocketHandleImpl::FileEventAdapter::accept(struct so
 void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Request& req,
                                                                     int32_t result) {
   if (result < 0) {
-    ENVOY_LOG(debug, "async request of type {} failed: {}", req.type_, errorDetails(-result));
+    ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
   }
 
   switch (req.type_) {

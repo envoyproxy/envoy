@@ -82,6 +82,7 @@ public:
   void resetFileEvents() override;
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override { return absl::nullopt; }
   absl::optional<std::string> interfaceName() override;
 
 private:
