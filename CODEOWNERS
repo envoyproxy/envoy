@@ -6,12 +6,8 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
-/*/extensions/access_loggers/filters/cel @dio @douglas-reid
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
-# compression extensions
-/*/extensions/compression/common/compressor @rojkov @junr03
-/*/extensions/compression/gzip/compressor @rojkov @junr03
 # alternate protocols cache extensions
 /*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @alyssawilk
 # csrf extension
@@ -28,9 +24,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
-# compressor used by http compression filters
-/*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
-/*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
 /*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
@@ -63,7 +56,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.xray extension
 /*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
-/*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
+/*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # zookeeper_proxy extension
@@ -107,7 +100,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
-/*/extensions/filters/http/gzip @gsagula @dio
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
@@ -149,7 +141,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
 /*/extensions/compression/brotli @junr03 @rojkov
-/*/extensions/filters/http/decompressor @rojkov @dio
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
 # Core upstream code
@@ -162,8 +153,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
-# HTTP Stateful Session
-/*/extensions/filters/http/stateful_session @wbpcode @dio
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
@@ -180,10 +169,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ratelimit @esmet @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
 /*/extensions/filters/network/ratelimit @esmet @mattklein123
-# External Authorization
-/*/extensions/filters/common/ext_authz @esmet @gsagula @dio
-/*/extensions/filters/http/ext_authz @esmet @gsagula @dio
-/*/extensions/filters/network/ext_authz @esmet @gsagula @dio
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # Original IP detection
@@ -193,18 +178,71 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/set_metadata @aguinet @snowp
 # Formatters
 /*/extensions/formatter/metadata @cpakulski @lizan
-/*/extensions/formatter/req_without_query @dio @tsaarni
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
-# Stateful session
-/*/extensions/http/stateful_session/cookie @wbpcode @dio
 # DNS Resolver
-/*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
-/*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
+
+# "Unowned extensions (without 1 maintainer or 2 owners)
+/*/extensions/network/dns_resolver/cares @yanavlasov @UNOWNED
+/*/extensions/network/dns_resolver/apple @yanavlasov @UNOWNED
+/*/extensions/formatter/req_without_query @UNOWNED @tsaarni
+/*/extensions/http/stateful_session/cookie @wbpcode @UNOWNED
+/*/extensions/filters/common/ext_authz @esmet @gsagula @UNOWNED
+/*/extensions/filters/http/ext_authz @esmet @gsagula @UNOWNED
+/*/extensions/filters/network/ext_authz @esmet @gsagula @UNOWNED
+/*/extensions/filters/http/stateful_session @wbpcode @UNOWNED
+/*/extensions/filters/http/decompressor @rojkov @UNOWNED
+/*/extensions/filters/http/gzip @gsagula @UNOWNED
+/*/extensions/filters/http/common/compressor @gsagula @rojkov @UNOWNED
+/*/extensions/filters/http/compressor @rojkov @UNOWNED
+/*/extensions/access_loggers/filters/cel @UNOWNED @douglas-reid
+/*/extensions/filters/http/buffer @alyssawilk @UNOWNED
+/*/extensions/filters/http/rbac @UNOWNED @UNOWNED
+/*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
+/*/extensions/filters/http/tap @UNOWNED @UNOWNED
+/*/extensions/filters/http/health_check @UNOWNED @UNOWNED
+/*/extensions/filters/http/cors @UNOWNED @UNOWNED
+/*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
+/*/extensions/filters/http/lua @UNOWNED @UNOWNED
+/*/extensions/filters/http/common @UNOWNED @UNOWNED
+/*/extensions/filters/common @UNOWNED @UNOWNED
+/*/extensions/filters/common/rbac @UNOWNED @UNOWNED
+/*/extensions/filters/common/lua @UNOWNED @UNOWNED
+/*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
+/*/extensions/filters/listener/proxy_protocol @UNOWNED @UNOWNED
+/*/extensions/stat_sinks/statsd @UNOWNED @UNOWNED
+/*/extensions/stat_sinks/common @UNOWNED @UNOWNED
+/*/extensions/stat_sinks/common/statsd @UNOWNED @UNOWNED
+/*/extensions/health_checkers/redis @UNOWNED @UNOWNED
+/*/extensions/access_loggers/grpc @UNOWNED @UNOWNED
+/*/extensions/access_loggers/file @UNOWNED @UNOWNED
+/*/extensions/common/tap @UNOWNED @UNOWNED
+/*/extensions/transport_sockets/raw_buffer @UNOWNED @UNOWNED
+/*/extensions/transport_sockets/tap @UNOWNED @UNOWNED
+/*/extensions/tracers/zipkin @UNOWNED @UNOWNED
+/*/extensions/tracers/dynamic_ot @UNOWNED @UNOWNED
+/*/extensions/tracers/opencensus @UNOWNED @UNOWNED
+/*/extensions/tracers/lightstep @UNOWNED @UNOWNED
+/*/extensions/tracers/common @UNOWNED @UNOWNED
+/*/extensions/tracers/common/ot @UNOWNED @UNOWNED
+/*/extensions/retry/host/previous_hosts @UNOWNED @UNOWNED
+/*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
+/*/extensions/filters/network/rbac @UNOWNED @UNOWNED
+/*/extensions/filters/network/echo @UNOWNED @UNOWNED
+/*/extensions/filters/network/redis_proxy @UNOWNED @UNOWNED
+/*/extensions/filters/network/kafka @UNOWNED @UNOWNED
+/*/extensions/filters/network/kafka/broker @UNOWNED @UNOWNED
+/*/extensions/filters/network/kafka/mesh @UNOWNED @UNOWNED
+/*/extensions/filters/network/kafka/mesh/command_handlers @UNOWNED @UNOWNED
+/*/extensions/filters/network/kafka/protocol @UNOWNED @UNOWNED
+/*/extensions/filters/network/kafka/serialization @UNOWNED @UNOWNED
+/*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
+/*/extensions/filters/network/common @UNOWNED @UNOWNED
+/*/extensions/filters/network/common/redis @UNOWNED @UNOWNED
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
