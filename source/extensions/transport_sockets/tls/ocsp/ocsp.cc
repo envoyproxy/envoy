@@ -3,7 +3,6 @@
 #include "source/common/common/utility.h"
 #include "source/extensions/transport_sockets/tls/ocsp/asn1_utility.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
-#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -266,9 +265,9 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
     throw EnvoyException("OCSP ResponseData is not a well-formed ASN.1 SEQUENCE");
   }
 
-
-  // only support v1
-  auto version = unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0));
+  // only support v1, the value of v1 is 0
+  auto version =
+      unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0));
   if (*version->data != 0) {
     throw EnvoyException("OCSP ResponseData version is not supported");
   }
