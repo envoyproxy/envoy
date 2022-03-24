@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/ssl/private_key/private_key.h"
 
 namespace Envoy {
 namespace Ssl {

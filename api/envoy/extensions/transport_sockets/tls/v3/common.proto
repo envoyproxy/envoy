@@ -488,9 +488,7 @@ message CertificateValidationContext {
   bool only_verify_leaf_cert_crl = 14;
 }
 
-// [#next-free-field: 3]
 message TlsRootCACertificate {
-
   // RootCA cert
   config.core.v3.DataSource cert = 1;
 

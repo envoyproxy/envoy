@@ -132,7 +132,6 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
-certpair
 dereferencing
 dnsresolvers
 guarddog

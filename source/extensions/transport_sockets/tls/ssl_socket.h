@@ -71,9 +71,9 @@ public:
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
 
   // mimic server certificate
-  void mimicServerCert(absl::string_view host);
+  void mimicServerCert(const std::string host);
 
-  bool useCachedDynamicCert(absl::string_view host);
+  bool useCachedDynamicCert(const std::string host);
 
   SSL* rawSslForTest() const { return rawSsl(); }
 

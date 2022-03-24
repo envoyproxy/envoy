@@ -39,6 +39,8 @@ struct DynamicCertPair {
   EVP_PKEY key_;
 };
 
+using DynamicCertPairOptRef = absl::optional<std::reference_wrapper<DynamicCertPair>>;
+
 struct TlsContext {
   // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
   // are identical with the exception of certificate material, and can be
@@ -95,12 +97,10 @@ public:
 
   virtual bssl::UniquePtr<X509> getRootCACert() { return nullptr; };
   virtual bssl::UniquePtr<EVP_PKEY> getRootCAKey() { return nullptr; };
-  virtual void cacheDynamicCertPair(absl::string_view /*host*/, DynamicCertPair /*certpair*/) {
-    return;
-  };
-  virtual bool getCachedDynamicCertPair(absl::string_view /* host */,
-                                        DynamicCertPair* /*certpair*/) {
-    return false;
+  virtual void cacheDynamicCertPair(const std::string /* host */,
+                                    DynamicCertPair /* cert_pair */){};
+  virtual DynamicCertPairOptRef getCachedDynamicCertPair(const std::string /* host */) {
+    return absl::nullopt;
   };
 
 protected:
@@ -179,19 +179,18 @@ public:
   // ClientHello details. This is made public for use by custom TLS extensions who want to
   // manually create and use this as a client hello callback.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-  bssl::UniquePtr<X509> getRootCACert() { return bssl::UpRef(root_ca_cert_); };
-  bssl::UniquePtr<EVP_PKEY> getRootCAKey() { return bssl::UpRef(root_ca_key_); };
-  void cacheDynamicCertPair(absl::string_view host, DynamicCertPair certpair) {
-    cached_dynamic_cert_pairs_[host] = certpair;
+  bssl::UniquePtr<X509> getRootCACert() override { return bssl::UpRef(root_ca_cert_); };
+  bssl::UniquePtr<EVP_PKEY> getRootCAKey() override { return bssl::UpRef(root_ca_key_); };
+  void cacheDynamicCertPair(const std::string host, DynamicCertPair cert_pair) override {
+    cached_dynamic_cert_pairs_[host] = cert_pair;
   };
-  bool getCachedDynamicCertPair(absl::string_view host, DynamicCertPair* certpair) {
-    std::map<absl::string_view, DynamicCertPair>::iterator iter;
+  DynamicCertPairOptRef getCachedDynamicCertPair(const std::string host) override {
+    absl::flat_hash_map<const std::string, DynamicCertPair>::iterator iter;
     iter = cached_dynamic_cert_pairs_.find(host);
     if (iter != cached_dynamic_cert_pairs_.end()) {
-      *certpair = iter->second;
-      return true;
+      return DynamicCertPairOptRef(iter->second);
     }
-    return false;
+    return absl::nullopt;
   };
 
 private:
@@ -211,7 +210,7 @@ private:
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
   bssl::UniquePtr<X509> root_ca_cert_;
   bssl::UniquePtr<EVP_PKEY> root_ca_key_;
-  std::map<absl::string_view, DynamicCertPair> cached_dynamic_cert_pairs_;
+  absl::flat_hash_map<const std::string, DynamicCertPair> cached_dynamic_cert_pairs_;
 };
 
 } // namespace Tls

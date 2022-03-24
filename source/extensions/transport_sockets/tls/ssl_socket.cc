@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include <string>
+
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -65,7 +67,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
   }
 }
 
-void SslSocket::mimicServerCert(absl::string_view host) {
+void SslSocket::mimicServerCert(const std::string host) {
   // Generate key pair
   EVP_PKEY* key = EVP_PKEY_new();
   X509* crt = X509_new();
@@ -90,7 +92,7 @@ void SslSocket::mimicServerCert(absl::string_view host) {
   // 2. generate signed key pair
   X509_set_version(crt, 2);
   std::string prefix = "DNS:";
-  std::string subAltName = prefix + host.data();
+  std::string subAltName = prefix + host;
   X509_EXTENSION* ext = X509V3_EXT_nconf_nid(NULL, NULL, NID_subject_alt_name, subAltName.c_str());
   X509_add_ext(crt, ext, -1);
   X509_set_issuer_name(crt, X509_get_subject_name(ctx_->getRootCACert().get()));
@@ -106,23 +108,23 @@ void SslSocket::mimicServerCert(absl::string_view host) {
   ENVOY_CONN_LOG(trace, "SslSocket::mimicServerCert: requested server name: {}",
                  callbacks_->connection(), host);
 
-  DynamicCertPair certpair;
-  certpair.cert_ = *crt;
-  certpair.key_ = *key;
-  ctx_->cacheDynamicCertPair(host, certpair);
+  DynamicCertPair cert_pair;
+  cert_pair.cert_ = *crt;
+  cert_pair.key_ = *key;
+  ctx_->cacheDynamicCertPair(host, cert_pair);
 }
 
-bool SslSocket::useCachedDynamicCert(absl::string_view host) {
-  DynamicCertPair* certpair = new DynamicCertPair();
-  if (ctx_->getCachedDynamicCertPair(host, certpair)) {
-    X509* crt = &(certpair->cert_);
-    EVP_PKEY* key = &(certpair->key_);
+bool SslSocket::useCachedDynamicCert(const std::string host) {
+  auto opt = ctx_->getCachedDynamicCertPair(host);
+  if (opt.has_value()) {
+    X509* crt = &(opt->get().cert_);
+    EVP_PKEY* key = &(opt->get().key_);
     SSL_use_certificate(rawSsl(), crt);
     SSL_use_PrivateKey(rawSsl(), key);
     /*
     BIO *bio = BIO_new(BIO_s_mem());;
     char *pem = NULL;
-    PEM_write_bio_X509(bio, &certpair->cert_);
+    PEM_write_bio_X509(bio, &cert_pair->cert_);
     pem = static_cast<char *>(malloc(bio->num_write + 1));
     memset(pem, 0, bio->num_write + 1);
     BIO_read(bio, pem, bio->num_write);
@@ -146,7 +148,8 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  absl::string_view host = callbacks_->connection().requestedServerName();
+  std::string host = std::string(callbacks_->connection().requestedServerName().data(),
+                                 callbacks_->connection().requestedServerName().size());
   if (!host.empty() && ctx_->getRootCACert() != nullptr && ctx_->getRootCAKey() != nullptr) {
     ENVOY_CONN_LOG(trace, "requested server name: {}", callbacks_->connection(), host);
     if (!useCachedDynamicCert(host)) {
