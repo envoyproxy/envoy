@@ -9,6 +9,12 @@ namespace Envoy {
 namespace Json {
 namespace {
 
+constexpr absl::string_view Lambda{"λ"};
+constexpr absl::string_view LambdaUtf8{"\xce\xbb"};
+constexpr absl::string_view Omicron{"ό"};
+constexpr absl::string_view OmicronUtf8{"\xe1\xbd\xb9"};
+constexpr absl::string_view TrebleClefUtf8{"\xf0\x9d\x84\x9e"};
+
 class JsonSanitizerTest : public testing::Test {
 protected:
   using UnicodeSizePair = JsonSanitizer::UnicodeSizePair;
@@ -24,6 +30,20 @@ protected:
 
   void expectUnchanged(absl::string_view str) {
     EXPECT_EQ(str, sanitizeAndCheckAgainstProtobufJson(str));
+  }
+
+  absl::string_view truncate(absl::string_view str) { return str.substr(0, str.size() - 1); }
+
+  std::string corruptByte2(absl::string_view str) {
+    std::string corrupt_second_byte = std::string(str);
+    ASSERT(str.size() >= 2);
+    corrupt_second_byte[1] |= '\xf0';
+    return corrupt_second_byte;
+  }
+
+  absl::string_view sanitizeInvalid(absl::string_view str) {
+    EXPECT_EQ(UnicodeSizePair(0, 0), decode(str));
+    return sanitizer_.sanitize(buffer_, str);
   }
 
   std::pair<uint32_t, uint32_t> decode(absl::string_view str) {
@@ -114,33 +134,34 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
 }
 
 TEST_F(JsonSanitizerTest, MultiByteUtf8) {
-  EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode("λ")); // lambda literal
-  EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode("\xce\xbb")); // lambda utf8
-  EXPECT_EQ(UnicodeSizePair(0x1f79, 3), decode("ό")); // Greek Small Letter Omicron with Oxia
-  EXPECT_EQ(UnicodeSizePair(0x1f79, 3), decode("\xe1\xbd\xb9")); // Omicron utf8
+  EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode(Lambda));
+  EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode(LambdaUtf8));
+  EXPECT_EQ(UnicodeSizePair(0x1f79, 3), decode(Omicron));
+  EXPECT_EQ(UnicodeSizePair(0x1f79, 3), decode(OmicronUtf8));
 
   // It's hard to find large unicode characters, but to test the utf8 decoder
   // there are some in https://unicode-table.com/en/blocks/musical-symbols/
   // with reference utf8 encoding from https://unicode-table.com/en/1D11E/
-  EXPECT_EQ(UnicodeSizePair(0x1d11e, 4), decode("\xf0\x9d\x84\x9e")); // treble clef
+  EXPECT_EQ(UnicodeSizePair(0x1d11e, 4), decode(TrebleClefUtf8));
 }
 
 TEST_F(JsonSanitizerTest, InvalidUtf8) {
-  // Tests invalid 2, 3, and 4-byte utf8 sequences, which we'll simply pass
-  // through as literals.
+  // 2 byte
+  EXPECT_EQ("\\xce", sanitizeInvalid(truncate(LambdaUtf8)));
+  EXPECT_EQ("\\xce\\xfb", sanitizeInvalid(corruptByte2(LambdaUtf8)));
 
-  // Invalid 4-byte sequences
-  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xf0\x9d\x84")); // treble clef missing last char
-  EXPECT_EQ("\\u00f0\\u009d\\u0084", sanitizer_.sanitize(buffer_, "\xf0\x9d\x84"));
-  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xf0\xfd\x84\x9e")); // treble clef with invalid 2nd byte
+  // 3 byte
+  EXPECT_EQ("\\xe1\xbd", sanitizeInvalid(truncate(OmicronUtf8)));
+  EXPECT_EQ("\\xe1\\xfd\xB9", sanitizeInvalid(corruptByte2(OmicronUtf8)));
 
-  // Invalid 3-byte sequences
-  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xe1\xbd")); // missing last char
-  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xe1\xfd\xb9")); // invalid second char
+  // 4 byte
+  EXPECT_EQ("\\xf0\\u009d\\u0084", sanitizeInvalid(truncate(TrebleClefUtf8)));
+  EXPECT_EQ("\\xf0\\xfd\\u0084\\u009e", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
 
-  // Invalid 2-byte sequences
-  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xce")); // lambda missing final byte
-  EXPECT_EQ(UnicodeSizePair(0, 0), decode("\xce\xfb")); // lambda with second byte invalid
+  // Invalid input embedded in normal text.
+  EXPECT_EQ(
+      "Hello, \\xf0\\u009d\\u0084, World!",
+      sanitizer_.sanitize(buffer_, absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
 }
 
 } // namespace

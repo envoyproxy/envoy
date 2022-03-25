@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -15,12 +15,12 @@ namespace Json {
 // ---------------------------------------------------------------------------
 // Benchmark                                 Time             CPU   Iterations
 // ---------------------------------------------------------------------------
-// BM_ProtoEncoderNoEscape                1089 ns         1089 ns       547657
-// BM_JsonSanitizerNoEscape               17.6 ns         17.6 ns     39777516
-// BM_StaticJsonSanitizerNoEscape         18.6 ns         18.6 ns     37789666
-// BM_ProtoEncoderWithEscape              1308 ns         1308 ns       533386
-// BM_JsonSanitizerWithEscape             96.0 ns         96.0 ns      7291029
-// BM_StaticJsonSanitizerWithEscape       96.7 ns         96.7 ns      7236032
+// BM_ProtoEncoderNoEscape                1123 ns         1123 ns       545345
+// BM_JsonSanitizerNoEscape               8.77 ns         8.77 ns     79517538
+// BM_StaticJsonSanitizerNoEscape         9.52 ns         9.52 ns     73570603
+// BM_ProtoEncoderWithEscape              1326 ns         1326 ns       528576
+// BM_JsonSanitizerWithEscape             96.3 ns         96.3 ns      7289627
+// BM_StaticJsonSanitizerWithEscape       97.5 ns         97.5 ns      7157098
 //
 class JsonSanitizer {
 public:
@@ -68,7 +68,7 @@ public:
   static UnicodeSizePair decodeUtf8(const uint8_t* bytes, uint32_t size);
 
 private:
-  //static constexpr uint32_t NumEscapes = 1 << 11; // 2^11=2048 codes possible in 2-byte utf8.
+  // static constexpr uint32_t NumEscapes = 1 << 11; // 2^11=2048 codes possible in 2-byte utf8.
   static constexpr uint32_t NumEscapes = 256;
 
   // Character-indexed array of translation strings. If an entry is nullptr then
@@ -86,7 +86,7 @@ private:
   absl::string_view slowSanitize(std::string& buffer, absl::string_view str) const;
 
   Escape char_escapes_[NumEscapes];
-  absl::flat_hash_set<uint32_t> unicode_escapes_;
+  absl::flat_hash_map<uint32_t, Escape> unicode_escapes_;
 };
 
 } // namespace Json

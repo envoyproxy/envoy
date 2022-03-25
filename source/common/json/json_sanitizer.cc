@@ -1,5 +1,6 @@
 #include "source/common/json/json_sanitizer.h"
 
+#include <cstdio>
 #include <utility>
 
 #include "source/common/common/assert.h"
@@ -37,21 +38,19 @@ JsonSanitizer::JsonSanitizer() {
 
   // Low characters (0-31) not listed above are encoded as unicode 4-digit hex.
   auto unicode_escape = [this](uint32_t index) {
-    unicode_escapes_.insert(index);
-    if (index >= NumEscapes) {
-      return;
-    }
-    Escape& escape = char_escapes_[index];
+    // We capture unicode Escapes both in a char-indexed array, for direct
+    // substitutions on literal inputs, and in a unicode-indexed hash-map,
+    // for lookup after utf8 decode.
     std::string escape_str = absl::StrFormat("\\u%04x", index);
     ASSERT(escape_str.size() == UnicodeEscapeSize);
+    Escape& escape = unicode_escapes_[index];
     escape.size_ = escape_str.size();
     RELEASE_ASSERT(escape.size_ <= sizeof(escape.chars_), "escaped string too large");
     memcpy(escape.chars_, escape_str.data(), escape_str.size()); // NOLINT(safe-memcpy)*/
+    if (index < NumEscapes) {
+      char_escapes_[index] = escape;
+    }
   };
-
-  for (char ch : {'\0', '<', '>', '\177'}) {
-    unicode_escape(char2uint32(ch));
-  }
 
   // Add unicode escapes for control-characters below 32 that don't have symbolic escapes.
   for (uint32_t i = 0; i < ' '; ++i) {
@@ -60,49 +59,57 @@ JsonSanitizer::JsonSanitizer() {
     }
   }
 
-  // There's a range of low-numbered 8-bit unicode characters that are unicode escaped
-  // by the protobuf library, so we match behavior.
+  // Unicode-escaped ascii constants above SPACE (32).
+  for (char ch : {'<', '>', '\177'}) {
+    unicode_escape(char2uint32(ch));
+  }
+
+  // There's a range of 8-bit characters that are unicode escaped by the
+  // protobuf library, so we match behavior.
   for (uint32_t i = 0x0080; i < 0x00a0; ++i) {
     unicode_escape(i);
   }
 
-  // Most high numbered unicode characters are passed through literally.
+  // The remaining unicode characters are mostly passed through literally. We'll
+  // initialize all of them and then override some below.
   for (uint32_t i = 0x00a0; i < NumEscapes; ++i) {
     char_escapes_[i].size_ = Literal;
   }
 
-  // However all the bytes matching pattern 11xxxxxx will be evaluated as utf-8.
-  for (uint32_t i = Utf8_2BytePattern; i < 0xff; ++i) {
-    if (char_escapes_[i].size_ == UnicodeEscapeSize) {
-      unicode_escapes_.insert(i);
-    }
+  // All the bytes matching pattern 11xxxxxx will be evaluated as utf-8.
+  for (uint32_t i = Utf8_2BytePattern; i <= 0xff; ++i) {
     char_escapes_[i].size_ = Utf8DecodeSentinel;
   }
 
-  // There are a few high numbered unicode characters that protobufs quote, so
-  // we do likewise here to make differential testing/fuzzing easier.
+  // There are an assortment of unicode characters that protobufs quote, so we
+  // do likewise here to make differential testing/fuzzing feasible.
   for (uint32_t i : {0x00ad, 0x0600, 0x0601, 0x0602, 0x0603, 0x06dd, 0x070f}) {
     unicode_escape(i);
   }
-
-
 }
 
 absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view str) const {
-  // Fast-path to see whether any escapes or utf-encoding are needed.
-  uint32_t size_total = 0;
-  for (uint32_t i = 0, n = str.size(); i < n; ++i) {
-    size_total += char_escapes_[char2uint32(str[i])].size_;
+  // Fast-path to see whether any escapes or utf-encoding are needed. If str has
+  // only unescaped ascii characters, we can simply return it. So before doing
+  // anything too fancy, do a lookup in char_escapes_ for each character, and
+  // simply OR in the return sizes. We use 0 for the return-size when we are
+  // simply leaving the character as is, so anything non-zero means we need to
+  // initiate the slow path.
+  //
+  // Benchmarks show it's faster to just rip through the string with no
+  // conditionals, so we only check the ORed sizes after the loop. This avoids
+  // branches and allows simpler loop unrolling by the compiler.
+  uint32_t sizes_ored_together = 0;
+  for (char c : str) {
+    sizes_ored_together |= char_escapes_[char2uint32(c)].size_;
   }
-  if (size_total == 0) {
-    return str;
+  if (sizes_ored_together == 0) {
+    return str; // Happy path, should be executed most of the time.
   }
   return slowSanitize(buffer, str);
 }
 
 absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_view str) const {
-  char hex_escape_buf[] = "\\u0000";
-  static constexpr char hex_chars[] = "0123456789abcdef";
   size_t past_escape = absl::string_view::npos;
   const uint8_t* first = reinterpret_cast<const uint8_t*>(str.data());
   const uint8_t* data = first;
@@ -110,56 +117,39 @@ absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_
   for (uint32_t n = str.size(); n != 0; ++data, --n) {
     const Escape& escape = char_escapes_[*data];
     if (escape.size_ != Literal) {
+      char hex_escape_buf[8];
       uint32_t start_of_escape = data - first;
       switch (escape.size_) {
-        case ControlEscapeSize:
-        case UnicodeEscapeSize:
-          escape_view = absl::string_view(escape.chars_, escape.size_);
-          break;
-        case Utf8DecodeSentinel: {
-          auto [unicode, consumed] = decodeUtf8(data, n);
-          if (consumed != 0) {
-            --consumed;
-            data += consumed;
-            n -= consumed;
-            //if (unicode >= NumEscapes) {
-            //  continue; // 3-byte and 4-byte utf-8 code-points are not in table.
-            //}
+      case ControlEscapeSize:
+      case UnicodeEscapeSize:
+        escape_view = absl::string_view(escape.chars_, escape.size_);
+        break;
+      case Utf8DecodeSentinel: {
+        auto [unicode, consumed] = decodeUtf8(data, n);
+        if (consumed != 0) {
+          --consumed;
+          data += consumed;
+          n -= consumed;
 
-            // We are indexing into char_escapes_ two ways: by the original first
-            // byte of a utf-8 sequence, and then, if the size_ is non-zero, we
-            // decode the utf8 sequence and do another lookup into the array using
-            // the resolved unicode. This is OK because in the first lookup, the
-            // utf8 intro pattern lands us between 128 and 255, which will all be
-            // initialized in the constructor with non-zero size. Then if we decode
-            // we will find the correct Escape entry for the unicode.
-            if (unicode_escapes_.find(unicode) != unicode_escapes_.end()) {
-              hex_escape_buf[2] = hex_chars[(unicode >> 12) & 0xf];
-              hex_escape_buf[3] = hex_chars[(unicode >> 8) & 0xf];
-              hex_escape_buf[4] = hex_chars[(unicode >> 4) & 0xf];
-              hex_escape_buf[5] = hex_chars[unicode & 0xf];
-              escape_view = absl::string_view(hex_escape_buf, UnicodeEscapeSize);
-            } else {
-              continue;
-            }
-
-            /*            escape = &char_escapes_[unicode];
-            if (escape.size_ == Literal) {
-              continue; // Most code-points are not escaped.
-            }
-            escape_view = absl::string_view(escape.chars_, escape.size_);
-            */
-          } else {
-            hex_escape_buf[2] = '0';
-            hex_escape_buf[3] = '0';
-            hex_escape_buf[4] = hex_chars[*data >> 4];
-            hex_escape_buf[5] = hex_chars[*data & 0xf];
-            escape_view = absl::string_view(hex_escape_buf, UnicodeEscapeSize);
+          // Having validated and constructed the unicode for the utf-8
+          // sequence we must determine whether to render it literally by
+          // simply leaving it alone, or whether we ought to render it
+          // as a unicode escape. We do this using a hash-map set up during
+          // the constructor with all desired unicode escapes, to mimic the
+          // behavior of the protobuf json serializer.
+          auto iter = unicode_escapes_.find(unicode);
+          if (iter == unicode_escapes_.end()) {
+            continue;
           }
-          break;
+          escape_view = absl::string_view(iter->second.chars_, iter->second.size_);
+        } else {
+          snprintf(hex_escape_buf, sizeof(hex_escape_buf), "\\x%02x", *data);
+          escape_view = absl::string_view(hex_escape_buf, 4);
         }
-        default:
-          ASSERT(false);
+        break;
+      }
+      default:
+        ASSERT(false);
       }
 
       if (past_escape == absl::string_view::npos) {
@@ -215,6 +205,10 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
   // Note that the code below could be optimized a bit, e.g. by factoring out
   // repeated lookups of the same index in the bytes array and using SSE
   // instructions for the multi-word bit hacking.
+  //
+  // See also http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ which might be a lot
+  // faster, though less readable. As coded, though, it looks like it would read
+  // past the end of the input if the input is malformed.
   if (size >= 2 && (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
       (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_2ByteMask;
