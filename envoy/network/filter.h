@@ -531,5 +531,18 @@ public:
   virtual const ConnectionSocket& socket() const PURE;
 };
 
+/**
+ * UDP listener filter matching context data for unified matchers.
+ */
+class UdpMatchingData {
+public:
+  static absl::string_view name() { return "network"; }
+
+  virtual ~UdpMatchingData() = default;
+
+  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+};
+
 } // namespace Network
 } // namespace Envoy
