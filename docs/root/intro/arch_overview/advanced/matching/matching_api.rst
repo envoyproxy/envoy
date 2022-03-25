@@ -40,13 +40,16 @@ These input functions are available for matching HTTP requests:
 Network Input Functions
 ***********************
 
-These input functions are available for matching TCP connections:
+These input functions are available for matching both TCP connections and UDP datagrams:
 
 * :ref:`Destination IP <extension_envoy.matching.inputs.destination_ip>`.
 * :ref:`Destination port <extension_envoy.matching.inputs.destination_port>`.
 * :ref:`Source IP <extension_envoy.matching.inputs.source_ip>`.
-* :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source port <extension_envoy.matching.inputs.source_port>`.
+
+These input functions are available for matching TCP connections:
+
+* :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
 * :ref:`Transport protocol <extension_envoy.matching.inputs.transport_protocol>`.

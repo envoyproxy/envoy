@@ -246,7 +246,8 @@ protected:
 };
 
 int getSrtt(std::string alt_svc, TimeSource& time_source) {
-  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source);
+  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source,
+                                                                      /*from_cache=*/false);
   return data.has_value() ? data.value().srtt.count() : 0;
 }
 // Test auto-config with a pre-populated HTTP/3 alt-svc entry. The upstream request will
