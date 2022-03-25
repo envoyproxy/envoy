@@ -269,7 +269,8 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   auto version =
       unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0));
   if (version.has_value() && *version.value().data != 0) {
-    throw EnvoyException(fmt::format("OCSP ResponseData version {} is not supported", *version.value().data));
+    throw EnvoyException(
+        fmt::format("OCSP ResponseData version {} is not supported", *version.value().data));
   }
 
   skipResponderId(elem);
