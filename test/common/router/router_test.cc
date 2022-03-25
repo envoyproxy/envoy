@@ -4390,7 +4390,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
 
 namespace {
 
-std::unique_ptr<ShadowPolicyImpl>
+std::shared_ptr<ShadowPolicyImpl>
 makeShadowPolicy(std::string cluster = "", absl::optional<std::string> runtime_key = absl::nullopt,
                  absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
                  bool trace_sampled = true) {
@@ -4404,16 +4404,16 @@ makeShadowPolicy(std::string cluster = "", absl::optional<std::string> runtime_k
   }
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
-  return std::make_unique<ShadowPolicyImpl>(policy);
+  return std::make_shared<ShadowPolicyImpl>(policy);
 }
 
 } // namespace
 
 TEST_F(RouterTest, Shadow) {
   ShadowPolicyPtr policy = makeShadowPolicy("foo", "bar");
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   policy = makeShadowPolicy("fizz", "buzz", envoy::type::v3::FractionalPercent(), false);
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
   NiceMock<Http::MockRequestEncoder> encoder;

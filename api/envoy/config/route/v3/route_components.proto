@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -198,6 +198,11 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+
+  // Specify a set of default request mirroring policies for every route under this virtual host.
+  // It takes precedence over the route config mirror policy entirely.
+  // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
+  repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
 }
 
 // A filter-defined action type.
@@ -1106,7 +1111,9 @@ message RouteAction {
   // should not be set if this field is used.
   google.protobuf.Any retry_policy_typed_config = 33;
 
-  // Indicates that the route has request mirroring policies.
+  // Specify a set of route request mirroring policies.
+  // It takes precedence over the virtual host and route config mirror policy entirely.
+  // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
