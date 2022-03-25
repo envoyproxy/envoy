@@ -2186,7 +2186,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
 // load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   const std::string yaml = R"EOF(
     name: staticcluster
@@ -2230,7 +2230,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
 // LOAD_BALANCING_POLICY_CONFIG.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   const std::string yaml = R"EOF(
     name: staticcluster
@@ -2273,7 +2273,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
 // load_balancing_policy should also be used when lb_policy is omitted.
 TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   const std::string yaml = R"EOF(
     name: staticcluster

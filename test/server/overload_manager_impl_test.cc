@@ -208,7 +208,8 @@ protected:
         register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
         register_factory4_(factory4_), register_factory5_(factory5_),
         api_(Api::createApiForTest(stats_)) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
 
   void setDispatcherExpectation() {

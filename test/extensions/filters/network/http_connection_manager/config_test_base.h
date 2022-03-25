@@ -35,7 +35,8 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   HttpConnectionManagerConfigTest() {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{context_.mainThreadDispatcher().timeSource()};

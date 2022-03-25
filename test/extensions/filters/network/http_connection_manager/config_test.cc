@@ -1470,7 +1470,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   const std::string yaml_string = R"EOF(
 codec_type: http1

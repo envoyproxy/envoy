@@ -94,7 +94,8 @@ protected:
       : context_manager_(
             std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)),
         registered_factory_(handshaker_factory_) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     // UpstreamTlsContext proto expects to use the newly-registered handshaker.
     envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();

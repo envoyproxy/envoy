@@ -475,7 +475,7 @@ public:
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   AlpnTestConfigFactory alpn_factory;
   Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
@@ -1094,7 +1094,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
@@ -4350,7 +4350,7 @@ public:
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(

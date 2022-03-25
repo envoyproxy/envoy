@@ -544,7 +544,8 @@ protected:
   GuardDogActionsTest()
       : log_factory_("LogFactory", events_), register_log_factory_(log_factory_),
         assert_factory_("AssertFactory"), register_assert_factory_(assert_factory_) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
 
   std::vector<std::string> getActionsConfig() {

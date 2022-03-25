@@ -64,7 +64,8 @@ public:
   CustomConfigValidatorsImplTest()
       : factory_accept_(false), factory_reject_(true), register_factory_accept_(factory_accept_),
         register_factory_reject_(factory_reject_) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
 
   static envoy::config::core::v3::TypedExtensionConfig parseConfig(const std::string& config) {

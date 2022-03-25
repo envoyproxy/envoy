@@ -1706,7 +1706,7 @@ TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
 // load balancing policy extensions.
 TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.

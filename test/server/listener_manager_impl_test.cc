@@ -437,7 +437,7 @@ public:
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   NonTerminalFilterFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
@@ -527,7 +527,7 @@ private:
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
@@ -4247,7 +4247,7 @@ public:
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
@@ -4305,7 +4305,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
 #if defined(WIN32) && defined(SOL_IP)
   OriginalDstTestConfigFactory factory;
@@ -4358,7 +4358,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
@@ -4444,7 +4444,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   };
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.prefer_extension_type_url", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
