@@ -167,10 +167,8 @@ public:
       return false;
     }
     absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (path.size() > prefix_.size() && path_matcher_->match(path) && path[prefix_.size()] == '/') {
-      ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
-      return true;
-    } else if (case_sensitive_ ? path == prefix_ : absl::EqualsIgnoreCase(path, prefix_)) {
+    if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
+        (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
       ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
       return true;
     }

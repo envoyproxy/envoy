@@ -1426,9 +1426,8 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
     return nullptr;
   }
   absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  if (path.size() > prefix_.size() && path_matcher_->match(path) && path[prefix_.size()] == '/') {
-    return clusterEntry(headers, random_value);
-  } else if (case_sensitive_ ? path == prefix_ : absl::EqualsIgnoreCase(path, prefix_)) {
+  if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
+      (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
