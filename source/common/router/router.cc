@@ -103,17 +103,11 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
     return false;
   }
 
-  if (policy.defaultValue().numerator() > 0) {
-    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
-                                             stable_random);
-  }
-
-  if (!policy.runtimeKey().empty() &&
-      !runtime.snapshot().featureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
-    return false;
-  }
-
-  return true;
+  // The policy's default value is set correctly regardless of whether there is a runtime key
+  // or not, thus this call is sufficient for all cases (100% if no runtime set, otherwise
+  // using the default value within the runtime fractional percent setting).
+  return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
+                                           stable_random);
 }
 
 FilterUtility::TimeoutData
@@ -562,7 +556,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
+      callbacks_->streamInfo().filterState());
 
   if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
     if (auto typed_state = downstream_connection->streamInfo()
@@ -916,21 +910,30 @@ void Filter::onResponseTimeout() {
     UpstreamRequestPtr upstream_request =
         upstream_requests_.back()->removeFromList(upstream_requests_);
 
-    // Don't do work for upstream requests we've already seen headers for.
-    if (upstream_request->awaitingHeaders()) {
+    // We want to record the upstream timeouts and increase the stats counters in all the cases.
+    // For example, we also want to record the stats in the case of BiDi streaming APIs where we
+    // might have already seen the headers.
+    // If desired, the old behavior to not do any work for those upstream requests we've already
+    // seen the headers for can be achieved by overloading the runtime guard
+    // `do_not_await_headers_on_upstream_timeout_to_emit_stats` to false.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats") ||
+        upstream_request->awaitingHeaders()) {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
 
+      if (upstream_request->upstreamHost()) {
+        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
+      }
+    }
+
+    if (upstream_request->awaitingHeaders()) {
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
         // play when the global timeout was hit.
         upstream_request->recordTimeoutBudget(false);
-      }
-
-      if (upstream_request->upstreamHost()) {
-        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
       }
 
       // If this upstream request already hit a "soft" timeout, then it
@@ -1036,10 +1039,17 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
 
   callbacks_->streamInfo().setResponseFlag(
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+  // Grab the const ref to call the const method of StreamInfo.
+  const auto& stream_info = callbacks_->streamInfo();
+  const bool downstream_decode_complete =
+      stream_info.downstreamTiming().has_value() &&
+      stream_info.downstreamTiming().value().get().lastDownstreamRxByteReceived().has_value();
+
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
   callbacks_->sendLocalReply(
-      Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
-      absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
+      Http::Utility::maybeRequestTimeoutCode(downstream_decode_complete),
+      "upstream max stream duration reached", modify_headers_, absl::nullopt,
+      StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
@@ -1455,6 +1465,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
 
+  callbacks_->streamInfo().setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
   // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
@@ -1692,7 +1705,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
 
-  const auto& route_name = route->routeEntry()->routeName();
+  const auto& route_name = route->directResponseEntry() ? route->directResponseEntry()->routeName()
+                                                        : route->routeEntry()->routeName();
   for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {

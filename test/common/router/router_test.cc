@@ -56,6 +56,7 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
@@ -319,7 +320,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
       sendLocalReply(Http::Code::ServiceUnavailable,
                      testing::Eq("missing required header: :method"), _, _,
                      "filter_removed_required_request_headers{missing_required_header:_:method}"))
-      .WillOnce(testing::InvokeWithoutArgs([] {}));
+      .WillOnce(InvokeWithoutArgs([] {}));
   router_.decodeHeaders(headers, true);
   router_.onDestroy();
 }
@@ -1139,6 +1140,75 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats",
+        "false"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(0U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(0U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+  EXPECT_EQ(0UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+}
+
+TEST_F(RouterTest, UpstreamTimeoutAllStatsEmissionWhenRuntimeGuardTrue) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
 TEST_F(RouterTest, UpstreamTimeout) {
@@ -3411,8 +3481,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   // Normally, sendLocalReply will actually send the reply, but in this case the
   // HCM will detect the headers have already been sent and not route through
   // the encoder again.
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).WillOnce(testing::InvokeWithoutArgs([] {
-  }));
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).WillOnce(InvokeWithoutArgs([] {}));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
@@ -4207,6 +4276,33 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
                    ->value());
 }
 
+TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
+
+  enableRedirects();
+  sendRequest();
+  EXPECT_CALL(callbacks_, clearRouteCache()).WillOnce(InvokeWithoutArgs([&]() -> void {
+    // Direct message route should be matched after internal redirect
+    EXPECT_CALL(*callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  }));
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+  EXPECT_EQ(1, callbacks_.streamInfo()
+                   .filterState()
+                   ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   ->value());
+}
+
 TEST_F(RouterTest, InternalRedirectStripsFragment) {
   enableRedirects();
   default_request_headers_.setForwardedProto("http");
@@ -4228,7 +4324,7 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
 
 TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
   enableRedirects();
   default_request_headers_.setForwardedProto("http");
@@ -4292,12 +4388,32 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   router_.onDestroy();
 }
 
+namespace {
+
+std::shared_ptr<ShadowPolicyImpl>
+makeShadowPolicy(std::string cluster = "", absl::optional<std::string> runtime_key = absl::nullopt,
+                 absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
+                 bool trace_sampled = true) {
+  envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
+  policy.set_cluster(cluster);
+  if (runtime_key.has_value()) {
+    policy.mutable_runtime_fraction()->set_runtime_key(runtime_key.value());
+  }
+  if (default_value.has_value()) {
+    *policy.mutable_runtime_fraction()->mutable_default_value() = default_value.value();
+  }
+  policy.mutable_trace_sampled()->set_value(trace_sampled);
+
+  return std::make_shared<ShadowPolicyImpl>(policy);
+}
+
+} // namespace
+
 TEST_F(RouterTest, Shadow) {
-  ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("foo", "bar");
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
-  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz", envoy::type::v3::FractionalPercent(),
-                                              false);
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  policy = makeShadowPolicy("fizz", "buzz", envoy::type::v3::FractionalPercent(), false);
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
   NiceMock<Http::MockRequestEncoder> encoder;
@@ -4306,8 +4422,16 @@ TEST_F(RouterTest, Shadow) {
 
   expectResponseTimerCreate();
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("buzz", 0, 43, 10000)).WillOnce(Return(true));
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("buzz",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)), 43))
+      .WillOnce(Return(true));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -5285,41 +5409,56 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
 
 TEST(RouterFilterUtilityTest, ShouldShadow) {
   {
-    TestShadowPolicy policy;
+    auto policy = makeShadowPolicy();
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
-    EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
+    EXPECT_CALL(
+        runtime.snapshot_,
+        featureEnabled(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), _))
+        .Times(0);
+    EXPECT_FALSE(FilterUtility::shouldShadow(*policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy("cluster");
+    auto policy = makeShadowPolicy("cluster");
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
-    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
+    EXPECT_CALL(
+        runtime.snapshot_,
+        featureEnabled(
+            "", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100)), _))
+        .WillOnce(Return(true));
+    EXPECT_TRUE(FilterUtility::shouldShadow(*policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy("cluster", "foo");
+    auto policy = makeShadowPolicy("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(false));
-    EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
+    EXPECT_CALL(
+        runtime.snapshot_,
+        featureEnabled("foo",
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)), 5))
+        .WillOnce(Return(false));
+    EXPECT_FALSE(FilterUtility::shouldShadow(*policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy("cluster", "foo");
+    auto policy = makeShadowPolicy("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
-    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
+    EXPECT_CALL(
+        runtime.snapshot_,
+        featureEnabled("foo",
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)), 5))
+        .WillOnce(Return(true));
+    EXPECT_TRUE(FilterUtility::shouldShadow(*policy, runtime, 5));
   }
   // Use default value instead of runtime key.
   {
     envoy::type::v3::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
-    fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    TestShadowPolicy policy("cluster", "foo", fractional_percent);
+    fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    auto policy = makeShadowPolicy("cluster", absl::nullopt, fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(
-        runtime.snapshot_,
-        featureEnabled("foo", testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 3))
+    EXPECT_CALL(runtime.snapshot_,
+                featureEnabled(
+                    "", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(5)), 3))
         .WillOnce(Return(true));
-    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
+    EXPECT_TRUE(FilterUtility::shouldShadow(*policy, runtime, 3));
   }
 }
 
@@ -5818,7 +5957,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
 
 TEST_F(RouterTest, ExpectedUpstreamTimeoutNotUpdatedDuringRetriesWhenRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.update_expected_rq_timeout_on_retry", "false"}});
 
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
@@ -6074,8 +6213,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
 
   auto override_host = router_.overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host->first);
-  EXPECT_EQ(~static_cast<uint32_t>(0), override_host->second);
+  EXPECT_EQ("1.2.3.4", override_host.value());
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

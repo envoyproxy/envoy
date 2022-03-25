@@ -60,9 +60,9 @@ template <class DataType> struct TrieNodeComparator {
  */
 template <class DataType> class TrieMatcher : public MatchTree<DataType> {
 public:
-  TrieMatcher(DataInputPtr<DataType>&& data_input,
+  TrieMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
               const std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>>& trie)
-      : data_input_(std::move(data_input)), trie_(trie) {}
+      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), trie_(trie) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
@@ -70,12 +70,12 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
     if (!input.data_) {
-      return {MatchState::MatchComplete, absl::nullopt};
+      return {MatchState::MatchComplete, on_no_match_};
     }
     const Network::Address::InstanceConstSharedPtr addr =
         Network::Utility::parseInternetAddressNoThrow(*input.data_);
     if (!addr) {
-      return {MatchState::MatchComplete, absl::nullopt};
+      return {MatchState::MatchComplete, on_no_match_};
     }
     auto values = trie_->getData(addr);
     // The candidates returned by the LC trie are not in any specific order, so we
@@ -101,11 +101,12 @@ public:
         first = false;
       }
     }
-    return {MatchState::MatchComplete, absl::nullopt};
+    return {MatchState::MatchComplete, on_no_match_};
   }
 
 private:
   const DataInputPtr<DataType> data_input_;
+  const absl::optional<OnMatch<DataType>> on_no_match_;
   std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>> trie_;
 };
 
@@ -116,6 +117,7 @@ public:
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
+                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) override {
     const auto& typed_config =
         MessageUtil::downcastAndValidate<const xds::type::matcher::v3::IPMatcher&>(
@@ -139,14 +141,16 @@ public:
       }
     }
     auto lc_trie = std::make_shared<Network::LcTrie::LcTrie<TrieNode<DataType>>>(data);
-    return [data_input, lc_trie]() {
-      return std::make_unique<TrieMatcher<DataType>>(data_input(), lc_trie);
+    return [data_input, lc_trie, on_no_match]() {
+      return std::make_unique<TrieMatcher<DataType>>(
+          data_input(), on_no_match ? absl::make_optional(on_no_match.value()()) : absl::nullopt,
+          lc_trie);
     };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<xds::type::matcher::v3::IPMatcher>();
   }
-  std::string name() const override { return "trie-matcher"; }
+  std::string name() const override { return "envoy.matching.custom_matchers.trie_matcher"; }
 };
 
 class NetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::MatchingData> {};

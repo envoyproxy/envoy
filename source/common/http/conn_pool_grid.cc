@@ -1,5 +1,8 @@
 #include "source/common/http/conn_pool_grid.h"
 
+#include <cstdint>
+
+#include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/http/spdy_utils.h"
@@ -198,12 +201,14 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     AlternateProtocolsCacheSharedPtr alternate_protocols, ConnectivityOptions connectivity_options,
-    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope)
+    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
-      time_source_(time_source), http3_status_tracker_(dispatcher_),
-      alternate_protocols_(alternate_protocols), quic_stat_names_(quic_stat_names), scope_(scope) {
+      time_source_(time_source), alternate_protocols_(alternate_protocols),
+      quic_stat_names_(quic_stat_names), scope_(scope), quic_info_(quic_info) {
+  ASSERT(connectivity_options.protocols_.size() == 3);
+  ASSERT(alternate_protocols);
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   AlternateProtocolsCache::Origin origin("https", host_->hostname(),
@@ -213,8 +218,6 @@ ConnectivityGrid::ConnectivityGrid(
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
   }
-  ASSERT(connectivity_options.protocols_.size() == 3);
-  ASSERT(alternate_protocols);
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
@@ -245,10 +248,10 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
   ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                   transport_socket_options_, state_, time_source_,
-                                   quic_stat_names_, *alternate_protocols_, scope_,
-                                   makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this));
+    pool = Http3::allocateConnPool(
+        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
+        state_, quic_stat_names_, *alternate_protocols_, scope_,
+        makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                    options_, transport_socket_options_, state_);
@@ -348,11 +351,19 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-bool ConnectivityGrid::isHttp3Broken() const { return http3_status_tracker_.isHttp3Broken(); }
+AlternateProtocolsCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
+  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
+  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
+                                         host_->address()->ip()->port());
+  return alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
+}
 
-void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_.markHttp3Broken(); }
+bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_.markHttp3Confirmed(); }
+void ConnectivityGrid::markHttp3Broken() { getHttp3StatusTracker().markHttp3Broken(); }
+
+void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }
 
 bool ConnectivityGrid::isIdle() const {
   // This is O(n) but the function is constant and there are no plans for n > 8.
@@ -377,10 +388,6 @@ void ConnectivityGrid::onIdleReceived() {
 }
 
 bool ConnectivityGrid::shouldAttemptHttp3() {
-  if (http3_status_tracker_.isHttp3Broken()) {
-    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
-    return false;
-  }
   if (host_->address()->type() != Network::Address::Type::Ip) {
     ENVOY_LOG(error, "Address is not an IP address");
     ASSERT(false);
@@ -396,7 +403,10 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
               host_->hostname());
     return false;
   }
-
+  if (isHttp3Broken()) {
+    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
+    return false;
+  }
   for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
     // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
     if (!protocol.hostname_.empty() || protocol.port_ != port) {

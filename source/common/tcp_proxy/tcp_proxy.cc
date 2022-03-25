@@ -73,7 +73,8 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    tunneling_config_ = config.tunneling_config();
+    tunneling_config_helper_ =
+        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config());
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -189,11 +190,18 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().enableHalfClose(true);
 
+  // Check that we are generating only the byte meters we need.
+  // The Downstream should be unset and the Upstream should be populated.
+  ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
+  ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
+
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
+  getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+
   config_->stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
     read_callbacks_->connection().setConnectionStats(
@@ -260,7 +268,8 @@ void Filter::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected) {
+  if (event == Network::ConnectionEvent::Connected ||
+      event == Network::ConnectionEvent::ConnectedZeroRtt) {
     return;
   }
   if (drainer_ == nullptr) {
@@ -361,34 +370,28 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
-    if (!read_callbacks_->connection()
-             .streamInfo()
-             .filterState()
-             ->hasData<Network::ProxyProtocolFilterState>(
-                 Network::ProxyProtocolFilterState::key())) {
-      read_callbacks_->connection().streamInfo().filterState()->setData(
-          Network::ProxyProtocolFilterState::key(),
-          std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              downstream_connection->connectionInfoProvider().remoteAddress(),
-              downstream_connection->connectionInfoProvider().localAddress()}),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
-    }
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstream_connection->streamInfo().filterState());
+  auto& downstream_connection = read_callbacks_->connection();
+  auto& filter_state = downstream_connection.streamInfo().filterState();
+  if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolFilterState::key())) {
+    filter_state->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+            downstream_connection.connectionInfoProvider().remoteAddress(),
+            downstream_connection.connectionInfoProvider().localAddress()}),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
 
-    if (auto typed_state = downstream_connection->streamInfo()
-                               .filterState()
-                               .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
-                                   Network::UpstreamSocketOptionsFilterState::key());
-        typed_state != nullptr) {
-      auto downstream_options = typed_state->value();
-      if (!upstream_options_) {
-        upstream_options_ = std::make_shared<Network::Socket::Options>();
-      }
-      Network::Socket::appendOptions(upstream_options_, downstream_options);
+  if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+          Network::UpstreamSocketOptionsFilterState::key());
+      typed_state != nullptr) {
+    auto downstream_options = typed_state->value();
+    if (!upstream_options_) {
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
     }
+    Network::Socket::appendOptions(upstream_options_, downstream_options);
   }
 
   if (!maybeTunnel(*thread_local_cluster)) {
@@ -413,8 +416,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
-                                                      *upstream_callbacks_);
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfigHelper(),
+                                                      this, *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -498,7 +501,9 @@ void Filter::onConnectTimeout() {
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
+  getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
   if (upstream_) {
+    getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
   }
   // The upstream should consume all of the data.
@@ -519,8 +524,14 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    downstream_closed_ = true;
+  }
+
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
                  static_cast<int>(event), upstream_ == nullptr);
+
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
@@ -529,7 +540,8 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                                   std::move(upstream_callbacks_), std::move(idle_timer_),
                                   read_callbacks_->upstreamHost());
     }
-    if (event != Network::ConnectionEvent::Connected) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
       upstream_.reset();
       disableIdleTimer();
     }
@@ -546,12 +558,17 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
+  getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
+  getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    return;
+  }
   // Update the connecting flag before processing the event because we may start a new connection
   // attempt in initializeUpstreamConnection.
   bool connecting = connecting_;
@@ -569,7 +586,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
 
-      initializeUpstreamConnection();
+      if (!downstream_closed_) {
+        initializeUpstreamConnection();
+      }
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
