@@ -505,9 +505,8 @@ deleted via the :ref:`removed_resources <envoy_v3_api_field_service.discovery.v3
 field of the response. This tells the client to remove the resource from its local cache.
 
 In the SotW protocol variants, the criteria for deleting is more complex. If a previously seen resource
-is not present in a new response, that indicates that the resource
-has been removed, and the client must delete it; a response containing no resources means to delete
-all resources of that type. 
+is not present in a new response, that indicates that the resource has been removed, and the client must
+delete it; a response containing no resources means to delete all resources of that type. 
 
 Other Resource Types
 ^^^^^^^^^^^^^^^^^^^^
