@@ -17,16 +17,6 @@ namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 
-TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithEmptyProto) {
-  GcpAuthnFilterConfig filter_config;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  GcpAuthnFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
-}
-
 TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithCorrectProto) {
   std::string filter_config_yaml = R"EOF(
     http_uri:
