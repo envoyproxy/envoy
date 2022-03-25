@@ -345,8 +345,24 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.clusterManager(), parent_.server_.localInfo(),
               parent_.server_.dispatcher(), parent_.server_.stats(),
               parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-              validation_visitor_, parent_.server_.api(), parent_.server_.options())),
+              validation_visitor_, parent_.server_.api(), parent_.server_.options(),
+              parent_.server_.accessLogManager())),
       quic_stat_names_(parent_.quicStatNames()) {
+
+  if ((address_->type() == Network::Address::Type::Ip &&
+       config.address().socket_address().ipv4_compat()) &&
+      (address_->ip()->version() != Network::Address::IpVersion::v6 ||
+       (!address_->ip()->isAnyAddress() &&
+        address_->ip()->ipv6()->v4CompatibleAddress() == nullptr))) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
+      throw EnvoyException(fmt::format(
+          "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
+          address_->asStringView()));
+    } else {
+      ENVOY_LOG(warn, "An invalid IPv4-mapped IPv6 address is used when ipv4_compat is set: {}",
+                address_->asStringView());
+    }
+  }
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);

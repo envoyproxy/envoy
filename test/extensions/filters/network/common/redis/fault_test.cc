@@ -92,7 +92,6 @@ TEST_F(FaultTest, NoFaults) {
   RedisProxy redis_config;
   auto* faults = redis_config.mutable_faults();
 
-  TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
   const Fault* fault_ptr = fault_manager.getFaultForCommand("get");
@@ -104,7 +103,6 @@ TEST_F(FaultTest, SingleCommandFaultNotEnabled) {
   auto* faults = redis_config.mutable_faults();
   createCommandFault(faults->Add(), "get", 0, 0, FractionalPercent::HUNDRED, RUNTIME_KEY);
 
-  TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
@@ -120,7 +118,6 @@ TEST_F(FaultTest, SingleCommandFault) {
   auto* faults = redis_config.mutable_faults();
   createCommandFault(faults->Add(), "ttl", 0, 5000, FractionalPercent::TEN_THOUSAND, RUNTIME_KEY);
 
-  TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
@@ -136,7 +133,6 @@ TEST_F(FaultTest, SingleCommandFaultWithNoDefaultValueOrRuntimeValue) {
   auto* faults = redis_config.mutable_faults();
   createCommandFault(faults->Add(), "ttl", 0, absl::nullopt, absl::nullopt, absl::nullopt);
 
-  TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
@@ -154,7 +150,6 @@ TEST_F(FaultTest, MultipleFaults) {
   createCommandFault(faults->Add(), "get", 0, 25, FractionalPercent::HUNDRED, RUNTIME_KEY);
   createAllKeyFault(faults->Add(), 2, 25, FractionalPercent::HUNDRED, absl::nullopt);
 
-  TestScopedRuntime scoped_runtime;
   FaultManagerImpl fault_manager = FaultManagerImpl(random_, runtime_, *faults);
   const Fault* fault_ptr;
 

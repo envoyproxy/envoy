@@ -118,7 +118,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
-  virtual bool has1xxheaders() PURE;
+  virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
   virtual void doData(bool end_stream) PURE;
@@ -226,7 +226,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
-  bool has1xxheaders() override { return false; }
+  bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
@@ -321,7 +321,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
-  bool has1xxheaders() override;
+  bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;

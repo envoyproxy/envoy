@@ -14,7 +14,7 @@ namespace Envoy {
 
 // Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
 template <>
-void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&) {}
+void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
 
 namespace Extensions {
 namespace NetworkFilters {
@@ -23,11 +23,7 @@ namespace SipProxy {
 MockConfig::MockConfig() = default;
 MockConfig::~MockConfig() = default;
 
-MockDecoderCallbacks::MockDecoderCallbacks() {
-  ON_CALL(*this, getLocalIp()).WillByDefault(Return("127.0.0.1"));
-  ON_CALL(*this, getOwnDomain()).WillByDefault(Return("pcsf-cfed.cncs.svc.cluster.local"));
-  ON_CALL(*this, getDomainMatchParamName()).WillByDefault(Return("x-suri"));
-}
+MockDecoderCallbacks::MockDecoderCallbacks() = default;
 MockDecoderCallbacks::~MockDecoderCallbacks() = default;
 
 MockDecoderEventHandler::MockDecoderEventHandler() {
@@ -91,6 +87,25 @@ MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&rout
 MockRoute::~MockRoute() = default;
 
 } // namespace Router
+
+MockConnectionManager::~MockConnectionManager() = default;
+
+MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
+    ConnectionManager& parent,
+    const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
+    Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
+    : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {
+  ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _))
+      .WillByDefault(
+          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
+                     std::string& host) -> QueryStatus {
+            host = "10.0.0.11";
+            return QueryStatus::Continue;
+          }));
+}
+
+MockTrafficRoutingAssistantHandler::~MockTrafficRoutingAssistantHandler() = default;
+
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions

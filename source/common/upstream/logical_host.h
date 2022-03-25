@@ -94,6 +94,9 @@ public:
     return logical_host_->transportSocketFactory();
   }
   const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
+  bool canCreateConnection(Upstream::ResourcePriority priority) const override {
+    return logical_host_->canCreateConnection(priority);
+  }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     return logical_host_->outlierDetector();

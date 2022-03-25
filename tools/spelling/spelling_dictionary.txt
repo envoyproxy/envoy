@@ -25,6 +25,7 @@ BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -161,6 +162,7 @@ HTML
 HTTP
 HTTPS
 HV
+Hyperscan
 IAM
 IANA
 IDL
@@ -255,6 +257,7 @@ OVFL
 PAYLOADLEN
 PB
 PCC
+PCRE
 PEERCRED
 PEM
 PERF
@@ -299,6 +302,7 @@ RTDS
 RTOS
 RTTI
 RUNDIR
+RVCM
 RW
 RX
 RXQ
@@ -320,6 +324,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIO
 SMTP
 SNI
 SOTW
@@ -447,6 +452,7 @@ authlen
 authn
 auths
 authz
+automata
 autoscale
 backend
 backends
@@ -1174,6 +1180,7 @@ subnets
 suboptimal
 subsecond
 subseconds
+subsegment
 subsequence
 subsetting
 substr
@@ -1233,6 +1240,7 @@ transcoded
 transcoder
 transcoding
 transferral
+trds
 triaged
 trie
 tuple
@@ -1332,3 +1340,8 @@ transid
 routable
 vhosts
 infos
+ElastiCache
+pinterest
+NSS
+SSLKEYLOGFILE
+

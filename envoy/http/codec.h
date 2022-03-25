@@ -337,7 +337,7 @@ public:
    * configured.
    * @return uint32_t the stream's configured buffer limits.
    */
-  virtual uint32_t bufferLimit() PURE;
+  virtual uint32_t bufferLimit() const PURE;
 
   /**
    * @return string_view optionally return the reason behind codec level errors.
