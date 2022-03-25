@@ -29,8 +29,8 @@ Otherwise, the filter chain ``plaintext`` is used.
 
 .. literalinclude:: _include/listener_tls.yaml
     :language: yaml
-    :linenos:
     :lines: 37-56
+    :caption: :download:`listener_tls.yaml <_include/listener_tls.yaml>`
 
 Match Against the Destination IP
 ********************************
@@ -41,8 +41,8 @@ the filter chain ``default`` is used.
 
 .. literalinclude:: _include/listener_vip.yaml
     :language: yaml
-    :linenos:
     :lines: 29-48
+    :caption: :download:`listener_vip.yaml <_include/listener_vip.yaml>`
 
 Match Against the Destination Port and the Source IP
 ****************************************************
@@ -59,5 +59,5 @@ and ``tls`` as follows:
 
 .. literalinclude:: _include/listener_complicated.yaml
     :language: yaml
-    :linenos:
     :lines: 57-101
+    :caption: :download:`listener_complicated.yaml <_include/listener_complicated.yaml>`
