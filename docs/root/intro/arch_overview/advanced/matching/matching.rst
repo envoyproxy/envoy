@@ -5,3 +5,4 @@ Generic Matching
   :maxdepth: 2
 
   matching_api
+  matching_listener
