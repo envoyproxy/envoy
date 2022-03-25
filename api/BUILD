@@ -82,6 +82,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg",
+        "//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
         "//contrib/envoy/extensions/vcl/v3alpha:pkg",
         "//envoy/admin/v3:pkg",
@@ -285,11 +286,22 @@ proto_library(
 )
 
 proto_library(
+    name = "xds_protos",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_cncf_udpa//xds/core/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/v3:pkg",
+    ],
+)
+
+proto_library(
     name = "all_protos",
     visibility = ["//visibility:public"],
     deps = [
         ":v2_protos",
         ":v3_protos",
+        ":xds_protos",
     ],
 )
 
