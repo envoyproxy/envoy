@@ -56,14 +56,14 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
 std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
 CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config) {
-  if (!config.match_typed_subject_alt_names().empty() &&
-      !config.match_subject_alt_names().empty()) {
-    throw EnvoyException("SAN-based verification using both match_typed_subject_alt_names and "
-                         "the deprecated match_subject_alt_names is not allowed");
-  }
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
       subject_alt_name_matchers(config.match_typed_subject_alt_names().begin(),
                                 config.match_typed_subject_alt_names().end());
+  // If typed subject alt name matchers are provided in the config, don't check
+  // for the deprecated non-typed field.
+  if (!subject_alt_name_matchers.empty()) {
+    return subject_alt_name_matchers;
+  }
   // Handle deprecated string type san matchers without san type specified, by
   // creating a matcher for each supported type.
   for (const envoy::type::matcher::v3::StringMatcher& matcher : config.match_subject_alt_names()) {

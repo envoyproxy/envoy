@@ -1932,8 +1932,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
       "Certificate configuration can't have both private_key and private_key_provider");
 }
 
-// Test that we don't allow specification of both typed and untyped matchers for
-// sans.
+// Test that if both typed and untyped matchers for sans are specified, we
+// ignore the untyped matchers.
 TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
@@ -1943,22 +1943,34 @@ TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
   const std::string yaml =
       R"EOF(
       common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
         validation_context:
           trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
           allow_expired_certificate: true
           match_typed_subject_alt_names:
           - san_type: DNS
             matcher:
-              exact: "foo.example"
+              exact: "foo1.example"
           match_subject_alt_names:
-            exact: "foo.example"
+            exact: "foo2.example"
       )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
-      "SAN-based verification using both match_typed_subject_alt_names and "
-      "the deprecated match_subject_alt_names is not allowed");
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_EQ(server_context_config.certificateValidationContext()->subjectAltNameMatchers().size(),
+            1);
+  EXPECT_EQ(
+      server_context_config.certificateValidationContext()->subjectAltNameMatchers()[0].san_type(),
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+  EXPECT_EQ(server_context_config.certificateValidationContext()
+                ->subjectAltNameMatchers()[0]
+                .matcher()
+                .exact(),
+            "foo1.example");
 }
 
 TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndMethod) {
