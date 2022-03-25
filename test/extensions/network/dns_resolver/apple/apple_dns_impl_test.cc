@@ -385,7 +385,8 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
 class AppleDnsImplFakeApiTest : public testing::Test {
 public:
   void SetUp() override {
-    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, stats_store_);
+    const envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig config;
+    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config, dispatcher_, stats_store_);
   }
 
   void checkErrorStat(DNSServiceErrorType error_code) {
