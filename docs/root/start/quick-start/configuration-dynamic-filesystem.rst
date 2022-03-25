@@ -8,10 +8,14 @@ protocol.
 
 When the files are changed on the filesystem, Envoy will automatically update its configuration.
 
+.. seealso::
+
+   :ref:`Atomic swap <_config_runtime_symbolic_link_swap>`
+      General explanation of how the atomic swap works.
 .. note::
 
    Envoy only updates when the configuration file is replaced, and not when the file is edited in place.
-   It is implemented this way to ensure configuration consistency.
+   It is implemented this way to ensure configuration consistency, more details refer to :ref:`Atomic swap for configuration file updates<_config_runtime_symbolic_link_swap>`.
 
 At a minimum, you will need to start Envoy configured with the following sections:
 
@@ -96,7 +100,3 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :linenos:
     :emphasize-lines: 11, 17-18, 22-23
 
-.. seealso::
-
-   :ref:`Atomic swap <_config_runtime_symbolic_link_swap>`
-      General explanation of how the atomic swap works.
