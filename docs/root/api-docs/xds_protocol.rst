@@ -499,7 +499,7 @@ Deleting Resources
 ^^^^^^^^^^^^^^^^^^
 
 Wildcard Resource Types
-^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""
 In the incremental protocol variants, the server signals the client that a resource should be
 deleted via the :ref:`removed_resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
 field of the response. This tells the client to remove the resource from its local cache.
@@ -509,7 +509,7 @@ is not present in a new response, that indicates that the resource has been remo
 delete it; a response containing no resources means to delete all resources of that type.
 
 Other Resource Types
-^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""
 In both SotW and incremental protocol variants, deletions are indicated implicitly by parent resources being
 changed to no longer refer to a child resource. For example, when the client receives an LDS update removing a :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 that was previously pointing to :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` A,
