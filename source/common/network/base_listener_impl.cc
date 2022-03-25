@@ -27,7 +27,7 @@ BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketShar
     // to IPv4 address here.
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.convert_ipv4_mapped_address_to_ipv4_address") &&
-        ip->version() == Address::IpVersion::v6 && !ip->ipv6()->v6only()) {
+        ip != nullptr && ip->version() == Address::IpVersion::v6 && !ip->ipv6()->v6only()) {
       local_address_ = ip->ipv6()->v4CompatibleAddress();
       ASSERT(local_address_ != nullptr);
     } else {
