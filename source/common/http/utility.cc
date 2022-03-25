@@ -333,7 +333,7 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
   const int result =
-      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u, 0);
 
   if (result != 0) {
     return false;

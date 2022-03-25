@@ -47,6 +47,14 @@ const char MaxResponseHeadersCountOverrideKey[] =
 class Stream;
 
 /**
+ * Header validation mode that codecs should use internally.
+ */
+enum class CodecHeaderValidationMode {
+  Enabled,
+  Disabled,
+};
+
+/**
  * Error codes used to convey the reason for a GOAWAY.
  */
 enum class GoAwayErrorCode {

@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/http/codec.h"
+
 #include "source/common/http/http1/parser.h"
 
 namespace Envoy {
@@ -10,7 +12,8 @@ namespace Http1 {
 
 class LegacyHttpParserImpl : public Parser {
 public:
-  LegacyHttpParserImpl(MessageType type, ParserCallbacks* data);
+  LegacyHttpParserImpl(MessageType type, ParserCallbacks* data,
+                       const CodecHeaderValidationMode codec_header_validation_mode);
   ~LegacyHttpParserImpl() override;
 
   // Http1::Parser

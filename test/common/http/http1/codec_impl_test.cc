@@ -83,7 +83,8 @@ public:
   void initialize() {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, headers_with_underscores_action_);
+        max_request_headers_count_, headers_with_underscores_action_,
+        codec_header_validation_mode_);
   }
 
   ~Http1ServerConnectionImplTest() override {
@@ -96,6 +97,8 @@ public:
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
   NiceMock<Http1Settings> codec_settings_;
   Http::ServerConnectionPtr codec_;
+  Http::CodecHeaderValidationMode codec_header_validation_mode_{
+      Http::CodecHeaderValidationMode::Enabled};
 
   void expectHeadersTest(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
                          TestRequestHeaderMapImpl& expected_headers);
@@ -153,7 +156,8 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        CodecHeaderValidationMode::Enabled);
   }
 
   MockRequestDecoder decoder;
@@ -183,7 +187,8 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        CodecHeaderValidationMode::Enabled);
   }
 
   MockRequestDecoder decoder;
@@ -204,7 +209,8 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+        CodecHeaderValidationMode::Enabled);
   }
 
   InSequence sequence;
@@ -241,7 +247,8 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   codec_settings_.enable_trailers_ = enable_trailers;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      CodecHeaderValidationMode::Enabled);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _))
@@ -325,7 +332,8 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      CodecHeaderValidationMode::Enabled);
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -710,7 +718,8 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
   codec_settings_.stream_error_on_invalid_http_message_ = true;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      CodecHeaderValidationMode::Enabled);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -729,7 +738,8 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
   codec_settings_.stream_error_on_invalid_http_message_ = false;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      CodecHeaderValidationMode::Enabled);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -2127,7 +2137,8 @@ class Http1ClientConnectionImplTest : public Http1CodecTestBase {
 public:
   void initialize() {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+        codec_header_validation_mode_);
   }
 
   void readDisableOnRequestEncoder(RequestEncoder* request_encoder, bool disable) {
@@ -2138,6 +2149,8 @@ public:
   NiceMock<Http::MockConnectionCallbacks> callbacks_;
   NiceMock<Http1Settings> codec_settings_;
   Http::ClientConnectionPtr codec_;
+  Http::CodecHeaderValidationMode codec_header_validation_mode_{
+      Http::CodecHeaderValidationMode::Enabled};
 
   void testClientAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
 
@@ -2150,7 +2163,8 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t
                                                                         bool allow_chunked_length) {
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
   codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+      CodecHeaderValidationMode::Enabled);
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
@@ -3004,6 +3018,39 @@ TEST_F(Http1ServerConnectionImplTest, ManyLargeRequestHeadersAccepted) {
   max_request_headers_kb_ = 8192;
   // Create a request with 64 headers, each header of size ~64 KiB. Total size ~4MB.
   testRequestHeadersAccepted(createLargeHeaderFragment(64));
+}
+
+TEST_F(Http1ServerConnectionImplTest, PermissiveParsing) {
+  codec_header_validation_mode_ = CodecHeaderValidationMode::Disabled;
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/δ¶/δt/pope?q=1#narf"},
+      {":method", "GET"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  Buffer::OwnedImpl buffer("GET /δ¶/δt/pope?q=1#narf HXXP/1.1\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+}
+
+TEST_F(Http1ServerConnectionImplTest, StrictParsing) {
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("GET /δ¶/δt/pope?q=1#narf HXXP/1.1\r\n\r\n");
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
 }
 
 // Tests that incomplete response headers of 80 kB header value fails.

@@ -254,7 +254,8 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
-                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 CodecHeaderValidationMode codec_header_validation_mode);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -436,7 +437,8 @@ public:
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       const CodecHeaderValidationMode codec_header_validation_mode);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -549,7 +551,8 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       const uint32_t max_response_headers_count);
+                       const uint32_t max_response_headers_count,
+                       const CodecHeaderValidationMode codec_header_validation_mode);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 

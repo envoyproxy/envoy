@@ -472,7 +472,8 @@ int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& 
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const Http1Settings& settings, MessageType type,
-                               uint32_t max_headers_kb, const uint32_t max_headers_count)
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               const CodecHeaderValidationMode codec_header_validation_mode)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
@@ -483,7 +484,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
-  parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
+  parser_ = std::make_unique<LegacyHttpParserImpl>(type, this, codec_header_validation_mode);
 }
 
 Status ConnectionImpl::completeLastHeader() {
@@ -957,9 +958,10 @@ ServerConnectionImpl::ServerConnectionImpl(
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    const CodecHeaderValidationMode codec_header_validation_mode)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
-                     max_request_headers_count),
+                     max_request_headers_count, codec_header_validation_mode),
       callbacks_(callbacks),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
@@ -1241,11 +1243,12 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
   os << DUMP_MEMBER(response_encoder_.local_end_stream_);
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
-                                           ConnectionCallbacks&, const Http1Settings& settings,
-                                           const uint32_t max_response_headers_count)
+ClientConnectionImpl::ClientConnectionImpl(
+    Network::Connection& connection, CodecStats& stats, ConnectionCallbacks&,
+    const Http1Settings& settings, const uint32_t max_response_headers_count,
+    const CodecHeaderValidationMode codec_header_validation_mode)
     : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count) {}
+                     max_response_headers_count, codec_header_validation_mode) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {

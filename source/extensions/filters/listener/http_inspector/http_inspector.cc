@@ -28,9 +28,8 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config) {
   http_parser_init(&parser_, HTTP_REQUEST);
 }
 
-http_parser_settings Filter::settings_{
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-};
+http_parser_settings Filter::settings_{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                       nullptr, nullptr, nullptr, nullptr, 0};
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "http inspector: new connection accepted");

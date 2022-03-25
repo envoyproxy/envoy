@@ -696,7 +696,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        headersWithUnderscoresAction(), Http::CodecHeaderValidationMode::Enabled);
   }
   case CodecType::HTTP2: {
     return std::make_unique<Http::Http2::ServerConnectionImpl>(

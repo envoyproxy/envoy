@@ -183,7 +183,7 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(CodecType type,
   case CodecType::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount());
+        host->cluster().maxResponseHeadersCount(), CodecHeaderValidationMode::Enabled);
     break;
   }
   case CodecType::HTTP2: {

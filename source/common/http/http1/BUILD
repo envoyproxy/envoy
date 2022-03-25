@@ -113,6 +113,7 @@ envoy_cc_library(
     external_deps = ["http_parser"],
     deps = [
         ":parser_interface",
+        "//envoy/http:codec_interface",
         "//source/common/common:assert_lib",
     ],
 )
