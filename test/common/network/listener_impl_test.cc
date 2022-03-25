@@ -316,6 +316,107 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(TcpListenerImplTest, ListenerIpv4Compat) {
+  auto option = std::make_unique<MockSocketOption>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(true));
+  options->emplace_back(std::move(option));
+
+  auto local_address =
+      std::make_shared<Address::Ipv6Instance>("::ffff:127.0.0.1", 0, nullptr, false);
+  auto socket =
+      std::make_shared<Network::Test::TcpListenSocketImmediateListen>(local_address, options);
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+
+  // Do not redirect since use_original_dst is false.
+  Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                                        listener_callbacks, true, false);
+
+  auto listener_address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(version_),
+      socket->connectionInfoProvider().localAddress()->ip()->port());
+  auto local_dst_address = std::make_shared<Address::Ipv6Instance>(
+      local_address->ip()->addressAsString(),
+      socket->connectionInfoProvider().localAddress()->ip()->port(), nullptr, false);
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      local_dst_address, Network::Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->connect();
+
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        Network::ConnectionPtr conn = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
+        EXPECT_EQ(conn->connectionInfoProvider().localAddress()->ip()->version(),
+                  conn->connectionInfoProvider().remoteAddress()->ip()->version());
+        EXPECT_EQ(conn->connectionInfoProvider().localAddress()->asString(),
+                  local_dst_address->ip()->ipv6()->v4CompatibleAddress()->asString());
+        EXPECT_EQ(*conn->connectionInfoProvider().localAddress(),
+                  *local_dst_address->ip()->ipv6()->v4CompatibleAddress());
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(TcpListenerImplTest, ListenerIpv4CompatOldBehavior) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  scoped_runtime_guard->mergeValues(
+      {{"envoy.reloadable_features.convert_ipv4_mapped_address_to_ipv4_address", "false"}});
+
+  auto option = std::make_unique<MockSocketOption>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(true));
+  options->emplace_back(std::move(option));
+
+  auto local_address =
+      std::make_shared<Address::Ipv6Instance>("::ffff:127.0.0.1", 33333, nullptr, false);
+  auto socket =
+      std::make_shared<Network::Test::TcpListenSocketImmediateListen>(local_address, options);
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+
+  // Do not redirect since use_original_dst is false.
+  Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator,
+                                        scoped_runtime_guard->loader(), socket, listener_callbacks,
+                                        true, false);
+
+  auto listener_address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(version_),
+      socket->connectionInfoProvider().localAddress()->ip()->port());
+  auto local_dst_address = std::make_shared<Address::Ipv6Instance>(
+      local_address->ip()->addressAsString(),
+      socket->connectionInfoProvider().localAddress()->ip()->port(), nullptr, false);
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      local_dst_address, Network::Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->connect();
+
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        Network::ConnectionPtr conn = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
+        EXPECT_EQ(conn->connectionInfoProvider().localAddress()->ip()->version(),
+                  conn->connectionInfoProvider().remoteAddress()->ip()->version());
+        EXPECT_EQ(conn->connectionInfoProvider().localAddress()->asString(),
+                  local_dst_address->asString());
+        EXPECT_EQ(*conn->connectionInfoProvider().localAddress(), *local_dst_address);
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
   testing::InSequence s1;
 
