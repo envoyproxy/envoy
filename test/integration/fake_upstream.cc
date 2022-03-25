@@ -349,7 +349,8 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action,
+        Http::CodecHeaderValidationMode::Enabled);
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
