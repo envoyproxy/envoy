@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/scope_tracker.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 
@@ -35,6 +36,13 @@ EnvoyQuicServerSession::~EnvoyQuicServerSession() {
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
+}
+
+void EnvoyQuicServerSession::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Http3::ServerSession";
+  QuicFilterManagerConnectionImpl::dumpState(os, indent_level);
+  os << '\n';
 }
 
 std::unique_ptr<quic::QuicCryptoServerStreamBase>
@@ -150,6 +158,13 @@ void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
   QuicServerSessionBase::OnRstStream(frame);
   quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error(),
                                                    /*from_self*/ false, /*is_upstream*/ false);
+}
+
+void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                                              const quic::QuicSocketAddress& peer_address,
+                                              const quic::QuicReceivedPacket& packet) {
+  ScopeTrackerScopeState scope(this, dispatcher());
+  quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
 }
 
 void EnvoyQuicServerSession::setHttp3Options(

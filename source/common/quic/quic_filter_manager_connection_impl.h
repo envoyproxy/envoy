@@ -43,6 +43,7 @@ public:
   bool initializeReadFilters() override;
 
   // Network::Connection
+  void dumpState(std::ostream&, int) const override;
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
     // TODO(danzh): implement to support proxy. This interface is only called from
     // TCP proxy code.

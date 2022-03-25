@@ -45,9 +45,7 @@ public:
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
-  void dumpState(std::ostream&, int) const override {
-    // TODO(kbaichoo): Implement dumpState for H3.
-  }
+  void dumpState(std::ostream&, int) const override;
 
   // Network::ClientConnection
   // Set up socket and start handshake.
@@ -65,6 +63,9 @@ public:
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;

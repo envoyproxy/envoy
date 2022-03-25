@@ -58,9 +58,7 @@ public:
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
-  void dumpState(std::ostream&, int) const override {
-    // TODO(kbaichoo): Implement dumpState for H3.
-  }
+  void dumpState(std::ostream&, int) const override;
 
   // Called by QuicHttpServerConnectionImpl before creating data streams.
   void setHttpConnectionCallbacks(Http::ServerConnectionCallbacks& callbacks) {
@@ -76,6 +74,9 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

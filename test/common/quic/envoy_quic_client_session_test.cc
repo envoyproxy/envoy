@@ -1,5 +1,6 @@
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/utility.h"
 #include "source/common/quic/codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -9,6 +10,7 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
@@ -25,8 +27,10 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::Return;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Quic {
@@ -357,6 +361,21 @@ TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
   envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, DumpsStreamlessSessionWithoutAllocatingMemory) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  Stats::TestUtil::MemoryTest memory_test;
+  envoy_quic_session_.dumpState(ostream, 1);
+
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  // Check the entire dump to ensure correct formatting.
+  EXPECT_THAT(ostream.contents(), StartsWith("  Http3::ClientSession"));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("disable_keepalive_: 0, initialized_: 1, bytes_to_send_: 0, "
+                        "max_headers_count_: 100, transport_failure_reason_: \n"));
 }
 
 } // namespace Quic

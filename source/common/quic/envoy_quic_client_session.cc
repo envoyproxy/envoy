@@ -1,5 +1,6 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include "source/common/common/scope_tracker.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -33,6 +34,13 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
+
+void EnvoyQuicClientSession::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Http3::ClientSession" << DUMP_MEMBER(disable_keepalive_);
+  QuicFilterManagerConnectionImpl::dumpState(os, indent_level);
+  os << '\n';
+}
 
 void EnvoyQuicClientSession::connect() {
   streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
@@ -206,6 +214,13 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
   if (level == quic::ENCRYPTION_ZERO_RTT) {
     raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
   }
+}
+
+void EnvoyQuicClientSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                                              const quic::QuicSocketAddress& peer_address,
+                                              const quic::QuicReceivedPacket& packet) {
+  ScopeTrackerScopeState scope(this, dispatcher());
+  quic::QuicSpdyClientSession::ProcessUdpPacket(self_address, peer_address, packet);
 }
 
 } // namespace Quic

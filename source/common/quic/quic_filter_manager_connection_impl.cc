@@ -48,6 +48,11 @@ bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_->initializeReadFilters();
 }
 
+void QuicFilterManagerConnectionImpl::dumpState(std::ostream& os, int /*indent_level*/) const {
+  os << DUMP_MEMBER(initialized_) << DUMP_MEMBER(bytes_to_send_) << DUMP_MEMBER(max_headers_count_)
+     << DUMP_MEMBER(transport_failure_reason_);
+}
+
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
