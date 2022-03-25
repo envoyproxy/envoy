@@ -7,7 +7,7 @@ How it works
 ------------
 
 This extension contains 2 major components to add a listener with
-an :ref:`envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`
+an :ref:`Envoy internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`
 and to create a client connection to that :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 
 envoy.bootstrap.internal_listener
@@ -19,11 +19,11 @@ This bootstrap extension is required to support looking up the target listener v
 network.connection.client.envoy_internal
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is a client connection factory. The factory is implicitly instantiated by the dispatcher to establish a client connection to an
-internal listener address.  This client connection factory is installed automatically when **envoy.bootstrap.internal_listerner** is specified.
+internal listener address.  This client connection factory is installed automatically when ``envoy.bootstrap.internal_listener`` is specified.
 
 Example config
 --------------
-Below is a smallest static config that redirect tcp_proxy on port 19000 to the tcp_proxy binding to the internal address.
+Below is a smallest static config that redirect TCP proxy on port 19000 to the TCP proxy binding to the internal address.
 
 .. code-block:: yaml
 
@@ -99,7 +99,7 @@ Encap HTTP GET requests in a HTTP CONNECT request
 Currently Envoy :ref:`HTTP connection manager <config_http_conn_man>`
 cannot proxy a GET request in an upstream HTTP CONNECT request. This requirement
 can be acomplished by setting up the upstream endpoint of HTTP connection manager to the internal listener address.
-Meanwhile, another internal listener binding to the above listener address includes a tcp_proxy with :ref:`tunneling config <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>`.
+Meanwhile, another internal listener binding to the above listener address includes a TCP proxy with :ref:`tunneling config <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>`.
 
 Decap the CONNECT requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
