@@ -479,7 +479,7 @@ message Cluster {
     //
     // .. attention::
     //
-    //   The header isn't sanitized by default, so enabling this feature allows HTTP clients to
+    //   This header isn't sanitized by default, so enabling this feature allows HTTP clients to
     //   route traffic to arbitrary hosts and/or ports, which may have serious security
     //   consequences.
     //
