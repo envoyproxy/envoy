@@ -15,10 +15,10 @@ export PATH
 RT_LIBRARY_PATH="$(dirname "$(find "$(llvm-config --libdir)" -name libclang_rt.ubsan_standalone_cxx-x86_64.a | head -1)")"
 
 echo "# Generated file, do not edit. If you want to disable clang, just delete this file.
-build:clang --action_env='PATH=${PATH}'
-build:clang --action_env=CC=clang
-build:clang --action_env=CXX=clang++
-build:clang --action_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
+build:clang --action_env='PATH=${PATH}' --host_action_env='PATH=${PATH}'
+build:clang --action_env=CC=clang --host_action_env=CC=clang
+build:clang --action_env=CXX=clang++ --host_action_env=CXX=clang++
+build:clang --action_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config' --host_action_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
 build:clang --repo_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
 build:clang --linkopt='-L$(llvm-config --libdir)'
 build:clang --linkopt='-Wl,-rpath,$(llvm-config --libdir)'
