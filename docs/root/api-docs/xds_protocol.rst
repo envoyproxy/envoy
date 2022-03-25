@@ -511,9 +511,8 @@ all resources of that type.
 
 Other Resource Types
 ^^^^^^^^^^^^^^^^^^^^
-In both SotW and incremental protocol variants, deletions are indicated
-implicitly by parent resources being changed to no longer refer to a child resource. For example,
-when the client receives an LDS update removing a :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
+In both SotW and incremental protocol variants, deletions are indicated implicitly by parent resources being
+changed to no longer refer to a child resource. For example, when the client receives an LDS update removing a :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 that was previously pointing to :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` A,
 if no other :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is pointing to :ref:`RouteConfiguration
 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` A, then the client may delete A. For those resource types,
