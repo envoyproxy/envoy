@@ -25,8 +25,8 @@ BENCHMARK(BM_ProtoEncoderNoEscape);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonSanitizerNoEscape(benchmark::State& state) {
-  Envoy::Json::JsonSanitizer sanitizer;
   std::string buffer;
+  Envoy::Json::JsonSanitizer sanitizer;
 
   for (auto _ : state) { // NOLINT
     sanitizer.sanitize(buffer, pass_through_encoding);

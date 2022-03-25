@@ -89,6 +89,18 @@ JsonSanitizer::JsonSanitizer() {
 }
 
 absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view str) const {
+  // Fast-path to see whether any escapes or utf-encoding are needed.
+  uint32_t size_total = 0;
+  for (uint32_t i = 0, n = str.size(); i < n; ++i) {
+    size_total += char_escapes_[char2uint32(str[i])].size_;
+  }
+  if (size_total == 0) {
+    return str;
+  }
+  return slowSanitize(buffer, str);
+}
+
+absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_view str) const {
   char hex_escape_buf[] = "\\u0000";
   static constexpr char hex_chars[] = "0123456789abcdef";
   size_t past_escape = absl::string_view::npos;
@@ -96,13 +108,13 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
   const uint8_t* data = first;
   absl::string_view escape_view;
   for (uint32_t n = str.size(); n != 0; ++data, --n) {
-    const Escape* escape = &char_escapes_[*data];
-    if (escape->size_ != Literal) {
+    const Escape& escape = char_escapes_[*data];
+    if (escape.size_ != Literal) {
       uint32_t start_of_escape = data - first;
-      switch (escape->size_) {
+      switch (escape.size_) {
         case ControlEscapeSize:
         case UnicodeEscapeSize:
-          escape_view = absl::string_view(escape->chars_, escape->size_);
+          escape_view = absl::string_view(escape.chars_, escape.size_);
           break;
         case Utf8DecodeSentinel: {
           auto [unicode, consumed] = decodeUtf8(data, n);
@@ -132,10 +144,10 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
             }
 
             /*            escape = &char_escapes_[unicode];
-            if (escape->size_ == Literal) {
+            if (escape.size_ == Literal) {
               continue; // Most code-points are not escaped.
             }
-            escape_view = absl::string_view(escape->chars_, escape->size_);
+            escape_view = absl::string_view(escape.chars_, escape.size_);
             */
           } else {
             hex_escape_buf[2] = '0';
