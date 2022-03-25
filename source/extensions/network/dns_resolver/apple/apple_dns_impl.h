@@ -16,6 +16,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
@@ -64,7 +65,10 @@ struct AppleDnsResolverStats {
  */
 class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  AppleDnsResolverImpl(Event::Dispatcher& dispatcher, Stats::Scope& root_scope);
+  AppleDnsResolverImpl(
+      const envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig&
+          proto_config,
+      Event::Dispatcher& dispatcher, Stats::Scope& root_scope);
 
   static AppleDnsResolverStats generateAppleDnsResolverStats(Stats::Scope& scope);
 
@@ -99,7 +103,7 @@ private:
     void finishResolve();
 
     // Wrappers for the API calls.
-    DNSServiceErrorType dnsServiceGetAddrInfo();
+    DNSServiceErrorType dnsServiceGetAddrInfo(bool include_unroutable_families);
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
@@ -138,6 +142,7 @@ private:
   BackOffStrategyPtr backoff_strategy_;
   Stats::ScopePtr scope_;
   AppleDnsResolverStats stats_;
+  bool include_unroutable_families_;
 };
 
 DECLARE_FACTORY(AppleDnsResolverFactory);
