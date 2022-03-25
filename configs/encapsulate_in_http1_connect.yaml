@@ -27,6 +27,25 @@ static_resources:
           cluster: "cluster_0"
           tunneling_config:
             hostname: host.com:443
+  - name: listener_1
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 10002
+    filter_chains:
+    - filters:
+      - name: tcp
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: "cluster_0"
+          tunneling_config:
+            hostname: 127.0.0.1:10003
+            headers_to_add:
+            - header:
+                key: to-original-dst
+                value: "true"
   clusters:
   - name: cluster_0
     connect_timeout: 5s

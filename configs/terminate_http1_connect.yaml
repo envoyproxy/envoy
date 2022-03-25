@@ -32,6 +32,19 @@ static_resources:
               - match:
                   connect_matcher:
                     {}
+                  headers:
+                    - name: to-original-dst
+                      string_match:
+                        exact: "true"
+                route:
+                  cluster: local_original_dst
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      {}
+              - match:
+                  connect_matcher:
+                    {}
                 route:
                   cluster: service_google
                   upgrade_configs:
@@ -59,3 +72,10 @@ static_resources:
               socket_address:
                 address: www.google.com
                 port_value: 443
+  - name: local_original_dst
+    connect_timeout: 0.25s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      use_http_header: true
+      use_http_authority: true
