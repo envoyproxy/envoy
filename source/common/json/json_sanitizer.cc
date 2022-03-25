@@ -1,6 +1,5 @@
 #include "source/common/json/json_sanitizer.h"
 
-#include <cstdio>
 #include <utility>
 
 #include "source/common/common/assert.h"
@@ -110,6 +109,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
 }
 
 absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_view str) const {
+  std::string hex_escape_buf;
   size_t past_escape = absl::string_view::npos;
   const uint8_t* first = reinterpret_cast<const uint8_t*>(str.data());
   const uint8_t* data = first;
@@ -117,7 +117,6 @@ absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_
   for (uint32_t n = str.size(); n != 0; ++data, --n) {
     const Escape& escape = char_escapes_[*data];
     if (escape.size_ != Literal) {
-      char hex_escape_buf[8];
       uint32_t start_of_escape = data - first;
       switch (escape.size_) {
       case ControlEscapeSize:
@@ -143,8 +142,13 @@ absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_
           }
           escape_view = absl::string_view(iter->second.chars_, iter->second.size_);
         } else {
-          snprintf(hex_escape_buf, sizeof(hex_escape_buf), "\\x%02x", *data);
-          escape_view = absl::string_view(hex_escape_buf, 4);
+          // Using StrFormat during decode seems slow. It would be faster to
+          // just decode each nybble by hand. The APIs in
+          // source/common/common/hex.h are a good starting point though those
+          // also construct an intermediate string. It would be faster to have
+          // versions of those that filled in a fixed-size buffer.
+          hex_escape_buf = absl::StrFormat("\\x%02x", *data);
+          escape_view = absl::string_view(hex_escape_buf);
         }
         break;
       }
