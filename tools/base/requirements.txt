@@ -822,9 +822,7 @@ sphinxext-rediraffe==0.2.7 \
     #   envoy-docs-sphinx-runner
 thrift==0.15.0 \
     --hash=sha256:87c8205a71cf8bbb111cb99b1f7495070fbc9cabb671669568854210da5b3e29
-    # via
-    #   -r requirements.in
-    #   twitter-common-rpc
+    # via -r requirements.in
 tomli==1.2.1 \
     --hash=sha256:8dd0e9524d6f386271a36b41dbf6c57d8e32fd96fd22b6584679dc569d20899f \
     --hash=sha256:a5b75cb6f3968abb47af1b40c1819dc519ea82bcc065776a866e8d74c5ca9442
@@ -837,17 +835,6 @@ trycast==0.3.0 \
     # via
     #   aio-core
     #   envoy-base-utils
-twitter-common-finagle-thrift==0.3.9 \
-    --hash=sha256:1e3a57d11f94f58745e6b83348ecd4fa74194618704f45444a15bc391fde497a
-    # via
-    #   -r requirements.in
-    #   twitter-common-rpc
-twitter-common-lang==0.3.9 \
-    --hash=sha256:56d1d266fd4767941d11c27061a57bc1266a3342e551bde3780f9e9eb5ad0ed1
-    # via twitter-common-rpc
-twitter-common-rpc==0.3.9 \
-    --hash=sha256:0792b63fb2fb32d970c2e9a409d3d00633190a22eb185145fe3d9067fdaa4514
-    # via -r requirements.in
 types-orjson==3.6.2 \
     --hash=sha256:22ee9a79236b6b0bfb35a0684eded62ad930a88a56797fa3c449b026cf7dbfe4 \
     --hash=sha256:cf9afcc79a86325c7aff251790338109ed6f6b1bab09d2d4262dd18c85a3c638
