@@ -952,6 +952,8 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   bool reject_duplicated_v4_mapped_addr = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.reject_duplicated_ipv4_mapped_address_and_ipv4_address");
+  // If the address's `ipv4_compat` is `true` and it isn't any address, then convert it to the IPv4
+  // address. Then we compare the IPv4-mapped IPv6 address with IPv4 address.
   auto this_address =
       reject_duplicated_v4_mapped_addr && address_->type() == Network::Address::Type::Ip &&
               config_.address().socket_address().ipv4_compat() && !address_->ip()->isAnyAddress()
