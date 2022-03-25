@@ -21,6 +21,7 @@ Minor Behavior Changes
 * dynamic_forward_proxy: if a DNS resolution fails, failing immediately with a specific resolution error, rather than finishing up all local filters and failing to select an upstream host.
 * ecds: changed to use ``http_filter`` stat prefix as the metrics root for ECDS subscriptions. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.top_level_ecds_stats`` to false.
 * ext_authz: added requested server name in ext_authz network filter for auth review.
+* ext_authz: forward :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by :ref:`typed_metadata_context_namespaces <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` to external auth service.
 * file: changed disk based files to truncate files which are not being appended to. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.append_or_truncate`` to false.
 * grpc: flip runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to be default enabled. async grpc client created through getOrCreateRawAsyncClient will be cached by default.
 * health_checker: exposing `initial_metadata` to GrpcHealthCheck in a way similar to `request_headers_to_add` of HttpHealthCheck.
@@ -30,6 +31,7 @@ Minor Behavior Changes
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
 * http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * listener: the :ref:`ipv4_compat <envoy_api_field_core.SocketAddress.ipv4_compat>` flag can only be set on Ipv6 address and Ipv4-mapped Ipv6 address. A runtime guard is added ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and the default is true.
+* network: add a new ConnectionEvent ``ConnectedZeroRtt`` which may be raised by QUIC connections to allow early data to be sent before the handshake finishes. This event is ignored at callsites which is only reachable for TCP connections in the Envoy core code. Any extensions which depend on ConnectionEvent enum value should audit their usage of it to make sure this new event is handled appropriately.
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 * ratelimit: the :ref:`header_value_match <envoy_v3_api_msg_config.route.v3.ratelimit.action.HeaderValueMatch>` support custom descriptor_key.
 * router: record upstream request timeouts for all the cases and not just for those requests which are awaiting headers. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` to false.
@@ -48,6 +50,7 @@ Bug Fixes
 * data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
 * data plane: fixing error handling where writing to a socket failed while under the stack of processing. This should genreally affect HTTP/3. This behavioral change can be reverted by setting ``envoy.reloadable_features.allow_upstream_inline_write`` to false.
 * eds: fix the eds cluster update by allowing update on the locality of the cluster endpoints. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` to false.
+* http: fixed a bug where %RESPONSE_CODE_DETAILS% was not set correctly in :ref:`request_headers_to_add <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add>`.
 * jwt_authn: fixed a bug where a JWT with empty "iss" is passed even the field :ref:`issuer <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.issuer>` is specified. If the "issuer" field is specified, "iss" in the JWT should match it.
 * jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
 * router: fixed mirror policy :ref:`runtime_fraction <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.runtime_fraction>` to
@@ -62,6 +65,7 @@ Bug Fixes
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
 * xray: fix the AWS X-Ray tracer extension to annotate a child span with ``type=subsegment`` to correctly relate subsegments to a parent segment. Previously a subsegment would be treated as an independent segment.
 * xray: fix the AWS X-Ray tracer extension to reuse the trace ID already present in the header ``x-amzn-trace-id`` instead of creating a new one.
+* xray: fix the AWS X-Ray tracer extension to set the HTTP X-Forwarded-For header value as client_ip in the segment data.
 
 Removed Config or Runtime
 -------------------------
@@ -89,6 +93,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* access_log: added TCP proxy upstream and downstream byte logging. This can be accessed through the ``%DOWNSTREAM_WIRE_BYTES_SENT%``, ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``, ``%UPSTREAM_WIRE_BYTES_SENT%``, and ``%UPSTREAM_WIRE_BYTES_RECEIVED%`` access_log command operatrors.
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * admin: :http:post:`/logging` now accepts ``/logging?paths=name1:level1,name2:level2,...`` to change multiple log levels at once.
 * cluster: added support for per host limits in :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>`. Currently only  :ref:`max_connections <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connections>` is supported.
@@ -103,6 +108,7 @@ New Features
   to the DNS cache implementation to configure the minimum DNS refresh rate, regardless of returned
   TTL. This was previously hard coded to 5s and defaults to 5s if unset.
 * http: added random_value_specifier in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow random value to be specified from configuration proto.
+* http: added request_mirror_policies to higher levels (i.e., :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies>` in :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` and  :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.VirtualHost.request_mirror_policies>` in :ref:`VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`) which applies to :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` in all routes underneath without configured mirror policies.
 * http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring `Proxy-Status <https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08>`_ HTTP response header fields.
 * http: make consistent custom header format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * http2: re-enabled the HTTP/2 wrapper API. This should be a transparent change that does not affect functionality. Any behavior changes can be reverted by setting the ``envoy.reloadable_features.http2_new_codec_wrapper`` runtime feature to false.
@@ -143,3 +149,4 @@ Deprecated
 * http: deprecated ``envoy.http.headermap.lazy_map_min_size``.  If you are using this config knob you can revert this temporarily by setting ``envoy.reloadable_features.deprecate_global_ints`` to true but you MUST file an upstream issue to ensure this feature remains available.
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
 * re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.
+* thrift: deprecated TTwitter protocol since we believe it's not used and it's causing significant maintenance burden.

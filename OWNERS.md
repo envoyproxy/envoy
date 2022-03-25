@@ -29,8 +29,6 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
-  * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
@@ -49,6 +47,8 @@ routing PRs, questions, etc. to the right place.
   * Data plane, overload management, flow control.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
   * Performance, Dubbo.
+* Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
+  * Bazel, CI, compilers, linkers, general build issues, etc.
 
 
 # Senior extension maintainers
@@ -100,6 +100,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 * Jose Nino ([junr03](https://github.com/junr03)) (recruiting@junr03.com)
+* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
 
 # Friends of Envoy
 

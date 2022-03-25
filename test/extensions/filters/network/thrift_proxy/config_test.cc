@@ -40,7 +40,8 @@ std::vector<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType>
 getProtocolTypes() {
   std::vector<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType> v;
   int protocol = envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_MIN;
-  while (protocol <= envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_MAX) {
+  // Note: ProtocolType_MAX is TTwitter, which is deprecated.
+  while (protocol < envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_MAX) {
     v.push_back(
         static_cast<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType>(protocol));
     protocol++;

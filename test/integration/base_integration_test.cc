@@ -274,6 +274,30 @@ void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
   }
 }
 
+absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
+    const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
+    std::chrono::milliseconds connection_wait_timeout) {
+  AssertionResult result = AssertionFailure();
+  int upstream_index = 0;
+  Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
+  // Loop over the upstreams until the call times out or an upstream request is
+  // received.
+  while (!result) {
+    upstream_index = upstream_index % upstream_indices.size();
+    result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
+        fake_upstream_connection, std::chrono::milliseconds(5));
+    if (result) {
+      return upstream_index;
+    } else if (!bound.withinBound()) {
+      RELEASE_ASSERT(0, "Timed out waiting for new connection.");
+      break;
+    }
+    ++upstream_index;
+  }
+  RELEASE_ASSERT(result, result.message());
+  return {};
+}
+
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,

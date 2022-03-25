@@ -5,6 +5,8 @@ on:
 jobs:
   CodeQL-Build:
 
+    permissions:
+      security-events: write  # for github/codeql-action/analyze to upload SARIF results
     strategy:
       fail-fast: false
 
