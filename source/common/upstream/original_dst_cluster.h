@@ -50,7 +50,9 @@ public:
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
     LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
-        : parent_(parent), host_map_(parent->getCurrentHostMap()) {}
+        : parent_(parent), original_host_provider_(createFromLbConfig(
+                               parent_->info()->stats(), parent_->info()->lbOriginalDstConfig())),
+          host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -69,9 +71,26 @@ public:
     }
 
   private:
-    Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
+    class OriginalHostProvider {
+    public:
+      OriginalHostProvider(ClusterStats& stats, const Http::LowerCaseString& header_name)
+          : stats_(stats), header_name_(header_name) {}
+
+      Network::Address::InstanceConstSharedPtr
+      getOriginalHost(const Http::RequestHeaderMap* headers) const;
+
+    private:
+      ClusterStats& stats_;
+      const Http::LowerCaseString& header_name_;
+    };
+
+    static std::unique_ptr<OriginalHostProvider> createFromLbConfig(
+        ClusterStats& stats,
+        const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& config);
 
     const std::shared_ptr<OriginalDstCluster> parent_;
+    // The optional original host provider that extracts the address from HTTP header map.
+    std::unique_ptr<OriginalHostProvider> original_host_provider_;
     HostMapConstSharedPtr host_map_;
   };
 
@@ -117,7 +136,6 @@ private:
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds cleanup_interval_ms_;
   Event::TimerPtr cleanup_timer_;
-  const bool use_http_header_;
 
   absl::Mutex host_map_lock_;
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);

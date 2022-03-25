@@ -23,10 +23,11 @@ namespace Upstream {
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     // Check if override host header is present, if yes use it otherwise check local address.
-    Network::Address::InstanceConstSharedPtr dst_host = nullptr;
-    if (parent_->use_http_header_) {
-      dst_host = requestOverrideHost(context);
-    }
+    Network::Address::InstanceConstSharedPtr dst_host =
+        original_host_provider_ == nullptr
+            ? nullptr
+            : original_host_provider_->getOriginalHost(context->downstreamHeaders());
+
     if (dst_host == nullptr) {
       const Network::Connection* connection = context->downstreamConnection();
       // The local address of the downstream connection is the original destination address,
@@ -81,12 +82,12 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 }
 
 Network::Address::InstanceConstSharedPtr
-OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
+OriginalDstCluster::LoadBalancer::OriginalHostProvider::getOriginalHost(
+    const Http::RequestHeaderMap* headers) const {
   Network::Address::InstanceConstSharedPtr request_host;
-  const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   Http::HeaderMap::GetResult override_header;
-  if (downstream_headers) {
-    override_header = downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost);
+  if (headers) {
+    override_header = headers->get(header_name_);
   }
   if (!override_header.empty()) {
     // This is an implicitly untrusted header, so per the API documentation only the first
@@ -99,10 +100,25 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
     } else {
       ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
                 request_override_host);
-      parent_->info()->stats().original_dst_host_invalid_.inc();
+      stats_.original_dst_host_invalid_.inc();
     }
   }
   return request_host;
+}
+
+std::unique_ptr<OriginalDstCluster::LoadBalancer::OriginalHostProvider>
+OriginalDstCluster::LoadBalancer::createFromLbConfig(
+    ClusterStats& stats,
+    const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& config) {
+  if (!config.has_value()) {
+    return nullptr;
+  }
+  if (!config->use_http_header()) {
+    return nullptr;
+  }
+  return std::make_unique<OriginalDstCluster::LoadBalancer::OriginalHostProvider>(
+      stats, config->has_use_http_authority() ? Http::Headers::get().Host
+                                              : Http::Headers::get().EnvoyOriginalDstHost);
 }
 
 OriginalDstCluster::OriginalDstCluster(
@@ -115,9 +131,6 @@ OriginalDstCluster::OriginalDstCluster(
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
-      use_http_header_(info_->lbOriginalDstConfig()
-                           ? info_->lbOriginalDstConfig().value().use_http_header()
-                           : false),
       host_map_(std::make_shared<HostMap>()) {
   if (config.has_load_assignment()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
