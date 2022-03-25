@@ -194,16 +194,20 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
       // SEQUENCE
       0x30,
       7,
-      // invalid version
+      // invalid version 1
       0xa0,
       0x02,
       1,
+      0,
+      // Responder ID tag 1
       1,
+      1,
+      0,
   };
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
   EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseData(cbs), EnvoyException,
-                            "OCSP ResponseData version is not supported");
+                            "OCSP ResponseData version 1 is not supported");
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
@@ -214,7 +218,7 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
       // version
       0xa0,
       0x02,
-      1,
+      0,
       0,
       // Invalid Responder ID tag 3
       3,
