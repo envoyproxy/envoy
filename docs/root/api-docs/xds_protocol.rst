@@ -498,19 +498,20 @@ twice. Clients should NACK responses that contain multiple instances of the same
 Deleting Resources
 ^^^^^^^^^^^^^^^^^^
 
+Wildcard Resource Types
+^^^^^^^^^^^^^^^^^^^^^^^
 In the incremental protocol variants, the server signals the client that a resource should be
 deleted via the :ref:`removed_resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
-field of the response for wildcard resource types like
-:ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`.
-This tells the client to remove the resource from its local cache.
+field of the response. This tells the client to remove the resource from its local cache.
 
-In the SotW protocol variants, the criteria for deleting resources is more complex. For wildcard resource types like
-:ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
-if a previously seen resource is not present in a new response, that indicates that the resource
+In the SotW protocol variants, the criteria for deleting is more complex. If a previously seen resource
+is not present in a new response, that indicates that the resource
 has been removed, and the client must delete it; a response containing no resources means to delete
 all resources of that type. 
 
-For other resource types, in both SotW and incremental protocol variants, deletions are indicated
+Other Resource Types
+^^^^^^^^^^^^^^^^^^^^
+In both SotW and incremental protocol variants, deletions are indicated
 implicitly by parent resources being changed to no longer refer to a child resource. For example,
 when the client receives an LDS update removing a :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 that was previously pointing to :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` A,
