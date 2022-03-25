@@ -54,19 +54,6 @@ Example of the default Envoy access log format:
   [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
   "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
 
-For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`, :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`
-is used to record stats. Recommended access log format for UDP proxy:
-
-.. code-block:: none
-
-  [%START_TIME%] %DYNAMIC_METADATA(udp.proxy:cluster_name)%
-  %DYNAMIC_METADATA(udp.proxy:bytes_sent)%
-  %DYNAMIC_METADATA(udp.proxy:bytes_received)%
-  %DYNAMIC_METADATA(udp.proxy:errors_sent)%
-  %DYNAMIC_METADATA(udp.proxy:errors_received)%
-  %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
-  %DYNAMIC_METADATA(udp.proxy:datagrams_received)%\n
-
 .. _config_access_log_format_dictionaries:
 
 Format Dictionaries
@@ -643,6 +630,18 @@ The following command operators are supported:
     * ``errors_received``: Number of errors that have occurred When receiving datagrams from the upstream in UDP proxy.
     * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
     * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
+
+    Recommended access log format for UDP proxy:
+
+    .. code-block:: none
+
+      [%START_TIME%] %DYNAMIC_METADATA(udp.proxy:cluster_name)%
+      %DYNAMIC_METADATA(udp.proxy:bytes_sent)%
+      %DYNAMIC_METADATA(udp.proxy:bytes_received)%
+      %DYNAMIC_METADATA(udp.proxy:errors_sent)%
+      %DYNAMIC_METADATA(udp.proxy:errors_received)%
+      %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
+      %DYNAMIC_METADATA(udp.proxy:datagrams_received)%\n
 
   .. note::
 
