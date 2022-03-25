@@ -90,7 +90,10 @@ public:
   MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
-  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
+  MOCK_METHOD(void, setPeerConnection, (const Network::Connection*), ());                          \
+  MOCK_METHOD(void, clearPeerConnection, ());                                                      \
+  MOCK_METHOD(Network::Connection*, getPeerConnection, ());
 
 class MockConnection : public Connection, public MockConnectionBase {
 public:

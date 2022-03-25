@@ -1456,6 +1456,12 @@ void ClientConnectionImpl::onBelowLowWatermark() {
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
 }
+void RequestEncoderImpl::setDownstream(const Network::Connection* downstream_conn) {
+  if (downstream_conn != nullptr) {
+    connection_.connection().setPeerConnection(downstream_conn);
+    const_cast<Network::Connection*>(downstream_conn)->setPeerConnection(&connection_.connection());
+  }
+}
 
 } // namespace Http1
 } // namespace Http

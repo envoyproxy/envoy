@@ -1371,6 +1371,11 @@ public:
    * Get the bytes meter for this stream.
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
+
+  /**
+   * Set the related downstream connection for upstream
+   */
+  virtual void setDownstream() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

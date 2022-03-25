@@ -109,6 +109,15 @@ void TcpUpstream::onBelowWriteBufferLowWatermark() {
   }
 }
 
+void TcpUpstream::setDownstream() {
+  if (upstream_request_) {
+    auto* downstream_conn = &(upstream_request_->connection());
+    upstream_conn_data_->connection().setPeerConnection(downstream_conn);
+    const_cast<Network::Connection*>(downstream_conn)
+        ->setPeerConnection(&(upstream_conn_data_->connection()));
+  }
+}
+
 } // namespace Tcp
 } // namespace Http
 } // namespace Upstreams

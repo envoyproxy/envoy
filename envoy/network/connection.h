@@ -351,6 +351,10 @@ public:
    * return value is cwnd(in packets) times the connection's MSS.
    */
   virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+
+  virtual void setPeerConnection(const Connection* peer_connection) PURE;
+  virtual void clearPeerConnection() PURE;
+  virtual const Connection* getPeerConnection() PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

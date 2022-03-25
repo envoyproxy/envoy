@@ -453,6 +453,7 @@ protected:
       encodeTrailersBase(trailers);
     }
     void enableTcpTunneling() override {}
+    void setDownstream(const Network::Connection*) override{};
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;

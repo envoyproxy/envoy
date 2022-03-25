@@ -46,7 +46,9 @@ public:
 
   // Network::ClientConnection
   void connect() override;
-
+  void setPeerConnection(const Connection*) override{};
+  void clearPeerConnection() override{};
+  const Connection* getPeerConnection() override { return {}; };
   // Methods which defer action until the final connection has been determined.
   void addWriteFilter(WriteFilterSharedPtr filter) override;
   void addFilter(FilterSharedPtr filter) override;

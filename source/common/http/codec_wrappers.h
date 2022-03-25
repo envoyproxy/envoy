@@ -104,6 +104,10 @@ public:
     return inner_.http1StreamEncoderOptions();
   }
 
+  void setDownstream(const Network::Connection* downstream_conn) override {
+    inner_.setDownstream(downstream_conn);
+  }
+
 protected:
   RequestEncoderWrapper(RequestEncoder& inner) : inner_(inner) {}
 

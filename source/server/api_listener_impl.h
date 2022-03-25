@@ -168,6 +168,9 @@ protected:
       absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
+      void setPeerConnection(const Network::Connection*) override {}
+      void clearPeerConnection() override {}
+      const Connection* getPeerConnection() override { return {}; };
 
       SyntheticReadCallbacks& parent_;
       Network::ConnectionInfoSetterSharedPtr connection_info_provider_;

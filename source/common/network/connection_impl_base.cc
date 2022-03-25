@@ -73,5 +73,9 @@ void ConnectionImplBase::onDelayedCloseTimeout() {
   closeConnectionImmediately();
 }
 
+void ConnectionImplBase::setPeerConnection(const Network::Connection* peer_connection) {
+  peer_connection_ = peer_connection;
+}
+
 } // namespace Network
 } // namespace Envoy

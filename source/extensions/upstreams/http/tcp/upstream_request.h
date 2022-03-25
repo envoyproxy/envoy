@@ -78,6 +78,7 @@ public:
   void readDisable(bool disable) override;
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
+  void setDownstream() override;
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;

@@ -177,6 +177,7 @@ public:
   Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
   void enableTcpTunneling() override { is_tcp_tunneling_ = true; }
+  void setDownstream(const Network::Connection* downstream_conn) override;
 
 private:
   bool upgrade_request_{};

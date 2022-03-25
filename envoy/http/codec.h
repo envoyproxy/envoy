@@ -131,6 +131,8 @@ public:
    * Enable TCP Tunneling.
    */
   virtual void enableTcpTunneling() PURE;
+
+  virtual void setDownstream(const Network::Connection* downstream_conn) PURE;
 };
 
 /**

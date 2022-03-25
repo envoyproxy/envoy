@@ -107,6 +107,10 @@ public:
     return request_encoder_->getStream().bytesMeter();
   }
 
+  void setDownstream() override {
+    request_encoder_->setDownstream(&upstream_request_.connection());
+  }
+
 private:
   Router::UpstreamToDownstream& upstream_request_;
   Envoy::Http::RequestEncoder* request_encoder_{};

@@ -111,6 +111,11 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
+  if (peer_connection_ != nullptr) {
+    ENVOY_CONN_LOG(debug, "reset peer connection", *this);
+    const_cast<Connection*>(peer_connection_)->clearPeerConnection();
+    peer_connection_ = nullptr;
+  }
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {

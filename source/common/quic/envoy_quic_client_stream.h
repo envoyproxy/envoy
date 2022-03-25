@@ -31,6 +31,9 @@ public:
   Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const Http::RequestTrailerMap& trailers) override;
   void enableTcpTunneling() override {}
+  void setDownstream(const Network::Connection* downstream_conn) override {
+    downstream_conn_ = downstream_conn;
+  }
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
@@ -77,6 +80,8 @@ private:
   Http::ResponseDecoder* response_decoder_{nullptr};
 
   bool decoded_1xx_{false};
+
+  const Network::Connection* downstream_conn_;
 };
 
 } // namespace Quic

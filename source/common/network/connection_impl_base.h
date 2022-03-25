@@ -28,6 +28,9 @@ public:
   void hashKey(std::vector<uint8_t>& hash) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
+  void setPeerConnection(const Connection* peer_connection) override;
+  void clearPeerConnection() override { peer_connection_ = nullptr; };
+  const Connection* getPeerConnection() override { return peer_connection_; };
 
 protected:
   void initializeDelayedCloseTimer();
@@ -59,6 +62,7 @@ protected:
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::unique_ptr<ConnectionStats> connection_stats_;
+  const Connection* peer_connection_{nullptr};
 
 private:
   // Callback issued when a delayed close timeout triggers.
