@@ -20,6 +20,7 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
       runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
+
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
@@ -27,6 +28,31 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
     }
     descriptors_.push_back(new_descriptor);
   }
+}
+
+std::vector<RateLimit::Descriptor>
+Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
+                                   StreamInfo::StreamInfo& stream_info) {
+
+  std::vector<RateLimit::Descriptor> dynamicDescriptors = std::vector<RateLimit::Descriptor>();
+  for (const RateLimit::Descriptor& descriptor : original_descriptors) {
+    RateLimit::Descriptor new_descriptor;
+    for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
+      std::string value = descriptorEntry.value_;
+      value = formatValue(value, stream_info);
+      new_descriptor.entries_.push_back({descriptorEntry.key_, value});
+    }
+    dynamicDescriptors.push_back(new_descriptor);
+  }
+  return dynamicDescriptors;
+}
+
+std::string Config::formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info) {
+
+  Formatter::FormatterImpl formatter(descriptor_value);
+  std::string value = formatter.format(*request_headers_.get(), *response_headers_.get(),
+                                       *response_trailers_.get(), stream_info, descriptor_value);
+  return value;
 }
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {

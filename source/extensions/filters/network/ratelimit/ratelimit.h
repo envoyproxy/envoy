@@ -23,6 +23,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
+static Http::RequestHeaderMapPtr request_headers_ = Http::RequestHeaderMapImpl::create();
+static Http::ResponseHeaderMapPtr response_headers_ = Http::ResponseHeaderMapImpl::create();
+static Http::ResponseTrailerMapPtr response_trailers_ = Http::ResponseTrailerMapImpl::create();
+
 /**
  * All tcp rate limit stats. @see stats_macros.h
  */
@@ -54,6 +58,11 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
+  Formatter::FormatterImpl substitutionFormatter() { return Formatter::FormatterImpl(""); }
+  std::vector<RateLimit::Descriptor>
+  applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
+                             StreamInfo::StreamInfo& stream_info);
+  std::string formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info);
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
@@ -85,36 +94,8 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
-    applySubstitutionFormatter(config_->descriptors(),
-                               filter_callbacks_->connection().streamInfo());
-  }
-
-  void applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
-                                  StreamInfo::StreamInfo& stream_info) {
-
-    std::vector<RateLimit::Descriptor> dynamicDescriptors = std::vector<RateLimit::Descriptor>();
-    for (const RateLimit::Descriptor& descriptor : original_descriptors) {
-      RateLimit::Descriptor new_descriptor;
-      for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
-        std::string value = descriptorEntry.value_;
-        value = formatValue(value, stream_info);
-        new_descriptor.entries_.push_back({descriptorEntry.key_, value});
-      }
-      dynamicDescriptors.push_back(new_descriptor);
-    }
-    filter_descriptors_ = dynamicDescriptors;
-  }
-
-  std::string formatValue(std::string body, StreamInfo::StreamInfo& stream_info) {
-    Http::RequestHeaderMapPtr request_headers = Http::RequestHeaderMapImpl::create();
-    Http::ResponseHeaderMapPtr response_headers = Http::ResponseHeaderMapImpl::create();
-    Http::ResponseTrailerMapPtr response_trailers = Http::ResponseTrailerMapImpl::create();
-
-    Formatter::FormatterImpl formatter(body);
-
-    std::string value = formatter.format(*request_headers.get(), *response_headers.get(),
-                                         *response_trailers.get(), stream_info, body);
-    return value;
+    filter_descriptors_ = config_->applySubstitutionFormatter(
+        config_->descriptors(), filter_callbacks_->connection().streamInfo());
   }
 
   // Network::ConnectionCallbacks
