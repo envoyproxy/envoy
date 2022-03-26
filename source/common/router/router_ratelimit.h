@@ -98,7 +98,7 @@ public:
 
 private:
   const uint32_t prefix_len_;
-  static const uint32_t MAX_PREFIX_LEN;
+  static const uint32_t MAX_PREFIX_LEN = 32;
 };
 
 /**
