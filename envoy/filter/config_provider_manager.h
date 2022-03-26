@@ -52,6 +52,11 @@ public:
   virtual FilterConfigProviderPtr<FactoryCb>
   createStaticFilterConfigProvider(const FactoryCb& config,
                                    const std::string& filter_config_name) PURE;
+
+  /**
+   * Get the stat prefix for the scope of the filter provider manager.
+   */
+  virtual absl::string_view statPrefix() const PURE;
 };
 
 } // namespace Filter

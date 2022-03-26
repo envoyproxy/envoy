@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
@@ -124,8 +125,25 @@ message DownstreamTlsContext {
   OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
 }
 
+// TLS key log configuration.
+// The key log file format is "format used by NSS for its SSLKEYLOGFILE debugging output" (text taken from openssl man page)
+message TlsKeyLog {
+  // The path to save the TLS key log.
+  string path = 1 [(validate.rules).string = {min_len: 1}];
+
+  // At least one of src or dst must be specified, or the config will be rejected as invalid.
+
+  // The local IP address that will be used to filter the connection which should save the TLS key log
+  // If it is not set, any local IP address  will be matched.
+  repeated config.core.v3.CidrRange local_address_range = 2;
+
+  // The remote IP address that will be used to filter the connection which should save the TLS key log
+  // If it is not set, any remote IP address will be matched.
+  repeated config.core.v3.CidrRange remote_address_range = 3;
+}
+
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -299,4 +317,7 @@ message CommonTlsContext {
   // Custom TLS handshaker. If empty, defaults to native TLS handshaking
   // behavior.
   config.core.v3.TypedExtensionConfig custom_handshaker = 13;
+
+  // TLS key log configuration
+  TlsKeyLog key_log = 15;
 }

@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//source/extensions/key_value/file_based:config_lib",
+        "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

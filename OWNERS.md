@@ -29,10 +29,6 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
-* Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
-  * Outlier detection, HTTP routing, xDS, configuration/operational questions.
-* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
-  * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
@@ -49,6 +45,10 @@ routing PRs, questions, etc. to the right place.
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Performance, Dubbo.
+* Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
+  * Bazel, CI, compilers, linkers, general build issues, etc.
 
 
 # Senior extension maintainers
@@ -63,6 +63,8 @@ without further review.
   * Thrift
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Dubbo
 
 # Envoy security team
 
@@ -83,6 +85,11 @@ contributors to envoy-setec and relevant Slack channels from:
   * Adam Meily ([ameily](https://github.com/ameily))
   * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
   * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
+* [X41 D-Sec](https://x41-dsec.de/) expiring 12/31/2022. Triage and fixes for OSS-Fuzz bugs.
+  * Markus Vervier ([markusx41](https://github.com/markusx41))
+  * Eric Sesterhenn ([ericsesterhennx41](https://github.com/ericsesterhennx41))
+  * Ralf Weinmann ([rpw-x41](https://github.com/rpw-x41))
+  * Dr. Andre Vehreschild ([vehre-x41](https://github.com/vehre-x41))
 
 # Emeritus maintainers
 
@@ -92,6 +99,8 @@ contributors to envoy-setec and relevant Slack channels from:
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 * Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
+* Jose Nino ([junr03](https://github.com/junr03)) (recruiting@junr03.com)
+* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
 
 # Friends of Envoy
 
