@@ -489,6 +489,7 @@ void UpstreamRequest::onPoolReady(
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
+    // The injectContext() of the parent span may be called repeatedly when the request is retried.
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders());
   }
 
