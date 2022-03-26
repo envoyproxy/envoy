@@ -13,6 +13,7 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/types/optional.h"
 
@@ -86,11 +87,18 @@ private:
  */
 class RemoteAddressAction : public RateLimit::DescriptorProducer {
 public:
+  RemoteAddressAction(const envoy::config::route::v3::RateLimit::Action::RemoteAddress& action)
+      : prefix_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, prefix_len, MAX_PREFIX_LEN)) {}
+
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const uint32_t prefix_len_;
+  static const uint32_t MAX_PREFIX_LEN;
 };
 
 /**

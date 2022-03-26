@@ -109,7 +109,15 @@ bool RemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
     return false;
   }
 
-  descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
+  if (prefix_len_ == RemoteAddressAction::MAX_PREFIX_LEN) {
+    descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
+    return true;
+  }
+
+  Network::Address::CidrRange cidr_entry =
+      Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), prefix_len_);
+  descriptor_entry = {"remote_address", cidr_entry.asString()};
+
   return true;
 }
 
@@ -195,7 +203,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRemoteAddress:
-      actions_.emplace_back(new RemoteAddressAction());
+      actions_.emplace_back(new RemoteAddressAction(action.remote_address()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kGenericKey:
       actions_.emplace_back(new GenericKeyAction(action.generic_key()));

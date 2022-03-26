@@ -1772,6 +1772,9 @@ message RateLimit {
     message RemoteAddress {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
+
+      // Length of prefix, e.g. 0, 32. Defaults to 32 when unset.
+      google.protobuf.UInt32Value prefix_len = 1 [(validate.rules).uint32 = {lte: 128}];
     }
 
     // The following descriptor entry is appended to the descriptor:
