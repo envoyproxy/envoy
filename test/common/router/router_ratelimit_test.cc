@@ -340,6 +340,24 @@ actions:
               testing::ContainerEq(local_descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, RemoteAddressWithPrefixLen) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address:
+    prefix_len: 16
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.0/16"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"remote_address", "10.0.0.0/16"}}}}),
+      testing::ContainerEq(local_descriptors_));
+}
+
 // Verify no descriptor is emitted if remote is a pipe.
 TEST_F(RateLimitPolicyEntryTest, PipeAddress) {
   const std::string yaml = R"EOF(
