@@ -6,6 +6,7 @@
 namespace {
 // This value found by iterating in stats_handler_speed_test.cc, maximizing the
 // performance of the Json tests, and then rounding to a power of 2.
+//constexpr int64_t JsonStatsFlushCount = 64; // protobuf size() functions return signed results.
 constexpr uint64_t JsonStatsFlushCount = 64;
 } // namespace
 namespace Envoy {
@@ -146,6 +147,7 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
 // Since histograms are buffered (see above), the finalize() method generates
 // all of them.
 void StatsJsonRender::finalize(Buffer::Instance& response) {
+  //if (stats_array_.values_size() > 0) {
   if (!stats_array_.empty()) {
     flushStats(response);
   }
@@ -191,6 +193,7 @@ void StatsJsonRender::addScalar(Buffer::Instance& response, const std::string& n
 
 // Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
 void StatsJsonRender::addJson(Buffer::Instance& response, ProtobufWkt::Value json) {
+  //*stats_array_.add_values() = json;
   stats_array_.push_back(json);
 
   // We build up stats_array to a certain size so we can amortize the overhead
@@ -199,15 +202,19 @@ void StatsJsonRender::addJson(Buffer::Instance& response, ProtobufWkt::Value jso
   // cache. The optimum threshold found after a few experiments on a local
   // host appears to be between 50 and 100.
   if (stats_array_.size() >= JsonStatsFlushCount) {
+    //if (stats_array_.values_size() >= JsonStatsFlushCount) {
     flushStats(response);
   }
 }
 
 // Flushes all stats that were buffered in addJson() above.
 void StatsJsonRender::flushStats(Buffer::Instance& response) {
+  //ASSERT(stats_array_.values_size() > 0);
   ASSERT(!stats_array_.empty());
   const std::string json_array = MessageUtil::getJsonStringFromMessageOrDie(
       ValueUtil::listValue(stats_array_), false /* pretty */, true);
+  //stats_array_, false /* pretty */, true);
+  //stats_array_.clear_values();
   stats_array_.clear();
 
   // We are going to wind up with multiple flushes which have to serialize as
@@ -262,7 +269,8 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
   ProtoMap& computed_quantile_fields = *computed_quantile.mutable_fields();
   computed_quantile_fields["name"] = ValueUtil::stringValue(name);
 
-  std::vector<ProtobufWkt::Value> computed_quantile_value_array;
+  ProtobufWkt::ListValue* computed_quantile_value_array =
+      computed_quantile_fields["values"].mutable_list_value();
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
   const std::vector<double>& cumulative_quantiles =
@@ -282,9 +290,9 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
     computed_quantile_value_fields["cumulative"] =
         std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
 
-    computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
+    *computed_quantile_value_array->add_values() = ValueUtil::structValue(computed_quantile_value);
   }
-  computed_quantile_fields["values"] = ValueUtil::listValue(computed_quantile_value_array);
+  //computed_quantile_fields["values"] = ValueUtil::listValue(computed_quantile_value_array);
   //*supported_quantile_array->add_values() = ValueUtil::numberValue(quantile * 100);
   *histogram_array_->add_values() = ValueUtil::structValue(computed_quantile);
 }
