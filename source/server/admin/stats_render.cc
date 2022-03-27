@@ -198,7 +198,7 @@ void StatsJsonRender::addScalar(Buffer::Instance& response, const std::string& n
 }
 
 // Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
-void StatsJsonRender::addJson(Buffer::Instance& response, ProtobufWkt::Value json) {
+void StatsJsonRender::addJson(Buffer::Instance& response, const ProtobufWkt::Value& json) {
 #if STATS_ARRAY_LIST_VALUE
   *stats_array_.add_values() = json;
 #else

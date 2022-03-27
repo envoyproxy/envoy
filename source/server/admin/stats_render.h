@@ -78,7 +78,7 @@ private:
   void addScalar(Buffer::Instance& response, const std::string& name, const Value& value);
 
   // Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
-  void addJson(Buffer::Instance& response, ProtobufWkt::Value json);
+  void addJson(Buffer::Instance& response, const ProtobufWkt::Value& json);
 
   // Flushes all stats that were buffered in addJson() above.
   void flushStats(Buffer::Instance& response);
