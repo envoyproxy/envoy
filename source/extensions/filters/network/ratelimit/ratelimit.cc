@@ -50,8 +50,9 @@ Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_d
 std::string Config::formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info) {
 
   Formatter::FormatterImpl formatter(descriptor_value);
-  std::string value = formatter.format(*request_headers_.get(), *response_headers_.get(),
-                                       *response_trailers_.get(), stream_info, descriptor_value);
+  std::string value =
+      formatter.format(*Config::request_headers_.get(), *Config::response_headers_.get(),
+                       *Config::response_trailers_.get(), stream_info, descriptor_value);
   return value;
 }
 

@@ -23,10 +23,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-static Http::RequestHeaderMapPtr request_headers_ = Http::RequestHeaderMapImpl::create();
-static Http::ResponseHeaderMapPtr response_headers_ = Http::ResponseHeaderMapImpl::create();
-static Http::ResponseTrailerMapPtr response_trailers_ = Http::ResponseTrailerMapImpl::create();
-
 /**
  * All tcp rate limit stats. @see stats_macros.h
  */
@@ -71,6 +67,9 @@ private:
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
+  Http::RequestHeaderMapPtr request_headers_;
+  Http::ResponseHeaderMapPtr response_headers_;
+  Http::ResponseTrailerMapPtr response_trailers_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
