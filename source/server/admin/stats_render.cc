@@ -6,8 +6,11 @@
 namespace {
 // This value found by iterating in stats_handler_speed_test.cc, maximizing the
 // performance of the Json tests, and then rounding to a power of 2.
-//constexpr int64_t JsonStatsFlushCount = 64; // protobuf size() functions return signed results.
+#if STATS_ARRAY_LIST_VALUE
+constexpr int64_t JsonStatsFlushCount = 64; // protobuf size() functions return signed results.
+#else
 constexpr uint64_t JsonStatsFlushCount = 64;
+#endif
 } // namespace
 namespace Envoy {
 
@@ -147,8 +150,11 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
 // Since histograms are buffered (see above), the finalize() method generates
 // all of them.
 void StatsJsonRender::finalize(Buffer::Instance& response) {
-  //if (stats_array_.values_size() > 0) {
+#if STATS_ARRAY_LIST_VALUE
+  if (stats_array_.values_size() > 0) {
+#else
   if (!stats_array_.empty()) {
+#endif
     flushStats(response);
   }
   if (histogram_array_->values_size() > 0) {
@@ -193,29 +199,39 @@ void StatsJsonRender::addScalar(Buffer::Instance& response, const std::string& n
 
 // Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
 void StatsJsonRender::addJson(Buffer::Instance& response, ProtobufWkt::Value json) {
-  //*stats_array_.add_values() = json;
+#if STATS_ARRAY_LIST_VALUE
+  *stats_array_.add_values() = json;
+#else
   stats_array_.push_back(json);
+#endif
 
   // We build up stats_array to a certain size so we can amortize the overhead
   // of entering into the JSON serialization infrastructure. If we set the
   // threshold too high we buffer too much memory, likely impacting processor
   // cache. The optimum threshold found after a few experiments on a local
   // host appears to be between 50 and 100.
+#if STATS_ARRAY_LIST_VALUE
+  if (stats_array_.values_size() >= JsonStatsFlushCount) {
+#else
   if (stats_array_.size() >= JsonStatsFlushCount) {
-    //if (stats_array_.values_size() >= JsonStatsFlushCount) {
+#endif
     flushStats(response);
   }
 }
 
 // Flushes all stats that were buffered in addJson() above.
 void StatsJsonRender::flushStats(Buffer::Instance& response) {
-  //ASSERT(stats_array_.values_size() > 0);
+#if STATS_ARRAY_LIST_VALUE
+  ASSERT(stats_array_.values_size() > 0);
+  const std::string json_array = MessageUtil::getJsonStringFromMessageOrDie(
+      stats_array_, false /* pretty */, true);
+  stats_array_.clear_values();
+#else
   ASSERT(!stats_array_.empty());
   const std::string json_array = MessageUtil::getJsonStringFromMessageOrDie(
       ValueUtil::listValue(stats_array_), false /* pretty */, true);
-  //stats_array_, false /* pretty */, true);
-  //stats_array_.clear_values();
   stats_array_.clear();
+#endif
 
   // We are going to wind up with multiple flushes which have to serialize as
   // a single array, rather than a concatenation of multiple arrays, so we add
