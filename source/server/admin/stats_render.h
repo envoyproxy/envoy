@@ -98,12 +98,7 @@ private:
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const UInt64Vec& interval_buckets, const UInt64Vec& cumulative_buckets);
 
-#define STATS_ARRAY_LIST_VALUE 0
-#if STATS_ARRAY_LIST_VALUE
-  ProtobufWkt::ListValue stats_array_;
-#else
   std::vector<ProtobufWkt::Value> stats_array_;
-#endif
   ProtobufWkt::Struct histograms_obj_;
   ProtobufWkt::Struct histograms_obj_container_;
   std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
