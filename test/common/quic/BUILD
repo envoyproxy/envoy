@@ -221,6 +221,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@com_github_google_quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -245,6 +246,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:global_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -357,11 +359,16 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "quic_transport_socket_factory_test",
     srcs = ["quic_transport_socket_factory_test.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )

@@ -12,6 +12,7 @@ envoy_package()
 
 envoy_cc_test_binary(
     name = "router_check_tool",
+    srcs = ["router_check.cc"],
     deps = [":router_check_main_lib"],
 )
 
@@ -22,7 +23,6 @@ envoy_cc_test_library(
         "coverage.h",
         "router.cc",
         "router.h",
-        "router_check.cc",
     ],
     copts = ["-DHAVE_LONG_LONG"],
     external_deps = ["tclap"],
@@ -38,6 +38,7 @@ envoy_cc_test_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/exe:platform_impl_lib",
         "//test/mocks/server:instance_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

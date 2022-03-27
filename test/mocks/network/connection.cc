@@ -91,6 +91,7 @@ template <class T> static void initializeMockConnection(T& connection) {
     buffer.drain(buffer.length());
   }));
 
+  connection.stream_info_.setUpstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
   ON_CALL(Const(connection), streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
 }

@@ -32,8 +32,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @snowp
-/*/extensions/filters/common/mutation_rules @gbrail @snowp
+/*/extensions/filters/http/ext_proc @gbrail @snowp @pradeepcrao @chaoqin-li1123
+/*/extensions/filters/common/mutation_rules @gbrail @snowp @pradeepcrao @chaoqin-li1123
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -69,8 +69,8 @@ extensions/filters/common/original_src @snowp @klarose
 # zookeeper_proxy extension
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
-/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
-/*/extensions/common/redis @msukalski @henryyyang @mattklein123
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @weisisea
+/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @weisisea
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
@@ -218,3 +218,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
 /contrib/cryptomb/ @rojkov @ipuustin
 /contrib/vcl/ @florincoras @rojkov
+/contrib/hyperscan/ @rojkov @zhxie
