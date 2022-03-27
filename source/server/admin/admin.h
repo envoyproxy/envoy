@@ -250,8 +250,8 @@ private:
    * @return the UrlHandler.
    */
   template <class Handler>
-  UrlHandler makeChunkedHandler(const std::string& prefix, const std::string& help_text,
-                                Handler& handler, bool removable, bool mutates_state) {
+  UrlHandler makeStreamingHandler(const std::string& prefix, const std::string& help_text,
+                                  Handler& handler, bool removable, bool mutates_state) {
     return {prefix, help_text,
             [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
               return handler.makeRequest(path, admin_stream);

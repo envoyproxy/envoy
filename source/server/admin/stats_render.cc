@@ -60,8 +60,8 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
   // Make sure all vectors are the same size.
   ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size());
   ASSERT(disjoint_cumulative_buckets.size() == supported_buckets.size());
-  size_t min_size = std::min({disjoint_interval_buckets.size(), disjoint_cumulative_buckets.size(),
-                              supported_buckets.size()});
+  const size_t min_size = std::min({disjoint_interval_buckets.size(),
+      disjoint_cumulative_buckets.size(), supported_buckets.size()});
   std::vector<std::string> bucket_strings;
   bucket_strings.reserve(min_size);
   for (size_t i = 0; i < min_size; ++i) {
@@ -154,7 +154,13 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
     }
     auto str = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
-    addStatAsRenderedJson(response, str);
+
+    // Protobuf json serialization can yield an empty string (printing an
+    // untrappable error message to stdout) if it receives an invalid input, so
+    // we exclude that here.
+    if (!str.empty()) {
+      addStatAsRenderedJson(response, str);
+    }
   }
   response.add("]}");
 }
@@ -182,7 +188,7 @@ void StatsJsonRender::addJson(Buffer::Instance& response, ProtobufWkt::Value jso
   // threshold too high we buffer too much memory, likely impacting processor
   // cache. The optimum threshold found after a few experiments on a local
   // host appears to be between 50 and 100.
-  if (stats_array_.size() == JsonStatsFlushCount) {
+  if (stats_array_.size() >= JsonStatsFlushCount) {
     flushStats(response);
   }
 }
@@ -198,7 +204,7 @@ void StatsJsonRender::flushStats(Buffer::Instance& response) {
   // a single array, rather than a concatenation of multiple arrays, so we add
   // those in the constructor and finalize() method, strip off the "[" and "]"
   // from each buffered serialization.
-  ASSERT(json_array.size() >= 2);
+  ASSERT(json_array.size() >= 3);
   ASSERT(json_array[0] == '[');
   ASSERT(json_array[json_array.size() - 1] == ']');
   addStatAsRenderedJson(response, absl::string_view(json_array).substr(1, json_array.size() - 2));
@@ -207,6 +213,7 @@ void StatsJsonRender::flushStats(Buffer::Instance& response) {
 // Adds a json fragment of scalar stats to the response buffer, including a
 // "," delimiter if this is not the first fragment.
 void StatsJsonRender::addStatAsRenderedJson(Buffer::Instance& response, absl::string_view json) {
+  ASSERT(!json.empty());
   if (first_) {
     response.add(json);
     first_ = false;
@@ -245,8 +252,8 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
   const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
   const std::vector<double>& cumulative_quantiles =
       histogram.cumulativeStatistics().computedQuantiles();
-  size_t min_size = std::min({computed_quantiles.size(), cumulative_quantiles.size(),
-                              interval_statistics.supportedQuantiles().size()});
+  const size_t min_size = std::min({computed_quantiles.size(), cumulative_quantiles.size(),
+      interval_statistics.supportedQuantiles().size()});
   ASSERT(min_size == computed_quantiles.size());
   ASSERT(min_size == cumulative_quantiles.size());
 
