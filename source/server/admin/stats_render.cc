@@ -233,13 +233,14 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
     // It is not possible for the supported quantiles to differ across histograms, so it is ok
     // to send them once.
     Stats::HistogramStatisticsImpl empty_statistics;
-    std::vector<ProtobufWkt::Value> supported_quantile_array;
+    auto supported_quantile_array = std::make_unique<ProtobufWkt::ListValue>();
     for (double quantile : empty_statistics.supportedQuantiles()) {
-      supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
+      *supported_quantile_array->add_values() = ValueUtil::numberValue(quantile * 100);
     }
 
     ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-    histograms_obj_fields["supported_quantiles"] = ValueUtil::listValue(supported_quantile_array);
+    histograms_obj_fields["supported_quantiles"].set_allocated_list_value(
+        supported_quantile_array.release());
     found_used_histogram_ = true;
   }
 
