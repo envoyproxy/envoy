@@ -86,6 +86,14 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
   // makes streaming difficult. Instead we emit the preamble in the
   // constructor here, and create json models for each stats entry.
   response.add("{\"stats\":[");
+  histogram_array_ = std::make_unique<ProtobufWkt::ListValue>();
+  /*
+  switch (histogram_buckets_mode) {
+  case Utility::HistogramBucketsMode::NoBuckets:
+  case Utility::HistogramBucketsMode::Cumulative:
+  case Utility::HistogramBucketsMode::Disjoint:
+  }
+  */
 }
 
 // Buffers a JSON fragment for a numeric stats, flushing to the response
@@ -141,16 +149,18 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
   if (!stats_array_.empty()) {
     flushStats(response);
   }
-  if (!histogram_array_.empty()) {
+  if (histogram_array_->values_size() > 0) {
     ProtoMap& histograms_obj_container_fields = *histograms_obj_container_.mutable_fields();
     if (found_used_histogram_) {
       ASSERT(histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets);
       ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-      histograms_obj_fields["computed_quantiles"] = ValueUtil::listValue(histogram_array_);
+      histograms_obj_fields["computed_quantiles"].set_allocated_list_value(
+          histogram_array_.release());
       histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
     } else {
       ASSERT(histogram_buckets_mode_ != Utility::HistogramBucketsMode::NoBuckets);
-      histograms_obj_container_fields["histograms"] = ValueUtil::listValue(histogram_array_);
+      histograms_obj_container_fields["histograms"].set_allocated_list_value(
+          histogram_array_.release());
     }
     auto str = MessageUtil::getJsonStringFromMessageOrDie(
         ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
@@ -275,11 +285,12 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
     computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
   }
   computed_quantile_fields["values"] = ValueUtil::listValue(computed_quantile_value_array);
-  histogram_array_.push_back(ValueUtil::structValue(computed_quantile));
+  //*supported_quantile_array->add_values() = ValueUtil::numberValue(quantile * 100);
+  *histogram_array_->add_values() = ValueUtil::structValue(computed_quantile);
 }
 
-// Collects the buckets from the specified histogram, using either the cumulative
-// or disjoint views, as controlled by buckets_fn.
+// Collects the buckets from the specified histogram, using either the
+// cumulative or disjoint views, as controlled by buckets_fn.
 void StatsJsonRender::collectBuckets(const std::string& name,
                                      const Stats::ParentHistogram& histogram,
                                      const UInt64Vec& interval_buckets,
@@ -297,7 +308,9 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
   histogram_obj_fields["name"] = ValueUtil::stringValue(name);
 
-  std::vector<ProtobufWkt::Value> bucket_array;
+  ProtobufWkt::ListValue* bucket_array = histogram_obj_fields["buckets"].mutable_list_value();
+
+  //std::vector<ProtobufWkt::Value> bucket_array;
   for (size_t i = 0; i < min_size; ++i) {
     ProtobufWkt::Struct bucket;
     ProtoMap& bucket_fields = *bucket.mutable_fields();
@@ -306,10 +319,10 @@ void StatsJsonRender::collectBuckets(const std::string& name,
     // ValueUtil::numberValue does unnecessary conversions from uint64_t values to doubles.
     bucket_fields["interval"] = ValueUtil::numberValue(interval_buckets[i]);
     bucket_fields["cumulative"] = ValueUtil::numberValue(cumulative_buckets[i]);
-    bucket_array.push_back(ValueUtil::structValue(bucket));
+    *bucket_array->add_values() = ValueUtil::structValue(bucket);
   }
-  histogram_obj_fields["buckets"] = ValueUtil::listValue(bucket_array);
-  histogram_array_.push_back(ValueUtil::structValue(histogram_obj));
+  //histogram_obj_fields["buckets"] = ValueUtil::listValue(bucket_array);
+  *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
 }
 
 } // namespace Server
