@@ -102,7 +102,6 @@ private:
   ProtobufWkt::Struct histograms_obj_;
   ProtobufWkt::Struct histograms_obj_container_;
   std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
-  //std::vector<ProtobufWkt::Value> histogram_array_;
   bool found_used_histogram_{false};
   bool first_{true};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
