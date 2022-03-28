@@ -74,6 +74,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/composite @snowp @mattklein123
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
+# previous hosts
+/*/extensions/retry/host/previous_hosts @snowp @alyssawilk
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
@@ -245,7 +247,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/tracers/opencensus @UNOWNED @UNOWNED
 /*/extensions/tracers/common @UNOWNED @UNOWNED
 /*/extensions/tracers/common/ot @UNOWNED @UNOWNED
-/*/extensions/retry/host/previous_hosts @UNOWNED @UNOWNED
 /*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
 
 # Intentionally exempt (treated as core code)
