@@ -351,6 +351,7 @@ private:
 
   const UdpProxyFilterConfigSharedPtr config_;
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
+  // Map for looking up cluster info with its name.
   absl::flat_hash_map<std::string, ClusterInfoPtr> cluster_infos_;
 };
 
