@@ -13,6 +13,7 @@ Local Ratelimit
 Rate limiting is used to control the rate of requests sent or received by a network interface controller, which is helpful to prevent DoS attacks and limit web scraping.
 
 Envoy supports both local (non-distributed) and global rate limiting, and two types for local rate limiting:
+
 - L4 connections via the :ref:`local rate limit filter <config_network_filters_local_rate_limit>`
 - HTTP requests via the :ref:`HTTP local rate limit filter <config_http_filters_local_rate_limit>`
 
@@ -38,9 +39,9 @@ Change to the ``examples/ratelimit`` directory and bring up the docker compositi
 Step 2: Test rate limiting of upstream service
 **********************************************
 
-The sandbox is configured with `10000` port for upstream service.
+The sandbox is configured with ``10000`` port for upstream service.
 
-If a request reaches rate limiting, Envoy will add `x-local-rate-limit` header and refuse with "local_rate_limited" response and 429 HTTP code.
+If a request reaches the rate limit, Envoy will add ``x-local-rate-limit`` header and refuse the connection with a 429 HTTP response code and with the content ``local_rate_limited``.
 
 Now, use ``curl`` to make a request five times for the limited upsteam service:
 
@@ -57,7 +58,7 @@ Now, use ``curl`` to make a request five times for the limited upsteam service:
     x-local-rate-limit: true
     local_rate_limited
 
-The first two requests get responses, and the rest requests are refused with expected responses.
+The first two requests get responses, and the remaining requests are refused with expected responses.
 
 
 Step 3: Test rate limiting of Envoy’s statistics
@@ -88,8 +89,6 @@ Now, use ``curl`` to make a request five times for the limited statistics:
     HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
     local_rate_limited
-
-The results are expected.
 
 .. seealso::
    :ref:`global rate limiting <arch_overview_global_rate_limit>`
