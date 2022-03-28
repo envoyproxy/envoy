@@ -99,6 +99,7 @@ public:
   void addDestination(std::string param, std::string value) {
     destination_list_.emplace_back(std::make_pair(param, value));
   }
+  void resetDestinationList() { destination_list_.clear(); }
 
   std::map<std::string, bool>& queryMap() { return query_map_; }
   void addQuery(std::string param, bool value) { query_map_[param] = value; }
@@ -229,45 +230,41 @@ public:
   std::string getDomainFromHeaderParameter(absl::string_view header, std::string parameter) {
     if (parameter != "host") {
       auto start = header.find(parameter);
-      if (start == absl::string_view::npos) {
-        // try next local service
-        return "";
-      }
-      // service.parameter() + "="
-      start = start + parameter.length() + strlen("=");
-      if ("sip:" == header.substr(start, strlen("sip:"))) {
-        start += strlen("sip:");
-      }
-      // end
-      auto end = header.find_first_of(":;>", start);
-      if (end == absl::string_view::npos) {
-        return "";
-      } else {
-        return std::string(header.substr(start, end - start));
-      }
-    } else {
-      auto start = header.find("sip:");
-      if (start == absl::string_view::npos) {
-        return "";
-      }
-      start += strlen("sip:");
-      auto end = header.find_first_of(":;>", start);
-      if (end == absl::string_view::npos) {
-        return "";
-      }
-
-      auto addr = header.substr(start, end - start);
-
-      // Remove name in format of sip:name@addr:pos
-      auto pos = addr.find("@");
-      if (pos == absl::string_view::npos) {
-        return std::string(header.substr(start, end - start));
-      } else {
-        pos += strlen("@");
-        return std::string(addr.substr(pos, addr.length() - pos));
+      if (start != absl::string_view::npos) {
+        // service.parameter() + "="
+        start = start + parameter.length() + strlen("=");
+        if ("sip:" == header.substr(start, strlen("sip:"))) {
+          start += strlen("sip:");
+        }
+        // end
+        auto end = header.find_first_of(":;>", start);
+        if (end != absl::string_view::npos) {
+          return std::string(header.substr(start, end - start));
+        }
       }
     }
-    return "";
+    // Parameter is host
+    // Or no domain in configured parameter, then try host
+    auto start = header.find("sip:");
+    if (start == absl::string_view::npos) {
+      return "";
+    }
+    start += strlen("sip:");
+    auto end = header.find_first_of(":;>", start);
+    if (end == absl::string_view::npos) {
+      return "";
+    }
+
+    auto addr = header.substr(start, end - start);
+
+    // Remove name in format of sip:name@addr:pos
+    auto pos = addr.find("@");
+    if (pos == absl::string_view::npos) {
+      return std::string(header.substr(start, end - start));
+    } else {
+      pos += strlen("@");
+      return std::string(addr.substr(pos, addr.length() - pos));
+    }
   }
 
 private:
