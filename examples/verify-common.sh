@@ -89,7 +89,7 @@ responds_with () {
     local expected
     expected="$1"
     shift
-    _curl "${@}" | grep -E "$expected" || {
+    _curl "${@}" | grep "$expected" || {
         echo "ERROR: curl expected (${*}): $expected" >&2
         return 1
     }
@@ -110,7 +110,7 @@ responds_with_header () {
     local expected
     expected="$1"
     shift
-    _curl --head "${@}" | grep -E "$expected"  || {
+    _curl --head "${@}" | grep "$expected"  || {
         echo "ERROR: curl header (${*}): $expected" >&2
         return 1
     }

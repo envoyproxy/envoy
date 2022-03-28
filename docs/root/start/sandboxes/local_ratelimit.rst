@@ -92,4 +92,4 @@ Now, use ``curl`` to make a request five times for the limited statistics:
 
 .. seealso::
    :ref:`global rate limiting <arch_overview_global_rate_limit>`
-      Reference documentation for Envoy's gloval rate limiting.
+      Reference documentation for Envoy's global rate limiting.
