@@ -137,6 +137,7 @@ public:
 
   bool contains(const Instance& address) const;
   size_t getIpListSize() const { return ip_list_.size(); };
+  bool isEmpty() const;
 
 private:
   std::vector<CidrRange> ip_list_;

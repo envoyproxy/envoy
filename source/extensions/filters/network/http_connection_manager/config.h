@@ -27,6 +27,7 @@
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/local_reply/local_reply.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -99,12 +100,15 @@ public:
       return unix_sockets_;
     }
 
-    // TODO(snowp): Make internal subnets configurable.
+    if (!cidr_ranges_.isEmpty()) {
+      return cidr_ranges_.contains(address);
+    }
     return Network::Utility::isInternalAddress(address);
   }
 
 private:
   const bool unix_sockets_;
+  const Network::Address::IpList cidr_ranges_;
 };
 
 /**

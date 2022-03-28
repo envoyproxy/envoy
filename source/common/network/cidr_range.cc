@@ -217,6 +217,8 @@ bool IpList::contains(const Instance& address) const {
   return false;
 }
 
+bool IpList::isEmpty() const { return ip_list_.empty(); }
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

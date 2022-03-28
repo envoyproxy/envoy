@@ -501,6 +501,13 @@ TEST(IpListTest, MatchAnyAll) {
   EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
 }
 
+TEST(IpListTest, AddressEmpty) {
+  IpList emptyList(makeCidrRangeList({}));
+  IpList nonEmptyList(makeCidrRangeList({{"192.168.3.0", 24}}));
+  EXPECT_TRUE(emptyList.isEmpty());
+  EXPECT_FALSE(nonEmptyList.isEmpty());
+}
+
 } // namespace
 } // namespace Address
 } // namespace Network
