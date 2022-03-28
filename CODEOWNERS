@@ -237,9 +237,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # "Unowned" extensions (currently without 1 maintainer or 2 owners)
 /*/extensions/formatter/req_without_query @UNOWNED @tsaarni
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao
-/*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao
-/*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao
+/*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
+/*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
+/*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
 /*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
 /*/extensions/tracers/zipkin @UNOWNED @UNOWNED
