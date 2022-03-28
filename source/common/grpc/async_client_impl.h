@@ -78,9 +78,6 @@ public:
 
   bool hasResetStream() const { return http_reset_; }
 
-protected:
-  Http::AsyncClient::StreamOptions options_;
-
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
@@ -95,6 +92,7 @@ private:
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
+  Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;

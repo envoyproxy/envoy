@@ -115,6 +115,7 @@ public:
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
+  StreamInfo::MockStreamInfo stream_info_;
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;

@@ -235,8 +235,6 @@ public:
 protected:
   bool callFailed() const { return call_failed_; }
 
-  const Http::AsyncClient::StreamOptions& options_;
-
 private:
   // Process queued events in completed_ops_ with handleOpCompletion() on
   // GoogleAsyncClient silo thread.
@@ -289,6 +287,7 @@ private:
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
+  const Http::AsyncClient::StreamOptions& options_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;

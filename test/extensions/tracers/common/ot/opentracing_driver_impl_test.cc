@@ -62,6 +62,7 @@ public:
 
   std::unique_ptr<TestDriver> driver_;
   Stats::TestUtil::TestStore stats_;
+
   NiceMock<Tracing::MockConfig> config_;
 };
 

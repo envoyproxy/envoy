@@ -68,8 +68,8 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options)
-    : options_(options), parent_(parent), service_full_name_(service_full_name),
-      method_name_(method_name), callbacks_(callbacks) {}
+    : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
+      callbacks_(callbacks), options_(options) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);

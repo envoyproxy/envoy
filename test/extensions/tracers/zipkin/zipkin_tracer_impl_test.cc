@@ -152,6 +152,7 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
+  StreamInfo::MockStreamInfo stream_info_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
