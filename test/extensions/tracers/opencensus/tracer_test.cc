@@ -110,6 +110,7 @@ TEST(OpenCensusTracerTest, Span) {
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const std::string operation_name{"my_operation_1"};
   SystemTime start_time;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
@@ -120,7 +121,8 @@ TEST(OpenCensusTracerTest, Span) {
     // injectContext is tested in another unit test.
     Tracing::SpanPtr child = span->spawnChild(config, "child_span", start_time);
     child->finishSpan();
-    span->setSampled(false); // Abandon tracer.
+    span->setSampled(false);                  // Abandon tracer.
+    span->setStreamInfoIntoSpan(stream_info); // Nothing to do
     span->finishSpan();
 
     // Baggage methods are a noop in opencensus and won't affect events.
