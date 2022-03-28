@@ -650,7 +650,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RetryUponTooEarlyResponse) {
   if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
@@ -695,7 +695,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
+TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestUsingEarlyData) {
 #ifdef WIN32
   // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
@@ -729,16 +729,19 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   ASSERT_TRUE(response2->waitForEndStream());
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
-#ifdef WIN32
-  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
-  GTEST_SKIP() << "Skipping on Windows";
-#endif
-  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
-    return;
-  }
+TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: router
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  allow_safe_requests: false
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(0));
+      });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -757,6 +760,63 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
 
   default_request_headers_.addCopy("second_request", "1");
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstreamProtocol() == Http::CodecType::HTTP3 ? 1u : 0u,
+            test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+}
+
+// Tests that if configured, POST request can be sent over early data. The upstream can reject it
+// and the Envoy should retry it automatically, but not over early data.
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
+      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+    return;
+  }
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: router
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  early_data_options:
+    allowed_methods: ["POST"]
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(0));
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  default_request_headers_.addCopy("second_request", "1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-envoy-retry-on", "5xx"}});
   waitForNextUpstreamRequest();
 
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());

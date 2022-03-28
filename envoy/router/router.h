@@ -985,6 +985,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return bool whether the given request should be allowed to be sent over early data.
+   */
+  virtual bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const PURE;
 };
 
 /**

@@ -16,11 +16,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3;routerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Router]
-// Router :ref:`configuration overview <config_http_filters_router>`.
-// [#extension: envoy.filters.http.router]
-
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.router.v2.Router";
@@ -89,4 +85,37 @@ message Router {
   // :ref:`gRPC stats filter<config_http_filters_grpc_stats>` documentation
   // for more details.
   bool suppress_grpc_request_failure_code_stats = 7;
+
+  // [#protodoc-title: Router]
+  // Router :ref:`configuration overview <config_http_filters_router>`.
+  // [#extension: envoy.filters.http.router]
+
+  message EarlyDataOptions {
+    // The request methods allowed to be sent over early data.
+    // If emtpy, no request is allowed to use early data.
+    repeated string allowed_methods = 1 [(validate.rules).repeated = {
+      items {
+        string {
+          in: "GET"
+          in: "HEAD"
+          in: "POST"
+          in: "PUT"
+          in: "DELETE"
+          in: "CONNECT"
+          in: "OPTIONS"
+          in: "TRACE"
+          in: "PATCH"
+        }
+      }
+    }];
+  }
+
+  // If absent, allows safe requests by default.
+  oneof early_data {
+    // If true, allow `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data. Otherwise, do not use early data.
+    bool allow_safe_requests = 8;
+
+    // If specified, only the requests with :ref:`allowed methods <>` can use early data.
+    EarlyDataOptions early_data_options = 9;
+  }
 }

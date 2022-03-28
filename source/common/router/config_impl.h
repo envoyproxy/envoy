@@ -594,6 +594,7 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+  bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const override;
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -761,6 +762,9 @@ private:
       return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
+    bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const override {
+      return parent_->allowsEarlyDataForRequest(request_headers);
+    }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -851,6 +855,19 @@ private:
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
+
+  class RequestMethod {
+  public:
+    static constexpr uint32_t GET = 0x1;
+    static constexpr uint32_t HEAD = 0x2;
+    static constexpr uint32_t POST = 0x4;
+    static constexpr uint32_t PUT = 0x8;
+    static constexpr uint32_t DELETE = 0x10;
+    static constexpr uint32_t CONNECT = 0x20;
+    static constexpr uint32_t OPTIONS = 0x40;
+    static constexpr uint32_t TRACE = 0x80;
+    static constexpr uint32_t PATCH = 0x100;
+  };
 
   /**
    * Returns a vector of request header parsers which applied or will apply header transformations
@@ -974,6 +991,8 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   const std::string random_value_header_name_;
+  // If absent, only allows only safe requests.
+  absl::optional<uint32_t> allowed_early_data_requests_;
 };
 
 /**

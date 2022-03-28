@@ -681,8 +681,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   conn_pool_new_stream_with_early_data_and_http3_ =
       Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
   const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_http3_ &&
-                                   Http::Utility::isSafeRequest(*downstream_headers_);
-
+                                   route_entry_->allowsEarlyDataForRequest(*downstream_headers_);
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         /*can_use_http3=*/true);

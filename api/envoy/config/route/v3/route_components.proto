@@ -627,7 +627,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 41]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1093,6 +1093,35 @@ message RouteAction {
   // is configured, this timeout is scaled according to the value for
   // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
+
+  message EarlyDataOptions {
+    // The request methods allowed to be sent over early data.
+    // If emtpy, no request is allowed to use early data.
+    repeated string allowed_methods = 1 [(validate.rules).repeated = {
+      items {
+        string {
+          in: "GET"
+          in: "HEAD"
+          in: "POST"
+          in: "PUT"
+          in: "DELETE"
+          in: "CONNECT"
+          in: "OPTIONS"
+          in: "TRACE"
+          in: "PATCH"
+        }
+      }
+    }];
+  }
+
+  // If absent, allows safe requests by default.
+  oneof early_data {
+    // If true, allow `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data. Otherwise, do not use early data.
+    bool early_data_allows_safe_requests = 39;
+
+    // If specified, only the requests with :ref:`allowed methods <>` can use early data.
+    EarlyDataOptions early_data_options = 40;
+  }
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely

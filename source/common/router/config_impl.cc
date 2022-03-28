@@ -587,6 +587,34 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "not be stripped: {}",
               path_redirect_);
   }
+  if (route.route().has_early_data_options()) {
+    uint32_t allowed_early_data_requests = 0;
+    for (const std::string& method : route.route().early_data_options().allowed_methods()) {
+      if (method == "GET") {
+        allowed_early_data_requests |= RequestMethod::GET;
+      } else if (method == "HEAD") {
+        allowed_early_data_requests |= RequestMethod::HEAD;
+      } else if (method == "POST") {
+        allowed_early_data_requests |= RequestMethod::POST;
+      } else if (method == "PUT") {
+        allowed_early_data_requests |= RequestMethod::PUT;
+      } else if (method == "DELETE") {
+        allowed_early_data_requests |= RequestMethod::DELETE;
+      } else if (method == "CONNECT") {
+        allowed_early_data_requests |= RequestMethod::CONNECT;
+      } else if (method == "OPTIONS") {
+        allowed_early_data_requests |= RequestMethod::OPTIONS;
+      } else if (method == "TRACE") {
+        allowed_early_data_requests |= RequestMethod::TRACE;
+      } else if (method == "PATCH") {
+        allowed_early_data_requests |= RequestMethod::PATCH;
+      }
+    }
+    allowed_early_data_requests_ = allowed_early_data_requests;
+  } else if (route.route().has_early_data_allows_safe_requests() &&
+             !route.route().early_data_allows_safe_requests()) {
+    allowed_early_data_requests_ = 0;
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -1269,6 +1297,34 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
   if (cfg) {
     cb(*cfg);
   }
+}
+
+bool RouteEntryImplBase::allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const {
+  if (!allowed_early_data_requests_.has_value()) {
+    return Http::Utility::isSafeRequest(request_headers);
+  }
+  uint32_t allowed_early_data_requests = allowed_early_data_requests_.value();
+  absl::string_view method = request_headers.getMethodValue();
+  if (method == "GET") {
+    allowed_early_data_requests &= RequestMethod::GET;
+  } else if (method == "HEAD") {
+    allowed_early_data_requests &= RequestMethod::HEAD;
+  } else if (method == "POST") {
+    allowed_early_data_requests &= RequestMethod::POST;
+  } else if (method == "PUT") {
+    allowed_early_data_requests &= RequestMethod::PUT;
+  } else if (method == "DELETE") {
+    allowed_early_data_requests &= RequestMethod::DELETE;
+  } else if (method == "CONNECT") {
+    allowed_early_data_requests &= RequestMethod::CONNECT;
+  } else if (method == "OPTIONS") {
+    allowed_early_data_requests &= RequestMethod::OPTIONS;
+  } else if (method == "TRACE") {
+    allowed_early_data_requests &= RequestMethod::TRACE;
+  } else if (method == "PATCH") {
+    allowed_early_data_requests &= RequestMethod::PATCH;
+  }
+  return allowed_early_data_requests != 0;
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(

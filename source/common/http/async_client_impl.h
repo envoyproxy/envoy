@@ -282,6 +282,10 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
+    bool allowsEarlyDataForRequest(Http::RequestHeaderMap& /*request_headers*/) const override {
+      return false;
+    }
+
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     std::unique_ptr<Router::RetryPolicy> retry_policy_;
 
