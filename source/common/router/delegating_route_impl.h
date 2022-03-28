@@ -109,6 +109,7 @@ public:
   const UpgradeMap& upgradeMap() const override;
   const absl::optional<ConnectConfig>& connectConfig() const override;
   const std::string& routeName() const override;
+  bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;

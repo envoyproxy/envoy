@@ -176,5 +176,10 @@ const std::string& DelegatingRouteEntry::routeName() const {
   return base_route_->routeEntry()->routeName();
 }
 
+bool DelegatingRouteEntry::allowsEarlyDataForRequest(
+    Http::RequestHeaderMap& request_headers) const {
+  return base_route_->routeEntry()->allowsEarlyDataForRequest(request_headers);
+}
+
 } // namespace Router
 } // namespace Envoy
