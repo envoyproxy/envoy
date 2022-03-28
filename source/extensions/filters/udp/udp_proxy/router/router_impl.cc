@@ -29,16 +29,8 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 absl::Status RouteActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Network::UdpMatchingData>&, absl::string_view type_url) {
-  static std::string source_ip_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-      envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
-          ->full_name());
-  if (type_url == source_ip_input_name) {
-    return absl::OkStatus();
-  }
-
-  return absl::InvalidArgumentError(
-      fmt::format("Route table can only match on source IP, saw {}", type_url));
+    const Matcher::DataInputFactory<Network::UdpMatchingData>&, absl::string_view) {
+  return absl::OkStatus();
 }
 
 RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
