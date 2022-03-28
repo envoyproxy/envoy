@@ -733,14 +733,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        // Configure just enough of an upstream access log to reference the upstream headers.
-        const std::string yaml_string = R"EOF(
-name: router
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  allow_safe_requests: false
-  )EOF";
-        TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(0));
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_route()
+            ->set_early_data_allows_safe_requests(false);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -784,15 +781,16 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        // Configure just enough of an upstream access log to reference the upstream headers.
-        const std::string yaml_string = R"EOF(
-name: router
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  early_data_options:
-    allowed_methods: ["POST"]
-  )EOF";
-        TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(0));
+        auto* route_action = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route();
+        route_action->mutable_early_data_options()->add_allowed_methods("POST");
+        // Also config retry upon 425 response because the POST request will not be automatically
+        // retried.
+        auto* retry_policy = route_action->mutable_retry_policy();
+        retry_policy->set_retry_on("retriable-status-codes");
+        retry_policy->add_retriable_status_codes(425);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -212,9 +212,7 @@ public:
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source),
-        // Alllows early data for all safe requests.
-        allowed_early_data_requests_(absl::nullopt) {
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -236,67 +234,12 @@ public:
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
-    if (config.has_early_data_options()) {
-      uint32_t allowed_early_data_requests = 0;
-      for (const std::string& method : config.early_data_options().allowed_methods()) {
-        if (method == "GET") {
-          allowed_early_data_requests |= RequestMethod::GET;
-        } else if (method == "HEAD") {
-          allowed_early_data_requests |= RequestMethod::HEAD;
-        } else if (method == "POST") {
-          allowed_early_data_requests |= RequestMethod::POST;
-        } else if (method == "PUT") {
-          allowed_early_data_requests |= RequestMethod::PUT;
-        } else if (method == "DELETE") {
-          allowed_early_data_requests |= RequestMethod::DELETE;
-        } else if (method == "CONNECT") {
-          allowed_early_data_requests |= RequestMethod::CONNECT;
-        } else if (method == "OPTIONS") {
-          allowed_early_data_requests |= RequestMethod::OPTIONS;
-        } else if (method == "TRACE") {
-          allowed_early_data_requests |= RequestMethod::TRACE;
-        } else if (method == "PATCH") {
-          allowed_early_data_requests |= RequestMethod::PATCH;
-        }
-      }
-      allowed_early_data_requests_ = allowed_early_data_requests;
-    } else if (config.has_allow_safe_requests() && !config.allow_safe_requests()) {
-      allowed_early_data_requests_ = 0;
-    }
   }
   using HeaderVector = std::vector<Http::LowerCaseString>;
   using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
-
-  bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const {
-    if (!allowed_early_data_requests_.has_value()) {
-      return Http::Utility::isSafeRequest(request_headers);
-    }
-    uint32_t allowed_early_data_requests = allowed_early_data_requests_.value();
-    absl::string_view method = request_headers.getMethodValue();
-    if (method == "GET") {
-      allowed_early_data_requests &= RequestMethod::GET;
-    } else if (method == "HEAD") {
-      allowed_early_data_requests &= RequestMethod::HEAD;
-    } else if (method == "POST") {
-      allowed_early_data_requests &= RequestMethod::POST;
-    } else if (method == "PUT") {
-      allowed_early_data_requests &= RequestMethod::PUT;
-    } else if (method == "DELETE") {
-      allowed_early_data_requests &= RequestMethod::DELETE;
-    } else if (method == "CONNECT") {
-      allowed_early_data_requests &= RequestMethod::CONNECT;
-    } else if (method == "OPTIONS") {
-      allowed_early_data_requests &= RequestMethod::OPTIONS;
-    } else if (method == "TRACE") {
-      allowed_early_data_requests &= RequestMethod::TRACE;
-    } else if (method == "PATCH") {
-      allowed_early_data_requests &= RequestMethod::PATCH;
-    }
-    return allowed_early_data_requests != 0;
-  }
 
   Router::Context& router_context_;
   Stats::Scope& scope_;
@@ -318,22 +261,8 @@ public:
   Stats::StatName empty_stat_name_;
 
 private:
-  class RequestMethod {
-  public:
-    static constexpr uint32_t GET = 0x1;
-    static constexpr uint32_t HEAD = 0x2;
-    static constexpr uint32_t POST = 0x4;
-    static constexpr uint32_t PUT = 0x8;
-    static constexpr uint32_t DELETE = 0x10;
-    static constexpr uint32_t CONNECT = 0x20;
-    static constexpr uint32_t OPTIONS = 0x40;
-    static constexpr uint32_t TRACE = 0x80;
-    static constexpr uint32_t PATCH = 0x100;
-  };
   ShadowWriterPtr shadow_writer_;
   TimeSource& time_source_;
-  // If absent, only allows safe requests.
-  absl::optional<uint32_t> allowed_early_data_requests_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

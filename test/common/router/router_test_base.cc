@@ -39,6 +39,9 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
   callbacks_.dispatcher_.delete_immediately_ = true;
+
+  ON_CALL(callbacks_.route_->route_entry_, allowsEarlyDataForRequest(_))
+      .WillByDefault(Invoke(Http::Utility::isSafeRequest));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
