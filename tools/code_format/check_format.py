@@ -63,6 +63,7 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/extensions/filters/common/expr/context_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
     "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
+    "./test/tools/router_check/router_check.cc",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage

@@ -6,6 +6,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_bug_tracker_impl.h"
+#include "quiche_platform_impl/quiche_bug_tracker_impl.h"
 
 #define EPOLL_BUG_IMPL QUICHE_BUG_IMPL

@@ -248,6 +248,20 @@ the following in the Docker recipe:
 RUN chmod go+r /etc/front-envoy.yaml
 ```
 
+### Additional `pip` dependencies
+
+Pip dependencies should be added to a `requirements.in` file, and compiled with `pip-compile`.
+
+Please see existing examples for further information.
+
+The `requirements.txt` will also need to be added to `.github/dependabot.yaml`.
+
+### Shared Docker images and service definitions
+
+There are shared `Dockerfile` resources available for use in building an example.
+
+Please see the `examples/shared` folder.
+
 ## Sandbox configuration tests
 
 Example configuration files are tested to ensure they are valid and well-formed, and do

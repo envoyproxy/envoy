@@ -4,14 +4,13 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_hostname_utils_impl.h"
-
 #include <string>
 
 #include "source/common/http/utility.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "quiche_platform_impl/quiche_hostname_utils_impl.h"
 
 // TODO(wub): Implement both functions on top of GoogleUrl, then enable
 // quiche/quic/platform/api/quiche_hostname_utils_test.cc.
