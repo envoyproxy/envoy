@@ -31,7 +31,7 @@ public:
 };
 
 TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
-  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=0");
+  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=0");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -47,7 +47,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
-  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=1");
+  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=1");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -61,7 +61,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
-  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=");
+  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -79,7 +79,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
-  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;");
+  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;");
   // sampling rules with default fixed_target = 0 & rate = 0
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", R"EOF(
 {
@@ -119,6 +119,39 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
   // b) there are no sampling rules passed, so the default rules apply (1 req/sec and 5% after that
   // within that second)
   ASSERT_NE(span, nullptr);
+}
+
+TEST_F(XRayDriverTest, XForwardedForHeaderSet) {
+  request_headers_.addCopy(std::string(XForwardedForHeader), "191.251.191.251");
+  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
+                           "" /*origin*/, aws_metadata_};
+  Driver driver(config, context_);
+
+  Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
+  Envoy::SystemTime start_time;
+  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+                               tracing_decision);
+
+  ASSERT_NE(span, nullptr);
+  auto* xray_span = static_cast<XRay::Span*>(span.get());
+  ASSERT_TRUE(xray_span->hasKeyInHttpRequestAnnotations(SpanXForwardedFor));
+  ASSERT_TRUE(xray_span->hasKeyInHttpRequestAnnotations(SpanClientIp));
+}
+
+TEST_F(XRayDriverTest, XForwardedForHeaderNotSet) {
+  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
+                           "" /*origin*/, aws_metadata_};
+  Driver driver(config, context_);
+
+  Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
+  Envoy::SystemTime start_time;
+  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+                               tracing_decision);
+
+  ASSERT_NE(span, nullptr);
+  auto* xray_span = static_cast<XRay::Span*>(span.get());
+  ASSERT_FALSE(xray_span->hasKeyInHttpRequestAnnotations(SpanXForwardedFor));
+  ASSERT_FALSE(xray_span->hasKeyInHttpRequestAnnotations(SpanClientIp));
 }
 
 } // namespace
