@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Filter {
 
 constexpr absl::string_view HttpStatPrefix = "http_filter.";
+constexpr absl::string_view ListenerStatPrefix = "listener_filter.";
 
 namespace {
 void validateTypeUrlHelper(const std::string& type_url,
@@ -232,18 +233,6 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   }
 }
 
-std::tuple<ProtobufTypes::MessagePtr, std::string> HttpFilterConfigProviderManagerImpl::getMessage(
-    const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-    Server::Configuration::ServerFactoryContext& factory_context) const {
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          filter_config);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      filter_config.typed_config(),
-      factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
-  return {std::move(message), factory.name()};
-}
-
 absl::string_view HttpFilterConfigProviderManagerImpl::statPrefix() const { return HttpStatPrefix; }
 
 ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
@@ -268,6 +257,27 @@ ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
       last_filter_in_filter_chain);
   return message;
 }
+
+absl::string_view ListenerFilterConfigProviderManagerImpl::statPrefix() const { return ListenerStatPrefix; }
+
+ProtobufTypes::MessagePtr ListenerFilterConfigProviderManagerImpl::getDefaultConfig(
+    const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
+    Server::Configuration::FactoryContext& factory_context, bool, const std::string&,
+    const absl::flat_hash_set<std::string>& require_type_urls) const {
+  auto* default_factory =
+      Config::Utility::getFactoryByType<Server::Configuration::NamedListenerFilterConfigFactory>(
+          proto_config);
+  if (default_factory == nullptr) {
+    throw EnvoyException(fmt::format("Error: cannot find listener filter factory {} for default filter "
+                                     "configuration with type URL {}.",
+                                     filter_config_name, proto_config.type_url()));
+  }
+  validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      proto_config, factory_context.messageValidationVisitor(), *default_factory);
+  return message;
+}
+
 
 } // namespace Filter
 } // namespace Envoy

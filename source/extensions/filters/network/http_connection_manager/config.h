@@ -39,7 +39,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-using FilterConfigProviderManager = Filter::FilterConfigProviderManager<Http::FilterFactoryCb>;
+using FilterConfigProviderManager = Filter::FilterConfigProviderManager<Http::FilterFactoryCb, Server::Configuration::FactoryContext>;
 
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.

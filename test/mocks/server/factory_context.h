@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Server {
 namespace Configuration {
-class MockFactoryContext : public virtual FactoryContext {
+class MockFactoryContext : public virtual ListenerFactoryContext {
 public:
   MockFactoryContext();
   ~MockFactoryContext() override;
@@ -45,6 +45,9 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
+
+  MOCK_METHOD(const Network::ListenerConfig&, listenerConfig, (), (const));
+
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }

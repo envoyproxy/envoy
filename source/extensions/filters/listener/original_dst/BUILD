@@ -29,6 +29,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    visibility = ["//visibility:public"],
     deps = [
         ":original_dst_lib",
         "//envoy/registry",

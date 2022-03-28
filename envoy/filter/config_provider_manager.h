@@ -23,7 +23,7 @@ using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvid
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider
  * for both static and dynamic filter config providers.
  */
-template <class FactoryCb> class FilterConfigProviderManager {
+template <class FactoryCb, class FactoryCt> class FilterConfigProviderManager {
 public:
   virtual ~FilterConfigProviderManager() = default;
 
@@ -40,7 +40,7 @@ public:
    */
   virtual DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
+      const std::string& filter_config_name, FactoryCt& factory_context,
       const std::string& stat_prefix, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type) PURE;
 
