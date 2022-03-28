@@ -79,7 +79,7 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; };
 
   std::string getTraceIdAsHex() const override;
-  void setStreamInfoIntoSpan(const StreamInfo::StreamInfo&) override{};
+  void setStreamInfo(const StreamInfo::StreamInfo&) override{};
 
 private:
   ::opencensus::trace::Span span_;

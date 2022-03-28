@@ -99,7 +99,7 @@ public:
    * stream.
    * @param stream_info stream info
    */
-  virtual void setStreamInfoIntoSpan(const StreamInfo::StreamInfo& stream_info) PURE;
+  virtual void setStreamInfo(const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 /**

@@ -73,7 +73,7 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
-  void setStreamInfoIntoSpan(const StreamInfo::StreamInfo& stream_info) override;
+  void setStreamInfo(const StreamInfo::StreamInfo& stream_info) override;
 
   const TracingContextPtr tracingContext() { return tracing_context_; }
   const TracingSpanPtr spanEntity() { return span_entity_; }

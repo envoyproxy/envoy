@@ -218,7 +218,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
-  span.setStreamInfoIntoSpan(stream_info);
+  span.setStreamInfo(stream_info);
 
   span.finishSpan();
 }

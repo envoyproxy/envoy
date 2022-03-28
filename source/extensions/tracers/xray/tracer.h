@@ -207,7 +207,7 @@ public:
   // TODO: This method is unimplemented for X-Ray.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
-  void setStreamInfoIntoSpan(const StreamInfo::StreamInfo&) override{};
+  void setStreamInfo(const StreamInfo::StreamInfo&) override{};
 
   /**
    * Creates a child span.

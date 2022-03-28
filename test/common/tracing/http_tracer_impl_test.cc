@@ -154,7 +154,7 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -186,7 +186,7 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("GET")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -217,7 +217,7 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("CONNECT")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -261,7 +261,7 @@ metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ {key: not-found } ] })EOF",
                         false, ""}});
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
@@ -303,7 +303,7 @@ TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
   EXPECT_CALL(span, log(log_timestamp, Tracing::Logs::get().LastDownstreamTxByteSent));
 
   EXPECT_CALL(config, verbose).WillOnce(Return(true));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
@@ -326,7 +326,7 @@ TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSet) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
@@ -368,7 +368,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _)).Times(0);
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), _)).Times(0);
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -388,7 +388,7 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
   EXPECT_CALL(span, setTag(_, _)).Times(AnyNumber());
   EXPECT_CALL(span,
               setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(remote_address->logicalName())));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -507,7 +507,7 @@ metadata:
   kind: { host: {} }
   metadata_key: { key: m.host, path: [ { key: not-found } ] })EOF",
         false, ""}});
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
                                             config);
@@ -561,7 +561,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), _)).Times(0);
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName), _)).Times(0);
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -611,7 +611,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -669,7 +669,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
   }
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -726,7 +726,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
     EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
   }
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
-  EXPECT_CALL(span, setStreamInfoIntoSpan(_));
+  EXPECT_CALL(span, setStreamInfo(_));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
                                             &response_trailers, stream_info, config);
@@ -758,6 +758,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
       null_tracer.startSpan(config, request_headers, stream_info, {Reason::Sampling, true});
   EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
 
+  span_ptr->setStreamInfo(stream_info); // nothing to do
   span_ptr->setOperation("foo");
   span_ptr->setTag("foo", "bar");
   span_ptr->setBaggage("key", "value");

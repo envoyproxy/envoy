@@ -121,8 +121,8 @@ TEST(OpenCensusTracerTest, Span) {
     // injectContext is tested in another unit test.
     Tracing::SpanPtr child = span->spawnChild(config, "child_span", start_time);
     child->finishSpan();
-    span->setSampled(false);                  // Abandon tracer.
-    span->setStreamInfoIntoSpan(stream_info); // Nothing to do
+    span->setSampled(false);          // Abandon tracer.
+    span->setStreamInfo(stream_info); // Nothing to do
     span->finishSpan();
 
     // Baggage methods are a noop in opencensus and won't affect events.

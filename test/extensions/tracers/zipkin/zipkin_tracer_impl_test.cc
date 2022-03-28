@@ -640,7 +640,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
   zipkin_span->setTag("key", "value");
-  zipkin_span->setStreamInfoIntoSpan(stream_info_); // Nothing to do
+  zipkin_span->setStreamInfo(stream_info_); // Nothing to do
 
   Span& zipkin_zipkin_span = zipkin_span->span();
   EXPECT_EQ(1ULL, zipkin_zipkin_span.binaryAnnotations().size());
