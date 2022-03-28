@@ -11,7 +11,10 @@ When the files are changed on the filesystem, Envoy will automatically update it
 .. note::
 
    Envoy only updates when the configuration file is replaced, and not when the file is edited in place.
-   It is implemented this way to ensure configuration consistency, more details refer to :ref:`Atomic swap for configuration file updates<config_runtime_symbolic_link_swap>`.
+
+   It is implemented this way to ensure configuration consistency.
+
+   Please see the section on :ref:`atomic swaps <config_runtime_symbolic_link_swap>` for further information on how runtime configuration is updated.
 
 At a minimum, you will need to start Envoy configured with the following sections:
 
@@ -95,4 +98,3 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :linenos:
     :emphasize-lines: 11, 17-18, 22-23
-
