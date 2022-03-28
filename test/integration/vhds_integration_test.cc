@@ -139,7 +139,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest,
                          UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
-  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
@@ -150,7 +150,7 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
       "2");
 
   // Confirm vhost_0 that was originally configured via VHDS is reachable
-  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }

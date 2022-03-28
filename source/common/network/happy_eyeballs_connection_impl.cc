@@ -157,6 +157,10 @@ bool HappyEyeballsConnectionImpl::readEnabled() const {
   return connections_[0]->readEnabled();
 }
 
+ConnectionInfoSetter& HappyEyeballsConnectionImpl::connectionInfoSetter() {
+  return connections_[0]->connectionInfoSetter();
+}
+
 const ConnectionInfoProvider& HappyEyeballsConnectionImpl::connectionInfoProvider() const {
   return connections_[0]->connectionInfoProvider();
 }
@@ -280,6 +284,11 @@ bool HappyEyeballsConnectionImpl::startSecureTransport() {
 absl::optional<std::chrono::milliseconds> HappyEyeballsConnectionImpl::lastRoundTripTime() const {
   // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
+}
+
+absl::optional<uint64_t> HappyEyeballsConnectionImpl::congestionWindowInBytes() const {
+  // Note, this value changes constantly even within the same connection.
+  return connections_[0]->congestionWindowInBytes();
 }
 
 void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
@@ -473,9 +482,13 @@ void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
 
 void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
-  if (event == ConnectionEvent::Connected) {
+  switch (event) {
+  case ConnectionEvent::Connected: {
     ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_ok", "address={}", *this, next_address_);
-  } else {
+    break;
+  }
+  case ConnectionEvent::LocalClose:
+  case ConnectionEvent::RemoteClose: {
     ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_attempt_failed", "address={}", *this,
                          next_address_);
     // This connection attempt has failed. If possible, start another connection attempt
@@ -496,6 +509,12 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     // the failure up by setting up this connection as the final one.
     ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_failed", "addresses={}", *this,
                          address_list_.size());
+    break;
+  }
+  case ConnectionEvent::ConnectedZeroRtt: {
+    IS_ENVOY_BUG("Unexpected 0-RTT event received on TCP connection.");
+    return;
+  }
   }
 
   // Close all other connections and configure the final connection.
@@ -504,6 +523,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
 
 void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
                                                        ConnectionCallbacksWrapper* wrapper) {
+  ASSERT(event != ConnectionEvent::ConnectedZeroRtt);
   connect_finished_ = true;
   ENVOY_LOG(trace, "Disabling next attempt timer due to final connection.");
   next_attempt_timer_->disableTimer();

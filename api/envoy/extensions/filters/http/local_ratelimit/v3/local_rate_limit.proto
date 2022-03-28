@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -107,4 +107,10 @@ message LocalRateLimit {
   // one to rate limit requests on a per connection basis.
   // If unspecified, the default value is false.
   bool local_rate_limit_per_downstream_connection = 11;
+
+  // Defines the standard version to use for X-RateLimit headers emitted by the filter.
+  //
+  // Disabled by default.
+  common.ratelimit.v3.XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 12
+      [(validate.rules).enum = {defined_only: true}];
 }

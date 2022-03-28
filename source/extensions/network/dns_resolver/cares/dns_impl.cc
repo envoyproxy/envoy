@@ -233,7 +233,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 void DnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
-                  pending_response_.status_);
+                  static_cast<int>(pending_response_.status_));
 
   if (!cancelled_) {
     // Use a raw try here because it is used in both main thread and filter.
@@ -260,7 +260,7 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
                     "dns resolution callback for {} not issued. Cancelled with reason={}",
-                    dns_name_, cancel_reason_);
+                    dns_name_, static_cast<int>(cancel_reason_));
   }
   if (owned_) {
     delete this;
@@ -430,7 +430,14 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  if (rc.return_value_ != 0) {
+    ENVOY_LOG_EVENT(debug, "cares_getiffaddrs_error",
+                    "dns resolution for {} could not obtain interface information with error={}",
+                    dns_name_, rc.errno_);
+    // Maintain no-op behavior if the system encountered an error while providing interface
+    // information.
+    return {true, true};
+  }
 
   DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces available_interfaces{false,
                                                                                        false};

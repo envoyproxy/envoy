@@ -27,7 +27,8 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
   case envoy::config::cluster::v3::Cluster::ALL:
     return Network::DnsLookupFamily::All;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected dns lookup family enum");
+  return Network::DnsLookupFamily::All;
 }
 
 std::vector<Network::Address::InstanceConstSharedPtr>

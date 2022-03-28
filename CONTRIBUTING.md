@@ -219,11 +219,20 @@ Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
 and false.
 
+Please note that if adding a runtime guarded feature, your [release notes](docs/root/version_history/current.rst) should include both the functional change, and how to revert it, for example
+
+```rst
+* http: changed the ``:scheme`` header to ``:schema``. This behavioral change can be
+temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema_is_better_than_scheme`` to false.
+```
+
 # PR review policy for maintainers
 
 * Typically we try to turn around reviews within one business day.
 * See [OWNERS.md](OWNERS.md) for the current list of maintainers.
-* It is generally expected that a senior maintainer should review every PR.
+* It is generally expected that a senior maintainer should review every PR to
+  core code. Test-only or extension-only changes need only be reviewed by a
+  maintainer, or senior extension maintainer.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
   PR. This person does not necessarily need to have commit access.
 * The previous two points generally mean that every PR should have two approvals. (Exceptions can

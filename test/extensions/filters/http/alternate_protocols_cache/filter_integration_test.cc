@@ -112,8 +112,9 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
   int port = fake_upstreams_[1]->localAddress()->ip()->port();
   std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
@@ -150,7 +151,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
-      {":authority", "host"},
+      {":authority", "sni.lyft.com"},
       {"x-lyft-user-id", "123"},
       {"x-forwarded-for", "10.0.0.1"},
       {"x-envoy-retry-on", "http3-post-connect-failure"}};
@@ -245,7 +246,8 @@ protected:
 };
 
 int getSrtt(std::string alt_svc, TimeSource& time_source) {
-  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source);
+  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source,
+                                                                      /*from_cache=*/false);
   return data.has_value() ? data.value().srtt.count() : 0;
 }
 // Test auto-config with a pre-populated HTTP/3 alt-svc entry. The upstream request will

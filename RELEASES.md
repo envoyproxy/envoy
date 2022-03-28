@@ -2,8 +2,7 @@
 
 ## Active development
 
-Active development is happening on the `main` branch, and a new version is released from it
-at the end of each quarter.
+Active development is happening on the `main` branch, and a new version is released from it.
 
 ## Stable releases
 
@@ -57,14 +56,13 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    |
 
 ## Release schedule
 
 In order to accommodate downstream projects, new Envoy releases are produced on a fixed release
-schedule (at the end of each quarter), with an acceptable delay of up to 2 weeks, with a hard
+schedule (the 15th day of each quarter), with an acceptable delay of up to 2 weeks, with a hard
 deadline of 3 weeks.
-
-As of 2022, the targeted release dates are the 15th day of each quarter.
 
 | Version |  Expected  |   Actual   | Difference | End of Life |
 |:-------:|:----------:|:----------:|:----------:|:-----------:|

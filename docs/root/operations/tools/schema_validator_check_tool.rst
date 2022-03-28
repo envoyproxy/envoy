@@ -9,7 +9,7 @@ config, please refer to the
 :ref:`config load check tool<install_tools_config_load_check_tool>`.
 
 Input
-  The tool expects two inputs:
+  The tool expects two required inputs:
 
   1. The schema type to check the passed in configuration against. The supported types are:
 
@@ -18,6 +18,11 @@ Input
     * `bootstrap` for :ref:`bootstrap<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` validation.
 
   2. The path to the configuration file.
+
+  Optional inputs include:
+
+  1. ``--fail-on-deprecated``: Will force failure if any deprecated fields are used.
+  2. ``--fail-on-wip``: Will force failure if any work-in-progress fields are used.
 
 Output
   If the configuration conforms to the schema, the tool will exit with status

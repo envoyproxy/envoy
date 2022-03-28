@@ -30,6 +30,12 @@ EXTENSIONS = {
     "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
 
     #
+    # Config validators
+    #
+
+    "envoy.config.validators.minimum_clusters":         "//source/extensions/config/validators/minimum_clusters:config",
+
+    #
     # gRPC Credentials Plugins
     #
 
@@ -323,6 +329,12 @@ EXTENSIONS = {
 
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
+
+    #
+    # Custom matchers
+    #
+
+    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
