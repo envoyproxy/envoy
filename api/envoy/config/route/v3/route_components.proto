@@ -453,6 +453,20 @@ message WeightedCluster {
   }
 }
 
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
+
+  // [#not-implemented-hide:]
+  // If is_optional is not set or is set to false and the plugin defined by this message is not a
+  // supported type, the containing resource is NACKed. If is_optional is set to true, the resource
+  // would not be NACKed for this reason. In this case, routes referencing this plugin's name would
+  // not be treated as an illegal configuration, but would result in a failure if the route is
+  // selected.
+  bool is_optional = 2;
+}
+
 // [#next-free-field: 14]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
@@ -909,7 +923,6 @@ message RouteAction {
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
 
-    // [#not-implemented-hide:]
     // Name of the cluster specifier plugin to use to determine the cluster for
     // requests on this route. The plugin name must be defined in the associated
     // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
@@ -917,8 +930,9 @@ message RouteAction {
     // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
     string cluster_specifier_plugin = 37;
 
-    // Custom cluster provider configuration to use to determine the cluster for requests on this route.
-    core.v3.TypedExtensionConfig cluster_provider = 39
+    // Custom cluster specifier plugin configuration to use to determine the cluster for requests
+    // on this route.
+    ClusterSpecifierPlugin cluster_plugin = 39
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 

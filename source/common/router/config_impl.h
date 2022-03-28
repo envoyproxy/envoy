@@ -1224,6 +1224,8 @@ public:
 
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
 
+  ClusterProviderSharedPtr clusterProvider(absl::string_view provider) const;
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1235,6 +1237,8 @@ private:
   const bool most_specific_header_mutations_wins_;
   const uint32_t max_direct_response_body_size_bytes_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
+  // Cluster specifier plugins/providers.
+  absl::flat_hash_map<std::string, ClusterProviderSharedPtr> cluster_providers_;
 };
 
 /**
