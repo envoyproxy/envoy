@@ -1,7 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
     "envoy_package",
+)
+load(
+    "quiche.bzl",
+    "envoy_quiche_platform_impl_cc_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -33,7 +36,7 @@ envoy_package()
 
 # TODO: add build target for quic_platform_impl_lib
 
-envoy_cc_library(
+envoy_quiche_platform_impl_cc_library(
     name = "quiche_flags_impl_lib",
     srcs = ["quiche_flags_impl.cc"],
     hdrs = ["quiche_flags_impl.h"],
@@ -41,7 +44,6 @@ envoy_cc_library(
         "abseil_base",
         "abseil_synchronization",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:assert_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
@@ -49,8 +51,8 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "quiche_platform_logging_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_logging_impl_lib",
     srcs = [
         "quiche_bug_tracker_impl.cc",
         "quiche_logging_impl.cc",
@@ -60,7 +62,6 @@ envoy_cc_library(
         "quiche_logging_impl.h",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:stl_helpers",
@@ -68,8 +69,8 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "quic_platform_base_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quic_base_impl_lib",
     hdrs = [
         "quic_flags_impl.h",
     ],
@@ -82,7 +83,6 @@ envoy_cc_library(
         "abseil_node_hash_set",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_flags_impl_lib",
         "//envoy/api:io_error_interface",
@@ -95,7 +95,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_quiche_platform_impl_cc_library(
     name = "quiche_platform_iovec_impl_lib",
     hdrs = [
         "quiche_iovec_impl.h",
@@ -109,13 +109,10 @@ envoy_cc_library(
         "abseil_node_hash_set",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-    ],
 )
 
-envoy_cc_library(
-    name = "quiche_platform_hostname_utils_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_hostname_utils_impl_lib",
     srcs = [
         "quiche_hostname_utils_impl.cc",
     ],
@@ -127,74 +124,56 @@ envoy_cc_library(
         "quiche_quic_platform_base",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
 
-envoy_cc_library(
-    name = "quiche_platform_stream_buffer_allocator_impl_lib",
-    hdrs = [
-        "quiche_stream_buffer_allocator_impl.h",
-    ],
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "quiche_platform_error_code_wrappers_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_error_code_wrappers_impl_lib",
     hdrs = [
         "quiche_error_code_wrappers_impl.h",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
 
-envoy_cc_library(
-    name = "quiche_platform_stack_trace_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_stack_trace_impl_lib",
     hdrs = [
         "quiche_stack_trace_impl.h",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
 
-envoy_cc_library(
-    name = "quiche_platform_server_stats_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_server_stats_impl_lib",
     hdrs = [
         "quiche_server_stats_impl.h",
     ],
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
 
-envoy_cc_library(
-    name = "quiche_platform_udp_socket_platform_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_udp_socket_platform_impl_lib",
     hdrs = select({
         "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
 )
 
-envoy_cc_library(
-    name = "quiche_common_platform_mem_slice_impl_lib",
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_mem_slice_impl_lib",
     srcs = [
         "quiche_mem_slice_impl.cc",
     ],
@@ -205,10 +184,9 @@ envoy_cc_library(
         "abseil_hash",
         "abseil_node_hash_map",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_flags_impl_lib",
-        ":quiche_platform_logging_impl_lib",
+        ":quiche_logging_impl_lib",
         "//source/common/buffer:buffer_lib",
         "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
     ],

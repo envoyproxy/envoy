@@ -63,9 +63,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name, SystemTime) {
-  auto child_span = tracing_context_->createExitSpan(span_entity_);
-  child_span->startSpan(name);
-  return std::make_unique<Span>(child_span, tracing_context_, parent_tracer_);
+  return std::make_unique<Span>(name, *this, tracing_context_, parent_tracer_);
 }
 
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
@@ -77,14 +75,8 @@ void Tracer::sendSegment(TracingContextPtr segment_context) {
   }
 }
 
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, SystemTime, const std::string& operation,
-                                   TracingContextPtr segment_context, TracingSpanPtr parent) {
-  Tracing::SpanPtr span;
-  auto span_entity = parent != nullptr ? segment_context->createExitSpan(parent)
-                                       : segment_context->createEntrySpan();
-  span_entity->startSpan(operation);
-  span = std::make_unique<Span>(span_entity, segment_context, *this);
-  return span;
+Tracing::SpanPtr Tracer::startSpan(const std::string& name, TracingContextPtr tracing_context) {
+  return std::make_unique<Span>(name, tracing_context, *this);
 }
 } // namespace SkyWalking
 } // namespace Tracers

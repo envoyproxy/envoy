@@ -4,8 +4,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_flags_impl.h"
-
 #include <set>
 
 #include "source/common/common/assert.h"
@@ -13,6 +11,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 namespace quiche {
 

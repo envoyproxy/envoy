@@ -78,6 +78,8 @@ public:
         pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
+        typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
+                                           config.typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
@@ -125,6 +127,10 @@ public:
 
   const std::vector<std::string>& metadataContextNamespaces() {
     return metadata_context_namespaces_;
+  }
+
+  const std::vector<std::string>& typedMetadataContextNamespaces() {
+    return typed_metadata_context_namespaces_;
   }
 
   const ExtAuthzFilterStats& stats() const { return stats_; }
@@ -180,6 +186,7 @@ private:
   Stats::StatNamePool pool_;
 
   const std::vector<std::string> metadata_context_namespaces_;
+  const std::vector<std::string> typed_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
 
