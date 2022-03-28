@@ -1,30 +1,54 @@
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
 
+#include <ostream>
+
 #include "test/common/json/json_sanitizer_test_util.h"
 
+#include "absl/strings/str_format.h"
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Json {
 namespace {
 
 constexpr absl::string_view Lambda{"λ"};
-constexpr absl::string_view LambdaUtf8{"\xce\xbb"};
+constexpr absl::string_view LambdaUtf8{"\316\273"};
 constexpr absl::string_view Omicron{"ό"};
-constexpr absl::string_view OmicronUtf8{"\xe1\xbd\xb9"};
-constexpr absl::string_view TrebleClefUtf8{"\xf0\x9d\x84\x9e"};
+constexpr absl::string_view OmicronUtf8{"\341\275\271"};
+constexpr absl::string_view TrebleClefUtf8{"\360\235\204\236"};
 
 class JsonSanitizerTest : public testing::Test {
 protected:
   using UnicodeSizePair = JsonSanitizer::UnicodeSizePair;
 
+  void SetUpTestCase() {
+    if (::getenv("GENERATE_INVALID_UTF8_RANGES") != nullptr) {
+      generate_invalid_utf8_ranges_ = true;
+      std::cout << "Runs full sweep of 3-byte and 4-byte utf8 to find unicodes that protobufs "
+          "cannot serialize, to collect them in ranges. The range initialization can "
+          "then be pasted into json_sanitizer_test_util.cc so that future fuzz tests "
+          "and unit tests can avoid doing differentials against protobuf ranges that "
+          "cannot be support. This likely needs to be re-run when the protobufs "
+          "dependency is updated. Be sure to run this piping the output through "
+          " |& grep -v 'contains invalid UTF-8' as the protobuf library will generate "
+          " that message thousands of times and there is no way to disable it."
+                << std::endl;
+    }
+  }
+
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
-    EXPECT_TRUE(isValidUtf8(str)) << "str=" << str;
+    EXPECT_TRUE(isValidUtf8(str, true)) << "str=" << str;
     absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, str);
-    std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
-        ValueUtil::stringValue(std::string(str)), false, true);
-    EXPECT_EQ(stripDoubleQuotes(proto_sanitized), hand_sanitized) << "str=" << str;
+    if (isValidUtf8(str, true)) {
+      std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
+          ValueUtil::stringValue(std::string(str)), false, true);
+      EXPECT_EQ(stripDoubleQuotes(proto_sanitized), hand_sanitized) << "str=" << str;
+    }
     return hand_sanitized;
   }
 
@@ -52,6 +76,41 @@ protected:
 
   JsonSanitizer sanitizer_;
   std::string buffer_;
+  static bool generate_invalid_utf8_ranges_{false};
+};
+
+// Collects unicode values that cannot be handled by the protobuf json encoder.
+// This is not needed for correct operation of the json sanitizer, but it is
+// needed for comparing sanitization results against the proto serializer, and
+// for differential fuzzing.
+//
+// Ordinarily we do not collect these invalid ranges while running
+class InvalidUnicodeCollector {
+ public:
+  /**
+   * Collects a unicode value that cannot be parsed as utf8 by the protobuf serializer.
+   *
+   * @param unicode the unicode value
+   */
+  void collect(uint32_t unicode) { invalid_.insert(unicode, unicode+1); }
+
+  /**
+   * Emits the collection of invalid unicode ranges to stdout.
+   *
+   * @return true if any invalid ranges were found.
+   */
+  bool emit(absl::string_view variable_name) {
+    bool has_invalid = false;
+    for (IntervalSet<uint32_t>::Interval& interval : invalid_.toVector()) {
+      has_invalid = true;
+      std::cout << absl::StrFormat("    %s.insert(0x%x, 0x%x);\n", variable_name,
+                                   interval.first, interval.second);
+    }
+    return has_invalid;
+  }
+
+ private:
+  IntervalSetImpl<uint32_t> invalid_;
 };
 
 TEST_F(JsonSanitizerTest, Empty) { expectUnchanged(""); }
@@ -128,10 +187,79 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
     buf[0] = byte1 | JsonSanitizer::Utf8_2BytePattern;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
       buf[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
+      auto [unicode, consumed] =
+          Envoy::Json::JsonSanitizer::decodeUtf8(reinterpret_cast<const uint8_t*>(buf), 2);
+      ASSERT_EQ(2, consumed);
       sanitizeAndCheckAgainstProtobufJson(utf8);
     }
   }
 }
+
+TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
+  std::string utf8("abc");
+  InvalidUnicodeCollector invalid;
+
+  bool exclude_protobuf_exceptions = !absl::GetFlag(FLAGS_generate_invalid_utf8_ranges);
+
+  for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
+    utf8[0] = byte1 | JsonSanitizer::Utf8_3BytePattern;
+    for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
+      utf8[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
+      for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
+        utf8[2] = byte3 | JsonSanitizer::Utf8_ContinuePattern;
+        if (isValidUtf8(utf8, exclude_protobuf_exceptions)) {
+          auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(
+              reinterpret_cast<const uint8_t*>(utf8.data()), 3);
+          EXPECT_EQ(3, consumed);
+          absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, utf8);
+          std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
+              ValueUtil::stringValue(utf8), false, true);
+          if (stripDoubleQuotes(proto_sanitized) != hand_sanitized) {
+            invalid.collect(unicode);
+          }
+        }
+      }
+    }
+  }
+
+  EXPECT_FALSE(invalid.emit("invalid_3byte_intervals_"));
+}
+
+// This test takes 17 seconds without optimization.
+#ifdef NDEBUG
+TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
+  std::string utf8("abcd");
+  InvalidUnicodeCollector invalid;
+
+  bool exclude_protobuf_exceptions = !absl::GetFlag(FLAGS_generate_invalid_utf8_ranges);
+
+  for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
+    utf8[0] = byte1 | JsonSanitizer::Utf8_4BytePattern;
+    for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
+      utf8[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
+      for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
+        utf8[2] = byte3 | JsonSanitizer::Utf8_ContinuePattern;
+        for (uint32_t byte4 = 0; byte4 < 64; ++byte4) {
+          utf8[3] = byte4 | JsonSanitizer::Utf8_ContinuePattern;
+          if (isValidUtf8(utf8, exclude_protobuf_exceptions)) {
+            absl::string_view hand_sanitized = sanitizer_.sanitize(buffer_, utf8);
+            std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
+                ValueUtil::stringValue(utf8), false, true);
+            if (stripDoubleQuotes(proto_sanitized) != hand_sanitized) {
+              auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(
+                  reinterpret_cast<const uint8_t*>(utf8.data()), 4);
+              EXPECT_EQ(4, consumed);
+              invalid.collect(unicode);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  EXPECT_FALSE(invalid.emit("invalid_4byte_intervals_"));
+}
+#endif
 
 TEST_F(JsonSanitizerTest, MultiByteUtf8) {
   EXPECT_EQ(UnicodeSizePair(0x3bb, 2), decode(Lambda));
@@ -201,34 +329,42 @@ TEST_F(JsonSanitizerTest, High8Bit) {
       "\xBD\xBE\xBF"
 
       // Codes with a utf8 introductory byte pattern that lack the correct
-      // pattern for the remaining codes. These get hex-escaped by the json
+      // pattern for the remaining codes. These get oct-escaped by the json
       // sanitizer, whereas the protobuf serializer generates an error message
       // and returns an empty string.
-      "\\xc0\\xc1\\xc2\\xc3\\xc4\\xc5\\xc6\\xc7\\xc8\\xc9\\xca"
-      "\\xcb\\xcc\\xcd\\xce\\xcf\\xd0\\xd1\\xd2\\xd3\\xd4\\xd5\\xd6\\xd7\\xd8"
-      "\\xd9\\xda\\xdb\\xdc\\xdd\\xde\\xdf\\xe0\\xe1\\xe2\\xe3\\xe4\\xe5\\xe6"
-      "\\xe7\\xe8\\xe9\\xea\\xeb\\xec\\xed\\xee\\xef\\xf0\\xf1\\xf2\\xf3\\xf4"
-      "\\xf5\\xf6\\xf7\\xf8\\xf9\\xfa\\xfb\\xfc\\xfd\\xfe\\xff",
+      "\\300\\301\\302\\303\\304\\305\\306\\307\\310\\311\\312\\313\\314\\315\\316\\317"
+      "\\320\\321\\322\\323\\324\\325\\326\\327\\330\\331\\332\\333\\334\\335\\336\\337"
+      "\\340\\341\\342\\343\\344\\345\\346\\347\\350\\351\\352\\353\\354\\355\\356\\357"
+      "\\360\\361\\362\\363\\364\\365\\366\\367\\370\\371\\372\\373\\374\\375\\376\\377",
       sanitizer_.sanitize(buffer_, x80_ff));
 }
 
 TEST_F(JsonSanitizerTest, InvalidUtf8) {
   // 2 byte
-  EXPECT_EQ("\\xce", sanitizeInvalid(truncate(LambdaUtf8)));
-  EXPECT_EQ("\\xce\\xfb", sanitizeInvalid(corruptByte2(LambdaUtf8)));
+  EXPECT_EQ("\\316", sanitizeInvalid(truncate(LambdaUtf8)));
+  EXPECT_EQ("\\316\\373", sanitizeInvalid(corruptByte2(LambdaUtf8)));
 
   // 3 byte
-  EXPECT_EQ("\\xe1\xbd", sanitizeInvalid(truncate(OmicronUtf8)));
-  EXPECT_EQ("\\xe1\\xfd\xB9", sanitizeInvalid(corruptByte2(OmicronUtf8)));
+  absl::string_view out = sanitizeInvalid(truncate(OmicronUtf8));
+  EXPECT_THAT(out, StartsWith("\\341"));
+  EXPECT_EQ(5, out.size());
+  EXPECT_EQ('\275', out[4]);
+  EXPECT_EQ("\\341\\375\271", sanitizeInvalid(corruptByte2(OmicronUtf8)));
 
   // 4 byte
-  EXPECT_EQ("\\xf0\\u009d\\u0084", sanitizeInvalid(truncate(TrebleClefUtf8)));
-  EXPECT_EQ("\\xf0\\xfd\\u0084\\u009e", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
+  EXPECT_EQ("\\360\\u009d\\u0084", sanitizeInvalid(truncate(TrebleClefUtf8)));
+  EXPECT_EQ("\\360\\375\\u0084\\u009e", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
 
   // Invalid input embedded in normal text.
   EXPECT_EQ(
-      "Hello, \\xf0\\u009d\\u0084, World!",
+      "Hello, \\360\\u009d\\u0084, World!",
       sanitizer_.sanitize(buffer_, absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+
+  // Replicate a few other cases that were discovered during initail fuzzing,
+  // to ensure we see these as invalid utf8 and avoid them in comparisons.
+  EXPECT_FALSE(isValidUtf8("_K\301\234K", true));
+  EXPECT_FALSE(isValidUtf8("\xF7\xA6\x8A\x8A", true));
+  EXPECT_FALSE(isValidUtf8("\020\377\377\376\000", true));
 }
 
 } // namespace

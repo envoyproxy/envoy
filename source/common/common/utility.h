@@ -561,6 +561,11 @@ public:
     intervals_.insert(Interval(left, right));
   }
 
+  bool test(Value value) const override {
+    const auto left_pos = intervals_.lower_bound(Interval(value, value + 1));
+    return left_pos != intervals_.end() && value >= left_pos->first;
+  }
+
   std::vector<Interval> toVector() const override {
     return std::vector<Interval>(intervals_.begin(), intervals_.end());
   }

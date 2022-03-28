@@ -931,6 +931,21 @@ TEST(IntervalSet, testIntervalTargeted) {
   EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
 }
 
+TEST(IntervalSet, testTest) {
+  IntervalSetImpl<uint32_t> set;
+  set.insert(4, 6);
+  EXPECT_FALSE(set.test(0));
+  set.insert(0, 2);
+  EXPECT_TRUE(set.test(0));
+  EXPECT_TRUE(set.test(1));
+  EXPECT_TRUE(set.test(2));
+  EXPECT_FALSE(set.test(3));
+  EXPECT_TRUE(set.test(4));
+  EXPECT_TRUE(set.test(5));
+  EXPECT_TRUE(set.test(6));
+  EXPECT_FALSE(set.test(7));
+}
+
 TEST(WelfordStandardDeviation, AllEntriesTheSame) {
   WelfordStandardDeviation wsd;
   wsd.update(10);

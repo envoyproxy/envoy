@@ -6,6 +6,8 @@
 #include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_format.h"
+
 namespace Envoy {
 namespace Fuzz {
 
@@ -29,9 +31,21 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(input), false, true);
       absl::string_view proto_sanitized = Envoy::Json::stripDoubleQuotes(buffer2);
       if (hand_sanitized != proto_sanitized) {
-        std::cerr << hand_sanitized << " != " << proto_sanitized << std::endl;
+        std::cerr << "ERROR on input = ";
+        for (char c : input) {
+          if (c == '\\' || c == '"') {
+            std::cerr << "\\" << c;
+          } else if (c < ' ' || c > 126) {
+            std::cerr << "\\" << absl::StrFormat("%03o", static_cast<uint8_t>(c));
+          } else {
+            std::cerr << c;
+          }
+        }
+        std::cerr << std::endl;
+        // << hand_sanitized << " != " << proto_sanitized << std::endl;
+        //std::cerr << input << ": " << hand_sanitized << " != " << proto_sanitized << std::endl;
       }
-      FUZZ_ASSERT(hand_sanitized == proto_sanitized);
+      FUZZ_ASSERT_EQ(hand_sanitized, proto_sanitized, input);
     }
   }
 }

@@ -74,5 +74,9 @@ envoy_cc_test_library(
     name = "json_sanitizer_test_util_lib",
     srcs = ["json_sanitizer_test_util.cc"],
     hdrs = ["json_sanitizer_test_util.h"],
-    deps = ["//source/common/json:json_sanitizer_lib"],
+    deps =
+        [
+            "//source/common/common:utility_lib",
+            "//source/common/json:json_sanitizer_lib",
+        ],
 )

@@ -109,7 +109,7 @@ absl::string_view JsonSanitizer::sanitize(std::string& buffer, absl::string_view
 }
 
 absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_view str) const {
-  std::string hex_escape_buf;
+  std::string oct_escape_buf;
   size_t past_escape = absl::string_view::npos;
   const uint8_t* first = reinterpret_cast<const uint8_t*>(str.data());
   const uint8_t* data = first;
@@ -142,13 +142,10 @@ absl::string_view JsonSanitizer::slowSanitize(std::string& buffer, absl::string_
           }
           escape_view = absl::string_view(iter->second.chars_, iter->second.size_);
         } else {
-          // Using StrFormat during decode seems slow. It would be faster to
-          // just decode each nybble by hand. The APIs in
-          // source/common/common/hex.h are a good starting point though those
-          // also construct an intermediate string. It would be faster to have
-          // versions of those that filled in a fixed-size buffer.
-          hex_escape_buf = absl::StrFormat("\\x%02x", *data);
-          escape_view = absl::string_view(hex_escape_buf);
+          // Using StrFormat during decode seems slow, but this case should be
+          // rare.
+          oct_escape_buf = absl::StrFormat("\\%03o", *data);
+          escape_view = absl::string_view(oct_escape_buf);
         }
         break;
       }

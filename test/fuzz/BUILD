@@ -61,10 +61,12 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "utility_lib",
+    srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
+        "//source/common/common:logger_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",
