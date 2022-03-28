@@ -389,6 +389,12 @@ stats_config:
             regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
         - safe_regex:
             google_re2: {}
+            regex: '^cluster\.[\w]+?\.update_(attempt|success|failure)'
+        - safe_regex:
+            google_re2: {}
+            regex: '^cluster\.[\w]+?\.http2.keepalive_timeout'
+        - safe_regex:
+            google_re2: {}
             regex: '^dns.apple.*'
         - safe_regex:
             google_re2: {}
@@ -398,7 +404,7 @@ stats_config:
             regex: '^http.hcm.decompressor.*'
         - safe_regex:
             google_re2: {}
-            regex: '^http.hcm.downstream_rq_(?:[12345]xx|total|completed)'
+            regex: '^http.hcm.downstream_rq_[\w]+'
         - safe_regex:
             google_re2: {}
             regex: '^pulse.*'
