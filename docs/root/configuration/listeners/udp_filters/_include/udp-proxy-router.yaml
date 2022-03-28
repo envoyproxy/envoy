@@ -1,0 +1,40 @@
+matcher:
+  # The outer matcher list matches source IP.
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            name: envoy.matching.inputs.source_ip
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+          value_match:
+            exact: 127.0.0.1
+      on_match:
+        matcher:
+          # The inner matcher tree matches source port.
+          matcher_tree:
+            input:
+              name: envoy.matching.inputs.source_port
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourcePortInput
+            exact_match_map:
+              map:
+                "80":
+                  action:
+                    name: route
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                      cluster: udp_service
+                "443":
+                  action:
+                    name: route
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                      cluster: udp_service2
+          on_no_match:
+            action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: udp_service3
