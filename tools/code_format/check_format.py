@@ -812,8 +812,11 @@ class FormatChecker:
                 "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
                 "other sinks can add the suffix automatically on flush should they prefer to do so."
             )
-
-        if not self.allow_listed_for_std_regex(file_path) and "std::regex" in line:
+        
+        normalized_target_path = file_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = "./" + normalized_target_path
+        if not self.allow_listed_for_std_regex(normalized_target_path) and "std::regex" in line:
             report_error(
                 "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
