@@ -6377,7 +6377,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl bar_request9 = genHeaders("www.lyft.com", "/bar", "PATCH");
   EXPECT_TRUE(config.route(bar_request9, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request9));
 
-  // If tured off, allows no request using early data.
+  // If turned off, allows no request using early data.
   Http::TestRequestHeaderMapImpl baz_request = genHeaders("www.lyft.com", "/baz", "GET");
   EXPECT_FALSE(config.route(baz_request, 0)->routeEntry()->allowsEarlyDataForRequest(baz_request));
 

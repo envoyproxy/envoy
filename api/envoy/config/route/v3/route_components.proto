@@ -877,7 +877,7 @@ message RouteAction {
 
   message EarlyDataOptions {
     // The request methods allowed to be sent over early data.
-    // If emtpy, no request is allowed to use early data.
+    // If empty, no request is allowed to use early data.
     repeated string allowed_methods = 1 [(validate.rules).repeated = {
       items {
         string {
