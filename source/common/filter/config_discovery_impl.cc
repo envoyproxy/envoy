@@ -258,7 +258,9 @@ ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
   return message;
 }
 
-absl::string_view ListenerFilterConfigProviderManagerImpl::statPrefix() const { return ListenerStatPrefix; }
+absl::string_view ListenerFilterConfigProviderManagerImpl::statPrefix() const {
+  return ListenerStatPrefix;
+}
 
 ProtobufTypes::MessagePtr ListenerFilterConfigProviderManagerImpl::getDefaultConfig(
     const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
@@ -268,16 +270,16 @@ ProtobufTypes::MessagePtr ListenerFilterConfigProviderManagerImpl::getDefaultCon
       Config::Utility::getFactoryByType<Server::Configuration::NamedListenerFilterConfigFactory>(
           proto_config);
   if (default_factory == nullptr) {
-    throw EnvoyException(fmt::format("Error: cannot find listener filter factory {} for default filter "
-                                     "configuration with type URL {}.",
-                                     filter_config_name, proto_config.type_url()));
+    throw EnvoyException(
+        fmt::format("Error: cannot find listener filter factory {} for default filter "
+                    "configuration with type URL {}.",
+                    filter_config_name, proto_config.type_url()));
   }
   validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config, factory_context.messageValidationVisitor(), *default_factory);
   return message;
 }
-
 
 } // namespace Filter
 } // namespace Envoy

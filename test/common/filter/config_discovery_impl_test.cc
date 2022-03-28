@@ -131,7 +131,8 @@ type_urls:
     init_manager_.initialize(init_watcher_);
   }
 
-  std::unique_ptr<FilterConfigProviderManager<Http::FilterFactoryCb, Server::Configuration::FactoryContext>>
+  std::unique_ptr<
+      FilterConfigProviderManager<Http::FilterFactoryCb, Server::Configuration::FactoryContext>>
       filter_config_provider_manager_;
   DynamicFilterConfigProviderPtr<Http::FilterFactoryCb> provider_;
   Config::SubscriptionCallbacks* callbacks_{};
@@ -458,8 +459,6 @@ TEST_F(HttpFilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
             scope_.counter("extension_config_discovery.http_filter.foo.config_reload").value());
 }
 
-
-
 // Listener ECDS test
 // Using OriginalDst listener filter in these tests.
 class ListenerFilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
@@ -467,7 +466,9 @@ public:
   ListenerFilterConfigDiscoveryImplTest() {
     filter_config_provider_manager_ = std::make_unique<ListenerFilterConfigProviderManagerImpl>();
   }
-  ~ListenerFilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
+  ~ListenerFilterConfigDiscoveryImplTest() override {
+    factory_context_.thread_local_.shutdownThread();
+  }
 
   DynamicFilterConfigProviderPtr<Network::ListenerFilterFactoryCb>
   createProvider(std::string name, bool warm, bool default_configuration,
@@ -500,7 +501,7 @@ type_urls:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-         config_source, name, factory_context_, "xds.", last_filter_config, "listener");
+        config_source, name, factory_context_, "xds.", last_filter_config, "listener");
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
@@ -516,31 +517,34 @@ type_urls:
     init_manager_.initialize(init_watcher_);
   }
 
-
   void incrementalTest() {
-     const auto response =
-         TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml_);
-     const auto decoded_resources =
-         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+    const auto response =
+        TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml_);
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
-     EXPECT_CALL(init_watcher_, ready());
-     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-     EXPECT_NE(absl::nullopt, provider_->config());
-     EXPECT_EQ(1UL,
-               scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
-     EXPECT_EQ(0UL,
-               scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
+    EXPECT_CALL(init_watcher_, ready());
+    callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
+    EXPECT_NE(absl::nullopt, provider_->config());
+    EXPECT_EQ(
+        1UL,
+        scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
+    EXPECT_EQ(0UL,
+              scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
 
-     // Ensure that we honor resource removals.
-     Protobuf::RepeatedPtrField<std::string> remove;
-     *remove.Add() = "foo";
-     callbacks_->onConfigUpdate({}, remove, "1");
-     EXPECT_EQ(2UL,
-               scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
-     EXPECT_EQ(0UL, scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
+    // Ensure that we honor resource removals.
+    Protobuf::RepeatedPtrField<std::string> remove;
+    *remove.Add() = "foo";
+    callbacks_->onConfigUpdate({}, remove, "1");
+    EXPECT_EQ(
+        2UL,
+        scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
+    EXPECT_EQ(0UL,
+              scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
   }
 
-  std::unique_ptr<FilterConfigProviderManager<Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext>>
+  std::unique_ptr<FilterConfigProviderManager<Network::ListenerFilterFactoryCb,
+                                              Server::Configuration::ListenerFactoryContext>>
       filter_config_provider_manager_;
   DynamicFilterConfigProviderPtr<Network::ListenerFilterFactoryCb> provider_;
   Config::SubscriptionCallbacks* callbacks_{};
@@ -553,7 +557,6 @@ type_urls:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF";
-
 };
 
 TEST_F(ListenerFilterConfigDiscoveryImplTest, DestroyReady) {
@@ -577,8 +580,9 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, Basic) {
     EXPECT_CALL(init_watcher_, ready());
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
     EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(1UL,
-              scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
+    EXPECT_EQ(
+        1UL,
+        scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
     EXPECT_EQ(0UL,
               scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
   }
@@ -599,13 +603,13 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, Basic) {
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
 
-    EXPECT_EQ(1UL,
-              scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
+    EXPECT_EQ(
+        1UL,
+        scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
     EXPECT_EQ(0UL,
               scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
   }
 }
-
 
 TEST_F(ListenerFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
   TestScopedRuntime scoped_runtime;
@@ -635,7 +639,8 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, ConfigFailed) {
   callbacks_->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::FetchTimedout, {});
   EXPECT_EQ(0UL,
             scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
-  EXPECT_EQ(1UL, scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
+  EXPECT_EQ(1UL,
+            scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
 }
 
 TEST_F(ListenerFilterConfigDiscoveryImplTest, TooManyResources) {
@@ -709,7 +714,8 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
   EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_EQ(0UL,
             scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
-  EXPECT_EQ(0UL, scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
+  EXPECT_EQ(0UL,
+            scope_.counter("extension_config_discovery.listener_filter.foo.config_fail").value());
 }
 
 TEST_F(ListenerFilterConfigDiscoveryImplTest, DualProviders) {
