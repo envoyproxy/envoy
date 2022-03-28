@@ -47,10 +47,10 @@ static_resources:
                               cluster: udp_service2
                   on_no_match:
                     action:
-                    name: route
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-                      cluster: udp_service3
+                      name: route
+                      typed_config:
+                        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                        cluster: udp_service3
   clusters:
   - name: service_udp
     type: STATIC
