@@ -382,6 +382,49 @@ upstream_socket_config:
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
 }
 
+// Route with source IP.
+TEST_F(UdpProxyFilterTest, Router) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+matcher:
+  matcher_tree:
+    input:
+      name: envoy.matching.inputs.source_ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
+  )EOF");
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  test_sessions_[0].idle_timer_->invokeCallback();
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[1].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  recvDataFromDownstream("10.0.0.3:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
 // Idle timeout flow.
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
