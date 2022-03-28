@@ -111,7 +111,7 @@ public:
 
 private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
-  quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
+  quiche::QuicheReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 
 class EnvoyQuicTestCryptoServerStreamFactory : public EnvoyQuicCryptoServerStreamFactoryInterface {
@@ -1031,6 +1031,18 @@ TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
                                                            "Received server push stream"));
   quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
   envoy_quic_session_.OnStreamFrame(stream_frame);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
+  installReadFilter();
+  EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
+  // Just make sure the CWND is non-zero. We don't want to make strong assertions on what the value
+  // should be in this test, that is the job the congestion controllers' tests.
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 500);
+
+  envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
+            quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
 }
 
 } // namespace Quic

@@ -134,6 +134,58 @@ matcher_tree:
   }
 }
 
+TEST_F(TrieMatcherTest, TestMatcherOnNoMatch) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+on_no_match:
+  action:
+    name: bar
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: bar
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputFactory("input", "192.0.100.1");
+    validateMatch("foo");
+  }
+  {
+    // No range matches.
+    auto input = TestDataInputFactory("input", "128.0.0.1");
+    validateMatch("bar");
+  }
+  {
+    // Input is not a valid IP.
+    auto input = TestDataInputFactory("input", "xxx");
+    validateMatch("bar");
+  }
+  {
+    // Input is nullopt.
+    auto input = TestDataInputFactory(
+        "input", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    validateMatch("bar");
+  }
+}
+
 TEST_F(TrieMatcherTest, OverlappingMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
@@ -483,6 +535,51 @@ matcher_tree:
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
   Network::Matching::MatchingDataImpl data(socket);
+
+  const auto result = match_tree()->match(data);
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
+}
+
+TEST(TrieMatcherIntegrationTest, UdpNetworkMatchingData) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+  )EOF";
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  StringActionFactory action_factory;
+  Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action(action_factory);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  MockMatchTreeValidationVisitor<Network::UdpMatchingData> validation_visitor;
+  EXPECT_CALL(validation_visitor, performDataInputValidation(_, _)).Times(testing::AnyNumber());
+  absl::string_view context = "";
+  MatchTreeFactory<Network::UdpMatchingData, absl::string_view> matcher_factory(
+      context, factory_context, validation_visitor);
+  auto match_tree = matcher_factory.create(matcher);
+
+  Network::MockConnectionSocket socket;
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080);
+  Network::Matching::UdpMatchingDataImpl data(address, address);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

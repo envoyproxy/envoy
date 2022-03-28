@@ -78,6 +78,9 @@ public:
       config_->custom_filter_ = custom_filter_;
     }
 
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(factory_context_));
+    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
@@ -227,6 +230,8 @@ settings:
     trans->response_decoder_ =
         std::make_unique<MockResponseDecoderTransportEnd>(decoder_transportEnd);
     trans->upstreamData(filter_->decoder_->metadata_);
+    filter_->continueHandling(filter_->decoder_->metadata_,
+                              filter_->newDecoderEventHandler(filter_->decoder_->metadata()));
 
     // AppException
     struct MockResponseDecoderAppException : public ConnectionManager::ResponseDecoder {
@@ -276,7 +281,7 @@ settings:
       response_decoder.onData(filter_->decoder_->metadata());
     } catch (const EnvoyException& ex) {
       filter_->stats_.response_exception_.inc();
-      EXPECT_EQ(3U, filter_->stats_.response_exception_.value());
+      EXPECT_EQ(4U, filter_->stats_.response_exception_.value());
     }
 
     // end_stream = false
@@ -441,6 +446,8 @@ settings:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::shared_ptr<SipFilters::MockDecoderFilter> decoder_filter_;
   Stats::TestUtil::TestStore store_;
   SipFilterStats stats_;
@@ -514,6 +521,27 @@ settings:
   EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  const std::string SIP_ACK_FULL =
+      "ACK sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "CSeq: 1 ACK\x0d\x0a"
+      "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+      "Supported: 100rel\x0d\x0a"
+      "Route: "
+      "<sip:+16959000000:15306;role=anch;lr;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;"
+      "transport=udp>\x0d\x0a"
+      "P-Asserted-Identity: <sip:User.0001@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "Allow: UPDATE,INVITE,ACK,CANCEL,BYE,PRACK,REFER,MESSAGE,INFO\x0d\x0a"
+      "Max-Forwards: 70\x0d\x0a"
+      "Content-Type: application/sdp\x0d\x0a"
+      "Content-Length:  127\x0d\x0a"
+      "\x0d\x0a";
+  write_buffer_.add(SIP_ACK_FULL);
+  EXPECT_EQ(filter_->onData(write_buffer_, false), Network::FilterStatus::StopIteration);
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesSipCallDefaultMatch) {
@@ -628,6 +656,11 @@ settings:
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
+TEST_F(SipConnectionManagerTest, ContinueHandling) {
+  initializeFilter();
+  filter_->continueHandling("10.0.0.1");
+}
+
 TEST_F(SipConnectionManagerTest, SendLocalReply_SuccessReply) {
   sendLocalReply(
       Envoy::Extensions::NetworkFilters::SipProxy::DirectResponse::ResponseType::SuccessReply);
@@ -655,6 +688,62 @@ TEST_F(SipConnectionManagerTest, ResetRemoteTrans) {
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 TEST_F(SipConnectionManagerTest, ResumeResponse) { resumeResponseTest(); }
+
+TEST_F(SipConnectionManagerTest, EncodeInsertOpaque) {
+  const std::string SIP_OK200_FULL =
+      "SIP/2.0 200 OK\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "CSeq: 1 INVITE\x0d\x0a"
+      "Contact: "
+      "<sip:User.0001@11.0.0.10:15060;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;transport="
+      "TCP>\x0d\x0a"
+      "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "Content-Length:  0\x0d\x0a"
+      "\x0d\x0a";
+
+  buffer_.add(SIP_OK200_FULL);
+
+  absl::string_view header =
+      "Contact: <sip:User.0001@11.0.0.10:15060;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
+      "local:5060;transport=TCP>";
+  metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
+  metadata_->addOpaqueOperation(SIP_OK200_FULL.find("Contact: "), header);
+  Buffer::OwnedImpl response_buffer;
+  metadata_->setEP("127.0.0.1");
+
+  std::shared_ptr<EncoderImpl> encoder = std::make_shared<EncoderImpl>();
+  encoder->encode(metadata_, response_buffer);
+  EXPECT_EQ(response_buffer.length(), buffer_.length() + strlen(",opaque=\"127.0.0.1\""));
+}
+
+TEST_F(SipConnectionManagerTest, EncodeInsert) {
+  const std::string SIP_OK200_FULL =
+      "SIP/2.0 200 OK\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "CSeq: 1 INVITE\x0d\x0a"
+      "Contact: "
+      "<sip:User.0001@11.0.0.10:15060;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;transport="
+      "TCP>\x0d\x0a"
+      "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "Content-Length:  0\x0d\x0a"
+      "\x0d\x0a";
+
+  buffer_.add(SIP_OK200_FULL);
+
+  metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
+  metadata_->setOperation(Operation(OperationType::Insert,
+                                    SIP_OK200_FULL.find(";transport=TCP") + strlen(";transport="),
+                                    InsertOperationValue(";ep=10.0.0.1")));
+  Buffer::OwnedImpl response_buffer;
+
+  std::shared_ptr<EncoderImpl> encoder = std::make_shared<EncoderImpl>();
+  encoder->encode(metadata_, response_buffer);
+  EXPECT_EQ(response_buffer.length(), buffer_.length() + strlen(";ep=10.0.0.1"));
+}
 
 TEST_F(SipConnectionManagerTest, EncodeDelete) {
   const std::string SIP_OK200_FULL =

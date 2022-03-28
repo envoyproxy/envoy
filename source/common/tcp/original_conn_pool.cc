@@ -216,7 +216,7 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
     }
   }
 
-  if (conn.connect_timer_) {
+  if (event != Network::ConnectionEvent::ConnectedZeroRtt && conn.connect_timer_) {
     conn.connect_timer_->disableTimer();
     conn.connect_timer_.reset();
   }

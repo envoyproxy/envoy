@@ -546,11 +546,111 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
 }
 
-TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
+TEST_F(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "0.0.0.0"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set "
+                            "ipv4_compat: 0.0.0.0:13333");
+}
+
+TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  scoped_runtime_guard->mergeValues(
+      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "0.0.0.0"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::1"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: [::1]:13333");
+}
+
+TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnIpv6AnyAddress) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::0"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  scoped_runtime_guard->mergeValues(
+      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::1"
+        port_value: 13333
+        ipv4_compat: true
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
   // Workaround of triggering death at windows platform.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "false"}});
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "false"}});
 
   const std::string yaml = R"EOF(
     name: "foo"
@@ -565,9 +665,8 @@ TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
 }
 
 TEST_F(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListenerConfig) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const std::string yaml = R"EOF(
     name: "foo"
@@ -587,9 +686,8 @@ TEST_F(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListe
 }
 
 TEST_F(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const std::string yaml = R"EOF(
     name: "foo"
@@ -4874,9 +4972,8 @@ api_listener:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "true"}});
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;

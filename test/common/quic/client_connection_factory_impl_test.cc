@@ -40,6 +40,9 @@ protected:
               protocol_options->max_concurrent_streams().value());
     EXPECT_EQ(quic_info_->quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
               protocol_options->initial_stream_window_size().value());
+    ASSERT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
+    EXPECT_TRUE(
+        quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(), quic::kRVCM));
 
     test_address_ = Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
@@ -49,9 +52,7 @@ protected:
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
-        std::make_unique<quic::QuicClientSessionCache>());
+    crypto_config_ = factory_->getCryptoConfig();
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {
@@ -87,7 +88,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   ASSERT(session != nullptr);
   EXPECT_EQ(highWatermark(session), 45);
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
-  EXPECT_EQ(absl::nullopt, session->lastRoundTripTime());
+  EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -95,7 +96,6 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   initialize();
 
   Http::MockAlternateProtocolsCache rtt_cache;
-  quic::QuicConfig config;
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
@@ -106,9 +106,9 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
 
-  EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
-
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+
+  EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());

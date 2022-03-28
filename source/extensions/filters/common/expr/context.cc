@@ -128,6 +128,15 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       return convertHeaderEntry(headers_.value_->RequestId());
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
+    } else if (value == Query) {
+      absl::string_view path = headers_.value_->getPathValue();
+      auto query_offset = path.find('?');
+      if (query_offset == absl::string_view::npos) {
+        return CelValue::CreateStringView(absl::string_view());
+      }
+      path = path.substr(query_offset + 1);
+      auto fragment_offset = path.find('#');
+      return CelValue::CreateStringView(path.substr(0, fragment_offset));
     }
   }
   return {};
