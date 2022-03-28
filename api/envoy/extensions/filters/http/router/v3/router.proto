@@ -25,26 +25,6 @@ message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.router.v2.Router";
 
-  message EarlyDataOptions {
-    // The request methods allowed to be sent over early data.
-    // If emtpy, no request is allowed to use early data.
-    repeated string allowed_methods = 1 [(validate.rules).repeated = {
-      items {
-        string {
-          in: "GET"
-          in: "HEAD"
-          in: "POST"
-          in: "PUT"
-          in: "DELETE"
-          in: "CONNECT"
-          in: "OPTIONS"
-          in: "TRACE"
-          in: "PATCH"
-        }
-      }
-    }];
-  }
-
   // Whether the router generates dynamic cluster statistics. Defaults to
   // true. Can be disabled in high performance scenarios.
   google.protobuf.BoolValue dynamic_stats = 1;

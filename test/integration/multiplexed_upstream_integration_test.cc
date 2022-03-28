@@ -650,7 +650,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, RetryUponTooEarlyResponse) {
+TEST_P(MultiplexedUpstreamIntegrationTest, AutoRetrySafeRequestUponTooEarlyResponse) {
   if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
@@ -666,8 +666,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, RetryUponTooEarlyResponse) {
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   if (upstreamProtocol() == Http::CodecType::HTTP2) {
     ASSERT_TRUE(response->waitForEndStream());
-    // 425 response should be forwarded back to the client as HTTP/2 upstream doesn't support
-    // early data.
+    // 425 response should be forwarded back to the client as HTTP/2 upstream doesn't support early
+    // data.
     EXPECT_EQ("425", response->headers().getStatusValue());
     return;
   }
@@ -695,7 +695,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, RetryUponTooEarlyResponse) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestUsingEarlyData) {
+TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestsUsingEarlyData) {
 #ifdef WIN32
   // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
@@ -766,8 +766,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   ASSERT_TRUE(response2->waitForEndStream());
 }
 
-// Tests that if configured, POST request can be sent over early data. The upstream can reject it
-// and the Envoy should retry it automatically, but not over early data.
+// Tests that if configured, POST request can be sent over early data and retried if the upstream
+// rejects it with TooEarly response.
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
 #ifdef WIN32
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
