@@ -45,12 +45,9 @@ void Span::finishSpan() {
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const StreamInfo::StreamInfo& stream_info) {
-  const auto upstream_info = stream_info.upstreamInfo();
-  const auto remote_address = upstream_info && upstream_info->upstreamHost()
-                                  ? upstream_info->upstreamHost()->address()->asString()
-                                  : std::string(trace_context.authority());
-
+                         const Upstream::HostDescriptionConstSharedPtr& upstream) {
+  const auto remote_address = upstream != nullptr ? upstream->address()->asString()
+                                                  : std::string(trace_context.authority());
   // TODO(wbpcode): Due to https://github.com/SkyAPM/cpp2sky/issues/83 in cpp2sky, it is necessary
   // to ensure that there is '\0' at the end of the string_view parameter to ensure that the
   // corresponding trace header is generated correctly. For this reason, we cannot directly use host

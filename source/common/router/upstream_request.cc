@@ -485,7 +485,10 @@ void UpstreamRequest::onPoolReady(
   }
 
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders(), stream_info_);
+    const auto host = stream_info_.upstreamInfo() != nullptr
+                          ? stream_info_.upstreamInfo()->upstreamHost()
+                          : nullptr;
+    span_->injectContext(*parent_.downstreamHeaders(), host);
   }
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());

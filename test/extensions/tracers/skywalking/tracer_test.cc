@@ -67,7 +67,6 @@ protected:
   SkyWalkingTracerStats tracing_stats_{
       SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TracerPtr tracer_;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Test that the basic functionality of Tracer is working, including creating Span, using Span to
@@ -149,8 +148,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_NE(0, first_child_span->spanEntity()->endTime());
 
     Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+    Upstream::HostDescriptionConstSharedPtr host{
+        new testing::NiceMock<Upstream::MockHostDescription>()};
 
-    first_child_span->injectContext(first_child_headers, stream_info_);
+    first_child_span->injectContext(first_child_headers, host);
     auto sp = createSpanContext(first_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
@@ -176,10 +177,8 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_NE(0, first_child_span->spanEntity()->endTime());
 
     Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
-    NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.upstream_info_->setUpstreamHost(nullptr);
 
-    first_child_span->injectContext(first_child_headers, stream_info);
+    first_child_span->injectContext(first_child_headers, nullptr);
     auto sp = createSpanContext(first_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());

@@ -210,7 +210,6 @@ void testIncomingHeaders(
   for (const auto& kv : headers) {
     request_headers.addCopy(Http::LowerCaseString(kv.first), kv.second);
   }
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   const std::string operation_name{"my_operation_2"};
   SystemTime start_time;
@@ -218,7 +217,7 @@ void testIncomingHeaders(
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});
-    span->injectContext(injected_headers, stream_info);
+    span->injectContext(injected_headers, nullptr);
     span->finishSpan();
 
     // Check contents via public API.

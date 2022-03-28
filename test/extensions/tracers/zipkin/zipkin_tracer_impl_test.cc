@@ -152,7 +152,6 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
@@ -557,7 +556,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
@@ -580,7 +579,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to not sample
@@ -602,7 +601,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
@@ -844,7 +843,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to not sample
@@ -861,7 +860,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
@@ -890,7 +889,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   };
 
   span->setSampled(true);
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
   request_headers_.iterate(
       [&dup_callback](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
         dup_callback(header.key().getStringView());

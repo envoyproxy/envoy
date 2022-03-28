@@ -115,7 +115,6 @@ public:
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
@@ -626,7 +625,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
                                                start_time_, {Tracing::Reason::Sampling, true});
 
     EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
-    span->injectContext(request_headers_, stream_info_);
+    span->injectContext(request_headers_, nullptr);
 
     injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
@@ -641,7 +640,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     Tracing::SpanPtr span_with_parent = driver_->startSpan(
         config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
     request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
-    span_with_parent->injectContext(request_headers_, stream_info_);
+    span_with_parent->injectContext(request_headers_, nullptr);
     injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
   }
@@ -677,7 +676,7 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
-  span->injectContext(request_headers_, stream_info_);
+  span->injectContext(request_headers_, nullptr);
   EXPECT_TRUE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
   EXPECT_TRUE(request_headers_.has("ot-tracer-traceid"));
   EXPECT_TRUE(request_headers_.has("x-b3-traceid"));
@@ -689,7 +688,7 @@ TEST_F(LightStepDriverTest, SpawnChild) {
 
   Tracing::SpanPtr parent = driver_->startSpan(config_, request_headers_, operation_name_,
                                                start_time_, {Tracing::Reason::Sampling, true});
-  parent->injectContext(request_headers_, stream_info_);
+  parent->injectContext(request_headers_, nullptr);
 
   Tracing::SpanPtr childViaHeaders = driver_->startSpan(
       config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
@@ -698,8 +697,8 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   Http::TestRequestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   Http::TestRequestHeaderMapImpl base2{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
 
-  childViaHeaders->injectContext(base1, stream_info_);
-  childViaSpawn->injectContext(base2, stream_info_);
+  childViaHeaders->injectContext(base1, nullptr);
+  childViaSpawn->injectContext(base2, nullptr);
 
   std::string base1_context =
       Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));

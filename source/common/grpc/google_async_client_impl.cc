@@ -455,7 +455,7 @@ void GoogleAsyncRequestImpl::cancel() {
 }
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata, *options_.parent_context.stream_info);
+  current_span_->injectContext(metadata, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

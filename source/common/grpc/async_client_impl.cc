@@ -254,7 +254,7 @@ void AsyncRequestImpl::cancel() {
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata, *options_.parent_context.stream_info);
+  current_span_->injectContext(metadata, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

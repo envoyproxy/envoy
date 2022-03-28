@@ -270,7 +270,7 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
 }
 
 void AsyncRequestImpl::initialize() {
-  child_span_->injectContext(request_->headers(), streamInfo());
+  child_span_->injectContext(request_->headers(), nullptr);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
