@@ -188,13 +188,6 @@ private:
     void onReadReady();
     void fillStreamInfo();
 
-    UdpProxyDownstreamStats generateStats(Stats::Scope& scope) {
-      const auto final_prefix =
-          absl::StrCat("udp.", cluster_.filter_.config_->randomGenerator().uuid());
-      return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                             POOL_GAUGE_PREFIX(scope, final_prefix))};
-    }
-
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                        Network::Address::InstanceConstSharedPtr peer_address,
@@ -209,6 +202,18 @@ private:
       // TODO(mattklein123) change this to a reasonable number if needed.
       return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
     }
+
+    /**
+     * Struct definition for session access logging.
+    */
+    struct UdpProxySessionStats {
+      uint64_t downstream_sess_tx_bytes_;
+      uint64_t downstream_sess_rx_bytes_;
+      uint64_t downstream_sess_tx_errors_;
+      uint64_t downstream_sess_rx_errors_;
+      uint64_t downstream_sess_tx_datagrams_;
+      uint64_t downstream_sess_rx_datagrams_;
+    };
 
     ClusterInfo& cluster_;
     const bool use_original_src_ip_;
@@ -225,7 +230,7 @@ private:
     // write to the upstream host.
     const Network::SocketPtr socket_;
 
-    UdpProxyDownstreamStats session_stats_;
+    UdpProxySessionStats session_stats_{};
     absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
   };
 
