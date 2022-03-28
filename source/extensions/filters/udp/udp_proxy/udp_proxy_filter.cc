@@ -231,7 +231,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      socket_(cluster.filter_.createSocket(host)){
+      socket_(cluster.filter_.createSocket(host)) {
   if (!cluster_.filter_.config_->accessLogs().empty()) {
     udp_sess_stats_.emplace(
         StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
@@ -291,12 +291,9 @@ void UdpProxyFilter::ActiveSession::fillStreamInfo() {
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["cluster_name"] = ValueUtil::stringValue(cluster_.cluster_.info()->name());
-  fields_map["bytes_sent"] =
-      ValueUtil::numberValue(session_stats_.downstream_sess_tx_bytes_);
-  fields_map["bytes_received"] =
-      ValueUtil::numberValue(session_stats_.downstream_sess_rx_bytes_);
-  fields_map["errors_sent"] =
-      ValueUtil::numberValue(session_stats_.downstream_sess_tx_errors_);
+  fields_map["bytes_sent"] = ValueUtil::numberValue(session_stats_.downstream_sess_tx_bytes_);
+  fields_map["bytes_received"] = ValueUtil::numberValue(session_stats_.downstream_sess_rx_bytes_);
+  fields_map["errors_sent"] = ValueUtil::numberValue(session_stats_.downstream_sess_tx_errors_);
   fields_map["errors_received"] =
       ValueUtil::numberValue(cluster_.filter_.config_->stats().downstream_sess_rx_errors_.value());
   fields_map["datagrams_sent"] =
@@ -340,7 +337,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
             host_->address()->asStringView());
   const uint64_t buffer_length = buffer.length();
   cluster_.filter_.config_->stats().downstream_sess_rx_bytes_.add(buffer_length);
-  session_stats_.downstream_sess_rx_bytes_+=buffer_length;
+  session_stats_.downstream_sess_rx_bytes_ += buffer_length;
   cluster_.filter_.config_->stats().downstream_sess_rx_datagrams_.inc();
   ++session_stats_.downstream_sess_rx_datagrams_;
 
@@ -380,7 +377,7 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
     ++session_stats_.downstream_sess_tx_errors_;
   } else {
     cluster_.filter_.config_->stats().downstream_sess_tx_bytes_.add(buffer_length);
-    session_stats_.downstream_sess_tx_bytes_+=buffer_length;
+    session_stats_.downstream_sess_tx_bytes_ += buffer_length;
     cluster_.filter_.config_->stats().downstream_sess_tx_datagrams_.inc();
     ++session_stats_.downstream_sess_tx_datagrams_;
   }

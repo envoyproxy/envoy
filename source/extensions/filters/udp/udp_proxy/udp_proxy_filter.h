@@ -205,7 +205,7 @@ private:
 
     /**
      * Struct definition for session access logging.
-    */
+     */
     struct UdpProxySessionStats {
       uint64_t downstream_sess_tx_bytes_;
       uint64_t downstream_sess_rx_bytes_;
