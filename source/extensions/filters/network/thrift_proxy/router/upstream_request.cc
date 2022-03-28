@@ -211,6 +211,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   case Network::ConnectionEvent::Connected:
+  case Network::ConnectionEvent::ConnectedZeroRtt:
     // Connected is consumed by the connection pool.
     IS_ENVOY_BUG("reached unexpectedly");
   }

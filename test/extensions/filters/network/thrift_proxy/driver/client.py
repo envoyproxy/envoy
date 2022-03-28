@@ -12,7 +12,6 @@ from thrift.protocol import (TBinaryProtocol, TCompactProtocol, TJSONProtocol, T
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from fbthrift import THeaderTransport
-from twitter.common.rpc.finagle.protocol import TFinagleProtocol
 
 # On Windows we run this test on Python3
 if sys.version_info[0] != 2:
@@ -105,8 +104,6 @@ def main(cfg, reqhandle, resphandle):
         protocol = TCompactProtocol.TCompactProtocol(transport)
     elif cfg.protocol == "json":
         protocol = TJSONProtocol.TJSONProtocol(transport)
-    elif cfg.protocol == "finagle":
-        protocol = TFinagleProtocol(transport, client_id="thrift-playground")
     else:
         sys.exit("unknown protocol {0}".format(cfg.protocol))
 
@@ -206,7 +203,7 @@ if __name__ == "__main__":
         "--protocol",
         dest="protocol",
         default="binary",
-        choices=["binary", "compact", "json", "finagle"],
+        choices=["binary", "compact", "json"],
         help="selects a protocol.",
     )
     parser.add_argument(

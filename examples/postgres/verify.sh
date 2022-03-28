@@ -8,7 +8,7 @@ export DELAY=10
 
 _psql () {
     local postgres_client
-    postgres_client=(docker run -i --rm --network envoymesh -e "PGSSLMODE=disable" postgres:latest psql -U postgres -h proxy -p 1999)
+    postgres_client=(docker run -i --rm --network postgres_default -e "PGSSLMODE=disable" postgres:latest psql -U postgres -h proxy -p 1999)
     "${postgres_client[@]}" "${@}"
 }
 
