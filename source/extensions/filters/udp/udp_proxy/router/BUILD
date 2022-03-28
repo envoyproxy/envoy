@@ -22,8 +22,8 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/matcher:matcher_lib",
         "//source/common/matcher:validation_visitor_lib",
+        "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

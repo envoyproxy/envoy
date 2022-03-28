@@ -42,10 +42,10 @@ public:
 };
 
 class RouteActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Network::MatchingData> {
+    : public Matcher::MatchTreeValidationVisitor<Network::UdpMatchingData> {
 public:
   absl::Status
-  performDataInputValidation(const Matcher::DataInputFactory<Network::MatchingData>& data_input,
+  performDataInputValidation(const Matcher::DataInputFactory<Network::UdpMatchingData>& data_input,
                              absl::string_view type_url) override;
 };
 
@@ -55,12 +55,13 @@ public:
              Server::Configuration::ServerFactoryContext& context);
 
   // Router::Router
-  const std::string route(Network::Address::InstanceConstSharedPtr source_address) const override;
+  const std::string route(Network::Address::InstanceConstSharedPtr destination_address,
+                          Network::Address::InstanceConstSharedPtr source_address) const override;
   const std::vector<std::string>& allClusterNames() const override;
 
 private:
   absl::optional<std::string> cluster_;
-  Matcher::MatchTreeSharedPtr<Network::MatchingData> matcher_;
+  Matcher::MatchTreeSharedPtr<Network::UdpMatchingData> matcher_;
   std::vector<std::string> cluster_names_;
 };
 

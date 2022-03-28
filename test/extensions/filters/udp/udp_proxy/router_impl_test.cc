@@ -52,10 +52,14 @@ cluster: udp_service
 
   setup(yaml);
 
-  EXPECT_EQ("udp_service", router_->route(parseAddress("10.0.0.1:10000")));
-  EXPECT_EQ("udp_service", router_->route(parseAddress("172.16.0.1:10000")));
-  EXPECT_EQ("udp_service", router_->route(parseAddress("192.168.0.1:10000")));
-  EXPECT_EQ("udp_service", router_->route(parseAddress("[fc00::1]:10000")));
+  EXPECT_EQ("udp_service",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+  EXPECT_EQ("udp_service",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("172.16.0.1:10000")));
+  EXPECT_EQ("udp_service",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("192.168.0.1:10000")));
+  EXPECT_EQ("udp_service",
+            router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
 }
 
 // Route UDP packets to multiple clusters.
@@ -65,9 +69,9 @@ stat_prefix: foo
 matcher:
   matcher_tree:
     input:
-      name: source-ip
+      name: envoy.matching.inputs.source_ip
       typed_config:
-        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
     exact_match_map:
       map:
         "10.0.0.1":
@@ -86,10 +90,12 @@ matcher:
 
   setup(yaml);
 
-  EXPECT_EQ("udp_service", router_->route(parseAddress("10.0.0.1:10000")));
-  EXPECT_EQ("udp_service2", router_->route(parseAddress("172.16.0.1:10000")));
-  EXPECT_EQ("", router_->route(parseAddress("192.168.0.1:10000")));
-  EXPECT_EQ("", router_->route(parseAddress("[fc00::1]:10000")));
+  EXPECT_EQ("udp_service",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+  EXPECT_EQ("udp_service2",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("172.16.0.1:10000")));
+  EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:80"), parseAddress("192.168.0.1:10000")));
+  EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
 }
 
 // Route UDP packets to multiple clusters with on_no_match set.
@@ -99,9 +105,9 @@ stat_prefix: foo
 matcher:
   matcher_tree:
     input:
-      name: source-ip
+      name: envoy.matching.inputs.source_ip
       typed_config:
-        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
     exact_match_map:
       map:
         "10.0.0.1":
@@ -126,10 +132,14 @@ matcher:
 
   setup(yaml);
 
-  EXPECT_EQ("udp_service", router_->route(parseAddress("10.0.0.1:10000")));
-  EXPECT_EQ("udp_service2", router_->route(parseAddress("172.16.0.1:10000")));
-  EXPECT_EQ("udp_service3", router_->route(parseAddress("192.168.0.1:10000")));
-  EXPECT_EQ("udp_service3", router_->route(parseAddress("[fc00::1]:10000")));
+  EXPECT_EQ("udp_service",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+  EXPECT_EQ("udp_service2",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("172.16.0.1:10000")));
+  EXPECT_EQ("udp_service3",
+            router_->route(parseAddress("0.0.0.0:80"), parseAddress("192.168.0.1:10000")));
+  EXPECT_EQ("udp_service3",
+            router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
 }
 
 // All cluster names in the router with a single cluster.
@@ -151,9 +161,9 @@ stat_prefix: foo
 matcher:
   matcher_tree:
     input:
-      name: source-ip
+      name: envoy.matching.inputs.source_ip
       typed_config:
-        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
     exact_match_map:
       map:
         "10.0.0.1":
@@ -183,9 +193,9 @@ stat_prefix: foo
 matcher:
   matcher_tree:
     input:
-      name: source-ip
+      name: envoy.matching.inputs.source_ip
       typed_config:
-        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
     exact_match_map:
       map:
         "10.0.0.1":
@@ -221,9 +231,9 @@ stat_prefix: foo
 matcher:
   matcher_tree:
     input:
-      name: source-ip
+      name: envoy.matching.inputs.destination_ip
       typed_config:
-        '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
     exact_match_map:
       map:
         "10.0.0.1":
@@ -238,7 +248,7 @@ matcher:
       setup(yaml), EnvoyException,
       "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
       "only match on source IP, saw "
-      "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+      "type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput");
 }
 
 } // namespace

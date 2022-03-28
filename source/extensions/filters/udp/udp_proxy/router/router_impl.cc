@@ -2,7 +2,6 @@
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.validate.h"
-#include "envoy/type/matcher/v3/network_inputs.pb.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/network/matching/data_impl.h"
@@ -30,9 +29,10 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 absl::Status RouteActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Network::MatchingData>&, absl::string_view type_url) {
+    const Matcher::DataInputFactory<Network::UdpMatchingData>&, absl::string_view type_url) {
   static std::string source_ip_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-      envoy::type::matcher::v3::SourceIpMatchInput::descriptor()->full_name());
+      envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
+          ->full_name());
   if (type_url == source_ip_input_name) {
     return absl::OkStatus();
   }
@@ -49,7 +49,7 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
   } else {
     RouteActionContext context{};
     RouteActionValidationVisitor validation_visitor;
-    Matcher::MatchTreeFactory<Network::MatchingData, RouteActionContext> factory(
+    Matcher::MatchTreeFactory<Network::UdpMatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
     matcher_ = factory.create(config.matcher())();
 
@@ -65,13 +65,14 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
   }
 }
 
-const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr source_address) const {
+const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr destination_address,
+                                    Network::Address::InstanceConstSharedPtr source_address) const {
   if (cluster_.has_value()) {
     return cluster_.value();
   }
 
   if (source_address->ip()) {
-    Network::Matching::MatchingDataImpl data(source_address->ip());
+    Network::Matching::UdpMatchingDataImpl data(destination_address, source_address);
 
     auto result = matcher_->match(data);
     if (result.match_state_ == Matcher::MatchState::MatchComplete) {
