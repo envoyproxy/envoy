@@ -49,6 +49,9 @@ WKT_NAMESPACE_PREFIX = '.google.protobuf.'
 # Namespace prefix for RPCs.
 RPC_NAMESPACE_PREFIX = '.google.rpc.'
 
+# Namespace prefix for cncf/xds top-level APIs.
+CNCF_PREFIX = '.xds.'
+
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
@@ -182,6 +185,11 @@ def github_url(text, type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
+    if type_context.name.startswith(CNCF_PREFIX[1:]):
+        return format_external_link(
+            text,
+            f"https://github.com/cncf/xds/blob/main/{type_context.source_code_info.name}#L{type_context.location.span[0]}"
+        )
     return f":repo:`{text} <api/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
 
 
@@ -428,8 +436,10 @@ def format_field_type(type_context, field):
         field: FieldDescriptor proto.
     Return: RST formatted field type.
     """
-    if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(
-            ENVOY_PREFIX):
+    envoy_proto = (
+        field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX)
+        or field.type_name.startswith(ENVOY_PREFIX) or field.type_name.startswith(CNCF_PREFIX))
+    if envoy_proto:
         type_name = normalize_field_type_name(field.type_name)
         if field.type == field.TYPE_MESSAGE:
             if type_context.map_typenames and type_name_from_fqn(

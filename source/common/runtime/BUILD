@@ -21,6 +21,7 @@ envoy_cc_library(
         # AVOID ADDING TO THESE DEPENDENCIES IF POSSIBLE
         # Any code using runtime guards depends on this library, and the more dependencies there are,
         # the harder it is to runtime-guard without dependency loops.
+        "@com_google_absl//absl/flags:commandlineflag",
         "@com_google_absl//absl/flags:flag",
         "//envoy/runtime:runtime_interface",
         "//source/common/common:hash_lib",

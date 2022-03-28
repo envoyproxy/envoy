@@ -15,6 +15,7 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
+#include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
 namespace Quic {

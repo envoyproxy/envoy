@@ -119,6 +119,9 @@ route_config:
             - header:
                 key: "x-route-response"
                 value: "route"
+            - header:
+                key: "details"
+                value: "%RESPONSE_CODE_DETAILS%"
           response_headers_to_remove: ["x-route-response-remove"]
           route:
             cluster: cluster_0
@@ -593,6 +596,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
           {"server", "envoy"},
           {"x-route-response", "upstream"},
           {"x-route-response", "route"},
+          {"details", "via_upstream"},
           {":status", "200"},
       });
 }
@@ -629,6 +633,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {"server", "envoy"},
           {"x-unmodified", "upstream"},
           {"x-route-response", "route"},
+          {"details", "via_upstream"},
           {":status", "200"},
       });
 }

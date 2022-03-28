@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -135,6 +136,7 @@ public:
   IpList() = default;
 
   bool contains(const Instance& address) const;
+  size_t getIpListSize() const { return ip_list_.size(); };
 
 private:
   std::vector<CidrRange> ip_list_;

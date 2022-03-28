@@ -621,7 +621,8 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
         interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
         break;
       default:
-        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}",
+                                     static_cast<int>(socket_address->ip()->version())));
       }
 
       if (socket_address_value == interface_address_value) {

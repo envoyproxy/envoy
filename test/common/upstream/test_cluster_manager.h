@@ -76,14 +76,13 @@ public:
             }));
   }
 
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
-                   std::vector<Http::Protocol>&,
-                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-                       alternate_protocol_options,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource&, ClusterConnectivityState& state) override {
+  Http::ConnectionPool::InstancePtr allocateConnPool(
+      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
+      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+          alternate_protocol_options,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
+      ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(
         host, alternate_protocol_options, options, transport_socket_options, state)};
   }
