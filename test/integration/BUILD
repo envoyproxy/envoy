@@ -727,6 +727,16 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "fake_runtime_loader_lib",
+    hdrs = [
+        "fake_runtime_loader.h",
+    ],
+    deps = [
+        "//envoy/runtime:runtime_interface",
+    ],
+)
+
+envoy_cc_test_library(
     name = "fake_upstream_lib",
     srcs = [
         "fake_upstream.cc",
@@ -735,6 +745,7 @@ envoy_cc_test_library(
         "fake_upstream.h",
     ],
     deps = [
+        ":fake_runtime_loader_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//source/server:listener_manager_lib",
         "//envoy/api:api_interface",

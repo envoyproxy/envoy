@@ -43,8 +43,8 @@
 
 #include "source/server/active_raw_udp_listener_config.h"
 
+#include "test/integration/fake_runtime_loader.h"
 #include "test/mocks/common.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -852,7 +852,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
-  testing::NiceMock<Runtime::MockLoader> runtime_;
+  FakeRuntimeLoader runtime_;
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
