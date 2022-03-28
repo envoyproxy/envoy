@@ -216,8 +216,8 @@ ConnectivityGrid::ConnectivityGrid(
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
-      time_source_(time_source),
-      alternate_protocols_(alternate_protocols), quic_stat_names_(quic_stat_names), scope_(scope),
+      time_source_(time_source), alternate_protocols_(alternate_protocols),
+      quic_stat_names_(quic_stat_names), scope_(scope),
       origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
               host_->address()->ip()->port()),
       quic_info_(quic_info) {
