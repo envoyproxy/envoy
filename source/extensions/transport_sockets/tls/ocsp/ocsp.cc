@@ -265,12 +265,14 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
     throw EnvoyException("OCSP ResponseData is not a well-formed ASN.1 SEQUENCE");
   }
 
-  // only support v1, the value of v1 is 0
-  auto version =
+  // only support v1, the value of v1 is 0x00
+  auto version_cbs =
       unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0));
-  if (version.has_value() && *version.value().data != 0) {
-    throw EnvoyException(
-        fmt::format("OCSP ResponseData version {} is not supported", *version.value().data));
+  if (version_cbs.has_value() && version_cbs->len > 0) {
+    auto version = unwrap(Asn1Utility::parseInteger(*version_cbs));
+    if (version != "00") {
+      throw EnvoyException(fmt::format("OCSP ResponseData version 0x{} is not supported", version));
+    }
   }
 
   skipResponderId(elem);

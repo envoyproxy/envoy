@@ -193,12 +193,13 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
       0x30,
-      7,
+      8,
       // invalid version 1
       0xa0,
-      0x02,
+      0x03, // bitstring
+      0x02, // integer
       1,
-      0,
+      1,
       // Responder ID tag 1
       1,
       1,
@@ -207,19 +208,14 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
   EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseData(cbs), EnvoyException,
-                            "OCSP ResponseData version 1 is not supported");
+                            "OCSP ResponseData version 0x01 is not supported");
 }
 
 TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
       0x30,
-      7,
-      // version
-      0xa0,
-      0x02,
-      0,
-      0,
+      3,
       // Invalid Responder ID tag 3
       3,
       1,
