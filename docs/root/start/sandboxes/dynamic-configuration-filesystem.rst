@@ -75,7 +75,7 @@ configuration, you should see it is configured with the ``example_proxy_cluster`
    :emphasize-lines: 10, 18-19
 
 Step 4: Replace ``cds.yaml`` inside the container to update upstream cluster
-*************************************************************************
+****************************************************************************
 
 The example setup provides Envoy with two dynamic configuration files:
 
