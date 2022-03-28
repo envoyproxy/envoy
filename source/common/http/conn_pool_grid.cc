@@ -1,7 +1,6 @@
 #include "source/common/http/conn_pool_grid.h"
 
 #include <cstdint>
-#include <memory>
 
 #include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
@@ -19,6 +18,17 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 }
 
 static constexpr uint32_t kDefaultTimeoutMs = 300;
+
+std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                   Network::TransportSocketFactory& transport_socket_factory) {
+  if (options && options->serverNameOverride().has_value()) {
+    return options->serverNameOverride().value();
+  }
+  auto* quic_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&transport_socket_factory);
+  ASSERT(quic_socket_factory != nullptr);
+  return quic_socket_factory->clientContextConfig().serverNameIndication();
+}
 
 } // namespace
 
@@ -107,7 +117,7 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
 
 ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newStream() {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
-            describePool(**current_), grid_.host_->hostname());
+            describePool(**current_), grid_.origin_.hostname_);
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (next_attempt_timer_ != nullptr && !next_attempt_timer_->enabled()) {
@@ -147,7 +157,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
 
 void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
   if (http3_attempt_failed_ && tcp_attempt_succeeded_) {
-    ENVOY_LOG(trace, "Marking HTTP/3 broken for host '{}'.", grid_.host_->hostname());
+    ENVOY_LOG(trace, "Marking HTTP/3 broken for host '{}'.", grid_.origin_.hostname_);
     grid_.markHttp3Broken();
   }
 }
@@ -208,15 +218,17 @@ ConnectivityGrid::ConnectivityGrid(
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
-      quic_stat_names_(quic_stat_names), scope_(scope), quic_info_(quic_info) {
-  ASSERT(connectivity_options.protocols_.size() == 3);
-  ASSERT(alternate_protocols);
+      quic_stat_names_(quic_stat_names), scope_(scope),
+      // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
+      origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
+              host_->address()->ip()->port()),
+      quic_info_(quic_info) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
-  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
-                                         host_->address()->ip()->port());
+  ASSERT(connectivity_options.protocols_.size() == 3);
+  ASSERT(alternate_protocols);
   std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin));
+      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
   }
@@ -366,10 +378,7 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
 
 AlternateProtocolsCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
   ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
-  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
-                                         host_->address()->ip()->port());
-  return alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
+  return alternate_protocols_->getOrCreateHttp3StatusTracker(origin_);
 }
 
 bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
@@ -410,13 +419,11 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return false;
   }
   uint32_t port = host_->address()->ip()->port();
-  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-  AlternateProtocolsCache::Origin origin("https", host_->hostname(), port);
   OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
-      alternate_protocols_->findAlternatives(origin);
+      alternate_protocols_->findAlternatives(origin_);
   if (!protocols.has_value()) {
     ENVOY_LOG(trace, "No alternate protocols available for host '{}', skipping HTTP/3.",
-              host_->hostname());
+              origin_.hostname_);
     return false;
   }
   if (isHttp3Broken()) {
@@ -428,7 +435,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     if (!protocol.hostname_.empty() || protocol.port_ != port) {
       ENVOY_LOG(trace,
                 "Alternate protocol for host '{}' attempts to change host or port, skipping.",
-                host_->hostname());
+                origin_.hostname_);
       continue;
     }
 
@@ -440,20 +447,20 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
         alt_svc, quic::CurrentSupportedVersions());
     if (version != quic::ParsedQuicVersion::Unsupported()) {
       // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
-      ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
+      ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", origin_.hostname_);
       return true;
     }
 
     ENVOY_LOG(trace, "Alternate protocol for host '{}' has unsupported ALPN '{}', skipping.",
-              host_->hostname(), protocol.alpn_);
+              origin_.hostname_, protocol.alpn_);
   }
 
-  ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());
+  ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", origin_.hostname_);
   return false;
 }
 
 void ConnectivityGrid::onHandshakeComplete() {
-  ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", host_->hostname());
+  ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", origin_.hostname_);
   markHttp3Confirmed();
 }
 

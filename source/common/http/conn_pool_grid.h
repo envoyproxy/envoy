@@ -236,6 +236,10 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  // The origin for this pool.
+  // Note the host name here is based off of the host name used for SNI, which
+  // may be from the cluster config, or the request headers for auto-sni.
+  AlternateProtocolsCache::Origin origin_;
   Http::PersistentQuicInfo& quic_info_;
 };
 
