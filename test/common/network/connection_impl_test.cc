@@ -334,9 +334,14 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   EXPECT_TRUE(client_connection_->connecting());
 
   StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
-  // Make sure removed connections don't get events.
+  // Make sure removed callbacks don't get events.
   client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
   client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
+
+  // Make sure later callbacks don't receive a connected event if an earlier callback closed
+  // the connection during its callback.
+  StrictMock<MockConnectionCallbacks> later_callbacks;
+  client_connection_->addConnectionCallbacks(later_callbacks);
 
   std::shared_ptr<MockReadFilter> add_and_remove_filter =
       std::make_shared<StrictMock<MockReadFilter>>();
@@ -346,6 +351,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
         client_connection_->close(ConnectionCloseType::NoFlush);
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(later_callbacks, onEvent(ConnectionEvent::LocalClose));
 
   read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 

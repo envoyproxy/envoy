@@ -1,7 +1,4 @@
-FROM alpine:latest
+FROM flask_service:python-3.10-slim-bullseye
 
-RUN apk update && apk add py3-pip
-RUN pip3 install -q Flask==2.0.3 pyyaml
-RUN mkdir /code
-COPY ./service.py /code
-CMD ["python3", "/code/service.py"]
+ADD requirements.txt /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt

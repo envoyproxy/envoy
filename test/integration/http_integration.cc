@@ -350,7 +350,7 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig();
+  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_);
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"}, test_server_);
@@ -562,19 +562,15 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   initialize();
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   if (set_content_length_header) {
-    request_headers.setContentLength(request_size);
-    response_headers.setContentLength(response_size);
+    default_request_headers_.setContentLength(request_size);
+    default_response_headers_.setContentLength(response_size);
   }
   if (big_header) {
-    request_headers.addCopy("big", std::string(4096, 'a'));
+    default_request_headers_.addCopy("big", std::string(4096, 'a'));
   }
-  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
-                                                response_size, 0, timeout);
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, request_size, default_response_headers_, response_size, 0, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
@@ -586,15 +582,14 @@ void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& exp
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
+      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "sni.lyft.com"}});
   auto response = std::move(encoder_decoder.second);
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
-  // be fixed.
   std::string data;
-  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
   ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -617,12 +612,11 @@ HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_co
   }
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", path},
-                                                 {":scheme", "http"},
-                                                 {":authority", authority},
-                                                 {"x-lyft-user-id", "123"}};
-  return sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
+  if (!authority.empty()) {
+    default_request_headers_.setHost(authority);
+  }
+  default_request_headers_.setPath(path);
+  return sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
                                        upstream_index);
 }
 
@@ -684,7 +678,7 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "sni.lyft.com"},
                                                  {matching_header, "true"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
@@ -693,12 +687,8 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
   test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
 
-  Http::TestRequestHeaderMapImpl request_headers2{{":method", "POST"},
-                                                  {":path", "/test/long/url"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"}};
-
-  auto response2 = sendRequestAndWaitForResponse(request_headers2, 0, default_response_headers_, 0);
+  auto response2 =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response2.get());
 
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
@@ -870,7 +860,7 @@ void HttpIntegrationTest::testRetry() {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
@@ -899,7 +889,7 @@ void HttpIntegrationTest::testRetry() {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
-  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("sni.lyft.com", "/test_retry");
   host.set_include_request_attempt_count(true);
   host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
@@ -910,7 +900,7 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test_retry"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024);
@@ -949,7 +939,7 @@ void HttpIntegrationTest::testGrpcRetry() {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-grpc-on", "cancelled"}});
   request_encoder_ = &encoder_decoder.first;
@@ -994,7 +984,7 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/dynamo/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"expect", "100-continue"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -1065,7 +1055,7 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                                  {":path", "/dynamo/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"expect", "100-continue"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -1174,7 +1164,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
   Http::TestRequestHeaderMapImpl big_headers{{":method", "GET"},
                                              {":path", "/" + std::string(url_size * 1024, 'a')},
                                              {":scheme", "http"},
-                                             {":authority", "host"}};
+                                             {":authority", "sni.lyft.com"}};
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1217,8 +1207,10 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
   setMaxRequestHeadersKb(max_size);
   setMaxRequestHeadersCount(max_count);
 
-  Http::TestRequestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl big_headers{{":method", "GET"},
+                                             {":path", "/test/long/url"},
+                                             {":scheme", "http"},
+                                             {":authority", "sni.lyft.com"}};
 
   // Already added four headers.
   for (unsigned int i = 0; i < count; i++) {
@@ -1311,7 +1303,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
       {{Http::Headers::get().Method, "GET"},
        {Http::Headers::get().Path, "/test/long/url"},
        {Http::Headers::get().Scheme, "http"},
-       {Http::Headers::get().Host, "host"}});
+       {Http::Headers::get().Host, "sni.lyft.com"}});
 
   for (int i = 0; i < 10000; i++) {
     big_headers->addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
@@ -1335,7 +1327,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"cookie", "a=b"},
                                                                  {"cookie", "c=d"}});
   request_encoder_ = &encoder_decoder.first;
@@ -1382,7 +1374,7 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, request_size, false);
@@ -1419,7 +1411,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"}};
+                                                 {":authority", "sni.lyft.com"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(0);
 
@@ -1466,22 +1458,14 @@ void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Start request 1
-  auto encoder_decoder1 =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
+  auto encoder_decoder1 = codec_client_->startRequest(default_request_headers_);
   Http::RequestEncoder* encoder1 = &encoder_decoder1.first;
   auto response1 = std::move(encoder_decoder1.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
 
   // Start request 2
-  auto encoder_decoder2 =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
+  auto encoder_decoder2 = codec_client_->startRequest(default_request_headers_);
   Http::RequestEncoder* encoder2 = &encoder_decoder2.first;
   auto response2 = std::move(encoder_decoder2.second);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));

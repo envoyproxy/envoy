@@ -16,6 +16,8 @@
 namespace Envoy {
 namespace Filter {
 
+constexpr absl::string_view HttpStatPrefix = "http_filter.";
+
 namespace {
 void validateTypeUrlHelper(const std::string& type_url,
                            const absl::flat_hash_set<std::string> require_type_urls) {
@@ -67,9 +69,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
-      scope_(factory_context.scope().createScope(stat_prefix + "extension_config_discovery." +
-                                                 filter_config_name_ + ".")),
-      stat_prefix_(stat_prefix),
+      scope_(factory_context.scope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
@@ -243,6 +243,8 @@ std::tuple<ProtobufTypes::MessagePtr, std::string> HttpFilterConfigProviderManag
       factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
   return {std::move(message), factory.name()};
 }
+
+absl::string_view HttpFilterConfigProviderManagerImpl::statPrefix() const { return HttpStatPrefix; }
 
 ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
     const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
