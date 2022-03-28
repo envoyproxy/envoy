@@ -1960,13 +1960,21 @@ TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
       )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
-  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_EQ(server_context_config.certificateValidationContext()->subjectAltNameMatchers().size(),
-            1);
+  absl::optional<ServerContextConfigImpl> server_context_config;
+  EXPECT_LOG_CONTAINS("warning",
+                      "Ignoring match_subject_alt_names as match_typed_subject_alt_names is also "
+                      "specified, and the former is deprecated.",
+                      server_context_config.emplace(tls_context, factory_context_));
   EXPECT_EQ(
-      server_context_config.certificateValidationContext()->subjectAltNameMatchers()[0].san_type(),
-      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
-  EXPECT_EQ(server_context_config.certificateValidationContext()
+      server_context_config.value().certificateValidationContext()->subjectAltNameMatchers().size(),
+      1);
+  EXPECT_EQ(server_context_config.value()
+                .certificateValidationContext()
+                ->subjectAltNameMatchers()[0]
+                .san_type(),
+            envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+  EXPECT_EQ(server_context_config.value()
+                .certificateValidationContext()
                 ->subjectAltNameMatchers()[0]
                 .matcher()
                 .exact(),

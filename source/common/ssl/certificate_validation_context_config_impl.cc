@@ -10,6 +10,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -62,6 +64,13 @@ CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
   // If typed subject alt name matchers are provided in the config, don't check
   // for the deprecated non-typed field.
   if (!subject_alt_name_matchers.empty()) {
+    // Warn that we're ignoring the deprecated san matcher field, if both are
+    // specified.
+    if (!config.match_subject_alt_names().empty()) {
+      ENVOY_LOG_MISC(warn,
+                     "Ignoring match_subject_alt_names as match_typed_subject_alt_names is also "
+                     "specified, and the former is deprecated.");
+    }
     return subject_alt_name_matchers;
   }
   // Handle deprecated string type san matchers without san type specified, by
