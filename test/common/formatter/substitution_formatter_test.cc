@@ -100,117 +100,57 @@ private:
   std::string raw_string_;
 };
 
-// Test tests command tokenize utility.
-TEST(SubstitutionFormatParser, tokenizer) {
-  std::vector<absl::string_view> tokens;
-  absl::optional<size_t> max_length;
-
-  std::string command = "COMMAND(item1)";
-
-  // The second parameter indicates where command name and opening bracket ends.
-  // In this case "COMMAND(" ends at index 8 (counting from zero).
-  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
-  ASSERT_EQ(tokens.size(), 1);
-  ASSERT_EQ(tokens.at(0), "item1");
-  ASSERT_EQ(max_length, absl::nullopt);
-
-  command = "COMMAND(item1:item2:item3)";
-  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
-  ASSERT_EQ(tokens.size(), 3);
-  ASSERT_EQ(tokens.at(0), "item1");
-  ASSERT_EQ(tokens.at(1), "item2");
-  ASSERT_EQ(tokens.at(2), "item3");
-  ASSERT_EQ(max_length, absl::nullopt);
-
-  command = "COMMAND(item1:item2:item3:item4):234";
-  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
-  ASSERT_EQ(tokens.size(), 4);
-  ASSERT_EQ(tokens.at(0), "item1");
-  ASSERT_EQ(tokens.at(1), "item2");
-  ASSERT_EQ(tokens.at(2), "item3");
-  ASSERT_EQ(tokens.at(3), "item4");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 234);
-
-  // Tokenizing the following commands should fail.
-  std::vector<std::string> wrong_commands = {
-      "COMMAND(item1:item2",           // Missing closing bracket.
-      "COMMAND(item1:item2))",         // Unexpected second closing bracket.
-      "COMMAND(item1:item2):",         // Missing length field.
-      "COMMAND(item1:item2):LENGTH",   // Length field must be integer.
-      "COMMAND(item1:item2):100:23",   // Length field must be integer.
-      "COMMAND(item1:item2):100):23"}; // Extra fields after length.
-
-  for (const auto& test_command : wrong_commands) {
-    EXPECT_THROW(
-        SubstitutionFormatParser::tokenizeCommand(test_command, 8, ':', tokens, max_length),
-        EnvoyException)
-        << test_command;
-  }
-}
-
 // Test tests multiple versions of variadic template method parseCommand
 // extracting tokens.
 TEST(SubstitutionFormatParser, commandParser) {
   std::vector<absl::string_view> tokens;
-  absl::optional<size_t> max_length;
   std::string token1;
 
-  std::string command = "COMMAND(item1)";
-  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1);
+  std::string command = "item1";
+  SubstitutionFormatParser::parseCommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
-  ASSERT_EQ(max_length, absl::nullopt);
 
   std::string token2;
-  command = "COMMAND(item1:item2)";
-  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1, token2);
+  command = "item1:item2";
+  SubstitutionFormatParser::parseCommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
-  ASSERT_EQ(max_length, absl::nullopt);
 
-  // Three tokens with optional length.
+  // Three tokens.
   std::string token3;
-  command = "COMMAND(item1?item2?item3):345";
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  command = "item1?item2?item3";
+  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 
   // Command string has 4 tokens but 3 are expected.
   // The first 3 will be read, the fourth will be ignored.
-  command = "COMMAND(item1?item2?item3?item4):345";
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  command = "item1?item2?item3?item4";
+  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 
   // Command string has 2 tokens but 3 are expected.
   // The third extracted token should be empty.
-  command = "COMMAND(item1?item2):345";
+  command = "item1?item2";
   token3.erase();
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_TRUE(token3.empty());
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 
   // Command string has 4 tokens. Get first 2 into the strings
   // and remaining 2 into a vector of strings.
-  command = "COMMAND(item1?item2?item3?item4):345";
+  command = "item1?item2?item3?item4";
   std::vector<std::string> bucket;
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, bucket);
+  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(bucket.size(), 2);
   ASSERT_EQ(bucket.at(0), "item3");
   ASSERT_EQ(bucket.at(1), "item4");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 }
 
 TEST(SubstitutionFormatUtilsTest, protocolToString) {
@@ -1682,11 +1622,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, FilterStateFormatter) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
 
   stream_info.filter_state_->setData("key",
                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
@@ -1710,10 +1646,8 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   {
     FilterStateFormatter formatter("key", absl::optional<size_t>(), false);
 
-    EXPECT_EQ("\"test_value\"", formatter.format(request_headers, response_headers,
-                                                 response_trailers, stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_EQ("\"test_value\"", formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
@@ -1721,14 +1655,13 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
 
     EXPECT_EQ(
         "{\"inner_key\":\"inner_value\"}",
-        formatter.format(request_headers, response_headers, response_trailers, stream_info, body));
+        formatter.extract(stream_info));
 
     ProtobufWkt::Value expected;
     (*expected.mutable_struct_value()->mutable_fields())["inner_key"] =
         ValueUtil::stringValue("inner_value");
 
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(expected));
   }
 
@@ -1736,10 +1669,8 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   {
     FilterStateFormatter formatter("key-not-found", absl::optional<size_t>(), false);
 
-    EXPECT_EQ(absl::nullopt, formatter.format(request_headers, response_headers, response_trailers,
-                                              stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
@@ -1747,10 +1678,8 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   {
     FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), false);
 
-    EXPECT_EQ(absl::nullopt, formatter.format(request_headers, response_headers, response_trailers,
-                                              stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
@@ -1758,10 +1687,8 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   {
     FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>(), false);
 
-    EXPECT_EQ(absl::nullopt, formatter.format(request_headers, response_headers, response_trailers,
-                                              stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
@@ -1769,12 +1696,10 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   {
     FilterStateFormatter formatter("key", absl::optional<size_t>(5), false);
 
-    EXPECT_EQ("\"test", formatter.format(request_headers, response_headers, response_trailers,
-                                         stream_info, body));
+    EXPECT_EQ("\"test", formatter.extract(stream_info));
 
     // N.B. Does not truncate.
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
 
@@ -1782,26 +1707,22 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   {
     FilterStateFormatter formatter("test_key", absl::optional<size_t>(), true);
 
-    EXPECT_EQ("test_value By PLAIN", formatter.format(request_headers, response_headers,
-                                                      response_trailers, stream_info, body));
+    EXPECT_EQ("test_value By PLAIN", formatter.extract(stream_info));
   }
 
   // size limit for serializeAsString
   {
     FilterStateFormatter formatter("test_key", absl::optional<size_t>(10), true);
 
-    EXPECT_EQ("test_value", formatter.format(request_headers, response_headers, response_trailers,
-                                             stream_info, body));
+    EXPECT_EQ("test_value", formatter.extract(stream_info));
   }
 
   // no serialization case for serializeAsString
   {
     FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), true);
 
-    EXPECT_EQ(absl::nullopt, formatter.format(request_headers, response_headers, response_trailers,
-                                              stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 }
@@ -1817,10 +1738,8 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
-    EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
-                                                       response_trailers, stream_info, body));
-    EXPECT_THAT(cert_start_formart.formatValue(request_headers, response_headers, response_trailers,
-                                               stream_info, body),
+    EXPECT_EQ(absl::nullopt, cert_start_formart.extract(stream_info));
+    EXPECT_THAT(cert_start_formart.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
   // No validFromPeerCertificate
@@ -1830,38 +1749,34 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
-                                                       response_trailers, stream_info, body));
-    EXPECT_THAT(cert_start_formart.formatValue(request_headers, response_headers, response_trailers,
-                                               stream_info, body),
+    EXPECT_EQ(absl::nullopt, cert_start_formart.extract(stream_info));
+    EXPECT_THAT(cert_start_formart.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format("DOWNSTREAM_PEER_CERT_V_START");
+    DownstreamPeerCertVStartFormatter cert_start_format("");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              cert_start_format.format(request_headers, response_headers, response_trailers,
-                                       stream_info, body));
+              cert_start_format.extract(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVStartFormatter cert_start_format(
-        "DOWNSTREAM_PEER_CERT_V_START(%b %e %H:%M:%S %Y %Z)");
+        "%b %e %H:%M:%S %Y %Z");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
-              cert_start_format.format(request_headers, response_headers, response_trailers,
-                                       stream_info, body));
+              cert_start_format.extract(stream_info));
   }
 }
 
@@ -1875,53 +1790,47 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
+    DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
+    EXPECT_EQ(absl::nullopt, cert_end_format.extract(stream_info));
+    EXPECT_THAT(cert_end_format.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
   // No expirationPeerCertificate
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, expirationPeerCertificate())
         .WillRepeatedly(Return(absl::nullopt));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
+    EXPECT_EQ(absl::nullopt, cert_end_format.extract(stream_info));
+    EXPECT_THAT(cert_end_format.extractValue(stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END");
+    DownstreamPeerCertVEndFormatter cert_end_format("");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              cert_end_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
+              cert_end_format.extract(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     DownstreamPeerCertVEndFormatter cert_end_format(
-        "DOWNSTREAM_PEER_CERT_V_END(%b %e %H:%M:%S %Y %Z)");
+        "%b %e %H:%M:%S %Y %Z");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
-              cert_end_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
+              cert_end_format.extract(stream_info));
   }
 }
 
@@ -1933,26 +1842,22 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   std::string body;
 
   {
-    StartTimeFormatter start_time_format("START_TIME(%Y/%m/%d)");
+    StartTimeFormatter start_time_format("%Y/%m/%d");
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    EXPECT_EQ("2018/03/28", start_time_format.format(request_headers, response_headers,
-                                                     response_trailers, stream_info, body));
-    EXPECT_THAT(start_time_format.formatValue(request_headers, response_headers, response_trailers,
-                                              stream_info, body),
+    EXPECT_EQ("2018/03/28", start_time_format.extract(stream_info));
+    EXPECT_THAT(start_time_format.extractValue(stream_info),
                 ProtoEq(ValueUtil::stringValue("2018/03/28")));
   }
 
   {
-    StartTimeFormatter start_time_format("START_TIME");
+    StartTimeFormatter start_time_format("");
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(request_headers, response_headers, response_trailers,
-                                       stream_info, body));
-    EXPECT_THAT(start_time_format.formatValue(request_headers, response_headers, response_trailers,
-                                              stream_info, body),
+              start_time_format.extract(stream_info));
+    EXPECT_THAT(start_time_format.extractValue(stream_info),
                 ProtoEq(ValueUtil::stringValue(AccessLogDateTimeFormatter::fromTime(time))));
   }
 }
@@ -3107,6 +3012,9 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
 
   std::vector<std::string> test_cases = {
       "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)",
+      "%PROTOCOL(should_not_have_params)%",
+      "%PROTOCOL(should_not_have_params_or_length):12%",
+      "%PROTOCOL:12%",
       "%REQ(FIRST?SECOND)T%",
       "RESP(FIRST)%",
       "%REQ(valid)% %NOT_VALID%",
@@ -3116,6 +3024,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
+      "%REQ(TEST):-3%",
       "%REQ(\n)%",
       "%REQ(?\n)%",
       "%RESP(TEST):%",
@@ -3185,6 +3094,47 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
   EXPECT_EQ(providers.size(), 2);
   EXPECT_EQ("TestFormatter", providers[1]->format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
+}
+
+TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
+    std::vector<std::tuple<TokenSyntaxChecker::TokenSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
+        // TOKEN_ONLY. Any additional params are not allowed
+        {TokenSyntaxChecker::TOKEN_ONLY,  "", 3},
+        {TokenSyntaxChecker::TOKEN_ONLY,  "PARAMS", 3},
+        {TokenSyntaxChecker::TOKEN_ONLY,  "PARAMS", absl::nullopt},
+        // PARAMS_REQUIRED. Length not allowed.
+        {TokenSyntaxChecker::PARAMS_REQUIRED, "", 3},
+        {TokenSyntaxChecker::PARAMS_REQUIRED, "PARAM", 3},
+        {TokenSyntaxChecker::PARAMS_REQUIRED, "", absl::nullopt},
+    };
+    
+    for (const auto& test_case : test_cases) {
+        EXPECT_THROW(TokenSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)), EnvoyException);
+    }
+}
+
+TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
+    std::vector<std::tuple<TokenSyntaxChecker::TokenSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
+        // TOKEN_ONLY. Any additional params are not allowed
+        {TokenSyntaxChecker::TOKEN_ONLY,  "", absl::nullopt},
+        // PARAMS_REQUIRED
+        {TokenSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+        // PARAMS_REQUIRED and LENGTH_ALLOWED
+        {TokenSyntaxChecker::PARAMS_REQUIRED | TokenSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
+        {TokenSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+        // ALLOWS_PARAMS
+        {TokenSyntaxChecker::PARAMS_OPTIONAL, "PARAMS", absl::nullopt},
+        {TokenSyntaxChecker::PARAMS_OPTIONAL, "", absl::nullopt},
+        // ALLOWS_PARAMS and LENGTH_ALLOWED
+        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
+        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "", 3},
+        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "PARAMS", absl::nullopt},
+        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "", absl::nullopt}
+    };
+    
+    for (const auto& test_case : test_cases) {
+        EXPECT_NO_THROW(TokenSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+    }
 }
 
 } // namespace

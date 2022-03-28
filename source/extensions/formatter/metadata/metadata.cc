@@ -13,11 +13,11 @@ namespace Extensions {
 namespace Formatter {
 
 // Metadata formatter for route's metadata.
-class RouteMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
+class RouteMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter_new {
 public:
   RouteMetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
                          absl::optional<size_t> max_length)
-      : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
+      : ::Envoy::Formatter::MetadataFormatter_new(filter_namespace, path, max_length,
                                               [](const StreamInfo::StreamInfo& stream_info)
                                                   -> const envoy::config::core::v3::Metadata* {
                                                 auto route = stream_info.route();
@@ -32,7 +32,6 @@ public:
 // Constructor registers all types of supported metadata along with the
 // handlers accessing the required metadata type.
 MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
-#if 0
   metadata_formatter_providers_["DYNAMIC"] = [](const std::string& filter_namespace,
                                                 const std::vector<std::string>& path,
                                                 absl::optional<size_t> max_length) {
@@ -50,20 +49,19 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
                                               absl::optional<size_t> max_length) {
     return std::make_unique<RouteMetadataFormatter>(filter_namespace, path, max_length);
   };
-#endif
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
-MetadataFormatterCommandParser::parse(const std::string& token, size_t, size_t) const {
-  constexpr absl::string_view METADATA_TOKEN = "METADATA(";
-  if (absl::StartsWith(token, METADATA_TOKEN)) {
+MetadataFormatterCommandParser::parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const {
+  //constexpr absl::string_view METADATA_TOKEN = "METADATA(";
+  if (token == "METADATA") {
     // Extract type of metadata and keys.
     std::string type, filter_namespace;
-    absl::optional<size_t> max_length;
+    absl::optional<size_t> length;
     std::vector<std::string> path;
-    const size_t start = METADATA_TOKEN.size();
+    const size_t start = 0;//METADATA_TOKEN.size();
 
-    ::Envoy::Formatter::SubstitutionFormatParser::parseCommand(token, start, ':', max_length, type,
+    ::Envoy::Formatter::SubstitutionFormatParser::parseCommand(format, start, ':', length, type,
                                                                filter_namespace, path);
 
     auto provider = metadata_formatter_providers_.find(type);
@@ -72,7 +70,7 @@ MetadataFormatterCommandParser::parse(const std::string& token, size_t, size_t) 
     }
 
     // Return a pointer to formatter provider.
-    return provider->second(filter_namespace, path, max_length);
+    return ::Envoy::Formatter::FormatterProviderPtr{new ::Envoy::Formatter::StreamInfoFormatter(provider->second(filter_namespace, path, max_length))};
   }
   return nullptr;
 }

@@ -104,8 +104,8 @@ public:
    *
    * @return FormattterProviderPtr substitution provider for the parsed command
    */
-  virtual FormatterProviderPtr parse(const std::string& token, size_t pos,
-                                     size_t command_end_position) const PURE;
+  virtual FormatterProviderPtr parse(const std::string& token, const std::string& format,
+                                     absl::optional<size_t>& max_length) const PURE;
 };
 
 using CommandParserPtr = std::unique_ptr<CommandParser>;

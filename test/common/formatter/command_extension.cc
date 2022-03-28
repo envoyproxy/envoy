@@ -21,7 +21,7 @@ ProtobufWkt::Value TestFormatter::formatValue(const Http::RequestHeaderMap&,
   return ValueUtil::stringValue("");
 }
 
-FormatterProviderPtr TestCommandParser::parse(const std::string& token, size_t, size_t) const {
+FormatterProviderPtr TestCommandParser::parse(const std::string& token, const std::string&, absl::optional<size_t>&) const {
   if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
     return std::make_unique<TestFormatter>();
   }
@@ -60,9 +60,8 @@ ProtobufWkt::Value AdditionalFormatter::formatValue(const Http::RequestHeaderMap
   return ValueUtil::stringValue("");
 }
 
-FormatterProviderPtr AdditionalCommandParser::parse(const std::string& token, size_t,
-                                                    size_t) const {
-  if (absl::StartsWith(token, "ADDITIONAL_EXTENSION")) {
+FormatterProviderPtr AdditionalCommandParser::parse(const std::string& token, const std::string&, absl::optional<size_t>&) const {
+  if (token == "ADDITIONAL_EXTENSION") {
     return std::make_unique<AdditionalFormatter>();
   }
 

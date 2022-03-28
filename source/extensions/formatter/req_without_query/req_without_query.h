@@ -34,8 +34,7 @@ private:
 class ReqWithoutQueryCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   ReqWithoutQueryCommandParser() = default;
-  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& token, size_t,
-                                                 size_t) const override;
+  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const override;
 
 private:
   static const size_t ReqWithoutQueryParamStart{sizeof("REQ_WITHOUT_QUERY(") - 1};

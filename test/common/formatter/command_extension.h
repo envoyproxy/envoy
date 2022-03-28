@@ -23,7 +23,7 @@ public:
 
 class TestCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(const std::string& token, size_t, size_t) const override;
+  FormatterProviderPtr parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const override;
 };
 
 class TestCommandFactory : public CommandParserFactory {
@@ -47,7 +47,7 @@ public:
 
 class AdditionalCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(const std::string& token, size_t, size_t) const override;
+  FormatterProviderPtr parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const override;
 };
 
 class AdditionalCommandFactory : public CommandParserFactory {
