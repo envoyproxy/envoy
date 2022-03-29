@@ -100,26 +100,26 @@ private:
   std::string raw_string_;
 };
 
-// Test tests multiple versions of variadic template method parseCommand
+// Test tests multiple versions of variadic template method parseSubcommand
 // extracting tokens.
 TEST(SubstitutionFormatParser, commandParser) {
   std::vector<absl::string_view> tokens;
   std::string token1;
 
   std::string command = "item1";
-  SubstitutionFormatParser::parseCommand(command, ':', token1);
+  SubstitutionFormatParser::parseSubcommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
 
   std::string token2;
   command = "item1:item2";
-  SubstitutionFormatParser::parseCommand(command, ':', token1, token2);
+  SubstitutionFormatParser::parseSubcommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
 
   // Three tokens.
   std::string token3;
   command = "item1?item2?item3";
-  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, token3);
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
@@ -127,7 +127,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 4 tokens but 3 are expected.
   // The first 3 will be read, the fourth will be ignored.
   command = "item1?item2?item3?item4";
-  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, token3);
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
@@ -136,7 +136,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // The third extracted token should be empty.
   command = "item1?item2";
   token3.erase();
-  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, token3);
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_TRUE(token3.empty());
@@ -145,7 +145,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // and remaining 2 into a vector of strings.
   command = "item1?item2?item3?item4";
   std::vector<std::string> bucket;
-  SubstitutionFormatParser::parseCommand(command, '?', token1, token2, bucket);
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(bucket.size(), 2);
@@ -3097,43 +3097,43 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
 }
 
 TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
-    std::vector<std::tuple<TokenSyntaxChecker::TokenSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
-        // TOKEN_ONLY. Any additional params are not allowed
-        {TokenSyntaxChecker::TOKEN_ONLY,  "", 3},
-        {TokenSyntaxChecker::TOKEN_ONLY,  "PARAMS", 3},
-        {TokenSyntaxChecker::TOKEN_ONLY,  "PARAMS", absl::nullopt},
+    std::vector<std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
+        // COMMAND_ONLY. Any additional params are not allowed
+        {CommandSyntaxChecker::COMMAND_ONLY,  "", 3},
+        {CommandSyntaxChecker::COMMAND_ONLY,  "PARAMS", 3},
+        {CommandSyntaxChecker::COMMAND_ONLY,  "PARAMS", absl::nullopt},
         // PARAMS_REQUIRED. Length not allowed.
-        {TokenSyntaxChecker::PARAMS_REQUIRED, "", 3},
-        {TokenSyntaxChecker::PARAMS_REQUIRED, "PARAM", 3},
-        {TokenSyntaxChecker::PARAMS_REQUIRED, "", absl::nullopt},
+        {CommandSyntaxChecker::PARAMS_REQUIRED, "", 3},
+        {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAM", 3},
+        {CommandSyntaxChecker::PARAMS_REQUIRED, "", absl::nullopt},
     };
     
     for (const auto& test_case : test_cases) {
-        EXPECT_THROW(TokenSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)), EnvoyException);
+        EXPECT_THROW(CommandSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)), EnvoyException);
     }
 }
 
 TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
-    std::vector<std::tuple<TokenSyntaxChecker::TokenSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
-        // TOKEN_ONLY. Any additional params are not allowed
-        {TokenSyntaxChecker::TOKEN_ONLY,  "", absl::nullopt},
+    std::vector<std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
+        // COMMAND_ONLY. Any additional params are not allowed
+        {CommandSyntaxChecker::COMMAND_ONLY,  "", absl::nullopt},
         // PARAMS_REQUIRED
-        {TokenSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+        {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
         // PARAMS_REQUIRED and LENGTH_ALLOWED
-        {TokenSyntaxChecker::PARAMS_REQUIRED | TokenSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
-        {TokenSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
+        {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
         // ALLOWS_PARAMS
-        {TokenSyntaxChecker::PARAMS_OPTIONAL, "PARAMS", absl::nullopt},
-        {TokenSyntaxChecker::PARAMS_OPTIONAL, "", absl::nullopt},
+        {CommandSyntaxChecker::PARAMS_OPTIONAL, "PARAMS", absl::nullopt},
+        {CommandSyntaxChecker::PARAMS_OPTIONAL, "", absl::nullopt},
         // ALLOWS_PARAMS and LENGTH_ALLOWED
-        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
-        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "", 3},
-        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "PARAMS", absl::nullopt},
-        {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED, "", absl::nullopt}
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "", 3},
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS", absl::nullopt},
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "", absl::nullopt}
     };
     
     for (const auto& test_case : test_cases) {
-        EXPECT_NO_THROW(TokenSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+        EXPECT_NO_THROW(CommandSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
     }
 }
 

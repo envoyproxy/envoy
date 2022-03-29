@@ -18,15 +18,15 @@
 namespace Envoy {
 namespace Formatter {
 
-class TokenSyntaxChecker {
+class CommandSyntaxChecker {
 public:
-using TokenSyntaxFlags = uint32_t ;
-static constexpr TokenSyntaxFlags    TOKEN_ONLY = 0;
-static constexpr TokenSyntaxFlags    PARAMS_REQUIRED = 1 << 0;
-static constexpr TokenSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
-static constexpr TokenSyntaxFlags LENGTH_ALLOWED = 1 << 2;
+using CommandSyntaxFlags = uint32_t ;
+static constexpr CommandSyntaxFlags    COMMAND_ONLY = 0;
+static constexpr CommandSyntaxFlags    PARAMS_REQUIRED = 1 << 0;
+static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
+static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
 
- static void VerifySyntax(TokenSyntaxChecker::TokenSyntaxFlags flags, const std::string& token, const std::string& format_command, const absl::optional<size_t>& length);
+ static void VerifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags, const std::string& command, const std::string& subcommand, const absl::optional<size_t>& length);
 };
 
 /**
@@ -44,7 +44,7 @@ public:
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
-  static void parseCommandHeader(const std::string& token,
+  static void parseSubcommandHeaders(const std::string& subcommand,
                                  std::string& main_header, std::string& alternative_header);
 
   /**
@@ -79,10 +79,10 @@ public:
      untouched.
   */
   template <typename... Tokens>
-  static void parseCommand(const std::string& command, const char separator,
+  static void parseSubcommand(const std::string& subcommand, const char separator,
                            Tokens&&... params) {
     std::vector<absl::string_view> tokens;
-    tokens = absl::StrSplit(command, separator);
+    tokens = absl::StrSplit(subcommand, separator);
     std::vector<absl::string_view>::iterator it = tokens.begin();
     (
         [&](auto& param) {
@@ -115,13 +115,13 @@ public:
    * @param token the token to parse
    * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
    */
-  static FormatterProviderPtr parseBuiltinCommand(const std::string& token, const std::string&, absl::optional<size_t>&);
+  static FormatterProviderPtr parseBuiltinCommand(const std::string&, const std::string&, absl::optional<size_t>&);
 
 private:
   using FormatterProviderCreateFunc = std::function<FormatterProviderPtr(const std::string&, absl::optional<size_t>&)>;
 
   using FormatterProviderLookupTbl =
-      absl::flat_hash_map<absl::string_view, std::pair<TokenSyntaxChecker::TokenSyntaxFlags, FormatterProviderCreateFunc>>;
+      absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags, FormatterProviderCreateFunc>>;
   static const FormatterProviderLookupTbl& getKnownFormatters();
 };
 

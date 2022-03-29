@@ -299,18 +299,18 @@ ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& reques
   return structFormatMapCallback(struct_output_format_, visitor).struct_value();
 }
 
-void SubstitutionFormatParser::parseCommandHeader(const std::string& token,
+void SubstitutionFormatParser::parseSubcommandHeaders(const std::string& subcommand,
                                                   std::string& main_header,
                                                   std::string& alternative_header) {
-  // subs is used only to check if there are more than 2 tokens separated by '?'.
+  // subs is used only to check if there are more than 2 headers separated by '?'.
   std::vector<std::string> subs;
   alternative_header = "";
-  parseCommand(token, '?', main_header, alternative_header, subs);
+  parseSubcommand(subcommand, '?', main_header, alternative_header, subs);
   if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
         // docs/root/configuration/observability/access_log/access_log.rst#format-rules
-        absl::StrCat("More than 1 alternative header specified in token: ", token));
+        absl::StrCat("More than 1 alternative header specified in token: ", subcommand));
   }
 
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
@@ -335,45 +335,45 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
 const SubstitutionFormatParser::FormatterProviderLookupTbl& SubstitutionFormatParser::getKnownFormatters() {
   CONSTRUCT_ON_FIRST_USE(
       FormatterProviderLookupTbl,
-      {{"REQ", {TokenSyntaxChecker::PARAMS_REQUIRED | TokenSyntaxChecker::LENGTH_ALLOWED,
+      {{"REQ", {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
         [](const std::string& format, absl::optional<size_t>& max_length) {
     std::string main_header, alternative_header;
 
-    parseCommandHeader(format, main_header, alternative_header);
+    parseSubcommandHeaders(format, main_header, alternative_header);
 
     return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header, max_length);
     }}},
-    {"RESP", {TokenSyntaxChecker::PARAMS_REQUIRED | TokenSyntaxChecker::LENGTH_ALLOWED,
+    {"RESP", {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
     [](const std::string& format, absl::optional<size_t>& max_length) {
     std::string main_header, alternative_header;
 
-    parseCommandHeader(format, main_header, alternative_header);
+    parseSubcommandHeaders(format, main_header, alternative_header);
 
     return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header, max_length);
     }}},
-    {"TRAILER", {TokenSyntaxChecker::PARAMS_REQUIRED | TokenSyntaxChecker::LENGTH_ALLOWED, 
+    {"TRAILER", {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, 
     [](const std::string& format, absl::optional<size_t>& max_length) {
     std::string main_header, alternative_header;
 
-    parseCommandHeader(format, main_header, alternative_header);
+    parseSubcommandHeaders(format, main_header, alternative_header);
 
     return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header, max_length);
     }}},
-    {"LOCAL_REPLY_BODY", {TokenSyntaxChecker::TOKEN_ONLY, [](const std::string&, absl::optional<size_t>&) {
+    {"LOCAL_REPLY_BODY", {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
     return std::make_unique<LocalReplyBodyFormatter>();
     }}},
-    {"GRPC_STATUS", {TokenSyntaxChecker::TOKEN_ONLY, [](const std::string&, const absl::optional<size_t>&) {
+    {"GRPC_STATUS", {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, const absl::optional<size_t>&) {
     return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
     }}},
-    {"REQUEST_HEADERS_BYTES", {TokenSyntaxChecker::TOKEN_ONLY, [](const std::string&, absl::optional<size_t>&) {
+    {"REQUEST_HEADERS_BYTES", {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
     return std::make_unique<HeadersByteSizeFormatter>(
         HeadersByteSizeFormatter::HeaderType::RequestHeaders);
     }}},
-    {"RESPONSE_HEADERS_BYTES", {TokenSyntaxChecker::TOKEN_ONLY, [](const std::string&, absl::optional<size_t>&) {
+    {"RESPONSE_HEADERS_BYTES", {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
     return std::make_unique<HeadersByteSizeFormatter>(
         HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
     }}},
-    {"RESPONSE_TRAILERS_BYTES", {TokenSyntaxChecker::TOKEN_ONLY, [](const std::string&, absl::optional<size_t>&) {
+    {"RESPONSE_TRAILERS_BYTES", {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
     return std::make_unique<HeadersByteSizeFormatter>(
         HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
     }}}
@@ -381,22 +381,22 @@ const SubstitutionFormatParser::FormatterProviderLookupTbl& SubstitutionFormatPa
   }
 
 
-FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token, 
-                                                                   const std::string& token_command, absl::optional<size_t>& length) {
+FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& command, 
+                                                                   const std::string& subcommand, absl::optional<size_t>& length) {
   const FormatterProviderLookupTbl& providers = getKnownFormatters();
 
-  auto it = providers.find(token);
+  auto it = providers.find(command);
 
   if (it == providers.end()) {
     return nullptr;
   }
 
-  // Check flags for the token.
-  TokenSyntaxChecker::VerifySyntax((*it).second.first, token, token_command, length);
+  // Check flags for the command.
+  CommandSyntaxChecker::VerifySyntax((*it).second.first, command, subcommand, length);
 
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.
-  return (*it).second.second(token_command, length);
+  return (*it).second.second(subcommand, length);
 }
 
 // TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
@@ -408,15 +408,15 @@ SubstitutionFormatParser::parse(const std::string& format,
   // The following regex is used to check validity of the formatter command and to 
   // extract groups.
   // The formatter command has the following format:
-  //    %TOKEN(SUBCOMMAND):LENGTH%
-  // % sign at the beginning and end are used by parser to find next TOKEN.
-  // TOKEN must always be present.
-  // SUBCOMMAND presence depends on the TOKEN:
-  // - for some tokens SUBCOMMAND is not allowed (for example %PROTOCOL%)
-  // - for some tokens SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will cause error)
-  // - for some tokens SUBCOMMAND is optional (for example %START_TIME% and %START_TIME(%f.%1f.%2f.%3f)% are both correct).
-  // LENGTH presence depends on the token. Some tokens allow LENGTH to be specified, so not.
-  // Regex is used to validate the syntax and also to extract values for TOKEN, SUBCOMMAND and LENGTH.
+  //    % COMMAND(SUBCOMMAND):LENGTH%
+  // % sign at the beginning and end are used by parser to find next COMMAND.
+  // COMMAND must always be present.
+  // SUBCOMMAND presence depends on the COMMAND:
+  // - for some commands SUBCOMMAND is not allowed (for example %PROTOCOL%)
+  // - for some commands SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will cause error)
+  // - for some commands SUBCOMMAND is optional (for example %START_TIME% and %START_TIME(%f.%1f.%2f.%3f)% are both correct).
+  // LENGTH presence depends on the command. Some commands allow LENGTH to be specified, so not.
+  // Regex is used to validate the syntax and also to extract values for COMMAND, SUBCOMMAND and LENGTH.
   // Below is explanation of capturing and non-capturing groups. Non-capturing groups are used
   // to specify that certain part of the formatter command is optional and should contain specific 
   // characters. Capturing groups are used to extract the values when regex is matched against
@@ -426,7 +426,7 @@ SubstitutionFormatParser::parse(const std::string& format,
   //                                                                                      |
   // Non-capturing group specifying optional (SUBCOMMAND)------------------               |
   //                                                                       |              |
-  // Non-capturing group specifying mandatory TOKEN                        |              |
+  // Non-capturing group specifying mandatory COMMAND                      |              |
   //  which uses only A-Z, 0-9 and _ characters     -----                  |              |
   //  Group is used only to specify allowed characters.  |                 |              |
   //                                                     |                 |              |
@@ -436,7 +436,7 @@ SubstitutionFormatParser::parse(const std::string& format,
   const std::regex command_w_args_regex(R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\(([^\)]*)\))?(?::([0-9]+))?%)EOF");
   //                                            |__________________|     |______|        |______|
   //                                                     |                   |              |
-  // Capturing group specifying TOKEN -------------------                    |              |
+  // Capturing group specifying COMMAND -----------------                    |              |
   // The index of this group is 1.                                           |              |
   //                                                                         |              |
   // Capturing group for SUBCOMMAND. If present, it will --------------------               |
@@ -473,9 +473,9 @@ SubstitutionFormatParser::parse(const std::string& format,
     const std::string match = m.str(0);
     //const std::string token = match.substr(1, match.length() - 2);
     // Token is at at index 1.
-    const std::string token = m.str(1);
+    const std::string command = m.str(1);
     // subcommand is at index 2.
-    const std::string token_command = m.str(2);
+    const std::string subcommand = m.str(2);
     // optional length is at index 3. If present validate that it is valid integer.
     absl::optional<size_t> max_length;
     if (m.str(3).length() != 0) {
@@ -488,7 +488,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     std::vector<std::string> path;
 
     //const auto matches_num = m.size();
-    //printf("TOKEN: %s\n", token.c_str());
+    //printf("COMMAND: %s\n", token.c_str());
     //printf("FOUND ITEMS: %lu\n", matches_num);
 /*
     for (const auto& it: m) {
@@ -498,7 +498,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     const size_t command_end_position = pos + m.str(0).length() - 1;
     //printf("End position: %lu\n", command_end_position);
 
-    auto formatter = parseBuiltinCommand(token, token_command, max_length);
+    auto formatter = parseBuiltinCommand(command, subcommand, max_length);
     if (formatter) {
       formatters.push_back(std::move(formatter));
     } else {
@@ -507,7 +507,7 @@ SubstitutionFormatParser::parse(const std::string& format,
       // or from stream info, etc.
       bool added = false;
       for (const auto& cmd : commands) {
-        auto formatter = cmd->parse(token, token_command, max_length);
+        auto formatter = cmd->parse(command, subcommand, max_length);
         if (formatter) {
           formatters.push_back(std::move(formatter));
           added = true;
@@ -516,7 +516,7 @@ SubstitutionFormatParser::parse(const std::string& format,
       }
 
       if (!added) {
-        formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token, token_command, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(command, subcommand, max_length)});
       }
     }
 
@@ -709,7 +709,7 @@ private:
 const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnownFieldExtractors() {
   CONSTRUCT_ON_FIRST_USE(
       FieldExtractorLookupTbl,
-      {{"REQUEST_DURATION", {TokenSyntaxChecker::TOKEN_ONLY,
+      {{"REQUEST_DURATION", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoDurationFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -717,7 +717,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return timing.lastDownstreamRxByteReceived();
               });
         }}},
-       {"REQUEST_TX_DURATION", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"REQUEST_TX_DURATION", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoDurationFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -725,7 +725,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return timing.lastUpstreamTxByteSent();
               });
         }}},
-       {"RESPONSE_DURATION", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"RESPONSE_DURATION", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoDurationFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -733,7 +733,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return timing.firstUpstreamRxByteReceived();
               });
         }}},
-       {"RESPONSE_TX_DURATION", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"RESPONSE_TX_DURATION", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoDurationFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -749,117 +749,117 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return result;
               });
         }}},
-       {"BYTES_RECEIVED", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"BYTES_RECEIVED", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.bytesReceived();
               });
         }}},
-       {"UPSTREAM_WIRE_BYTES_RECEIVED", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_WIRE_BYTES_RECEIVED", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getUpstreamBytesMeter()->wireBytesReceived();
               });
         }}},
-       {"UPSTREAM_HEADER_BYTES_RECEIVED", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_HEADER_BYTES_RECEIVED", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getUpstreamBytesMeter()->headerBytesReceived();
               });
         }}},
-       {"DOWNSTREAM_WIRE_BYTES_RECEIVED", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_WIRE_BYTES_RECEIVED", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getDownstreamBytesMeter()->wireBytesReceived();
               });
         }}},
-       {"DOWNSTREAM_HEADER_BYTES_RECEIVED", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_HEADER_BYTES_RECEIVED", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getDownstreamBytesMeter()->headerBytesReceived();
               });
         }}},
-       {"PROTOCOL", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"PROTOCOL", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
               });
         }}},
-       {"RESPONSE_CODE", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"RESPONSE_CODE", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.responseCode().value_or(0);
               });
         }}},
-       {"RESPONSE_CODE_DETAILS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"RESPONSE_CODE_DETAILS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.responseCodeDetails();
               });
         }}},
-       {"CONNECTION_TERMINATION_DETAILS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"CONNECTION_TERMINATION_DETAILS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.connectionTerminationDetails();
               });
         }}},
-       {"BYTES_SENT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"BYTES_SENT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
         }}},
-       {"UPSTREAM_WIRE_BYTES_SENT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_WIRE_BYTES_SENT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getUpstreamBytesMeter()->wireBytesSent();
               });
         }}},
-       {"UPSTREAM_HEADER_BYTES_SENT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_HEADER_BYTES_SENT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getUpstreamBytesMeter()->headerBytesSent();
               });
         }}},
-       {"DOWNSTREAM_WIRE_BYTES_SENT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_WIRE_BYTES_SENT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getDownstreamBytesMeter()->wireBytesSent();
               });
         }}},
-       {"DOWNSTREAM_HEADER_BYTES_SENT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_HEADER_BYTES_SENT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.getDownstreamBytesMeter()->headerBytesSent();
               });
         }}},
-       {"DURATION", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DURATION", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoDurationFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.requestComplete();
               });
         }}},
-       {"RESPONSE_FLAGS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"RESPONSE_FLAGS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
               });
         }}},
-       {"UPSTREAM_HOST", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_HOST", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -870,7 +870,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_CLUSTER", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_CLUSTER", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -886,7 +886,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                            : absl::make_optional<std::string>(upstream_cluster_name);
               });
         }}},
-       {"UPSTREAM_LOCAL_ADDRESS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_LOCAL_ADDRESS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -897,7 +897,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withoutPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -908,7 +908,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_LOCAL_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_LOCAL_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::justPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -919,7 +919,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_REMOTE_ADDRESS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_REMOTE_ADDRESS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -930,7 +930,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withoutPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -941,7 +941,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_REMOTE_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_REMOTE_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::justPort(
               [](const StreamInfo::StreamInfo& stream_info)
@@ -952,84 +952,84 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return nullptr;
               });
         }}},
-       {"UPSTREAM_REQUEST_ATTEMPT_COUNT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_REQUEST_ATTEMPT_COUNT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.attemptCount().value_or(0);
               });
         }}},
-       {"DOWNSTREAM_LOCAL_ADDRESS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_LOCAL_ADDRESS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withPort(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().localAddress();
               });
         }}},
-       {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withoutPort(
               [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().localAddress();
               });
         }}},
-       {"DOWNSTREAM_LOCAL_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_LOCAL_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::justPort(
               [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().localAddress();
               });
         }}},
-       {"DOWNSTREAM_REMOTE_ADDRESS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_REMOTE_ADDRESS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withPort(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().remoteAddress();
               });
         }}},
-       {"DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withoutPort(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().remoteAddress();
               });
         }}},
-       {"DOWNSTREAM_REMOTE_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_REMOTE_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::justPort(
               [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().remoteAddress();
               });
         }}},
-       {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withPort(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().directRemoteAddress();
               });
         }}},
-       {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::withoutPort(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().directRemoteAddress();
               });
         }}},
-       {"DOWNSTREAM_DIRECT_REMOTE_PORT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_DIRECT_REMOTE_PORT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return StreamInfoAddressFieldExtractor::justPort(
               [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().directRemoteAddress();
               });
         }}},
-       {"CONNECTION_ID", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"CONNECTION_ID", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoUInt64FieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
                 return stream_info.downstreamAddressProvider().connectionID().value_or(0);
               });
         }}},
-       {"REQUESTED_SERVER_NAME", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"REQUESTED_SERVER_NAME", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -1041,7 +1041,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return result;
               });
         }}},
-       {"ROUTE_NAME", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"ROUTE_NAME", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -1053,91 +1053,91 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return result;
               });
         }}},
-       {"DOWNSTREAM_PEER_URI_SAN", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_URI_SAN", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
               });
         }}},
-       {"DOWNSTREAM_LOCAL_URI_SAN", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_LOCAL_URI_SAN", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
               });
         }}},
-       {"DOWNSTREAM_PEER_SUBJECT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_SUBJECT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.subjectPeerCertificate();
               });
         }}},
-       {"DOWNSTREAM_LOCAL_SUBJECT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_LOCAL_SUBJECT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.subjectLocalCertificate();
               });
         }}},
-       {"DOWNSTREAM_TLS_SESSION_ID", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_TLS_SESSION_ID", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.sessionId();
               });
         }}},
-       {"DOWNSTREAM_TLS_CIPHER", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_TLS_CIPHER", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.ciphersuiteString();
               });
         }}},
-       {"DOWNSTREAM_TLS_VERSION", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_TLS_VERSION", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.tlsVersion();
               });
         }}},
-       {"DOWNSTREAM_PEER_FINGERPRINT_256", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_FINGERPRINT_256", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.sha256PeerCertificateDigest();
               });
         }}},
-       {"DOWNSTREAM_PEER_FINGERPRINT_1", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_FINGERPRINT_1", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.sha1PeerCertificateDigest();
               });
         }}},
-       {"DOWNSTREAM_PEER_SERIAL", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_SERIAL", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.serialNumberPeerCertificate();
               });
         }}},
-       {"DOWNSTREAM_PEER_ISSUER", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_ISSUER", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.issuerPeerCertificate();
               });
         }}},
-       {"DOWNSTREAM_PEER_CERT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"DOWNSTREAM_PEER_CERT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
               [](const Ssl::ConnectionInfo& connection_info) {
                 return connection_info.urlEncodedPemEncodedPeerCertificate();
               });
         }}},
-       {"UPSTREAM_TRANSPORT_FAILURE_REASON", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"UPSTREAM_TRANSPORT_FAILURE_REASON", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -1153,13 +1153,13 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return result;
               });
         }}},
-       {"HOSTNAME", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"HOSTNAME", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [hostname](const StreamInfo::StreamInfo&) { return hostname; });
         }}},
-       {"FILTER_CHAIN_NAME", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"FILTER_CHAIN_NAME", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
@@ -1169,14 +1169,14 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return absl::nullopt;
               });
         }}},
-       {"VIRTUAL_CLUSTER_NAME", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"VIRTUAL_CLUSTER_NAME", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
                 return stream_info.virtualClusterName();
               });
         }}},
-       {"TLS_JA3_FINGERPRINT", {TokenSyntaxChecker::TOKEN_ONLY,
+       {"TLS_JA3_FINGERPRINT", {CommandSyntaxChecker::COMMAND_ONLY,
         [](const std::string&, const absl::optional<size_t>&) {
           return std::make_unique<StreamInfoStringFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) {
@@ -1187,7 +1187,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                 return result;
               });
         }}},
-        {"START_TIME", {TokenSyntaxChecker::PARAMS_OPTIONAL, 
+        {"START_TIME", {CommandSyntaxChecker::PARAMS_OPTIONAL, 
         [](const std::string& format, const absl::optional<size_t>&) {
           return std::make_unique<SystemTimeFormatter> (format,
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
@@ -1196,30 +1196,30 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
     );
         }}},
     
-        {"DYNAMIC_METADATA", {TokenSyntaxChecker::PARAMS_REQUIRED, 
+        {"DYNAMIC_METADATA", {CommandSyntaxChecker::PARAMS_REQUIRED, 
             [](const std::string& format, const absl::optional<size_t>& max_length) {
     std::string filter_namespace;
     std::vector<std::string> path;
 
-    SubstitutionFormatParser::parseCommand(format, ':', filter_namespace, path);
+    SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
     return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
         }}},
     
-        {"CLUSTER_METADATA", {TokenSyntaxChecker::PARAMS_REQUIRED, 
+        {"CLUSTER_METADATA", {CommandSyntaxChecker::PARAMS_REQUIRED, 
             [](const std::string& format, const absl::optional<size_t>& max_length) {
     std::string filter_namespace;
     std::vector<std::string> path;
 
-    SubstitutionFormatParser::parseCommand(format, ':', filter_namespace, path);
+    SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
     return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
     }}},
-    {"FILTER_STATE", {TokenSyntaxChecker::PARAMS_OPTIONAL | TokenSyntaxChecker::LENGTH_ALLOWED,
+    {"FILTER_STATE", {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
     [](const std::string& format, const absl::optional<size_t>& max_length) {
     std::string key, serialize_type;
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
 
-    SubstitutionFormatParser::parseCommand(format, ':', key, serialize_type);
+    SubstitutionFormatParser::parseSubcommand(format, ':', key, serialize_type);
     if (key.empty()) {
       throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
     }
@@ -1234,32 +1234,32 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
 
     return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
     }}},
-    {"DOWNSTREAM_PEER_CERT_V_START", {TokenSyntaxChecker::PARAMS_OPTIONAL,
+    {"DOWNSTREAM_PEER_CERT_V_START", {CommandSyntaxChecker::PARAMS_OPTIONAL,
     [](const std::string& format, const absl::optional<size_t>&) {
     return std::make_unique<DownstreamPeerCertVStartFormatter>(format);
     }}},
-    {"DOWNSTREAM_PEER_CERT_V_END", {TokenSyntaxChecker::PARAMS_OPTIONAL,
+    {"DOWNSTREAM_PEER_CERT_V_END", {CommandSyntaxChecker::PARAMS_OPTIONAL,
     [](const std::string& format, const absl::optional<size_t>&) {
     return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
     }}}
     });
 }
 
-StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name, const std::string& token_command, const absl::optional<size_t>& length) {
+StreamInfoFormatter::StreamInfoFormatter(const std::string& command, const std::string& subcommand, const absl::optional<size_t>& length) {
   const FieldExtractorLookupTbl& extractors = getKnownFieldExtractors();
 
-  auto it = extractors.find(field_name);
+  auto it = extractors.find(command);
 
   if (it == extractors.end()) {
-    throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
+    throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", command));
   }
 
-  // Check flags for the token.
-  TokenSyntaxChecker::VerifySyntax((*it).second.first, field_name, token_command, length);
+  // Check flags for the command.
+  CommandSyntaxChecker::VerifySyntax((*it).second.first, command, subcommand, length);
 
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.
-  field_extractor_ = (*it).second.second(token_command, length);
+  field_extractor_ = (*it).second.second(subcommand, length);
 }
 
 absl::optional<std::string> StreamInfoFormatter::format(const Http::RequestHeaderMap&,
@@ -1632,25 +1632,25 @@ ProtobufWkt::Value FilterStateFormatter::extractValue(
 }
 
 // A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
-// an access log token that starts with `START_TIME`.
-StartTimeFormatter::StartTimeFormatter(const std::string& token)
-    : SystemTimeFormatter(token,
+// an access log command that starts with `START_TIME`.
+StartTimeFormatter::StartTimeFormatter(const std::string& format)
+    : SystemTimeFormatter(format,
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                 return stream_info.startTime();
               }) {}
 
-DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::string& token)
+DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::string& format)
     : SystemTimeFormatter(
-          token,
+          format,
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                 const auto connection_info =
                     stream_info.downstreamAddressProvider().sslConnection();
                 return connection_info != nullptr ? connection_info->validFromPeerCertificate()
                                                   : absl::optional<SystemTime>();
               }) {}
-DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::string& token)
+DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::string& format)
     : SystemTimeFormatter(
-          token, 
+          format, 
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                 const auto connection_info =
                     stream_info.downstreamAddressProvider().sslConnection();
@@ -1684,17 +1684,17 @@ ProtobufWkt::Value SystemTimeFormatter::extractValue(
     return ValueUtil::optionalStringValue(extract(stream_info));
 }
 
-void TokenSyntaxChecker::VerifySyntax(TokenSyntaxFlags flags, const std::string& token, const std::string& token_command, const absl::optional<size_t>& length) {
-  if ((flags == TOKEN_ONLY) && ((token_command.length() != 0) || length.has_value())) {
-    throw EnvoyException(fmt::format("{} Does not take any parameters or length", token));
+void CommandSyntaxChecker::VerifySyntax(CommandSyntaxFlags flags, const std::string& command, const std::string& subcommand, const absl::optional<size_t>& length) {
+  if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
+    throw EnvoyException(fmt::format("{} Does not take any parameters or length", command));
   }
 
-  if ((flags == PARAMS_REQUIRED) && (token_command.length() == 0)) {
-    throw EnvoyException(fmt::format("{} Requires params", token));
+  if ((flags == PARAMS_REQUIRED) && (subcommand.length() == 0)) {
+    throw EnvoyException(fmt::format("{} Requires params", command));
   }
 
   if (!(flags & LENGTH_ALLOWED) && length.has_value()) {
-    throw EnvoyException(fmt::format("{} Does not allow length to be specified.", token));
+    throw EnvoyException(fmt::format("{} Does not allow length to be specified.", command));
   }
 }
 
