@@ -236,22 +236,22 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/tracers/opencensus @wbpcode @Shikugawa
 /*/extensions/tracers/common @wbpcode @Shikugawa
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa
+# ext_authz
+/*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
+/*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
+/*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
 
 # Maintainerless extensions (need maintainer owner)
-# ext_authz
-/*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
-/*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
-/*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
 # formatter
 /*/extensions/formatter/req_without_query @UNOWNED @tsaarni @rgs1 @giantcroc
+# IP tagging
+/*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # cors
 /*/extensions/filters/http/cors @wbpcode @UNOWNED
 
 # "Unowned" extensions (currently without 1 maintainer or 2 owners)
-# IP tagging
-/*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # original dst
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
 # mongo proxy
