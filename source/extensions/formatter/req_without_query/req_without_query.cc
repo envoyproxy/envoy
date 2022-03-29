@@ -73,10 +73,9 @@ const Http::HeaderEntry* ReqWithoutQuery::findHeader(const Http::HeaderMap& head
 ReqWithoutQueryCommandParser::parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const {
   if (token == "REQ_WITHOUT_QUERY") {
     std::string main_header, alternative_header;
-    absl::optional<size_t> length;
 
     Envoy::Formatter::SubstitutionFormatParser::parseCommandHeader(
-        format, ReqWithoutQueryParamStart, main_header, alternative_header, length);
+        format, main_header, alternative_header);
     return std::make_unique<ReqWithoutQuery>(main_header, alternative_header, max_length);
   }
 

@@ -13,11 +13,11 @@ namespace Extensions {
 namespace Formatter {
 
 // Metadata formatter for route's metadata.
-class RouteMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter_new {
+class RouteMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
 public:
   RouteMetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
                          absl::optional<size_t> max_length)
-      : ::Envoy::Formatter::MetadataFormatter_new(filter_namespace, path, max_length,
+      : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
                                               [](const StreamInfo::StreamInfo& stream_info)
                                                   -> const envoy::config::core::v3::Metadata* {
                                                 auto route = stream_info.route();
@@ -53,15 +53,12 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
 
 ::Envoy::Formatter::FormatterProviderPtr
 MetadataFormatterCommandParser::parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const {
-  //constexpr absl::string_view METADATA_TOKEN = "METADATA(";
   if (token == "METADATA") {
     // Extract type of metadata and keys.
     std::string type, filter_namespace;
-    absl::optional<size_t> length;
     std::vector<std::string> path;
-    const size_t start = 0;//METADATA_TOKEN.size();
 
-    ::Envoy::Formatter::SubstitutionFormatParser::parseCommand(format, start, ':', length, type,
+    ::Envoy::Formatter::SubstitutionFormatParser::parseCommand(format, ':', type,
                                                                filter_namespace, path);
 
     auto provider = metadata_formatter_providers_.find(type);

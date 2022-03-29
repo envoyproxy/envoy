@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-// Access log handler for METADATA( command.
+// Access log handler for METADATA() command.
 class MetadataFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   MetadataFormatterCommandParser();
@@ -20,7 +20,7 @@ public:
 private:
   // Map used to dispatch types of metadata to individual handlers which will
   // access required metadata object.
-  using FormatterProviderFunc = std::function<std::unique_ptr<::Envoy::Formatter::StreamInfoFormatter::FieldExtractor>/*FormatterProviderPtr*/(
+  using FormatterProviderFunc = std::function<std::unique_ptr<::Envoy::Formatter::StreamInfoFormatter::FieldExtractor>(
       const std::string& filter_namespace, const std::vector<std::string>& path,
       absl::optional<size_t> max_length)>;
   std::map<std::string, FormatterProviderFunc> metadata_formatter_providers_;
