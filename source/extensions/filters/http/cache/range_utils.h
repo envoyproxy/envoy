@@ -96,7 +96,7 @@ struct RangeDetails {
   // cache.
   bool satisfiable_ = false;
   // The ranges that will be served by the cache, if satisfiable_ = true.
-  std::vector<AdjustedByteRange> ranges_;
+  std::vector<AdjustedByteRange> ranges_ = {};
 };
 
 namespace RangeUtils {

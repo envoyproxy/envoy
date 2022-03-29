@@ -33,18 +33,18 @@ struct LookupResult {
   CacheEntryStatus cache_entry_status_ = CacheEntryStatus::Unusable;
 
   // Headers of the cached response.
-  Http::ResponseHeaderMapPtr headers_;
+  Http::ResponseHeaderMapPtr headers_ = nullptr;
 
   // Size of the full response body. Cache filter will generate a content-length
   // header with this value, replacing any preexisting content-length header.
   // (This lets us dechunk responses as we insert them, then later serve them
   // with a content-length header.)
-  uint64_t content_length_;
+  uint64_t content_length_ = 0;
 
   // If the request is a range request, this struct indicates if the ranges can
   // be satisfied and which ranges are requested. nullopt indicates that this is
   // not a range request or the range header has been ignored.
-  absl::optional<RangeDetails> range_details_;
+  absl::optional<RangeDetails> range_details_ = absl::nullopt;
 
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.

@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_mock", "envoy_cc_test_library", "envoy_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -74,6 +74,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         ":common",
+        ":http_cache_mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
         "//source/extensions/filters/http/cache/simple_http_cache:config",
         "//test/mocks/server:factory_context_mocks",
@@ -147,5 +148,13 @@ envoy_extension_cc_test_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_mock(
+    name = "http_cache_mocks",
+    hdrs = ["mocks.h"],
+    deps = [
+        "//source/extensions/filters/http/cache:http_cache_lib",
     ],
 )
