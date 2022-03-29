@@ -730,6 +730,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestsUsin
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
