@@ -405,7 +405,47 @@ SubstitutionFormatParser::parse(const std::string& format,
                                 const std::vector<CommandParserPtr>& commands) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
+  // The following regex is used to check validity of the formatter command and to 
+  // extract groups.
+  // The formatter command has the following format:
+  //    %TOKEN(SUBCOMMAND):LENGTH%
+  // % sign at the beginning and end are used by parser to find next TOKEN.
+  // TOKEN must always be present.
+  // SUBCOMMAND presence depends on the TOKEN:
+  // - for some tokens SUBCOMMAND is not allowed (for example %PROTOCOL%)
+  // - for some tokens SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will cause error)
+  // - for some tokens SUBCOMMAND is optional (for example %START_TIME% and %START_TIME(%f.%1f.%2f.%3f)% are both correct).
+  // LENGTH presence depends on the token. Some tokens allow LENGTH to be specified, so not.
+  // Regex is used to validate the syntax and also to extract values for TOKEN, SUBCOMMAND and LENGTH.
+  // Below is explanation of capturing and non-capturing groups. Non-capturing groups are used
+  // to specify that certain part of the formatter command is optional and should contain specific 
+  // characters. Capturing groups are used to extract the values when regex is matched against
+  // formatter command string. 
+  //
+  // Non-capturing group specifying optional :LENGTH -------------------------------------
+  //                                                                                      |
+  // Non-capturing group specifying optional (SUBCOMMAND)------------------               |
+  //                                                                       |              |
+  // Non-capturing group specifying mandatory TOKEN                        |              |
+  //  which uses only A-Z, 0-9 and _ characters     -----                  |              |
+  //  Group is used only to specify allowed characters.  |                 |              |
+  //                                                     |                 |              |
+  //                                                     |                 |              |
+  //                                             _________________  _______________  _____________
+  //                                             |               |  |             |  |           |
   const std::regex command_w_args_regex(R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\(([^\)]*)\))?(?::([0-9]+))?%)EOF");
+  //                                            |__________________|     |______|        |______|
+  //                                                     |                   |              |
+  // Capturing group specifying TOKEN -------------------                    |              |
+  // The index of this group is 1.                                           |              |
+  //                                                                         |              |
+  // Capturing group for SUBCOMMAND. If present, it will --------------------               |
+  // contain SUBCOMMAND without "(" and ")". The index                                      |
+  // of SUBCOMMAND group is 2.                                                              |
+  //                                                                                        |
+  // Capturing group for LENGTH. If present, it wil -----------------------------------------
+  // contain just number without ":". The index of
+  // LENGTH group is 3.
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     //printf("Checking %c\n", format[pos]);
@@ -432,8 +472,11 @@ SubstitutionFormatParser::parse(const std::string& format,
 
     const std::string match = m.str(0);
     //const std::string token = match.substr(1, match.length() - 2);
+    // Token is at at index 1.
     const std::string token = m.str(1);
+    // subcommand is at index 2.
     const std::string token_command = m.str(2);
+    // optional length is at index 3. If present validate that it is valid integer.
     absl::optional<size_t> max_length;
     if (m.str(3).length() != 0) {
         size_t length_value;
