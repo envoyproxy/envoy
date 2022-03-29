@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <regex>
 #include <string>
@@ -63,7 +64,7 @@ const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
 FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
-  return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
+  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
 const absl::optional<std::reference_wrapper<const std::string>>
@@ -454,10 +455,19 @@ SubstitutionFormatParser::parse(const std::string& format,
   std::vector<FormatterProviderPtr> formatters;
   const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
-  for (size_t pos = 0; pos < format.length(); ++pos) {
+  for (size_t pos = 0; pos < format.size(); ++pos) {
     if (format[pos] != '%') {
       current_token += format[pos];
       continue;
+    }
+
+    // escape '%%'
+    if (format.size() > pos + 1) {
+      if (format[pos + 1] == '%') {
+        current_token += '%';
+        pos++;
+        continue;
+      }
     }
 
     if (!current_token.empty()) {

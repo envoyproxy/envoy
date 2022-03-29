@@ -9,6 +9,7 @@ load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
+load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 
 # go version for rules_go
 GO_VERSION = "1.17.5"
@@ -31,6 +32,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     )
     rules_cc_dependencies()
     rules_cc_toolchains()
+    emscripten_deps()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
@@ -77,12 +79,12 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "com_github_lyft_protoc_gen_star",
         importpath = "github.com/lyft/protoc-gen-star",
-        sum = "h1:sImehRT+p7lW9n6R7MQc5hVgzWGEkDVZU4AsBQ4Isu8=",
-        version = "v0.5.1",
+        sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
+        version = "v0.6.0",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2020-08-06"
+        # last_update = "2022-03-04"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L35-L40"
+        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",

@@ -40,6 +40,7 @@ request_headers_to_add_when_not_enforced:
       key: x-local-ratelimited
       value: 'true'
 local_rate_limit_per_downstream_connection: {}
+enable_x_ratelimit_headers: {}
   )";
 // '{}' used in the yaml config above are position dependent placeholders used for substitutions.
 // Different test cases toggle functionality based on these positional placeholder variables
@@ -99,17 +100,17 @@ public:
 };
 
 TEST_F(FilterTest, Runtime) {
-  setup(fmt::format(config_yaml, "1", "false"), false, false);
+  setup(fmt::format(config_yaml, "1", "false", "\"OFF\""), false, false);
   EXPECT_EQ(&runtime_, &(config_->runtime()));
 }
 
 TEST_F(FilterTest, ToErrorCode) {
-  setup(fmt::format(config_yaml, "1", "false"), false, false);
+  setup(fmt::format(config_yaml, "1", "false", "\"OFF\""), false, false);
   EXPECT_EQ(Http::Code::BadRequest, toErrorCode(400));
 }
 
 TEST_F(FilterTest, Disabled) {
-  setup(fmt::format(config_yaml, "1", "false"), false, false);
+  setup(fmt::format(config_yaml, "1", "false", "\"OFF\""), false, false);
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enabled"));
@@ -117,7 +118,7 @@ TEST_F(FilterTest, Disabled) {
 }
 
 TEST_F(FilterTest, RequestOk) {
-  setup(fmt::format(config_yaml, "1", "false"));
+  setup(fmt::format(config_yaml, "1", "false", "\"OFF\""));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_2_->decodeHeaders(headers, false));
@@ -128,7 +129,7 @@ TEST_F(FilterTest, RequestOk) {
 }
 
 TEST_F(FilterTest, RequestOkPerConnection) {
-  setup(fmt::format(config_yaml, "1", "true"));
+  setup(fmt::format(config_yaml, "1", "true", "\"OFF\""));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, false));
@@ -139,7 +140,7 @@ TEST_F(FilterTest, RequestOkPerConnection) {
 }
 
 TEST_F(FilterTest, RequestRateLimited) {
-  setup(fmt::format(config_yaml, "1", "false"));
+  setup(fmt::format(config_yaml, "1", "false", "\"OFF\""));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -179,7 +180,7 @@ connection rate limiting and even though 'max_token' is set to 1, it allows 2 re
 allowed (across the process) for the same configuration.
 */
 TEST_F(FilterTest, RequestRateLimitedPerConnection) {
-  setup(fmt::format(config_yaml, "1", "true"));
+  setup(fmt::format(config_yaml, "1", "true", "\"OFF\""));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -216,7 +217,7 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
 }
 
 TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
-  setup(fmt::format(config_yaml, "0", "false"), true, false);
+  setup(fmt::format(config_yaml, "0", "false", "\"OFF\""), true, false);
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _)).Times(0);
 
@@ -228,6 +229,29 @@ TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
   EXPECT_EQ(request_headers, expected_headers);
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
+  setup(fmt::format(config_yaml, "1", "false", "DRAFT_VERSION_03"));
+
+  auto request_headers = Http::TestRequestHeaderMapImpl();
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_2_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
@@ -253,6 +277,7 @@ response_headers_to_add:
       key: x-test-rate-limit
       value: 'true'
 local_rate_limit_per_downstream_connection: true
+enable_x_ratelimit_headers: {}
 descriptors:
 - entries:
    - key: hello
@@ -297,7 +322,7 @@ public:
 };
 
 TEST_F(DescriptorFilterTest, NoRouteEntry) {
-  setupPerRoute(fmt::format(descriptor_config_yaml, "1", "1", "0"), true, true, true);
+  setupPerRoute(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"), true, true, true);
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -307,7 +332,7 @@ TEST_F(DescriptorFilterTest, NoRouteEntry) {
 }
 
 TEST_F(DescriptorFilterTest, NoCluster) {
-  setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
 
@@ -319,7 +344,7 @@ TEST_F(DescriptorFilterTest, NoCluster) {
 }
 
 TEST_F(DescriptorFilterTest, DisabledInRoute) {
-  setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -334,7 +359,7 @@ TEST_F(DescriptorFilterTest, DisabledInRoute) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorRequestOk) {
-  setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -350,7 +375,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestOk) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimited) {
-  setUpTest(fmt::format(descriptor_config_yaml, "0", "0", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -366,7 +391,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimited) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
-  setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -383,7 +408,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
 
 TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
   // Request  should not be rate  limited as it should match first descriptor with 10 req/min
-  setUpTest(fmt::format(descriptor_config_yaml, "0", "0", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -399,7 +424,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
-  setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "1"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "1"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(1));
@@ -412,6 +437,29 @@ TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+}
+
+TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedXRateLimitHeaders) {
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "DRAFT_VERSION_03", "0", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+
+  auto request_headers = Http::TestRequestHeaderMapImpl();
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("60", response_headers.get_("x-ratelimit-reset"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
 } // namespace LocalRateLimitFilter

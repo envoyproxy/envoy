@@ -18,7 +18,8 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
     return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
                                : envoy::admin::v3::ServerInfo::LIVE;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected server state enum");
+  return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
 }
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map) {
@@ -54,6 +55,26 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
     }
   }
   return true;
+}
+
+// Helper method to get the histogram_buckets parameter. Returns false if histogram_buckets query
+// param is found and value is not "cumulative" or "disjoint", true otherwise.
+absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
+                                   HistogramBucketsMode& histogram_buckets_mode) {
+  absl::optional<std::string> histogram_buckets_query_param =
+      queryParam(params, "histogram_buckets");
+  if (histogram_buckets_query_param.has_value()) {
+    if (histogram_buckets_query_param.value() == "cumulative") {
+      histogram_buckets_mode = HistogramBucketsMode::Cumulative;
+    } else if (histogram_buckets_query_param.value() == "disjoint") {
+      histogram_buckets_mode = HistogramBucketsMode::Disjoint;
+    } else {
+      histogram_buckets_mode = HistogramBucketsMode::NoBuckets;
+      return absl::InvalidArgumentError(
+          "usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n");
+    }
+  }
+  return absl::OkStatus();
 }
 
 // Helper method to get the format parameter.

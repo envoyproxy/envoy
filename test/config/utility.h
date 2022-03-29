@@ -97,6 +97,19 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool local_negative,
+                                         bool remote_negative, std::string log_path,
+                                         bool multiple_ips, Network::Address::IpVersion version) {
+      keylog_local_filter_ = local;
+      keylog_remote_filter_ = remote;
+      keylog_local_negative_ = local_negative;
+      keylog_remote_negative_ = remote_negative;
+      keylog_path_ = log_path;
+      keylog_multiple_ips_ = multiple_ips;
+      ip_version_ = version;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -106,6 +119,13 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
+    bool keylog_local_filter_{false};
+    bool keylog_remote_filter_{false};
+    bool keylog_local_negative_{false};
+    bool keylog_remote_negative_{false};
+    bool keylog_multiple_ips_{false};
+    std::string keylog_path_;
+    Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
@@ -124,6 +144,9 @@ public:
   initializeTls(const ServerSslOptions& options,
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
+  static void initializeTlsKeyLog(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+      const ServerSslOptions& options);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
@@ -267,14 +290,15 @@ public:
   void configDownstreamTransportSocketWithTls(
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-          configure_tls_context);
+          configure_tls_context,
+      bool enable_quic_early_data = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig();
+  void addQuicDownstreamTransportSocketConfig(bool enable_early_data);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -334,7 +358,7 @@ public:
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
   // Add this key value pair to the static runtime.
-  void addRuntimeOverride(const std::string& key, const std::string& value);
+  void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
   void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);

@@ -72,6 +72,9 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
+  ConnectionInfoSetter& connectionInfoSetter() override {
+    return socket_->connectionInfoProvider();
+  }
   const ConnectionInfoProvider& connectionInfoProvider() const override {
     return socket_->connectionInfoProvider();
   }
@@ -101,6 +104,7 @@ public:
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

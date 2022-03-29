@@ -19,6 +19,9 @@ MockClientContextConfig::MockClientContextConfig() {
   ON_CALL(*this, capabilities()).WillByDefault(testing::Return(capabilities_));
   ON_CALL(*this, alpnProtocols()).WillByDefault(testing::ReturnRef(alpn_));
   ON_CALL(*this, signingAlgorithmsForTest()).WillByDefault(testing::ReturnRef(test_));
+  ON_CALL(*this, tlsKeyLogLocal()).WillByDefault(testing::ReturnRef(iplist_));
+  ON_CALL(*this, tlsKeyLogRemote()).WillByDefault(testing::ReturnRef(iplist_));
+  ON_CALL(*this, tlsKeyLogPath()).WillByDefault(testing::ReturnRef(path_));
 }
 MockClientContextConfig::~MockClientContextConfig() = default;
 

@@ -12,8 +12,6 @@
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
-
 namespace Envoy {
 namespace Http {
 namespace Http3 {
@@ -24,6 +22,19 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
                                          max_concurrent_streams, 100);
 }
 
+const Envoy::Ssl::ClientContextConfig&
+getConfig(Network::TransportSocketFactory& transport_socket_factory) {
+  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
+      .clientContextConfig();
+}
+
+std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                Upstream::HostConstSharedPtr host) {
+  return options && options->serverNameOverride().has_value()
+             ? options->serverNameOverride().value()
+             : getConfig(host->transportSocketFactory()).serverNameIndication();
+}
+
 } // namespace
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
@@ -31,7 +42,7 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data),
       async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
-        if (state() == Envoy::ConnectionPool::ActiveClient::State::CONNECTING) {
+        if (state() == Envoy::ConnectionPool::ActiveClient::State::Connecting) {
           codec_client_->connect();
         }
       })) {
@@ -46,20 +57,14 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
-  if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
-    parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
+  if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
+    parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
-  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::READY) {
+  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::Ready) {
     // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
-    parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
+    parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
   }
-}
-
-const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::TransportSocketFactory& transport_socket_factory) {
-  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
-      .clientContextConfig();
 }
 
 ConnectionPool::Cancellable* Http3ConnPoolImpl::newStream(Http::ResponseDecoder& response_decoder,
@@ -76,11 +81,11 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-    OptRef<PoolConnectResultCallback> connect_callback)
+    OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol),
-      quic_info_(Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster())),
-      server_id_(getConfig(host->transportSocketFactory()).serverNameIndication(),
+      quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
+      server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port()), false),
       connect_callback_(connect_callback) {}
 
@@ -93,31 +98,13 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
-std::shared_ptr<quic::QuicCryptoClientConfig> Http3ConnPoolImpl::cryptoConfig() {
-  Envoy::Ssl::ClientContextSharedPtr context =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
-          .sslCtx();
-  // If the secrets haven't been loaded, there is no crypto config.
-  if (context == nullptr) {
-    return nullptr;
-  }
-
-  // If the secret has been updated, update the proof source.
-  if (context.get() != client_context_.get()) {
-    client_context_ = context;
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
-        std::make_unique<quic::QuicClientSessionCache>());
-  }
-  // Return the latest client config.
-  return crypto_config_;
-}
-
 std::unique_ptr<Network::ClientConnection>
 Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::AlternateProtocolsCache> rtt_cache,
                                           Stats::Scope& scope) {
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = cryptoConfig();
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
+          .getCryptoConfig();
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
@@ -127,7 +114,7 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
 
-  return Quic::createQuicNetworkConnection(*quic_info_, std::move(crypto_config), server_id_,
+  return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
                                            dispatcher(), host()->address(), source_address,
                                            quic_stat_names, rtt_cache, scope);
 }
@@ -139,7 +126,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
-                 OptRef<PoolConnectResultCallback> connect_callback) {
+                 OptRef<PoolConnectResultCallback> connect_callback,
+                 Http::PersistentQuicInfo& quic_info) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names, rtt_cache,
@@ -192,7 +180,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                                                     pool->randomGenerator());
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, connect_callback);
+      std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);
 }
 
 } // namespace Http3

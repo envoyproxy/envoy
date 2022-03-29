@@ -28,7 +28,7 @@
 #include "absl/strings/numbers.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/platform/quiche_flags_impl.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {
@@ -55,13 +55,16 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     }
-    if (it.second.uint_value_.has_value()) {
-      maybeSetDeprecatedInts(it.first, it.second.uint_value_.value());
-    }
   }
 #ifdef ENVOY_ENABLE_QUIC
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 #endif
+  // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
+  for (const auto& it : flag_map) {
+    if (it.second.uint_value_.has_value()) {
+      maybeSetDeprecatedInts(it.first, it.second.uint_value_.value());
+    }
+  }
 }
 
 } // namespace
@@ -375,6 +378,11 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
+      IS_ENVOY_BUG(absl::StrCat(
+          "Using a removed guard ", prefix,
+          ". In future version of Enovy this will be treated as invalid configuration"));
+    }
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kStructValue: {

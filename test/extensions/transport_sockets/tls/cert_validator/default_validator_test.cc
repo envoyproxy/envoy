@@ -195,6 +195,7 @@ TEST(DefaultCertValidatorTest, NoSanInCert) {
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+<<<<<<< HEAD
 TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
   Stats::TestUtil::TestStore test_store;
@@ -256,6 +257,56 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
 
   EXPECT_EQ(X509_verify_cert(store_ctx.get()), 1);
   EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_OK);
+=======
+class MockCertificateValidationContextConfig : public Ssl::CertificateValidationContextConfig {
+public:
+  MockCertificateValidationContextConfig() {
+    auto matcher = envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher();
+    matcher.set_san_type(
+        static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType>(
+            123));
+    matchers_.emplace_back(matcher);
+  };
+  const std::string& caCert() const override { return s_; }
+  const std::string& caCertPath() const override { return s_; }
+  const std::string& certificateRevocationList() const override { return s_; }
+  const std::string& certificateRevocationListPath() const override { return s_; }
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return matchers_;
+  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return strs_; }
+  bool allowExpiredCertificate() const override { return false; }
+  MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                  TrustChainVerification,
+              trustChainVerification, (), (const override));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+              customValidatorConfig, (), (const override));
+  MOCK_METHOD(Api::Api&, api, (), (const override));
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
+
+private:
+  std::string s_;
+  std::vector<std::string> strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers_;
+};
+
+TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
+  auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>();
+  EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
+      .WillRepeatedly(testing::Return(envoy::extensions::transport_sockets::tls::v3::
+                                          CertificateValidationContext::ACCEPT_UNTRUSTED));
+  auto matchers =
+      std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
+  Stats::TestUtil::TestStore store;
+  auto ssl_stats = generateSslStats(store);
+  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
+                                                          Event::GlobalTimeSystem().timeSystem());
+  auto ctx = std::vector<SSL_CTX*>();
+  EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
+                          "Failed to create string SAN matcher of type.*");
+>>>>>>> 93b0a4e9c5877cbebc50ad8cca702717c2a3d865
 }
 
 } // namespace Tls

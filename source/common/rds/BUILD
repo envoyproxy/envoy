@@ -19,6 +19,10 @@ envoy_cc_library(
         "util.cc",
     ],
     hdrs = [
+        "common/config_traits_impl.h",
+        "common/proto_traits_impl.h",
+        "common/route_config_provider_manager.h",
+        "common/route_config_provider_manager_impl.h",
         "rds_route_config_provider_impl.h",
         "rds_route_config_subscription.h",
         "route_config_provider_manager.h",

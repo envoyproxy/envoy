@@ -49,7 +49,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/wasm:95.8"
 "source/extensions/filters/listener:95.9"
 "source/extensions/filters/listener/http_inspector:95.8"
-"source/extensions/filters/listener/original_dst:93.3"
+"source/extensions/filters/listener/original_dst:82.4"
+"source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/listener/tls_inspector:92.3"
 "source/extensions/filters/network/common:96.0"
 "source/extensions/filters/network/common/redis:96.2"
@@ -82,7 +83,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:95.3"
+"source/server/admin:97.6"
 "source/server/config_validation:74.8"
 )
 

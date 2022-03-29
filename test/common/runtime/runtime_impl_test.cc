@@ -573,6 +573,13 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 }
 #endif
 
+TEST_F(StaticLoaderImplTest, RemovedFlags) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.removed_foo: true
+  )EOF");
+  EXPECT_ENVOY_BUG(setup(), "envoy.reloadable_features.removed_foo");
+}
+
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(

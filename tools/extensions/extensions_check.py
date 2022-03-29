@@ -15,7 +15,14 @@ from envoy.base import utils
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
-    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic")
+    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic",
+    "envoy.matching.inputs.request_headers", "envoy.matching.inputs.request_trailers",
+    "envoy.matching.inputs.response_headers", "envoy.matching.inputs.response_trailers",
+    "envoy.matching.inputs.destination_ip", "envoy.matching.inputs.destination_port",
+    "envoy.matching.inputs.source_ip", "envoy.matching.inputs.source_port",
+    "envoy.matching.inputs.direct_source_ip", "envoy.matching.inputs.source_type",
+    "envoy.matching.inputs.server_name", "envoy.matching.inputs.transport_protocol",
+    "envoy.matching.inputs.application_protocol")
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -41,19 +48,21 @@ EXTENSION_SECURITY_POSTURES = (
 # Extension categories as defined by factories
 EXTENSION_CATEGORIES = (
     "envoy.access_loggers", "envoy.bootstrap", "envoy.clusters", "envoy.compression.compressor",
-    "envoy.compression.decompressor", "envoy.filters.http", "envoy.filters.http.cache",
-    "envoy.filters.listener", "envoy.filters.network", "envoy.filters.udp_listener",
-    "envoy.formatter", "envoy.grpc_credentials", "envoy.guarddog_actions", "envoy.health_checkers",
-    "envoy.http.stateful_header_formatters", "envoy.internal_redirect_predicates",
-    "envoy.io_socket", "envoy.http.original_ip_detection", "envoy.matching.common_inputs",
-    "envoy.matching.input_matchers", "envoy.tls.key_providers", "envoy.quic.proof_source",
-    "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors", "envoy.request_id",
-    "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
-    "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.sip_proxy.filters",
-    "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
-    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value",
-    "envoy.network.dns_resolver", "envoy.rbac.matchers", "envoy.access_loggers.extension_filters",
-    "envoy.http.stateful_session")
+    "envoy.compression.decompressor", "envoy.config.validators", "envoy.filters.http",
+    "envoy.filters.http.cache", "envoy.filters.listener", "envoy.filters.network",
+    "envoy.filters.udp_listener", "envoy.formatter", "envoy.grpc_credentials",
+    "envoy.guarddog_actions", "envoy.health_checkers", "envoy.http.stateful_header_formatters",
+    "envoy.internal_redirect_predicates", "envoy.io_socket", "envoy.http.original_ip_detection",
+    "envoy.matching.common_inputs", "envoy.matching.input_matchers", "envoy.tls.key_providers",
+    "envoy.quic.proof_source", "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors",
+    "envoy.request_id", "envoy.resource_monitors", "envoy.retry_host_predicates",
+    "envoy.retry_priorities", "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers",
+    "envoy.sip_proxy.filters", "envoy.transport_sockets.downstream",
+    "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
+    "envoy.wasm.runtime", "envoy.common.key_value", "envoy.network.dns_resolver",
+    "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session",
+    "envoy.matching.http.input", "envoy.matching.network.input",
+    "envoy.matching.network.custom_matchers")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.

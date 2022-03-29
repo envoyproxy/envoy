@@ -34,6 +34,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cidr_range_interface",
+    hdrs = ["cidr_range.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
@@ -230,6 +239,17 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_filter_buffer_lib",
+    srcs = ["listener_filter_buffer_impl.cc"],
+    hdrs = ["listener_filter_buffer_impl.h"],
+    deps = [
+        "//envoy/network:io_handle_interface",
+        "//envoy/network:listener_filter_buffer_interface",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 
