@@ -19,7 +19,10 @@ namespace RateLimitFilter {
 Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
-      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
+      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()),
+      request_headers_(Http::RequestHeaderMapImpl::create()),
+      response_headers_(Http::ResponseHeaderMapImpl::create()),
+      response_trailers_(Http::ResponseTrailerMapImpl::create()) {
 
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
