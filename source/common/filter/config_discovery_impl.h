@@ -343,14 +343,14 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb, class FactoryCt>
+template <class Factory, class FactoryCb, class FactoryCtx>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
-                                        public FilterConfigProviderManager<FactoryCb, FactoryCt>,
+                                        public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
 public:
   DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name, FactoryCt& factory_context,
+      const std::string& filter_config_name, FactoryCtx& factory_context,
       const std::string& stat_prefix, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type) override {
     std::string subscription_stat_prefix;
@@ -427,7 +427,7 @@ private:
   virtual std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>
   createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
                                  const absl::flat_hash_set<std::string>& require_type_urls,
-                                 FactoryCt& factory_context,
+                                 FactoryCtx& factory_context,
                                  ProtobufTypes::MessagePtr&& default_config,
                                  bool last_filter_in_filter_chain,
                                  const std::string& filter_chain_type,

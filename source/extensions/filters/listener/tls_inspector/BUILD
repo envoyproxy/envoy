@@ -41,8 +41,8 @@ envoy_cc_extension(
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
+        "//test/common/filter:__subpackages__",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",

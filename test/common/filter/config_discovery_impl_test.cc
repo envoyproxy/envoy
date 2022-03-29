@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
+#include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -470,42 +471,27 @@ public:
     factory_context_.thread_local_.shutdownThread();
   }
 
+  // Create listener filter config provider callbacks.
   DynamicFilterConfigProviderPtr<Network::ListenerFilterFactoryCb>
-  createProvider(std::string name, bool warm, bool default_configuration,
-                 bool last_filter_config = true) {
-
+  createProvider(std::string name, bool warm, bool default_configuration) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ExtensionConfigSource config_source;
-
-    std::string inject_default_configuration;
-    if (default_configuration) {
-      inject_default_configuration = R"EOF(
-default_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
-)EOF";
-    }
-    TestUtility::loadFromYaml(absl::Substitute(R"EOF(
-config_source: { ads: {} }
-$0
-type_urls:
-- envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
-)EOF",
-                                               inject_default_configuration),
-                              config_source);
-    if (!warm) {
-      config_source.set_apply_default_config_without_warming(true);
-      TestUtility::loadFromYaml(R"EOF(
-"@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
-)EOF",
-                                *config_source.mutable_default_config());
+    envoy::config::core::v3::AggregatedConfigSource ads;
+    config_source.mutable_config_source()->mutable_ads()->MergeFrom(ads);
+    config_source.add_type_urls("envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector");
+    config_source.set_apply_default_config_without_warming(!warm);
+    if (default_configuration || !warm) {
+      const auto default_config =
+          envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector();
+      config_source.mutable_default_config()->PackFrom(default_config);
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_, "xds.", last_filter_config, "listener");
+        config_source, name, factory_context_, "xds.", true, "listener");
   }
 
-  void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
-    provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
+  void setup(bool warm = true, bool default_configuration = false) {
+    provider_ = createProvider("foo", warm, default_configuration);
     callbacks_ =
         factory_context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*factory_context_.server_factory_context_.cluster_manager_.subscription_factory_
@@ -517,6 +503,7 @@ type_urls:
     init_manager_.initialize(init_watcher_);
   }
 
+  // Add a listener filter configuration by send a extension discovery response. Then removes it.
   void incrementalTest() {
     const auto response =
         TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml_);
@@ -693,17 +680,25 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, WrongName) {
             scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
 }
 
-TEST_F(ListenerFilterConfigDiscoveryImplTest, Incremental) {
+// Without default config.
+// First adding a listener filter configuration by send a extension discovery response, then removes
+// it.
+TEST_F(ListenerFilterConfigDiscoveryImplTest, IncrementalWithOutDefault) {
   InSequence s;
   setup();
   incrementalTest();
+  // Verify the provider config is empty.
   EXPECT_EQ(absl::nullopt, provider_->config());
 }
 
+// With default config.
+// First adding a listener filter configuration by send a extension discovery response, then removes
+// it.
 TEST_F(ListenerFilterConfigDiscoveryImplTest, IncrementalWithDefault) {
   InSequence s;
   setup(true, true);
   incrementalTest();
+  // Verify the provider config is not empty since default config is there.
   EXPECT_NE(absl::nullopt, provider_->config());
 }
 

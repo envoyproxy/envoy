@@ -276,9 +276,8 @@ ProtobufTypes::MessagePtr ListenerFilterConfigProviderManagerImpl::getDefaultCon
                     filter_config_name, proto_config.type_url()));
   }
   validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+  return Config::Utility::translateAnyToFactoryConfig(
       proto_config, factory_context.messageValidationVisitor(), *default_factory);
-  return message;
 }
 
 } // namespace Filter
