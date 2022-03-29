@@ -483,12 +483,16 @@ void UpstreamRequest::onPoolReady(
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
                                    parent_.routeEntry()->appendXfh());
   }
-
+  const auto host = stream_info_.upstreamInfo() != nullptr
+                        ? stream_info_.upstreamInfo()->upstreamHost()
+                        : nullptr;
   if (span_ != nullptr) {
-    const auto host = stream_info_.upstreamInfo() != nullptr
-                          ? stream_info_.upstreamInfo()->upstreamHost()
-                          : nullptr;
     span_->injectContext(*parent_.downstreamHeaders(), host);
+  } else {
+    // No independent child span for current upstream request then inject the parent span's tracing
+    // context into the request headers.
+    // The injectContext() of the parent span may be called repeatedly when the request is retried.
+    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());

@@ -66,8 +66,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // balanced across them.
   Upstream::HostDescriptionConstSharedPtr host =
       encoder_callbacks_->streamInfo().upstreamInfo()->upstreamHost();
+  absl::string_view hostname = host->hostname();
+  if (encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection() &&
+      !encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni().empty()) {
+    // In the case the configured hostname and SNI differ, prefer SNI where
+    // available.
+    hostname = encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni();
+  }
   const uint32_t port = host->address()->ip()->port();
-  const std::string& hostname = host->hostname();
   Http::AlternateProtocolsCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                port);
   cache_->setAlternatives(origin, protocols);
