@@ -55,6 +55,24 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo(TimeSource& time_source) {
 
 } // namespace
 
+// Test measures how fast Formatters are constructed from
+// LogFormat string.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AccessLogFormatterSetup(benchmark::State& state) {
+  static const char* LogFormat =
+      "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
+      "%REQ(:METHOD)% "
+      "%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% "
+      "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
+
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+  std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
+      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+  }
+}
+BENCHMARK(BM_AccessLogFormatterSetup);
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
   MockTimeSystem time_system;
