@@ -1203,51 +1203,6 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 
-// Verify that all the pending connections are closed after the cluster request time out.
-// We cannot really verify that because it is the impl of ClusterManager which is fully mocked.
-TEST_F(TcpProxyTest, DISABLED_OdcdsClusterTimeoutAllConnections) {
-  auto config = onDemandConfig();
-  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
-
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
-      .WillOnce(Return(nullptr))
-      .WillOnce(Return(nullptr))
-      .RetiresOnSaturation();
-
-  Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
-  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
-        cluster_discovery_callback = std::move(cb);
-        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
-
-  setup(0, config);
-
-  // Same expectations for filter_2 as filter_.
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_2;
-  ON_CALL(filter_callbacks_2.connection_.stream_info_, setUpstreamClusterInfo(_))
-      .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
-        upstream_cluster_ = cluster_info;
-      }));
-  ON_CALL(filter_callbacks_2.connection_.stream_info_, upstreamClusterInfo())
-      .WillByDefault(ReturnPointee(&upstream_cluster_));
-
-  EXPECT_CALL(filter_callbacks_2.connection_, enableHalfClose(true));
-  EXPECT_CALL(filter_callbacks_2.connection_, readDisable(true));
-  auto filter_2 = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
-  filter_2->initializeReadFilterCallbacks(filter_callbacks_2);
-  filter_callbacks_2.connection_.stream_info_.downstream_connection_info_provider_
-      ->setSslConnection(filter_callbacks_2.connection_.ssl());
-
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_2->onNewConnection());
-
-  // Both connections are closed when the timeout is fired.
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
-  EXPECT_CALL(filter_callbacks_2.connection_, close(_));
-  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Timeout);
-}
-
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
