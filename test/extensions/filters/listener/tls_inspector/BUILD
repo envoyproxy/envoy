@@ -22,6 +22,8 @@ envoy_cc_test(
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
@@ -62,6 +64,7 @@ envoy_extension_cc_benchmark_binary(
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
