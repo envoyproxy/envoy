@@ -3,6 +3,9 @@
 An `AsyncFileManager` should be a singleton or similarly long-lived scope. It represents a
 thread pool for performing file operations asynchronously.
 
+`AsyncFileManager` can create `AsyncFileHandle`s via `createAnonymousFile` or `openExistingFile`,
+can postpone queuing file actions using `whenReady`, and can delete files via `unlink`.
+
 ## newFileHandle()
 
 Returns an `AsyncFileHandle` that will use the `AsyncFileManager`'s thread pool.
@@ -49,21 +52,16 @@ OPEN-WRITE-CLOSE-OPEN-WRITE-CLOSE-OPEN-WRITE-CLOSE-OPEN-WRITE-CLOSE-OPEN-WRITE-C
 
 Expand this concept to 100+ files all asking to be written at once and you can immediately see the advantages of chaining; not having the resource issues of many files open at the same time, more localized access, etc.
 
-## abort()
+## cancellation
 
-`abort` cancels the `AsyncFileHandle`'s current action, and queues closure of any file that is currently open. `abort` should be called if a file is open or if an already-queued action's callback's captured context is being invalidated (i.e. it is generally a good idea to put an `abort` in the destructor of any object that contains an `AsyncFileHandle`).
+Each action function returns a cancellation function which can be called to remove an action from the queue and prevent the callback from being called. If the execution is already in progress, it may be undone (e.g. a file open operation will close the file if it is opening when cancel is called). The cancel function will block if the callback is already in progress when cancel is called, until the callback completes. This should not be a long block, as callbacks should be short (see callbacks below).
 
-If an action is already executing, `abort` returns immediately, the action finishes asynchronously, and the callback is not called.
-
-If a callback is already being called, `abort` blocks until the callback returns. (See callbacks below, this should never be long-blocking!)
+As such, a client should ensure that the cleanup order is consistent - if a callback captures a file handle, the client should clean up that file handle (if present) *after* calling cancel, in case the file was opened during the call to cancel.
 
 ## callbacks
 
-The callbacks passed to `AsyncFileHandle` are scheduled in the shared thread pool - therefore they should be doing minimal work, not blocking, and return promptly. If any significant work or blocking is required, the result of the previous action should be passed from the callback to another thread (via some dispatcher or other queuing mechanism) so the async file thread pool can continue performing file operations.
-
-NOTE: Callbacks *must not* reference variables on the stack of the thread that enqueued the action, as such references will be invalid in the context of the thread that runs the callback, even if the stack context hasn't exited by the time the callback is called.
+The callbacks passed to `AsyncFileHandle` and `AsyncFileManager` are scheduled in the shared thread pool - therefore they should be doing minimal work, not blocking (for more than a trivial data-guard lock), and return promptly. If any significant work or blocking is required, the result of the previous action should be passed from the callback to another thread (via some dispatcher or other queuing mechanism) so the async file thread pool can continue performing file operations.
 
 ## Possible actions
 
-See `async_file_handle.h` for the actions that can currently be queued.
-
+See `async_file_handle.h` for the actions that can currently be queued on an `AsyncFileHandle`.

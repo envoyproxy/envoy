@@ -18,20 +18,17 @@ namespace AsyncFiles {
 
 class MockAsyncFileContext : public AsyncFileContext {
 public:
-  MOCK_METHOD(void, abort, ());
-  MOCK_METHOD(void, createAnonymousFile, (std::string, std::function<void(absl::Status)>));
-  MOCK_METHOD(void, createHardLink, (std::string, std::function<void(absl::Status)>));
-  MOCK_METHOD(void, unlink, (std::string, std::function<void(absl::Status)>));
-  MOCK_METHOD(void, openExistingFile, (std::string, Mode, std::function<void(absl::Status)>));
-  MOCK_METHOD(void, close, (std::function<void(absl::Status)> on_complete));
-  MOCK_METHOD(void, read,
+  MOCK_METHOD(std::function<void()>, createHardLink,
+              (absl::string_view, std::function<void(absl::Status)>));
+  MOCK_METHOD(std::function<void()>, close, (std::function<void(absl::Status)> on_complete));
+  MOCK_METHOD(std::function<void()>, read,
               (off_t, size_t,
                std::function<void(absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>)>));
-  MOCK_METHOD(void, write,
+  MOCK_METHOD(std::function<void()>, write,
               (Envoy::Buffer::Instance&, off_t, // NOLINT(runtime/references)
                std::function<void(absl::StatusOr<size_t>)>));
-  MOCK_METHOD(void, whenReady, (std::function<void(absl::Status)>));
-  MOCK_METHOD(absl::StatusOr<std::shared_ptr<AsyncFileContext>>, duplicate, ());
+  MOCK_METHOD(std::function<void()>, duplicate,
+              (std::function<void(absl::StatusOr<AsyncFileHandle>)>));
 };
 
 using MockAsyncFileHandle = std::shared_ptr<MockAsyncFileContext>;

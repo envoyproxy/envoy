@@ -14,7 +14,7 @@ namespace AsyncFiles {
 
 absl::Status statusAfterFileError() {
   int code = errno;
-  std::string str = Envoy::errorDetails(code);
+  const std::string str = Envoy::errorDetails(code);
   switch (code) {
   case EACCES:
   case EPERM:
