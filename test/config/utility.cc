@@ -149,6 +149,7 @@ std::string ConfigHelper::testInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.test"
 typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF";
 }
 

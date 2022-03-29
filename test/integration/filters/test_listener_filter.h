@@ -7,7 +7,7 @@ namespace Envoy {
  */
 class TestListenerFilter : public Network::ListenerFilter {
 public:
-  TestListenerFilter() {}
+  TestListenerFilter() = default;
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
