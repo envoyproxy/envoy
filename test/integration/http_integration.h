@@ -16,6 +16,12 @@ namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
 
+enum class Http2Impl {
+  Nghttp2,
+  WrappedNghttp2,
+  Oghttp2,
+};
+
 /**
  * HTTP codec client used during integration testing.
  */
@@ -115,6 +121,7 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
+  void setupHttp2Overrides(Http2Impl implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
