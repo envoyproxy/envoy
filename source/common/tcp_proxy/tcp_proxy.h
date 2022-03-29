@@ -370,10 +370,6 @@ protected:
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
 
-  // Prepare the route for the upstream connection.
-  // It will be called exactly once.
-  void initializeUpstreamConnection();
-
   // Create connection to the upstream cluster. This function can be repeatedly called on upstream
   // connection failure.
   Network::FilterStatus establishUpstreamConnection();
@@ -400,7 +396,7 @@ protected:
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
 
-  // The on demand cluster response on the flight.
+  // A pointer to the on demand cluster lookup when lookup is in flight.
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
 
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a

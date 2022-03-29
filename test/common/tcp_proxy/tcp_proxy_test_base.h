@@ -88,12 +88,6 @@ public:
     return config;
   }
 
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy onDemandConfig() {
-    auto config = defaultConfig();
-    config.mutable_on_demand();
-    return config;
-  }
-
   // Return the default config, plus one file access log with the specified format
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy
   accessLogConfig(const std::string& access_log_format) {

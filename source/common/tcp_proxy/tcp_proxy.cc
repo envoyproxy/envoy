@@ -327,11 +327,6 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
   parent_ = nullptr;
 }
 
-void Filter::initializeUpstreamConnection() {
-  ASSERT(upstream_ == nullptr);
-  route_ = pickRoute();
-}
-
 Network::FilterStatus Filter::establishUpstreamConnection() {
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
   Upstream::ThreadLocalCluster* thread_local_cluster =
@@ -416,8 +411,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 }
 
 void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status) {
-  // Clear the handle_ before calling establishUpstreamConnection since we may request cluster
-  // again.
+  // Clear the cluster_discovery_handle_ before calling establishUpstreamConnection since we may
+  // request cluster again.
   cluster_discovery_handle_.reset();
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
   switch (cluster_status) {
@@ -426,13 +421,13 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
                    cluster_name);
     break;
   case Upstream::ClusterDiscoveryStatus::Timeout:
-    ENVOY_CONN_LOG(debug, "On on demand cluster {} is not found before time out.",
+    ENVOY_CONN_LOG(debug, "On on demand cluster {} was not found before time out.",
                    read_callbacks_->connection(), cluster_name);
     break;
   case Upstream::ClusterDiscoveryStatus::Available:
-    if (!downstream_closed_) {
-      establishUpstreamConnection();
-    }
+    // cluster_discovery_handle_ must have cancelled when downstream is closed.
+    ASSERT(!downstream_closed_);
+    establishUpstreamConnection();
     return;
   }
   // Failure path.
@@ -556,7 +551,9 @@ Network::FilterStatus Filter::onNewConnection() {
         [this]() -> void { onMaxDownstreamConnectionDuration(); });
     connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
   }
-  initializeUpstreamConnection();
+
+  ASSERT(upstream_ == nullptr);
+  route_ = pickRoute();
   return establishUpstreamConnection();
 }
 
@@ -564,6 +561,8 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     downstream_closed_ = true;
+    // Cancel the potential odcds callback.
+    cluster_discovery_handle_ = nullptr;
   }
 
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
