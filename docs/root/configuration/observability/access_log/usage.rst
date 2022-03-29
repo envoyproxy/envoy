@@ -626,10 +626,9 @@ The following command operators are supported:
     * ``cluster_name``: Name of the cluster.
     * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
     * ``bytes_received``: Total number of downstream bytes received from the upstream in the session.
-    * ``errors_sent``: Number of errors that have occurred When sending datagrams to the upstream in the session.
-    * ``errors_received``: Number of errors that have occurred When receiving datagrams from the upstream in UDP proxy.
-      Since the receiving errors are counted in onReceiveError, it seems that no way to distinguish the number of errors in each session.
-      So, it's counted during the lifetime of UDP proxy.
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in the session.
+    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the upstream in UDP proxy.
+      Since the receiving errors are counted in at the listener level (vs. the session), this counter is global to all sessions and may not be directly attributable to the session being logged.
     * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
     * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
 
