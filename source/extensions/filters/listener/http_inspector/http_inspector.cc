@@ -43,6 +43,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
               transport_protocol);
     return Network::FilterStatus::Continue;
   }
+  ENVOY_LOG(trace, "http inspector: set transport protocol to raw_buffer");
 
   cb_ = &cb;
   const ParseState parse_state = onRead();
@@ -124,6 +125,7 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     }
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
+    ENVOY_LOG(trace, "http inspector: set application protocol to %s", protocol_);
     return ParseState::Done;
   } else {
     absl::string_view new_data = data.substr(parser_.nread);
@@ -147,6 +149,7 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
         // Set other HTTP protocols to HTTP/1.0
         protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
       }
+      ENVOY_LOG(trace, "http inspector: set application protocol to %s", protocol_);
       return ParseState::Done;
     } else {
       ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());

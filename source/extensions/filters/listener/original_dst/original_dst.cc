@@ -27,6 +27,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     // the address returned by getOriginalDst() matches the local address of the new socket.
     // In this case the listener handles the connection directly and does not hand it off.
     if (original_local_address) {
+      ENVOY_LOG(trace, "original_dst: set destination to %s", original_local_address->ip()->addressAsString());
 #ifdef WIN32
       // See how to perform bind or connect redirection here:
       // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
