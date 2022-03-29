@@ -93,7 +93,7 @@ protected:
 // sets become invalid, we can re-run the collector with:
 //
 // bazel build -c opt test/common/json:json_sanitizer_test
-// GENERATE_INVALID_UTF8_RANGES=1 \
+// GENERATE_INVALID_UTF8_RANGES=1
 //   ./bazel-bin/test/common/json/json_sanitizer_test |&
 //   grep -v 'contains invalid UTF-8'
 //
