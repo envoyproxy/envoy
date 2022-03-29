@@ -64,7 +64,7 @@ const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
 FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
-  return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
+  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
 const absl::optional<std::reference_wrapper<const std::string>>
