@@ -1021,8 +1021,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk",
-        version = "898aaed73e69c453eeefd08ca8c405dd056f2251",
-        sha256 = "8fb86b8c2ed8a546f54d06a355543f85796d86f3b3a7a0c6e0466f9d2152ef92",
+        version = "e30535b7c0cd3126e6401bc3769063a74bbb37be",
+        sha256 = "94e474ebea782225821224734ed5992fa749301e12e06b6520b8b4d4e1c05ffc",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1038,7 +1038,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-03-11",
+        release_date = "2022-03-15",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
@@ -1077,16 +1077,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-07-13",
         cpe = "N/A",
     ),
-    emscripten_toolchain = dict(
+    emsdk = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        version = "3.1.7",
-        sha256 = "bcceced0b7cad2e08375adf74ef20fa431230abbae8766bdad268c43e34f8d03",
-        strip_prefix = "emsdk-{version}",
+        # v3.1.7 with Bazel fixes
+        version = "0ea8f8a8707070e9a7c83fbb4a3065683bcf1799",
+        sha256 = "1ca0ff918d476c55707bb99bc0452be28ac5fb8f22a9260a8aae8a38d1bc0e27",
+        strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
-        use_category = ["build"],
-        release_date = "2022-03-07",
+        use_category = ["test_only"],
+        release_date = "2022-03-09",
     ),
     rules_rust = dict(
         project_name = "Bazel rust rules",
