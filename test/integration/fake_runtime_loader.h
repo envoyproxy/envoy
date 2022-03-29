@@ -37,7 +37,7 @@ public:
   public:
     FakeSnapshot() = default;
     FakeSnapshot(const FakeSnapshot& other) { entry_map_ = other.entry_map_; }
-    ~FakeSnapshot() = default;
+    ~FakeSnapshot() override = default;
 
     bool deprecatedFeatureEnabled(absl::string_view key, bool default_enabled) const override {
       return getBoolean(key, default_enabled);
