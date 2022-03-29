@@ -470,7 +470,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
     only_has_default = peer->isCaresDefaultTheOnlyNameserver();
   }
 
-  // Now create a resolver with failovers.
+  // Now create a resolver with a failover resolver.
   envoy::config::core::v3::Address dns_resolvers;
   Network::Utility::addressToProtobufAddress(
       Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
