@@ -101,9 +101,26 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      protocol_test_params.http2_new_codec_wrapper ? "true"
-                                                                                   : "false");
+    switch (protocol_test_params.http2_implementation) {
+      case Http2Impl::Nghttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "false");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "false");
+        break;
+      case Http2Impl::WrappedNghttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "true");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "false");
+        break;
+      case Http2Impl::Oghttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "true");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "true");
+        break;
+    }
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);
   }
@@ -297,9 +314,26 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      protocol_test_params.http2_new_codec_wrapper ? "true"
-                                                                                   : "false");
+    switch (protocol_test_params.http2_implementation) {
+      case Http2Impl::Nghttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "false");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "false");
+        break;
+      case Http2Impl::WrappedNghttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "true");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "false");
+        break;
+      case Http2Impl::Oghttp2:
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                          "true");
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2",
+                                          "true");
+        break;
+    }
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);
   }

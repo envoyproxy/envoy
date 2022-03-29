@@ -7,8 +7,8 @@
 namespace Envoy {
 
 enum class Http2Impl {
-  Bare,
-  Wrapped,
+  Nghttp2,
+  WrappedNghttp2,
   Oghttp2,
 };
 
@@ -62,11 +62,11 @@ public:
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
     switch (GetParam().http2_implementation) {
-    case Http2Impl::Bare:
+    case Http2Impl::Nghttp2:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "false");
       break;
-    case Http2Impl::Wrapped:
+    case Http2Impl::WrappedNghttp2:
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
                                         "true");
       config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
