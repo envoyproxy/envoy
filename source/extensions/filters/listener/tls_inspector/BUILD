@@ -42,6 +42,7 @@ envoy_cc_extension(
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",

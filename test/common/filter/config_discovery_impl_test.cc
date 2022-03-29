@@ -460,7 +460,7 @@ TEST_F(HttpFilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
 }
 
 // Listener ECDS test
-// Using OriginalDst listener filter in these tests.
+// Using TlsInspector listener filter in these tests.
 class ListenerFilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   ListenerFilterConfigDiscoveryImplTest() {
@@ -481,21 +481,21 @@ public:
     if (default_configuration) {
       inject_default_configuration = R"EOF(
 default_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 )EOF";
     }
     TestUtility::loadFromYaml(absl::Substitute(R"EOF(
 config_source: { ads: {} }
 $0
 type_urls:
-- envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+- envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 )EOF",
                                                inject_default_configuration),
                               config_source);
     if (!warm) {
       config_source.set_apply_default_config_without_warming(true);
       TestUtility::loadFromYaml(R"EOF(
-"@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+"@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 )EOF",
                                 *config_source.mutable_default_config());
     }
@@ -555,7 +555,7 @@ type_urls:
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   )EOF";
 };
 
@@ -595,7 +595,7 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, Basic) {
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   )EOF";
     const auto response =
         TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
@@ -652,11 +652,11 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, TooManyResources) {
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   )EOF";
   const auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
@@ -679,7 +679,7 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, WrongName) {
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: bar
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   )EOF";
   const auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
@@ -758,7 +758,7 @@ TEST_F(ListenerFilterConfigDiscoveryImplTest, DualProvidersInvalid) {
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
       EnvoyException,
       "Error: filter config has type URL test.integration.filters.AddBodyFilterConfig but "
-      "expect envoy.extensions.filters.listener.original_dst.v3.OriginalDst.");
+      "expect envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector.");
   EXPECT_EQ(0UL,
             scope_.counter("extension_config_discovery.listener_filter.foo.config_reload").value());
 }
