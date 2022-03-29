@@ -227,20 +227,23 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta 
 # access loggers
 /*/extensions/access_loggers/file @wbpcode @cpakulski @rgs1 @giantcroc
-
-# "Underowned" extensions (no backup reviewers, please volunter!)
 # Stateful session
-/*/extensions/http/stateful_session/cookie @wbpcode @UNOWNED
-/*/extensions/filters/http/stateful_session @wbpcode @UNOWNED
-# cors
-/*/extensions/filters/http/cors @wbpcode @UNOWNED
+/*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
+/*/extensions/filters/http/stateful_session @wbpcode @cpakulski
 
-# "Unowned" extensions (currently without 1 maintainer or 2 owners)
-/*/extensions/formatter/req_without_query @UNOWNED @tsaarni @rgs1 @giantcroc
+# Maintainerless extensions (need maintainer owner)
 # ext_authz
 /*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
 /*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
 /*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
+# formatter
+/*/extensions/formatter/req_without_query @UNOWNED @tsaarni @rgs1 @giantcroc
+
+# "Underowned" extensions (no backup reviewers, please volunter!)
+# cors
+/*/extensions/filters/http/cors @wbpcode @UNOWNED
+
+# "Unowned" extensions (currently without 1 maintainer or 2 owners)
 # IP tagging
 /*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # original dst
