@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -17,6 +18,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/config/integration/certs/client2cert_hash.h"
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
@@ -1221,10 +1223,24 @@ void ConfigHelper::initializeTls(
   if (options.custom_validator_config_) {
     validation_context->set_allocated_custom_validator_config(options.custom_validator_config_);
   } else {
-    validation_context->mutable_trusted_ca()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    validation_context->add_verify_certificate_hash(
-        options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+    if (options.client_with_intermediate_cert_) {
+      validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
+      std::string cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_cert_chain.pem"
+      )EOF";
+      if (options.max_verify_depth_) {
+        cert_yaml += R"EOF(
+        max_verify_depth: 1
+      )EOF";
+      }
+      TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+    } else {
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      validation_context->add_verify_certificate_hash(
+          options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+    }
   }
   validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 

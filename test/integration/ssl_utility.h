@@ -52,6 +52,11 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setClientWithIntermediateCert(bool intermediate_cert) {
+    client_with_intermediate_cert_ = intermediate_cert;
+    return *this;
+  }
+
   bool alpn_{};
   bool client_ecdsa_cert_{false};
   std::vector<std::string> cipher_suites_{};
@@ -60,7 +65,8 @@ struct ClientSslTransportOptions {
   std::string sni_;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
-  bool use_expired_spiffe_cert_{};
+  bool use_expired_spiffe_cert_{false};
+  bool client_with_intermediate_cert_{false};
 };
 
 void initializeUpstreamTlsContextConfig(

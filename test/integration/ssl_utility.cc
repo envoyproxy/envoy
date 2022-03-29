@@ -47,6 +47,14 @@ void initializeUpstreamTlsContextConfig(
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_key.pem"
 )EOF";
+  } else if (options.client_with_intermediate_cert_) {
+    yaml_plain += R"EOF(
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/config/integration/certs/client2cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/config/integration/certs/client2key.pem"
+)EOF";
   } else {
     yaml_plain += R"EOF(
     tls_certificates:

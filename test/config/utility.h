@@ -87,6 +87,16 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setClientWithIntermediateCert(bool client_intermediate_cert) {
+      client_with_intermediate_cert_ = client_intermediate_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setVerifyDepth(absl::optional<uint32_t> depth) {
+      max_verify_depth_ = depth;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -98,6 +108,8 @@ public:
     bool expect_client_ecdsa_cert_{false};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
+    bool client_with_intermediate_cert_{false};
+    absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
