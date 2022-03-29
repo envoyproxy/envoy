@@ -375,7 +375,10 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
-    parent_.onStreamClose(this, 0);
+    if (auto status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message());
+    }
   }
 }
 
@@ -764,7 +767,10 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
         parent_.connection_, stream_id_);
     // The stream didn't originally have an NGHTTP2 error, since we buffered
     // its stream close.
-    parent_.onStreamClose(this, 0);
+    if (auto status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message());
+    }
     return;
   }
 
@@ -1356,7 +1362,7 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   return length;
 }
 
-int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
+Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
     const int32_t stream_id = stream->stream_id_;
 
@@ -1406,7 +1412,7 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       // to end up invoking.
       stream->stream_manager_.buffered_on_stream_close_ = true;
       stats_.deferred_stream_close_.inc();
-      return 0;
+      return okStatus();
     }
 
     stream->destroy();
@@ -1428,10 +1434,10 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     }
   }
 
-  return 0;
+  return okStatus();
 }
 
-int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
+Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   return onStreamClose(getStream(stream_id), error_code);
 }
 
@@ -1778,7 +1784,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
   nghttp2_session_callbacks_set_on_stream_close_callback(
       callbacks_,
       [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
       });
 
   nghttp2_session_callbacks_set_on_frame_send_callback(

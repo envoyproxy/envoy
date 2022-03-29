@@ -1817,6 +1817,43 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
   tcp_client_->close();
 }
 
+TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = Http2Frame::makeClientStreamId(0);
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  // Start a second request and wait for it to reach the upstream. This is to
+  // exercise the case where numActiveRequests > 0 at the time that GOAWAY is
+  // received from upstream.
+  sendFrame(
+      Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/path/to/long/url"));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
+
+  // Send RST_STREAM, GOAWAY followed by WINDOW_UPDATE
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  // Since last_stream_index <= the stream IDs of all active streams, this
+  // results in all active streams being closed, so the connection gets closed
+  // as well.
+  const Http2Frame go_away_frame = Http2Frame::makeEmptyGoAwayFrame(
+      /*last_stream_index=*/client_stream_idx, Http2Frame::ErrorCode::NoError);
+  const Http2Frame window_update_frame = Http2Frame::makeWindowUpdateFrame(0, 10);
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
+                                              std::string(window_update_frame)));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
