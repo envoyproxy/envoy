@@ -248,14 +248,12 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @UNOWNED
+# original dst
+/*/extensions/filters/listener/original_dst @kyessenov @lambdai @UNOWNED
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # cors
 /*/extensions/filters/http/cors @wbpcode @UNOWNED
-
-# "Unowned" extensions (currently without 1 maintainer or 2 owners)
-# original dst
-/*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
