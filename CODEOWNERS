@@ -230,6 +230,12 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski
+# tracers
+/*/extensions/tracers/zipkin @wbpcode @Shikugawa @suniltheta 
+/*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa
+/*/extensions/tracers/opencensus @wbpcode @Shikugawa
+/*/extensions/tracers/common @wbpcode @Shikugawa
+/*/extensions/tracers/common/ot @wbpcode @Shikugawa
 
 # Maintainerless extensions (need maintainer owner)
 # ext_authz
@@ -248,12 +254,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # original dst
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
-# tracers
-/*/extensions/tracers/zipkin @UNOWNED @UNOWNED
-/*/extensions/tracers/dynamic_ot @UNOWNED @UNOWNED
-/*/extensions/tracers/opencensus @UNOWNED @UNOWNED
-/*/extensions/tracers/common @UNOWNED @UNOWNED
-/*/extensions/tracers/common/ot @UNOWNED @UNOWNED
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
 
