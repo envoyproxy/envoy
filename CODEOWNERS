@@ -247,7 +247,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # IP tagging
 /*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # mongo proxy
-/*/extensions/filters/network/mongo_proxy @mythra-stripe @giantcroc
+/*/extensions/filters/network/mongo_proxy @mythra-stripe @giantcroc @UNOWNED
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # cors
