@@ -938,11 +938,11 @@ TEST(IntervalSet, testTest) {
   set.insert(0, 2);
   EXPECT_TRUE(set.test(0));
   EXPECT_TRUE(set.test(1));
-  EXPECT_TRUE(set.test(2));
+  EXPECT_FALSE(set.test(2));
   EXPECT_FALSE(set.test(3));
   EXPECT_TRUE(set.test(4));
   EXPECT_TRUE(set.test(5));
-  EXPECT_TRUE(set.test(6));
+  EXPECT_FALSE(set.test(6));
   EXPECT_FALSE(set.test(7));
 }
 

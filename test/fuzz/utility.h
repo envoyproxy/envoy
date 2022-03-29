@@ -199,11 +199,12 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
 // expected==actual
 std::vector<std::string> FuzzFindDiffs(absl::string_view expected, absl::string_view actual);
 
-#define FUZZ_ASSERT_EQ(expected, actual, annotation) {   \
-  std::vector<std::string> diffs = FuzzFindDiffs(expected, actual); \
-  RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual, \
-                                                  "\n  ", absl::StrJoin(diffs, "\n  "))); \
-}
+#define FUZZ_ASSERT_EQ(expected, actual, annotation)                                               \
+  {                                                                                                \
+    std::vector<std::string> diffs = FuzzFindDiffs(expected, actual);                              \
+    RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual,    \
+                                                    "\n  ", absl::StrJoin(diffs, "\n  ")));        \
+  }
 
 } // namespace Fuzz
 } // namespace Envoy

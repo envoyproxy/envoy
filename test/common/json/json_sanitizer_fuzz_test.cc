@@ -42,8 +42,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           }
         }
         std::cerr << std::endl;
-        // << hand_sanitized << " != " << proto_sanitized << std::endl;
-        //std::cerr << input << ": " << hand_sanitized << " != " << proto_sanitized << std::endl;
       }
       FUZZ_ASSERT_EQ(hand_sanitized, proto_sanitized, input);
     }

@@ -18,8 +18,14 @@ absl::string_view stripDoubleQuotes(absl::string_view str) {
 namespace {
 
 class InvalidUnicodeSet {
- public:
+public:
   InvalidUnicodeSet() {
+    // Generated with
+    //   bazel build -c opt test/common/json:json_sanitizer_test
+    //   GENERATE_INVALID_UTF8_RANGES=1 \
+    //     ./bazel-bin/test/common/json/json_sanitizer_test |& \
+    //     grep -v 'contains invalid UTF-8'
+
     invalid_3byte_intervals_.insert(0x17b4, 0x17b6);
     invalid_3byte_intervals_.insert(0x200b, 0x2010);
     invalid_3byte_intervals_.insert(0x2028, 0x202f);
@@ -35,22 +41,16 @@ class InvalidUnicodeSet {
     invalid_4byte_intervals_.insert(0x110000, 0x200000);
   }
 
-  bool isValid3Byte(uint32_t unicode) const {
-    return !invalid_3byte_intervals_.test(unicode);
-  }
+  bool isValid3Byte(uint32_t unicode) const { return !invalid_3byte_intervals_.test(unicode); }
 
-  bool isValid4Byte(uint32_t unicode) const {
-    return !invalid_4byte_intervals_.test(unicode);
-  }
+  bool isValid4Byte(uint32_t unicode) const { return !invalid_4byte_intervals_.test(unicode); }
 
- private:
+private:
   IntervalSetImpl<uint32_t> invalid_3byte_intervals_;
   IntervalSetImpl<uint32_t> invalid_4byte_intervals_;
 };
 
-const InvalidUnicodeSet& invalidUnicodeSet() {
-  CONSTRUCT_ON_FIRST_USE(InvalidUnicodeSet);
-}
+const InvalidUnicodeSet& invalidUnicodeSet() { CONSTRUCT_ON_FIRST_USE(InvalidUnicodeSet); }
 
 } // namespace
 
@@ -67,30 +67,30 @@ bool isValidUtf8(absl::string_view in, bool exclude_protobuf_exceptions) {
       size -= consumed;
 
       switch (consumed) {
-        case 0:
-        case 1:
+      case 0:
+      case 1:
+        return false;
+      case 2:
+        if (unicode < 0x80) { // 2-byte sequences start at 0x80
           return false;
-        case 2:
-          if (unicode < 0x80) {  // 2-byte sequences start at 0x80
-            return false;
-          }
-          break;
-        case 3:
-          if (unicode < 0x800) { // 3-byte starts at 0x800
-            // Protobufs reject 12-bit values encoded as 3-byte utf8, as well as
-            // a few other code-points.
-            return false;
-          } else if (exclude_protobuf_exceptions && !invalidUnicodeSet().isValid3Byte(unicode)) {
-            return false;
-          }
-          break;
-        case 4:
-          if (unicode < 0x10000) { // 4-byte starts at 0x10000
-            return false;
-          } else if (exclude_protobuf_exceptions && !invalidUnicodeSet().isValid4Byte(unicode)) {
-            return false;
-          }
-          break;
+        }
+        break;
+      case 3:
+        if (unicode < 0x800) { // 3-byte starts at 0x800
+          // Protobufs reject 12-bit values encoded as 3-byte utf8, as well as
+          // a few other code-points.
+          return false;
+        } else if (exclude_protobuf_exceptions && !invalidUnicodeSet().isValid3Byte(unicode)) {
+          return false;
+        }
+        break;
+      case 4:
+        if (unicode < 0x10000) { // 4-byte starts at 0x10000
+          return false;
+        } else if (exclude_protobuf_exceptions && !invalidUnicodeSet().isValid4Byte(unicode)) {
+          return false;
+        }
+        break;
       }
     }
   }

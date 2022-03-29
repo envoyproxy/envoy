@@ -563,7 +563,7 @@ public:
 
   bool test(Value value) const override {
     const auto left_pos = intervals_.lower_bound(Interval(value, value + 1));
-    return left_pos != intervals_.end() && value >= left_pos->first;
+    return left_pos != intervals_.end() && value >= left_pos->first && value < left_pos->second;
   }
 
   std::vector<Interval> toVector() const override {
