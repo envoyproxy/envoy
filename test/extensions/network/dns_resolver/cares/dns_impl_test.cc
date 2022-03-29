@@ -451,7 +451,26 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
   auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
 
-  // convert the address and options into typed_dns_resolver_config
+  // First, create a resolver with no fallback. Check to see if cares default is
+  // the only nameserver.
+  bool only_has_default = false;
+  {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+    Network::DnsResolverFactory& dns_resolver_factory =
+        createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    auto resolver =
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+    auto peer =
+        std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+    only_has_default = peer->isCaresDefaultTheOnlyNameserver();
+  }
+
+  // Now create a resolver with failovers.
   envoy::config::core::v3::Address dns_resolvers;
   Network::Utility::addressToProtobufAddress(
       Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
@@ -459,10 +478,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.set_use_resolvers_as_fallback(true);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-
   // copy over dns_resolver_options_
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
-
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
@@ -471,17 +488,17 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   auto resolver =
       dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
 
-  // Given that the local machine will have a working conf in resolve.conf the resolver will not
-  // use the fallback given.
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
   EXPECT_EQ(resolvers->family, AF_INET);
-  if (peer->isCaresDefaultTheOnlyNameserver()) {
-    // If cares default is the only name server, the resolver will use the fallback option.
+  if (only_has_default) {
+    // If cares default was the only resolver, the fallbacks will be used.
     EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
   } else {
+    // In the common case, where cares default was not the only resolver, the fallback will not be
+    // used.
     EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
   }
   ares_free_data(resolvers);
