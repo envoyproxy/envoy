@@ -45,11 +45,8 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
         context, factory_context, validation_visitor);
     matcher_ = factory.create(config.matcher())();
 
-    if (!validation_visitor.errors().empty()) {
-      // TODO(snowp): Output all violations.
-      throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
-                                       validation_visitor.errors()[0]));
-    }
+    // All UDP network inputs should be accept, so there will be no error.
+    ASSERT(validation_visitor.errors().empty());
 
     // Copy all clusters names
     cluster_names_.insert(cluster_names_.end(), context.cluster_name_.begin(),
