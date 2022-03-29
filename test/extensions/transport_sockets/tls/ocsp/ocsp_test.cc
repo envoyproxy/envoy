@@ -196,7 +196,7 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
       8,
       // invalid version 1
       0xa0,
-      0x03, // bitstring
+      0x03, // bit string
       0x02, // integer
       1,
       1,
