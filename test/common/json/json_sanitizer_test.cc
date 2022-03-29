@@ -94,7 +94,7 @@ protected:
 //
 // bazel build -c opt test/common/json:json_sanitizer_test
 // GENERATE_INVALID_UTF8_RANGES=1 \
-//   ./bazel-bin/test/common/json/json_sanitizer_test |& \
+//   ./bazel-bin/test/common/json/json_sanitizer_test |&
 //   grep -v 'contains invalid UTF-8'
 //
 // The grep pipe is essential as otherwise you will be buried in thousands of

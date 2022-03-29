@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Fuzz {
 
-std::vector<std::string> FuzzFindDiffs(absl::string_view expected, absl::string_view actual) {
+std::vector<std::string> fuzzFindDiffs(absl::string_view expected, absl::string_view actual) {
   std::vector<std::string> diffs;
   const uint32_t max_diffs = 5;
   if (expected.size() != actual.size()) {
