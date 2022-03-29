@@ -196,11 +196,16 @@ public:
 
 class MockListenerFilter : public ListenerFilter {
 public:
-  MockListenerFilter();
+  MockListenerFilter(size_t max_read_bytes = 0) : listener_filter_max_read_bytes_(max_read_bytes) {}
   ~MockListenerFilter() override;
+
+  size_t maxReadBytes() const override { return listener_filter_max_read_bytes_; }
 
   MOCK_METHOD(void, destroy_, ());
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
+  MOCK_METHOD(Network::FilterStatus, onData, (Network::ListenerFilterBuffer&));
+
+  size_t listener_filter_max_read_bytes_{0};
 };
 
 class MockListenerFilterManager : public ListenerFilterManager {

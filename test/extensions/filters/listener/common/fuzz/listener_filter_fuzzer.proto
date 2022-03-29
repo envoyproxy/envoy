@@ -9,5 +9,8 @@ message Socket {
 
 message FilterFuzzTestCase {
   Socket sock = 1;
+}
+
+message FilterFuzzWithDataTestCase {
   repeated bytes data = 2;
 }
