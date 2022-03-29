@@ -114,6 +114,12 @@ public:
     keylog_local_negative_ = false;
     keylog_remote_negative_ = false;
   }
+  void setNeitherLocalNorRemoteFilter() {
+    keylog_remote_ = false;
+    keylog_local_ = false;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = false;
+  }
   void setNegative() {
     keylog_local_ = true;
     keylog_remote_ = true;
@@ -982,6 +988,21 @@ TEST_P(SslKeyLogTest, SetRemoteFilter) {
 TEST_P(SslKeyLogTest, SetLocalAndRemoteFilter) {
   setLogPath();
   setBothLocalAndRemoteFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  logCheck();
+}
+
+TEST_P(SslKeyLogTest, SetNeitherLocalNorRemoteFilter) {
+  setLogPath();
+  setNeitherLocalNorRemoteFilter();
   initialize();
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
