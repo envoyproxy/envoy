@@ -217,30 +217,31 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/transport_sockets/tap @mattklein123 @daixiang0
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
+# proxy protocol
+/*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu @rgs1
+# access loggers
+/*/extensions/access_loggers/grpc @wbpcode @cpakulski @rgs1 @giantcroc @gyohuangxin 
+# stats
+/*/extensions/stat_sinks/statsd @mattklein123 @suniltheta 
+/*/extensions/stat_sinks/common @mattklein123 @suniltheta 
+/*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta 
+# access loggers
+/*/extensions/access_loggers/file @wbpcode @cpakulski @rgs1 @giantcroc
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @UNOWNED
 /*/extensions/filters/http/stateful_session @wbpcode @UNOWNED
-# stats
-/*/extensions/stat_sinks/statsd @mattklein123 @UNOWNED
-/*/extensions/stat_sinks/common @mattklein123 @UNOWNED
-/*/extensions/stat_sinks/common/statsd @mattklein123 @UNOWNED
-# proxy protocol
-/*/extensions/filters/listener/proxy_protocol @ggreenway @UNOWNED
 # cors
 /*/extensions/filters/http/cors @wbpcode @UNOWNED
-# access loggers
-/*/extensions/access_loggers/grpc @wbpcode @UNOWNED
-/*/extensions/access_loggers/file @wbpcode @UNOWNED
 
 # "Unowned" extensions (currently without 1 maintainer or 2 owners)
-/*/extensions/formatter/req_without_query @UNOWNED @tsaarni
+/*/extensions/formatter/req_without_query @UNOWNED @tsaarni @rgs1 @giantcroc
 # ext_authz
 /*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
 /*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
 /*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @UNOWNED
-/*/extensions/filters/http/ip_tagging @UNOWNED @UNOWNED
+/*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
 /*/extensions/tracers/zipkin @UNOWNED @UNOWNED
 /*/extensions/tracers/dynamic_ot @UNOWNED @UNOWNED
