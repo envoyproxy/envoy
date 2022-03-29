@@ -246,6 +246,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/formatter/req_without_query @UNOWNED @tsaarni @rgs1 @giantcroc
 # IP tagging
 /*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
+# mongo proxy
+/*/extensions/filters/network/mongo_proxy @mythra-stripe @giantcroc
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # cors
@@ -254,8 +256,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # "Unowned" extensions (currently without 1 maintainer or 2 owners)
 # original dst
 /*/extensions/filters/listener/original_dst @UNOWNED @UNOWNED
-# mongo proxy
-/*/extensions/filters/network/mongo_proxy @UNOWNED @UNOWNED
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
