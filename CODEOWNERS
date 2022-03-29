@@ -220,18 +220,18 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # proxy protocol
 /*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu @rgs1
 # access loggers
-/*/extensions/access_loggers/grpc @wbpcode @cpakulski @rgs1 @giantcroc @gyohuangxin 
+/*/extensions/access_loggers/grpc @wbpcode @cpakulski @rgs1 @giantcroc @gyohuangxin
 # stats
-/*/extensions/stat_sinks/statsd @mattklein123 @suniltheta 
-/*/extensions/stat_sinks/common @mattklein123 @suniltheta 
-/*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta 
+/*/extensions/stat_sinks/statsd @mattklein123 @suniltheta
+/*/extensions/stat_sinks/common @mattklein123 @suniltheta
+/*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta
 # access loggers
 /*/extensions/access_loggers/file @wbpcode @cpakulski @rgs1 @giantcroc
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski
 # tracers
-/*/extensions/tracers/zipkin @wbpcode @Shikugawa @suniltheta 
+/*/extensions/tracers/zipkin @wbpcode @Shikugawa @suniltheta
 /*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa
 /*/extensions/tracers/opencensus @wbpcode @Shikugawa
 /*/extensions/tracers/common @wbpcode @Shikugawa
