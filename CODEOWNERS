@@ -240,6 +240,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
 /*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
 /*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
+# original dst
+/*/extensions/filters/listener/original_dst @kyessenov @lambdai @lizan
 
 # Maintainerless extensions (need maintainer owner)
 # formatter
@@ -248,8 +250,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @UNOWNED
-# original dst
-/*/extensions/filters/listener/original_dst @kyessenov @lambdai @UNOWNED
 
 # "Underowned" extensions (no backup reviewers, please volunter!)
 # cors
