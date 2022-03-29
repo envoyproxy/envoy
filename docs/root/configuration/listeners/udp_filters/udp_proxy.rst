@@ -65,7 +65,11 @@ source IPs, ignore datagrams other than those with a source IP of 127.0.0.1, and
 remaining datagrams to different clusters according to their source ports.
 
 .. literalinclude:: _include/udp-proxy-router.yaml
-    :language: yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 14
+   :lines: 14-53
+   :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
 
 Example configuration
 ---------------------
