@@ -1164,6 +1164,28 @@ if __name__ == "__main__":
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
 
+    def check_visibility(error_messages):
+        # https://github.com/envoyproxy/envoy/issues/20589
+        # https://github.com/envoyproxy/envoy/issues/9953
+        # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
+        exclude_list = (
+            "-- . ':(exclude)source/extensions/filters/http/buffer/BUILD' "
+            "':(exclude)source/extensions/filters/network/common/BUILD' "
+            "':(exclude)tools/code_format/check_format.py'")
+        command = (
+            "git diff `tools/git/last_github_commit.sh` %s |grep '+.*visibility ='" % exclude_list)
+        try:
+            output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
+            if output:
+                error_messages.append(
+                    "This change appears to add visibility rules. Please get senior maintainer "
+                    "approval to add an exemption to check_visibility tools/code_format/check_format.py"
+                )
+            return []
+        except subprocess.CalledProcessError as e:
+            if (e.returncode != 0 and e.returncode != 1):
+                error_messages.append("Failed to check visibility with command %s" % command)
+
     # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
     # error_messages.
     def owned_directories(error_messages):
@@ -1239,6 +1261,9 @@ if __name__ == "__main__":
     # Calculate the list of owned directories once per run.
     error_messages = []
     owned_directories = owned_directories(error_messages)
+
+    check_visibility(error_messages)
+
     if os.path.isfile(args.target_path):
         # All of our EXCLUDED_PREFIXES start with "./", but the provided
         # target path argument might not. Add it here if it is missing,
