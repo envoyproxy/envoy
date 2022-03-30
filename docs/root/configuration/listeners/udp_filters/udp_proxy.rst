@@ -52,6 +52,9 @@ The number of sessions that can be created per upstream cluster is limited by th
 :ref:`maximum connection circuit breaker <arch_overview_circuit_break_cluster_maximum_connections>`.
 By default this is 1024.
 
+
+.. _config_udp_listener_filters_udp_proxy_routing:
+
 Routing
 -------
 
