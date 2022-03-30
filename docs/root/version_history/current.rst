@@ -7,6 +7,7 @@ Incompatible Behavior Changes
 
 * sip-proxy: change API by replacing ``own_domain`` with :ref:`local_services <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.LocalService>`.
 * tls: set TLS v1.2 as the default minimal version for servers. Users can still explicitly opt-in to 1.0 and 1.1 using :ref:`tls_minimum_protocol_version <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.tls_minimum_protocol_version>`.
+* tls-inspector: the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
 
 Minor Behavior Changes
 ----------------------
@@ -28,6 +29,8 @@ Minor Behavior Changes
 * http: changed the http status code to 504 from 408 if the request timeouts after the request is completed. This behavior can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` to false.
 * http: lazy disable downstream connection reading in the HTTP/1 codec to reduce unnecessary system calls. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.http1_lazy_read_disable`` to false.
 * http: now the max concurrent streams of http2 connection can not only be adjusted down according to the SETTINGS frame but also can be adjusted up, of course, it can not exceed the configured upper bounds. This fix is guarded by ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings``.
+* http: respecting ``content-type`` in :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` even when the response body is modified. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` to false.
+* http: when writing custom filters, `injectEncodedDataToFilterChain` and `injectDecodedDataToFilterChain` now trigger sending of headers if they were not yet sent due to `StopIteration`. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * http: when writing custom filters, ``injectEncodedDataToFilterChain`` and ``injectDecodedDataToFilterChain`` now trigger sending of headers if they were not yet sent due to ``StopIteration``. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * listener: the :ref:`ipv4_compat <envoy_api_field_core.SocketAddress.ipv4_compat>` flag can only be set on Ipv6 address and Ipv4-mapped Ipv6 address. A runtime guard is added ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and the default is true.
 * network: add a new ConnectionEvent ``ConnectedZeroRtt`` which may be raised by QUIC connections to allow early data to be sent before the handshake finishes. This event is ignored at callsites which is only reachable for TCP connections in the Envoy core code. Any extensions which depend on ConnectionEvent enum value should audit their usage of it to make sure this new event is handled appropriately.
@@ -92,6 +95,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* access_log: added new access_log command operator ``%ENVIRONMENT(X):Z%``.
 * access_log: added TCP proxy upstream and downstream byte logging. This can be accessed through the ``%DOWNSTREAM_WIRE_BYTES_SENT%``, ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``, ``%UPSTREAM_WIRE_BYTES_SENT%``, and ``%UPSTREAM_WIRE_BYTES_RECEIVED%`` access_log command operatrors.
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * admin: :http:post:`/logging` now accepts ``/logging?paths=name1:level1,name2:level2,...`` to change multiple log levels at once.
@@ -138,6 +142,7 @@ New Features
   useful in support systems such as CI, CD, etc. The
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
   to the tools image.
+* udp_proxy: added support for :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log>`.
 
 Deprecated
 ----------

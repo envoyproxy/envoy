@@ -221,7 +221,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -267,7 +267,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_2->write("world2"));
   while (response_2.find("world2") == std::string::npos) {
-    client_conn_2->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_2->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_2->close();
   while (!client_conn_2->closed()) {
@@ -280,7 +280,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -551,6 +551,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
+  config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   initialize();
   // Given we're using LDS in this test, initialize() will not complete until
@@ -670,7 +671,7 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {

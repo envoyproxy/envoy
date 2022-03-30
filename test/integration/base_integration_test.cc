@@ -446,7 +446,10 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(
       },
       std::move(transport_socket));
 
-  connection->run();
+  if (connection->run() != testing::AssertionSuccess()) {
+    FAIL() << "Failed to get expected response within the time bound\n"
+           << "received " << *response << "\n";
+  }
 }
 
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {

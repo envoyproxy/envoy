@@ -533,13 +533,13 @@ TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
       });
 
   while (!connection_driver->allBytesSent()) {
-    connection_driver->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection_driver->run(Event::Dispatcher::RunType::NonBlock));
   }
   test_server_->waitForGaugeGe("http.config_test.downstream_rq_active", 1);
   ASSERT_FALSE(connection_driver->closed());
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1001));
-  connection_driver->run();
+  ASSERT_TRUE(connection_driver->run());
 
   // The upstream should send a 40x response and send a local reply.
   EXPECT_TRUE(connection_driver->closed());

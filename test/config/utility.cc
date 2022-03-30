@@ -1057,6 +1057,12 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
+void ConfigHelper::disableDelayClose() {
+  addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
+}
+
 void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
   addConfigModifier(
       [max_requests_per_connection](
