@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/rds/config.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -54,7 +55,9 @@ public:
    * to the corresponding route configuration class.
    * @throw EnvoyException if the new config can't be applied of.
    */
-  virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const PURE;
+  virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
+                                            Server::Configuration::ServerFactoryContext& context,
+                                            bool validate_clusters_default) const PURE;
 };
 
 } // namespace Rds

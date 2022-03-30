@@ -7,7 +7,9 @@
 #include "source/extensions/filters/network/thrift_proxy/router/config.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
+#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -19,15 +21,32 @@ namespace ThriftProxy {
 namespace Router {
 namespace {
 
-envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
-parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config);
-  TestUtility::validate(route_config);
-  return route_config;
-}
+class ThriftRouteMatcherTest : public testing::Test {
+protected:
+  RouteMatcher createMatcher(
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route) {
+    return RouteMatcher(route, context_, false);
+  }
 
-TEST(ThriftRouteMatcherTest, RouteByMethodNameWithNoInversion) {
+  RouteMatcher createMatcher(const std::string& yaml) {
+    envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV3Yaml(yaml);
+    return createMatcher(config);
+  }
+
+private:
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
+  parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
+    envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
+    TestUtility::loadFromYaml(yaml, route_config);
+    TestUtility::validate(route_config);
+    return route_config;
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+};
+
+TEST_F(ThriftRouteMatcherTest, RouteByMethodNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -41,10 +60,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   metadata.setMethodName("unknown");
@@ -63,7 +79,7 @@ routes:
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByMethodNameWithInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByMethodNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -78,10 +94,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
@@ -107,7 +120,7 @@ routes:
   EXPECT_EQ(nullptr, route);
 }
 
-TEST(ThriftRouteMatcherTest, RouteByAnyMethodNameWithNoInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByAnyMethodNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -121,10 +134,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
 
   {
     MessageMetadata metadata;
@@ -147,7 +157,7 @@ routes:
   }
 }
 
-TEST(ThriftRouteMatcherTest, RouteByAnyMethodNameWithInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByAnyMethodNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -158,13 +168,10 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  EXPECT_THROW(new RouteMatcher(config), EnvoyException);
+  EXPECT_THROW(createMatcher(yaml), EnvoyException);
 }
 
-TEST(ThriftRouteMatcherTest, RouteByServiceNameWithNoInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByServiceNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -178,10 +185,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   metadata.setMethodName("unknown");
@@ -200,7 +204,7 @@ routes:
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByServiceNameWithInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByServiceNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -215,10 +219,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
@@ -244,7 +245,7 @@ routes:
   EXPECT_EQ(nullptr, route);
 }
 
-TEST(ThriftRouteMatcherTest, RouteByAnyServiceNameWithNoInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByAnyServiceNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -258,10 +259,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
 
   {
     MessageMetadata metadata;
@@ -284,7 +282,7 @@ routes:
   }
 }
 
-TEST(ThriftRouteMatcherTest, RouteByAnyServiceNameWithInversion) {
+TEST_F(ThriftRouteMatcherTest, RouteByAnyServiceNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -295,13 +293,10 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  EXPECT_THROW(new RouteMatcher(config), EnvoyException);
+  EXPECT_THROW(createMatcher(yaml), EnvoyException);
 }
 
-TEST(ThriftRouteMatcherTest, RouteByExactHeaderMatcher) {
+TEST_F(ThriftRouteMatcherTest, RouteByExactHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -315,10 +310,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
@@ -333,7 +325,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByRegexHeaderMatcher) {
+TEST_F(ThriftRouteMatcherTest, RouteByRegexHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -349,10 +341,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
@@ -372,7 +361,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByRangeHeaderMatcher) {
+TEST_F(ThriftRouteMatcherTest, RouteByRangeHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -387,10 +376,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
@@ -410,7 +396,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByPresentHeaderMatcher) {
+TEST_F(ThriftRouteMatcherTest, RouteByPresentHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -423,10 +409,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
@@ -447,7 +430,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByPrefixHeaderMatcher) {
+TEST_F(ThriftRouteMatcherTest, RouteByPrefixHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -461,10 +444,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
@@ -484,7 +464,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteBySuffixHeaderMatcher) {
+TEST_F(ThriftRouteMatcherTest, RouteBySuffixHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -498,10 +478,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
@@ -526,7 +503,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByClusterHeader) {
+TEST_F(ThriftRouteMatcherTest, RouteByClusterHeader) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -536,10 +513,7 @@ routes:
       cluster_header: "x-cluster"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   RouteConstSharedPtr route;
 
@@ -564,7 +538,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, WeightedClusters) {
+TEST_F(ThriftRouteMatcherTest, WeightedClusters) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -592,9 +566,7 @@ routes:
             weight: 5000
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
 
   {
@@ -620,7 +592,7 @@ routes:
   }
 }
 
-TEST(ThriftRouteMatcherTest, WeightedClusterMissingWeight) {
+TEST_F(ThriftRouteMatcherTest, WeightedClusterMissingWeight) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -636,12 +608,10 @@ routes:
             weight: 5000
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-  EXPECT_THROW(RouteMatcher m(config), EnvoyException);
+  EXPECT_THROW(createMatcher(yaml), EnvoyException);
 }
 
-TEST(ThriftRouteMatcherTest, RouteActionMetadataMatch) {
+TEST_F(ThriftRouteMatcherTest, RouteActionMetadataMatch) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -660,9 +630,7 @@ routes:
       cluster: cluster2
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
 
   // match with metadata
@@ -701,7 +669,7 @@ routes:
   }
 }
 
-TEST(ThriftRouteMatcherTest, WeightedClusterMetadataMatch) {
+TEST_F(ThriftRouteMatcherTest, WeightedClusterMetadataMatch) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -732,9 +700,7 @@ routes:
                   k3: v3
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   metadata.setMethodName("method1");
   ProtobufWkt::Value v1, v2, v3;
@@ -791,7 +757,7 @@ routes:
   }
 }
 
-TEST(ThriftRouteMatcherTest, WeightedClusterRouteActionMetadataMatchMerged) {
+TEST_F(ThriftRouteMatcherTest, WeightedClusterRouteActionMetadataMatchMerged) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -821,9 +787,7 @@ routes:
                   k2: v3
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV3Yaml(yaml);
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   metadata.setMethodName("method1");
   ProtobufWkt::Value v1, v2, v3;
@@ -897,7 +861,7 @@ routes:
 }
 
 // Test that the route entry has metadata match criteria when using a cluster header.
-TEST(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
+TEST_F(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config;
   {
     config.set_name("config");
@@ -917,7 +881,7 @@ TEST(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
     action2->set_cluster("cluster2");
   }
 
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(config);
 
   // match with metadata
   {
@@ -963,7 +927,7 @@ TEST(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
 }
 
 // Tests that weighted cluster route entries can be configured to strip the service name.
-TEST(RouteMatcherTest, WeightedClusterWithStripServiceEnabled) {
+TEST_F(ThriftRouteMatcherTest, WeightedClusterWithStripServiceEnabled) {
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config;
   {
     config.set_name("config");
@@ -979,7 +943,7 @@ TEST(RouteMatcherTest, WeightedClusterWithStripServiceEnabled) {
     action->set_strip_service_name(true);
   }
 
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(config);
 
   MessageMetadata metadata;
   metadata.setMethodName("method1");
@@ -988,7 +952,7 @@ TEST(RouteMatcherTest, WeightedClusterWithStripServiceEnabled) {
 }
 
 // Tests that dynamic route entries can be configured to strip the service name.
-TEST(RouteMatcherTest, ClusterHeaderWithStripServiceEnabled) {
+TEST_F(ThriftRouteMatcherTest, ClusterHeaderWithStripServiceEnabled) {
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config;
   {
     config.set_name("config");
@@ -999,7 +963,7 @@ TEST(RouteMatcherTest, ClusterHeaderWithStripServiceEnabled) {
     action->set_strip_service_name(true);
   }
 
-  RouteMatcher matcher(config);
+  auto matcher = createMatcher(config);
 
   MessageMetadata metadata;
   metadata.setMethodName("method1");

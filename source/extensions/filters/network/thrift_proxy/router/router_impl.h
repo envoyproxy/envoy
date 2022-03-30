@@ -52,6 +52,7 @@ class RouteEntryImplBase : public RouteEntry,
 public:
   RouteEntryImplBase(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
+  void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -184,7 +185,8 @@ private:
 
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&);
+  RouteMatcher(const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&,
+               Server::Configuration::ServerFactoryContext&, bool);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 

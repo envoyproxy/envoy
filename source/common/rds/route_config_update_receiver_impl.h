@@ -32,6 +32,7 @@ public:
 private:
   ConfigTraits& config_traits_;
   ProtoTraits& proto_traits_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
   ProtobufTypes::MessagePtr route_config_proto_;
   uint64_t last_config_hash_;
