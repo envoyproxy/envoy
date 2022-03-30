@@ -91,10 +91,10 @@ MockRoute::~MockRoute() = default;
 MockConnectionManager::~MockConnectionManager() = default;
 
 MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
-    ConnectionManager& parent,
+    ConnectionManager& parent, Event::Dispatcher& dispatcher,
     const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
     Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
-    : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {
+    : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {
   ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _))
       .WillByDefault(
           Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,

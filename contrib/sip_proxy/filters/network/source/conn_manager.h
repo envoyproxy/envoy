@@ -61,7 +61,7 @@ class TrafficRoutingAssistantHandler : public TrafficRoutingAssistant::RequestCa
                                        public Logger::Loggable<Logger::Id::filter> {
 public:
   TrafficRoutingAssistantHandler(
-      ConnectionManager& parent,
+      ConnectionManager& parent, Event::Dispatcher& dispatcher,
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
 

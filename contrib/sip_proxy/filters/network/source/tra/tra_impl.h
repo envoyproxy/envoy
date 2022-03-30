@@ -13,6 +13,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
 #include "source/common/grpc/typed_async_client.h"
@@ -40,16 +41,12 @@ class GrpcClientImpl : public Client,
                        public TrafficRoutingAssistantAsyncStreamCallbacks,
                        public Logger::Loggable<Logger::Id::filter> {
 public:
-  GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
+  GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client, Event::Dispatcher& dispatcher,
                  const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl() override;
 
   // Extensions::NetworkFilters::SipProxy::TrafficRoutingAssistant::Client
   void setRequestCallbacks(RequestCallbacks& callbacks) override;
-  void cancel() override;
-
-  void closeStream() override;
-
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
                                      Tracing::Span& parent_span,
@@ -66,6 +63,7 @@ public:
                                      const StreamInfo::StreamInfo& stream_info) override;
   void subscribeTrafficRoutingAssistant(const std::string& type, Tracing::Span& parent_span,
                                         const StreamInfo::StreamInfo& stream_info) override;
+
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
   void
@@ -93,21 +91,103 @@ public:
   };
 
 private:
+  class AsyncRequestCallbacks
+      : public Grpc::AsyncRequestCallbacks<
+            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>,
+        public Event::DeferredDeletable,
+        public LinkedObject<AsyncRequestCallbacks> {
+  public:
+    AsyncRequestCallbacks(GrpcClientImpl& parent) : parent_(parent) {}
+
+    // Grpc::AsyncRequestCallbacks
+    void onCreateInitialMetadata(Http::RequestHeaderMap& data) override {
+      return parent_.onCreateInitialMetadata(data);
+    }
+    void onSuccess(
+        std::unique_ptr<
+            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
+            response,
+        Tracing::Span& span) override {
+      parent_.onSuccess(std::move(response), span);
+      cleanup();
+    }
+    void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
+                   Tracing::Span& span) override {
+      parent_.onFailure(status, message, span);
+      cleanup();
+    }
+
+    void cleanup() {
+      if (LinkedObject<AsyncRequestCallbacks>::inserted()) {
+        ASSERT(parent_.dispatcher_.isThreadSafe());
+        parent_.dispatcher_.deferredDelete(
+            LinkedObject<AsyncRequestCallbacks>::removeFromList(parent_.request_callbacks_));
+      }
+    }
+
+    Grpc::AsyncRequest* request_{};
+    GrpcClientImpl& parent_;
+  };
+
+  class AsyncStreamCallbacks
+      : public Grpc::AsyncStreamCallbacks<
+            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>,
+        public Event::DeferredDeletable,
+        public LinkedObject<AsyncStreamCallbacks> {
+  public:
+    AsyncStreamCallbacks(GrpcClientImpl& parent) : parent_(parent) {}
+
+    // Grpc::AsyncStreamCallbacks
+    void onCreateInitialMetadata(Http::RequestHeaderMap& data) override {
+      return parent_.onCreateInitialMetadata(data);
+    }
+    void onReceiveMessage(
+        std::unique_ptr<
+            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
+            message) override {
+      parent_.onReceiveMessage(std::move(message));
+    }
+    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
+      return parent_.onReceiveInitialMetadata(std::move(metadata));
+    }
+    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
+      return parent_.onReceiveTrailingMetadata(std::move(metadata));
+    };
+    void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
+      parent_.onRemoteClose(status, message);
+      cleanup();
+    };
+
+    void cleanup() {
+      if (LinkedObject<AsyncStreamCallbacks>::inserted()) {
+        ASSERT(parent_.dispatcher_.isThreadSafe());
+        parent_.dispatcher_.deferredDelete(
+            LinkedObject<AsyncStreamCallbacks>::removeFromList(parent_.stream_callbacks_));
+      }
+    }
+
+    Grpc::AsyncStream<
+        envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest>
+        stream_{};
+    GrpcClientImpl& parent_;
+  };
+
   RequestCallbacks* callbacks_{};
   Grpc::AsyncClient<
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest,
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>
       async_client_;
-  Grpc::AsyncRequest* request_{};
-  Grpc::AsyncStream<envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest>
-      stream_{};
+  Event::Dispatcher& dispatcher_;
   absl::optional<std::chrono::milliseconds> timeout_;
+
+  std::list<std::unique_ptr<AsyncRequestCallbacks>> request_callbacks_;
+  std::list<std::unique_ptr<AsyncStreamCallbacks>> stream_callbacks_;
 };
 
 /**
  * Builds the Tra client.
  */
-ClientPtr traClient(Server::Configuration::FactoryContext& context,
+ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::FactoryContext& context,
                     const envoy::config::core::v3::GrpcService& grpc_service,
                     const std::chrono::milliseconds timeout);
 

@@ -20,6 +20,7 @@ envoy_cc_contrib_extension(
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:headers_lib",

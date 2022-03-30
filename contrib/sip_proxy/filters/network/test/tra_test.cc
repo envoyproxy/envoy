@@ -53,23 +53,24 @@ public:
                                                                     *context, nullptr);
 
     auto tra_handler = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandlerDeep>>(
-        *filter, *tra_config, *context, stream_info_);
+        *filter, dispatcher_, *tra_config, *context, stream_info_);
 
     auto async_client = std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
+
     EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
-        .WillRepeatedly(testing::Return(async_client->async_request_.get()));
+        .WillRepeatedly(Return(async_client->async_request_.get()));
 
     async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
-    EXPECT_CALL(*async_client, startRaw(_, _, _, _))
-        .WillRepeatedly(testing::Return(async_stream_.get()));
+    EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillRepeatedly(Return(async_stream_.get()));
 
     auto grpc_client = std::make_unique<TrafficRoutingAssistant::GrpcClientImpl>(
-        async_client, std::chrono::milliseconds(2000));
+        async_client, dispatcher_, std::chrono::milliseconds(2000));
     tra_client_ = std::move(grpc_client);
     EXPECT_CALL(*tra_handler, traClient()).WillRepeatedly(ReturnRef(tra_client_));
     return tra_handler;
   }
 
+  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockTimeSystem> time_source_;
   Tracing::MockSpan span_;
   Stats::TestUtil::TestStore store_;
@@ -185,37 +186,6 @@ TEST_F(SipTraTest, TraSubscribe) {
   tra_handler->subscribeTrafficRoutingAssistant("lskpmc");
 }
 
-TEST_F(SipTraTest, GrpcClientCancel) {
-  auto async_client = std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
-  testing::NiceMock<Grpc::MockAsyncStream> async_stream;
-  EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
-      .WillRepeatedly(testing::Return(async_client->async_request_.get()));
-
-  auto grpc_client =
-      TrafficRoutingAssistant::GrpcClientImpl(async_client, std::chrono::milliseconds(2000));
-  NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
-  grpc_client.setRequestCallbacks(request_callbacks);
-
-  absl::flat_hash_map<std::string, std::string> data;
-  data.emplace(std::make_pair("S1F1", "10.0.0.1"));
-  grpc_client.createTrafficRoutingAssistant("lskpmc", data, span_, stream_info_);
-  grpc_client.cancel();
-}
-
-TEST_F(SipTraTest, GrpcClientCloseStream) {
-  auto async_client = std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
-  testing::NiceMock<Grpc::MockAsyncStream> async_stream;
-  EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillRepeatedly(testing::Return(&async_stream));
-
-  auto grpc_client =
-      TrafficRoutingAssistant::GrpcClientImpl(async_client, std::chrono::milliseconds(2000));
-  NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
-  grpc_client.setRequestCallbacks(request_callbacks);
-
-  grpc_client.subscribeTrafficRoutingAssistant("lskpmc", span_, stream_info_);
-  grpc_client.closeStream();
-}
-
 TEST_F(SipTraTest, GrpcClientOnSuccessRetrieveRsp) {
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse
       service_response_config;
@@ -233,7 +203,7 @@ TEST_F(SipTraTest, GrpcClientOnSuccessRetrieveRsp) {
           envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>(
           service_response_config);
 
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, dispatcher_, absl::nullopt);
   NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
   grpc_client.setRequestCallbacks(request_callbacks);
   grpc_client.onSuccess(std::move(response), span_);
@@ -257,7 +227,7 @@ TEST_F(SipTraTest, GrpcClientOnSuccessCreateRsp) {
           envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>(
           service_response_config);
 
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, dispatcher_, absl::nullopt);
   NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
   grpc_client.setRequestCallbacks(request_callbacks);
   grpc_client.onSuccess(std::move(response), span_);
@@ -280,7 +250,7 @@ TEST_F(SipTraTest, GrpcClientOnSuccessUpdateRsp) {
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>(
       service_response_config);
 
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, dispatcher_, absl::nullopt);
   NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
   grpc_client.setRequestCallbacks(request_callbacks);
   grpc_client.onSuccess(std::move(response), span_);
@@ -303,7 +273,7 @@ TEST_F(SipTraTest, GrpcClientOnSuccessDeleteRsp) {
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>(
       service_response_config);
 
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, dispatcher_, absl::nullopt);
   NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
   grpc_client.setRequestCallbacks(request_callbacks);
   grpc_client.onSuccess(std::move(response), span_);
@@ -314,7 +284,7 @@ TEST_F(SipTraTest, GrpcClientOnReceiveMessage) {
       response = std::make_unique<
           envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>();
 
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, dispatcher_, absl::nullopt);
   NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
   grpc_client.setRequestCallbacks(request_callbacks);
   grpc_client.onReceiveMessage(std::move(response));
@@ -323,27 +293,63 @@ TEST_F(SipTraTest, GrpcClientOnReceiveMessage) {
 TEST_F(SipTraTest, GrpcClientOnFailure) {
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
 
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, dispatcher_, absl::nullopt);
   NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
   grpc_client.setRequestCallbacks(request_callbacks);
   grpc_client.onFailure(status, "", span_);
 }
 
 TEST_F(SipTraTest, Misc) {
-  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(nullptr, absl::nullopt);
+  auto async_client = std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
+  Grpc::RawAsyncRequestCallbacks* request_cb;
+  Grpc::RawAsyncStreamCallbacks* stream_cb;
+
+  EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
+      .WillRepeatedly(Invoke([&](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                                 Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span&,
+                                 const Http::AsyncClient::RequestOptions&) {
+        request_cb = &callbacks;
+        return async_client->async_request_.get();
+      }));
+
+  async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
+  EXPECT_CALL(*async_client, startRaw(_, _, _, _))
+      .WillRepeatedly(
+          Invoke([&](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                     const Http::AsyncClient::StreamOptions&) {
+            stream_cb = &callbacks;
+            return async_stream_.get();
+          }));
+
+  auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(async_client, dispatcher_,
+                                                             std::chrono::milliseconds(2000));
+  NiceMock<SipProxy::MockRequestCallbacks> request_callbacks;
+  grpc_client.setRequestCallbacks(request_callbacks);
+
+  absl::flat_hash_map<std::string, std::string> data;
+  data.emplace(std::make_pair("S1F1", "10.0.0.1"));
+  grpc_client.createTrafficRoutingAssistant("lskpmc", data, span_, stream_info_);
 
   Http::TestRequestHeaderMapImpl request_headers;
-  grpc_client.onCreateInitialMetadata(request_headers);
+  request_cb->onCreateInitialMetadata(request_headers);
+  request_cb->onSuccessRaw(std::make_unique<Buffer::OwnedImpl>(""), span_);
+
+  Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
+  request_cb->onFailure(status, "", span_);
+
+  grpc_client.subscribeTrafficRoutingAssistant("lskpmc", span_, stream_info_);
+
+  Http::TestRequestHeaderMapImpl request_headers2;
+  stream_cb->onCreateInitialMetadata(request_headers2);
 
   Http::ResponseHeaderMapPtr response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
-  grpc_client.onReceiveInitialMetadata(std::move(response_headers));
+  stream_cb->onReceiveInitialMetadata(std::move(response_headers));
 
   Http::ResponseTrailerMapPtr response_trailers =
       std::make_unique<Http::TestResponseTrailerMapImpl>();
-  grpc_client.onReceiveTrailingMetadata(std::move(response_trailers));
-
-  Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
-  grpc_client.onRemoteClose(status, "");
+  stream_cb->onReceiveTrailingMetadata(std::move(response_trailers));
+  stream_cb->onReceiveMessageRaw(std::make_unique<Buffer::OwnedImpl>(""));
+  stream_cb->onRemoteClose(status, "");
 }
 
 } // namespace SipProxy
