@@ -12,6 +12,7 @@
 
 #include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/extensions/transport_sockets/tls/test_data/spiffe_san_cert_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -560,6 +561,30 @@ typed_config:
   EXPECT_EQ(19231, validator().daysUntilFirstCertExpires());
   time_system.setSystemTime(std::chrono::milliseconds(864000000));
   EXPECT_EQ(19221, validator().daysUntilFirstCertExpires());
+}
+
+TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
+  Event::SimulatedTimeSystem time_system;
+  // 2033-05-18 03:33:20 UTC
+  const time_t known_date_time = 2000000000;
+  time_system.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+  )EOF"),
+             time_system);
+
+  const absl::Time expiration =
+      TestUtility::parseTime(TEST_SPIFFE_SAN_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
+
+  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
+  EXPECT_EQ(days, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {
