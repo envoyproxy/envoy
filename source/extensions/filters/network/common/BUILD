@@ -15,6 +15,7 @@ envoy_cc_library(
     visibility = [
         "//source/extensions:__subpackages__",
         "//test:__subpackages__",
+        "//contrib:__subpackages__",
     ],
     deps = [
         "//envoy/server:filter_config_interface",
