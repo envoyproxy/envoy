@@ -101,7 +101,7 @@ protected:
 
   void expectLookup(LookupResult lookup_result,
                     std::function<void(MockLookupContext&)> context_callback = nullptr) {
-    // Wrap the move-only LookupResult in a copiable shared_ptr to fit with
+    // Wrap the move-only LookupResult in a copyable shared_ptr to fit with
     // EXPECT_CALL(...).WillOnce()'s interface.
     auto result_wrapper = std::make_shared<LookupResult>(std::move(lookup_result));
     EXPECT_CALL(*cache_, makeLookupContext)
