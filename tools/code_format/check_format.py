@@ -1181,7 +1181,13 @@ if __name__ == "__main__":
                     "This change appears to add visibility rules. Please get senior maintainer "
                     "approval to add an exemption to check_visibility tools/code_format/check_format.py"
                 )
-            return []
+            output = subprocess.check_output(
+                "grep -r --include BUILD envoy_package source/extensions/*",
+                shell=True,
+                stderr=subprocess.STDOUT).strip()
+            if output:
+                error_messages.append(
+                    "envoy_package is not allowed to be used in source/extensions BUILD files.")
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
                 error_messages.append("Failed to check visibility with command %s" % command)
