@@ -579,7 +579,7 @@ TEST_F(OriginalDstClusterTest, UseHttpAuthorityHeader) {
     lb_policy: CLUSTER_PROVIDED
     original_dst_lb_config:
       use_http_header: true
-      use_http_authority: true
+      http_header_name: ":authority"
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -589,7 +589,7 @@ TEST_F(OriginalDstClusterTest, UseHttpAuthorityHeader) {
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
 
-  // HTTP header override by ``:authority``.
+  // HTTP header override by `:authority`.
   TestLoadBalancerContext lb_context1(nullptr, Http::Headers::get().Host.get(), "127.0.0.1:6666");
   lb_context1.downstream_headers_->setCopy(Http::Headers::get().EnvoyOriginalDstHost,
                                            "127.0.0.1:5555");
@@ -602,7 +602,7 @@ TEST_F(OriginalDstClusterTest, UseHttpAuthorityHeader) {
   EXPECT_EQ("127.0.0.1:6666", host1->address()->asString());
 }
 
-// Verify clearing ``use_http_header`` disables override from ``:authority``.
+// Verify clearing `use_http_header` is required to consume `http_header_name`.
 TEST_F(OriginalDstClusterTest, DoNotReadFromHttpAuthorityHeaderUnlessSetUseHttpHeader) {
   std::string yaml = R"EOF(
     name: name
@@ -610,7 +610,8 @@ TEST_F(OriginalDstClusterTest, DoNotReadFromHttpAuthorityHeaderUnlessSetUseHttpH
     type: ORIGINAL_DST
     lb_policy: CLUSTER_PROVIDED
     original_dst_lb_config:
-      use_http_authority: true
+      # `use_http_header` is not set and default value is false.
+      http_header_name: ":authority"
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -619,7 +620,7 @@ TEST_F(OriginalDstClusterTest, DoNotReadFromHttpAuthorityHeaderUnlessSetUseHttpH
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
 
-  // HTTP ``:authority`` header override is ignored.
+  // HTTP `:authority` header override is ignored.
   TestLoadBalancerContext lb_context1(nullptr, Http::Headers::get().Host.get(), "127.0.0.1:6666");
 
   EXPECT_CALL(membership_updated_, ready()).Times(0);

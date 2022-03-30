@@ -81,7 +81,7 @@ public:
 
     private:
       ClusterStats& stats_;
-      const Http::LowerCaseString& header_name_;
+      const Http::LowerCaseString header_name_;
     };
 
     static std::unique_ptr<OriginalHostProvider> createFromLbConfig(

@@ -117,8 +117,9 @@ OriginalDstCluster::LoadBalancer::createFromLbConfig(
     return nullptr;
   }
   return std::make_unique<OriginalDstCluster::LoadBalancer::OriginalHostProvider>(
-      stats, config->has_use_http_authority() ? Http::Headers::get().Host
-                                              : Http::Headers::get().EnvoyOriginalDstHost);
+      stats, config->http_header_name().empty()
+                 ? Http::Headers::get().EnvoyOriginalDstHost
+                 : Http::LowerCaseString(config->http_header_name()));
 }
 
 OriginalDstCluster::OriginalDstCluster(
