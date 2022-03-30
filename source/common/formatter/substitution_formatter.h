@@ -39,7 +39,7 @@ public:
   parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
   /**
-   * Parse a header format rule of the form: %REQ(X?Y):Z% .
+   * Parse a header subcommandle of the form: X?Y .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
@@ -47,27 +47,10 @@ public:
   static void parseSubcommandHeaders(const std::string& subcommand,
                                  std::string& main_header, std::string& alternative_header);
 
-  /**
-   * General tokenize utility. Will parse command from start position. Command is expected to end
-   * with ')'. An optional ":max_length" may be specified after the closing ')' char. Command may
-   * contain multiple values separated by "separator" character. Those values will be places
-   * into tokens container. If no separator is found, entire command (up to ')') will be
-   * placed as only item in the container.
-   *
-   * @param command the command to parse
-   * @param start the index to start parsing from
-   * @param separator separator between values
-   * @param tokens values found in command separated by separator
-   * @param max_length optional max_length will be populated if specified
-   *
-   * TODO(glicht) Rewrite with a parser library. See:
-   * https://github.com/envoyproxy/envoy/issues/2967
-   */
-  //static void tokenizeCommand(const std::string& command, const char separator,
-  //                            std::vector<absl::string_view>& tokens);
-
-  /* Variadic function template which invokes tokenizeCommand method to parse the
-     token command and assigns found tokens to sequence of params.
+  /* Variadic function template to parse the
+     subcommand and assign found tokens to sequence of params. 
+     subcommand must be a sequence
+     of tokens separated by the same separator, like: header1:header2 or header1?header2?header3.
      params must be a sequence of std::string& with optional container storing std::string. Here are
      examples of params:
      - std::string& token1
@@ -106,16 +89,15 @@ public:
   }
 
   /**
-   * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method
-   * handles mapping the command name to an appropriate formatter after parsing.
+   * Return a FormatterProviderPtr if a built-in command is found. This method
+   * handles mapping the command name to an appropriate formatter.
    *
-   * TODO(rgs1): this can be refactored into a dispatch table using the command name as the key and
-   * the parsing parameters as the value.
-   *
-   * @param token the token to parse
-   * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
+   * @param command - formatter's name.
+   * @param subcommand - optional formatter specific data.
+   * @param length - optional max length of output produced by the formatter.  
+   * @return FormattterProviderPtr substitution provider for the command or nullptr
    */
-  static FormatterProviderPtr parseBuiltinCommand(const std::string&, const std::string&, absl::optional<size_t>&);
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& command, const std::string& subcommand, absl::optional<size_t>& length);
 
 private:
   using FormatterProviderCreateFunc = std::function<FormatterProviderPtr(const std::string&, absl::optional<size_t>&)>;
@@ -423,7 +405,6 @@ public:
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
 };
-
 
 /**
  * FormatterProvider based on StreamInfo fields.

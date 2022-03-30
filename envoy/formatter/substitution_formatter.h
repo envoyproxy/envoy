@@ -89,22 +89,17 @@ public:
   virtual ~CommandParser() = default;
 
   /**
-   * Return a FormatterProviderPtr if this command is parsed from the token.
-   * @param token the token to parse
-   * @param pos current position in the entire format string
-   * @param command_end_position position at the end of the command token
-   *
-   * Given the following format line using an extension called %CMD()%:
-   *
-   * %CMD()% %START_TIME(%Y/%m/%d)% ...
-   *
-   * The call to parse() for that extension would look like this:
-   *
-   *  parse("CMD()", 1, 5)
+   * Return a FormatterProviderPtr if subcommand and max_length
+   * are correct for the formatter provider associated 
+   * with command.
+   * @param command - name of the FormatterProvider 
+   * @param subcommand - command specific data. (optional) 
+   * @param max_length - length to which the output produced by FormatterProvider
+   *   should be truncated to (optional)
    *
    * @return FormattterProviderPtr substitution provider for the parsed command
    */
-  virtual FormatterProviderPtr parse(const std::string& token, const std::string& format,
+  virtual FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
                                      absl::optional<size_t>& max_length) const PURE;
 };
 

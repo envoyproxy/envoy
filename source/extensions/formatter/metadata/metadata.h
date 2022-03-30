@@ -15,7 +15,7 @@ namespace Formatter {
 class MetadataFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   MetadataFormatterCommandParser();
-  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const override;
+  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& command, const std::string& subcommand, absl::optional<size_t>& max_length) const override;
 
 private:
   // Map used to dispatch types of metadata to individual handlers which will

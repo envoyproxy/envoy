@@ -34,7 +34,7 @@ private:
 class ReqWithoutQueryCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   ReqWithoutQueryCommandParser() = default;
-  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& token, const std::string& format, absl::optional<size_t>& max_length) const override;
+  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& command, const std::string& subcommand, absl::optional<size_t>& max_length) const override;
 };
 
 } // namespace Formatter

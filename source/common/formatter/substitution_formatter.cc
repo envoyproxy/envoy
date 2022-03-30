@@ -320,14 +320,6 @@ void SubstitutionFormatParser::parseSubcommandHeaders(const std::string& subcomm
   }
 }
 
-/*
-void SubstitutionFormatParser::tokenizeCommand(const std::string& command,
-                                               const char separator,
-                                               std::vector<absl::string_view>& tokens) {
-  tokens = absl::StrSplit(command, separator);
-}
-*/
-
 std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
   return SubstitutionFormatParser::parse(format, {});
 }
@@ -409,14 +401,15 @@ SubstitutionFormatParser::parse(const std::string& format,
   // extract groups.
   // The formatter command has the following format:
   //    % COMMAND(SUBCOMMAND):LENGTH%
-  // % sign at the beginning and end are used by parser to find next COMMAND.
-  // COMMAND must always be present.
-  // SUBCOMMAND presence depends on the COMMAND:
+  // % signs at the beginning and end are used by parser to find next COMMAND.
+  // COMMAND must always be present and must consist of characters: "A-Z", "0-9" or "_".
+  // SUBCOMMAND presence depends on the COMMAND. Format is flexible but cannot contain ")".:
   // - for some commands SUBCOMMAND is not allowed (for example %PROTOCOL%)
   // - for some commands SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will cause error)
   // - for some commands SUBCOMMAND is optional (for example %START_TIME% and %START_TIME(%f.%1f.%2f.%3f)% are both correct).
   // LENGTH presence depends on the command. Some commands allow LENGTH to be specified, so not.
   // Regex is used to validate the syntax and also to extract values for COMMAND, SUBCOMMAND and LENGTH.
+  //
   // Below is explanation of capturing and non-capturing groups. Non-capturing groups are used
   // to specify that certain part of the formatter command is optional and should contain specific 
   // characters. Capturing groups are used to extract the values when regex is matched against
@@ -448,35 +441,29 @@ SubstitutionFormatParser::parse(const std::string& format,
   // LENGTH group is 3.
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
-    //printf("Checking %c\n", format[pos]);
     if (format[pos] != '%') {
       current_token += format[pos];
-        //printf("Skipped\n");
       continue;
     }
 
     if (!current_token.empty()) {
-      //printf("Plain text >>%s<<\n", current_token.c_str());
       formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
       current_token = "";
     }
 
     std::smatch m;
-    //printf("Format is  \n%s\n", format.c_str());
     const std::string search_space = format.substr(pos);
-    //printf("searching in: \n%s\n", search_space.c_str());
     if (!std::regex_search(search_space, m, command_w_args_regex)) {
       throw EnvoyException(fmt::format(
           "Incorrect configuration: {}. Couldn't find valid command at position {}", format, pos));
     }
 
     const std::string match = m.str(0);
-    //const std::string token = match.substr(1, match.length() - 2);
     // Token is at at index 1.
     const std::string command = m.str(1);
     // subcommand is at index 2.
     const std::string subcommand = m.str(2);
-    // optional length is at index 3. If present validate that it is valid integer.
+    // optional length is at index 3. If present, validate that it is valid integer.
     absl::optional<size_t> max_length;
     if (m.str(3).length() != 0) {
         size_t length_value;
@@ -487,16 +474,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     }
     std::vector<std::string> path;
 
-    //const auto matches_num = m.size();
-    //printf("COMMAND: %s\n", token.c_str());
-    //printf("FOUND ITEMS: %lu\n", matches_num);
-/*
-    for (const auto& it: m) {
-    std::cout << it << "\n";
-    }
-*/
     const size_t command_end_position = pos + m.str(0).length() - 1;
-    //printf("End position: %lu\n", command_end_position);
 
     auto formatter = parseBuiltinCommand(command, subcommand, max_length);
     if (formatter) {
