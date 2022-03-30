@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:socket_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_update_callbacks_handle_mocks",
