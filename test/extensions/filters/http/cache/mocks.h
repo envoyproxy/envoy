@@ -15,24 +15,18 @@ public:
               (const Http::ResponseHeaderMap& response_headers, const ResponseMetadata& metadata,
                bool end_stream),
               (override));
-
   MOCK_METHOD(void, insertBody,
               (const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk, bool end_stream),
               (override));
-
   MOCK_METHOD(void, insertTrailers, (const Http::ResponseTrailerMap& trailers), (override));
-
   MOCK_METHOD(void, onDestroy, (), (override));
 };
 
 class MockLookupContext : public LookupContext {
 public:
   MOCK_METHOD(void, getHeaders, (LookupHeadersCallback && cb), (override));
-
   MOCK_METHOD(void, getBody, (const AdjustedByteRange& range, LookupBodyCallback&& cb), (override));
-
   MOCK_METHOD(void, getTrailers, (LookupTrailersCallback && cb), (override));
-
   MOCK_METHOD(void, onDestroy, (), (override));
 };
 
