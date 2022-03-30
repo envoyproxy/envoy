@@ -12,7 +12,10 @@ envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
     # This is useful code for classes implementing generic extensions.
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/server:filter_config_interface",
     ],
