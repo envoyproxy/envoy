@@ -56,10 +56,12 @@ The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struc
 Substitution Formatting
 -----------------------
 
+.. _config_network_filters_ratelimit_substitution_formatter:
+
 The network rate limit filter also supports substitution formatting based on stream info populated at request time for its descriptors.
 The value field for :ref:`rate_limit_descriptor <envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.descriptors>`
 accepts runtime substitution.
-The format for the substitution formatting can be found here :ref:`Access Logging <config_access_log>`
+The format for the substitution formatting can be found in the :ref:`access logging <config_access_log>` documentation
 
 Example usage:
 

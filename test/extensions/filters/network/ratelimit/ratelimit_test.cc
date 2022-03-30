@@ -167,8 +167,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "HTTP/1.1"}}});
 
-  std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
-                                                        filter_->descriptors().end()};
+  std::vector<RateLimit::Descriptor> actual_descriptors{config_->descriptors().begin(),
+                                                        config_->descriptors().end()};
 
   for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
        it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();
@@ -216,8 +216,8 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
 
-  std::vector<RateLimit::Descriptor> actual_descriptors{filter_->descriptors().begin(),
-                                                        filter_->descriptors().end()};
+  std::vector<RateLimit::Descriptor> actual_descriptors{config_->descriptors().begin(),
+                                                        config_->descriptors().end()};
 
   for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
        it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();

@@ -33,11 +33,10 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
   }
 }
 
-std::vector<RateLimit::Descriptor>
-Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
-                                   StreamInfo::StreamInfo& stream_info) {
+void Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
+                                        StreamInfo::StreamInfo& stream_info) {
 
-  std::vector<RateLimit::Descriptor> dynamicDescriptors = std::vector<RateLimit::Descriptor>();
+  std::vector<RateLimit::Descriptor> dynamic_descriptors = std::vector<RateLimit::Descriptor>();
   for (const RateLimit::Descriptor& descriptor : original_descriptors) {
     RateLimit::Descriptor new_descriptor;
     for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
@@ -45,9 +44,9 @@ Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_d
       value = formatValue(value, stream_info);
       new_descriptor.entries_.push_back({descriptorEntry.key_, value});
     }
-    dynamicDescriptors.push_back(new_descriptor);
+    dynamic_descriptors.push_back(new_descriptor);
   }
-  return dynamicDescriptors;
+  descriptors_ = dynamic_descriptors;
 }
 
 std::string Config::formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info) {
@@ -81,7 +80,7 @@ Network::FilterStatus Filter::onNewConnection() {
     config_->stats().active_.inc();
     config_->stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), filter_descriptors_, Tracing::NullSpan::instance(),
+    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance(),
                    filter_callbacks_->connection().streamInfo());
     calling_limit_ = false;
   }

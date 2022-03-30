@@ -55,21 +55,21 @@ public:
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
   Formatter::FormatterImpl substitutionFormatter() { return Formatter::FormatterImpl(""); }
-  std::vector<RateLimit::Descriptor>
-  applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
-                             StreamInfo::StreamInfo& stream_info);
+  void applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
+                                  StreamInfo::StreamInfo& stream_info);
   std::string formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info);
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   std::string domain_;
   std::vector<RateLimit::Descriptor> descriptors_;
+  std::vector<Formatter::FormatterImpl> substitution_formatters_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
-  Http::RequestHeaderMapPtr request_headers_;
-  Http::ResponseHeaderMapPtr response_headers_;
-  Http::ResponseTrailerMapPtr response_trailers_;
+  const Http::RequestHeaderMapPtr request_headers_;
+  const Http::ResponseHeaderMapPtr response_headers_;
+  const Http::ResponseTrailerMapPtr response_trailers_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -93,8 +93,8 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
-    filter_descriptors_ = config_->applySubstitutionFormatter(
-        config_->descriptors(), filter_callbacks_->connection().streamInfo());
+    config_->applySubstitutionFormatter(config_->descriptors(),
+                                        filter_callbacks_->connection().streamInfo());
   }
 
   // Network::ConnectionCallbacks
@@ -102,7 +102,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  const std::vector<RateLimit::Descriptor>& descriptors() { return filter_descriptors_; }
+  // const std::vector<RateLimit::Descriptor>& descriptors() { return confi; }
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
                 Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
@@ -114,7 +114,7 @@ public:
 private:
   enum class Status { NotStarted, Calling, Complete };
   ConfigSharedPtr config_;
-  std::vector<RateLimit::Descriptor> filter_descriptors_;
+  // std::vector<RateLimit::Descriptor> filter_descriptors_;
   Filters::Common::RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
