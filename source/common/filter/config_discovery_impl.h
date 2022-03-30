@@ -94,7 +94,12 @@ public:
 
   // Config::ExtensionConfigProvider
   const std::string& name() override { return DynamicFilterConfigProviderImplBase::name(); }
-  absl::optional<FactoryCb> config() override { return tls_->config_; }
+  absl::optional<std::reference_wrapper<FactoryCb>> config() override {
+    if (auto& optional_config = tls_->config_; optional_config.has_value()) {
+      return std::ref<FactoryCb>(optional_config.value());
+    }
+    return absl::nullopt;
+  }
 
   // Config::DynamicExtensionConfigProviderBase
   void onConfigUpdate(const Protobuf::Message& message, const std::string&,
@@ -269,7 +274,9 @@ public:
 
   // Config::ExtensionConfigProvider
   const std::string& name() override { return filter_config_name_; }
-  absl::optional<FactoryCb> config() override { return config_; }
+  absl::optional<std::reference_wrapper<FactoryCb>> config() override {
+    return std::ref<FactoryCb>(config_);
+  }
 
 private:
   FactoryCb config_;

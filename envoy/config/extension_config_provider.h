@@ -32,7 +32,7 @@ public:
    * callback is the latest version of the extension configuration, and should
    * generally apply only to new requests and connections.
    */
-  virtual absl::optional<FactoryCallback> config() PURE;
+  virtual absl::optional<std::reference_wrapper<FactoryCallback>> config() PURE;
 };
 
 class DynamicExtensionConfigProviderBase {
