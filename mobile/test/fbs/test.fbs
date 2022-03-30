@@ -1,0 +1,10 @@
+namespace Test.Nested;
+
+table SomeType {
+}
+
+table SomeOtherType {
+
+}
+
+root_type SomeType;
