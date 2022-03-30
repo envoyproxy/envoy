@@ -35,7 +35,7 @@ envoy_proto_library(
     name = "tls_inspector_fuzz_test_proto",
     srcs = ["tls_inspector_fuzz_test.proto"],
     deps = [
-        "//test/extensions/filters/listener/common/fuzz:tls_inspector_fuzzer_proto",
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_proto",
         "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg",
     ],
 )
@@ -47,7 +47,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":tls_inspector_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
-        "//test/extensions/filters/listener/common/fuzz:tls_inspector_fuzzer_lib",
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
     ],
 )
 
