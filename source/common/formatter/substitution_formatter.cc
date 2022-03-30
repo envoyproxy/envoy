@@ -434,7 +434,8 @@ SubstitutionFormatParser::parse(const std::string& format,
   // - for some commands SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will
   // cause error)
   // - for some commands SUBCOMMAND is optional (for example %START_TIME% and
-  // %START_TIME(%f.%1f.%2f.%3f)% are both correct). LENGTH presence depends on the command. Some
+  // %START_TIME(%f.%1f.%2f.%3f)% are both correct).
+  // LENGTH presence depends on the command. Some
   // commands allow LENGTH to be specified, so not. Regex is used to validate the syntax and also to
   // extract values for COMMAND, SUBCOMMAND and LENGTH.
   //
@@ -498,7 +499,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     }
 
     const std::string match = m.str(0);
-    // Token is at at index 1.
+    // command is at at index 1.
     const std::string command = m.str(1);
     // subcommand is at index 2.
     const std::string subcommand = m.str(2);
