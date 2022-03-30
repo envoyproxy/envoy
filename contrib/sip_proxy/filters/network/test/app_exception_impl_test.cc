@@ -17,6 +17,13 @@ TEST(AppExceptionImplTest, CopyConstructor) {
   EXPECT_STREQ("msg", copy.what());
 }
 
+TEST(AppExceptionImplTest, EncodeWithoutNecessaryHeaders) {
+  AppException app_ex(AppExceptionType::InternalError, "msg");
+  MessageMetadata metadata;
+  Buffer::OwnedImpl buffer;
+  app_ex.encode(metadata, buffer);
+}
+
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions

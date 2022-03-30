@@ -767,9 +767,7 @@ public:
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
                                                     std::list<DnsResponse>&& results) -> void {
-                                if (!expected_to_execute) {
-                                  FAIL();
-                                }
+                                EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
                               });
@@ -879,6 +877,21 @@ TEST_P(DnsImplTest, DestructPending) {
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
   EXPECT_GT(peer_->events().size(), 0U);
+}
+
+// Validate that All queries (2 concurrent queries) properly cleanup when the channel is destroyed.
+// TODO(mattklein123): This is a brute force way of testing this path, however we have seen
+// evidence that this happens during normal operation via the "channel dirty" path. The sequence
+// must look something like:
+// 1) Issue All query with 2 parallel sub-queries.
+// 2) Issue parallel query which fails with ARES_ECONNREFUSED, mark channel dirty.
+// 3) Issue 3rd query which sees a dirty channel and destroys it, causing the parallel queries
+//    issued in step 1 to fail. It's not clear whether this is possible over a TCP channel or
+//    just via UDP.
+// Either way, we have no tests today that cover parallel queries. We can do this is a follow up.
+TEST_P(DnsImplTest, DestructPendingAllQuery) {
+  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::All, true);
+  ASSERT_NE(nullptr, query);
 }
 
 TEST_P(DnsImplTest, DestructCallback) {

@@ -649,9 +649,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Inject the active span's tracing context into the request headers.
-  callbacks_->activeSpan().injectContext(headers);
-
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(

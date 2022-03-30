@@ -53,8 +53,6 @@ public:
 
   virtual void closeStream() PURE;
 
-  virtual void resetStream() PURE;
-
   virtual void createTrafficRoutingAssistant(
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
       Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;

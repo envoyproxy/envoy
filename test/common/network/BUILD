@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -160,6 +161,16 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "listener_filter_buffer_impl_test",
+    srcs = ["listener_filter_buffer_impl_test.cc"],
+    deps = [
+        "//source/common/network:listener_filter_buffer_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:io_handle_mocks",
     ],
 )
 
@@ -459,5 +470,23 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:filter_matcher_lib",
         "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_proto_library(
+    name = "listener_filter_buffer_fuzz_proto",
+    srcs = ["listener_filter_buffer_fuzz.proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "listener_filter_buffer_fuzz_test",
+    srcs = ["listener_filter_buffer_fuzz_test.cc"],
+    corpus = "listener_filter_buffer_corpus",
+    deps = [
+        ":listener_filter_buffer_fuzz_proto_cc_proto",
+        "//source/common/network:listener_filter_buffer_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:io_handle_mocks",
     ],
 )
