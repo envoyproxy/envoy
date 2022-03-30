@@ -925,7 +925,7 @@ message RouteAction {
 
     // Name of the cluster provider to use to determine the cluster for requests on this route.
     // The cluster provider name must be defined in the associated
-    // :ref:`cluster providers <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_providers>`
+    // :ref:`cluster specifier plugins <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins>`
     // in the :ref:`name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` field.
     string cluster_specifier_plugin = 37;
 
