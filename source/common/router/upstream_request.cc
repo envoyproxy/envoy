@@ -483,9 +483,7 @@ void UpstreamRequest::onPoolReady(
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
                                    parent_.routeEntry()->appendXfh());
   }
-  const auto host = stream_info_.upstreamInfo() != nullptr
-                        ? stream_info_.upstreamInfo()->upstreamHost()
-                        : nullptr;
+
   if (span_ != nullptr) {
     span_->injectContext(*parent_.downstreamHeaders(), host);
   } else {
