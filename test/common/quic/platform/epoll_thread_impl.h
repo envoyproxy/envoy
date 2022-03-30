@@ -6,10 +6,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "test/common/quic/platform/quic_thread_impl.h"
+#include "quiche_platform_impl/quiche_thread_impl.h"
 
 namespace epoll_server {
 
-using EpollThreadImpl = quic::QuicThreadImpl;
+using EpollThreadImpl = quiche::QuicheThreadImpl;
 
 } // namespace epoll_server

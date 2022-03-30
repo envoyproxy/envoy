@@ -5,6 +5,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
@@ -127,13 +128,12 @@ public:
   JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
                 CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats)
       : stats_(stats) {
-    for (const auto& it : config.providers()) {
-      const auto& provider = it.second;
+    for (const auto& [name, provider] : config.providers()) {
       auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats);
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
       }
-      jwks_data_map_.emplace(it.first, std::move(jwks_data));
+      jwks_data_map_.emplace(name, std::move(jwks_data));
     }
   }
 
@@ -152,7 +152,7 @@ public:
       return it->second.get();
     }
     // Verifier::innerCreate function makes sure that all provider names are defined.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 
   JwtAuthnFilterStats& stats() override { return stats_; }

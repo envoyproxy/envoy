@@ -41,7 +41,7 @@ public:
 };
 
 /**
- * A client used to query a centralized rate limit service.
+ * A client used to query a centralized TRA service.
  */
 class Client {
 public:

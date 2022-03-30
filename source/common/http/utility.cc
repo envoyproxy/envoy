@@ -584,8 +584,11 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   if (encode_functions.modify_headers_) {
     encode_functions.modify_headers_(*response_headers);
   }
+  bool has_custom_content_type = false;
   if (encode_functions.rewrite_) {
+    std::string content_type_value = std::string(response_headers->getContentTypeValue());
     encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
+    has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
   }
 
   // Respond with a gRPC trailers-only response if the request is gRPC
@@ -619,12 +622,19 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
 
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
-    // If the `rewrite` function has changed body_text or content-type is not set, set it.
-    // This allows `modify_headers` function to set content-type for the body. For example,
-    // router.direct_response is calling sendLocalReply and may need to set content-type for
-    // the body.
-    if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
-      response_headers->setReferenceContentType(content_type);
+    // If the content-type is not set, set it.
+    // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
+    // set a content type header, set the content type to be based on the changed body.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_adding_content_type_in_local_replies")) {
+      if (response_headers->ContentType() == nullptr ||
+          (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+        response_headers->setReferenceContentType(content_type);
+      }
+    } else {
+      if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
+        response_headers->setReferenceContentType(content_type);
+      }
     }
   } else {
     response_headers->removeContentLength();
@@ -1124,6 +1134,24 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
       route_retry_policy.retry_back_off().max_interval());
 
   return route_retry_policy;
+}
+
+bool Utility::isSafeRequest(Http::RequestHeaderMap& request_headers) {
+  absl::string_view method = request_headers.getMethodValue();
+  return method == Http::Headers::get().MethodValues.Get ||
+         method == Http::Headers::get().MethodValues.Head ||
+         method == Http::Headers::get().MethodValues.Options ||
+         method == Http::Headers::get().MethodValues.Trace;
+}
+
+Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
+  return remote_decode_complete &&
+                 Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
+             ? Http::Code::GatewayTimeout
+             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
+             // connection any more.
+             : Http::Code::RequestTimeout;
 }
 
 } // namespace Http

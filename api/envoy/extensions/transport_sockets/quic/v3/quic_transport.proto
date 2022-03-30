@@ -4,6 +4,8 @@ package envoy.extensions.transport_sockets.quic.v3;
 
 import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -20,6 +22,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message QuicDownstreamTransport {
   tls.v3.DownstreamTlsContext downstream_tls_context = 1
       [(validate.rules).message = {required: true}];
+
+  // If false, QUIC will tell TLS to reject any early data and to stop issuing 0-RTT credentials with resumption session tickets. This will prevent clients from sending 0-RTT requests.
+  // Default to true.
+  google.protobuf.BoolValue enable_early_data = 2;
 }
 
 // Configuration for Upstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.

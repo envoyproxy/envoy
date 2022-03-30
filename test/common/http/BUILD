@@ -159,6 +159,7 @@ envoy_cc_test_library(
         "//envoy/http:conn_pool_interface",
         "//envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:http3_status_tracker_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
     ],
@@ -439,6 +440,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:test_runtime_lib",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",
@@ -446,11 +448,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http3_status_tracker_test",
-    srcs = ["http3_status_tracker_test.cc"],
+    name = "http3_status_tracker_impl_test",
+    srcs = ["http3_status_tracker_impl_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:http3_status_tracker",
+        "//source/common/http:http3_status_tracker_impl_lib",
         "//test/mocks:common_lib",
     ],
 )

@@ -563,5 +563,24 @@ public:
   DownstreamPeerCertVEndFormatter(const std::string& format);
 };
 
+/**
+ * FormatterProvider for environment. If no valid environment value then
+ */
+class EnvironmentFormatter : public FormatterProvider {
+public:
+  EnvironmentFormatter(const std::string& key, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  ProtobufWkt::Value str_;
+};
+
 } // namespace Formatter
 } // namespace Envoy

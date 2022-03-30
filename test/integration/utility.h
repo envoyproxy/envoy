@@ -19,6 +19,7 @@
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -85,7 +86,9 @@ public:
                       Network::TransportSocketPtr transport_socket = nullptr);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
-  void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
+  testing::AssertionResult
+  run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void close();
   Network::ConnectionEvent lastConnectionEvent() const {
     return callbacks_->last_connection_event_;
@@ -115,7 +118,8 @@ private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
     using WriteCb = std::function<void()>;
 
-    ConnectionCallbacks(WriteCb write_cb) : write_cb_(write_cb) {}
+    ConnectionCallbacks(WriteCb write_cb, Event::Dispatcher& dispatcher)
+        : write_cb_(write_cb), dispatcher_(dispatcher) {}
     bool connected() const { return connected_; }
     bool closed() const { return closed_; }
 
@@ -124,11 +128,15 @@ private:
       if (!connected_ && event == Network::ConnectionEvent::Connected) {
         write_cb_();
       }
-
       last_connection_event_ = event;
+
       closed_ |= (event == Network::ConnectionEvent::RemoteClose ||
                   event == Network::ConnectionEvent::LocalClose);
       connected_ |= (event == Network::ConnectionEvent::Connected);
+
+      if (closed_) {
+        dispatcher_.exit();
+      }
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override { write_cb_(); }
@@ -137,6 +145,7 @@ private:
 
   private:
     WriteCb write_cb_;
+    Event::Dispatcher& dispatcher_;
     bool connected_{false};
     bool closed_{false};
   };

@@ -124,7 +124,7 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -180,6 +180,7 @@ uint64_t MultiplexedUpstreamIntegrationTest::upstreamTxResetCounterValue() {
       ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"))
       ->value();
 }
+
 uint64_t MultiplexedUpstreamIntegrationTest::downstreamRxResetCounterValue() {
   return test_server_->counter(absl::StrCat(downstreamProtocolStatsRoot(), ".rx_reset"))->value();
 }
@@ -196,7 +197,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreamingReset) {
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"}});
+                                                                 {":authority", "sni.lyft.com"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -255,7 +256,7 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
         {":method", "POST"},
         {":path", "/test/long/url"},
         {":scheme", "http"},
-        {":authority", "host"},
+        {":authority", "sni.lyft.com"},
         {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(response_bytes[i])},
         {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_bytes)}};
     if (i % 2 == 0) {
@@ -341,6 +342,15 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
+
+  if (GetParam().defer_processing_backedup_streams) {
+    // TODO(kbaichoo): fix this test to work with deferred processing by using a
+    // timer to lower the watermark when the filter has raised above watermark.
+    // Since we deferred processing data, when the filter raises watermark
+    // with deferred processing we won't invoke it again which could lower
+    // the watermark.
+    return;
+  }
   config_helper_.prependFilter(R"EOF(
   name: random-pause-filter
   typed_config:
@@ -362,7 +372,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStream
         codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                    {":path", "/test/long/url"},
                                                                    {":scheme", "http"},
-                                                                   {":authority", "host"}});
+                                                                   {":authority", "sni.lyft.com"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
 
@@ -448,7 +458,7 @@ typed_config:
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":scheme", "http"},
-                                                                 {":authority", "host"},
+                                                                 {":authority", "sni.lyft.com"},
                                                                  {"te", "trailers"}});
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -557,7 +567,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"},
                                      {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
@@ -596,7 +606,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {AutonomousStream::NO_END_STREAM, "true"}});
   // Wait until the response is sent to ensure the SETTINGS frame has been read
   // by Envoy.
@@ -638,6 +648,84 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
   fake_upstream_connection2.reset();
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
+  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
+    return;
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Kick off the initial request and make sure it's received upstream.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    ASSERT_TRUE(response->waitForEndStream());
+    // 425 response should be forwarded back to the client as HTTP/2 upstream doesn't support early
+    // data.
+    EXPECT_EQ("425", response->headers().getStatusValue());
+    return;
+  }
+  // 425 response will be retried by Envoy, so expect another upstream request.
+  waitForNextUpstreamRequest(0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"},
+                                         {":path", "/test/long/url"},
+                                         {":scheme", "http"},
+                                         {":authority", "sni.lyft.com"},
+                                         {"Early-Data", "1"}};
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request);
+  waitForNextUpstreamRequest(0);
+  // If the request already has Early-Data header, no additional Early-Data header should be added
+  // and the header should be forwarded as is.
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  // 425 response should be forwarded back to the client.
+  EXPECT_EQ("425", response2->headers().getStatusValue());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  default_request_headers_.addCopy("second_request", "1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(1u,
+              test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  }
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
 }
 
 } // namespace Envoy

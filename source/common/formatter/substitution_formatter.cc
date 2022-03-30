@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -63,7 +66,7 @@ const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
 FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
-  return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
+  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
 const absl::optional<std::reference_wrapper<const std::string>>
@@ -382,9 +385,15 @@ SubstitutionFormatParser::getKnownFormatters() {
                HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
          }}},
        {"RESPONSE_TRAILERS_BYTES",
-        {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
+        {CommandSyntaxChecker::COMMAND_ONLY,
+         [](const std::string&, absl::optional<size_t>&) {
            return std::make_unique<HeadersByteSizeFormatter>(
                HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
+         }}},
+       {"ENVIRONMENT",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](const std::string& key, absl::optional<size_t>& max_length) {
+           return std::make_unique<EnvironmentFormatter>(key, max_length);
          }}}});
 }
 
@@ -461,10 +470,19 @@ SubstitutionFormatParser::parse(const std::string& format,
   // LENGTH group is 3.
   // clang-format on
 
-  for (size_t pos = 0; pos < format.length(); ++pos) {
+  for (size_t pos = 0; pos < format.size(); ++pos) {
     if (format[pos] != '%') {
       current_token += format[pos];
       continue;
+    }
+
+    // escape '%%'
+    if (format.size() > pos + 1) {
+      if (format[pos + 1] == '%') {
+        current_token += '%';
+        pos++;
+        continue;
+      }
     }
 
     if (!current_token.empty()) {
@@ -1683,10 +1701,7 @@ FilterStateFormatter::FilterStateFormatter(const std::string& key,
 const Envoy::StreamInfo::FilterState::Object*
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
   const StreamInfo::FilterState& filter_state = stream_info.filterState();
-  if (!filter_state.hasDataWithName(key_)) {
-    return nullptr;
-  }
-  return &filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
+  return filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
 }
 
 absl::optional<std::string>
@@ -1803,16 +1818,45 @@ void CommandSyntaxChecker::VerifySyntax(CommandSyntaxFlags flags, const std::str
                                         const std::string& subcommand,
                                         const absl::optional<size_t>& length) {
   if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
-    throw EnvoyException(fmt::format("{} Does not take any parameters or length", command));
+    throw EnvoyException(fmt::format("{} does not take any parameters or length", command));
   }
 
-  if ((flags == PARAMS_REQUIRED) && (subcommand.length() == 0)) {
-    throw EnvoyException(fmt::format("{} Requires params", command));
+  if ((flags & PARAMS_REQUIRED) && (subcommand.length() == 0)) {
+    throw EnvoyException(fmt::format("{} requires parameters", command));
   }
 
   if (!(flags & LENGTH_ALLOWED) && length.has_value()) {
-    throw EnvoyException(fmt::format("{} Does not allow length to be specified.", command));
+    throw EnvoyException(fmt::format("{} does not allow length to be specified.", command));
   }
+}
+
+EnvironmentFormatter::EnvironmentFormatter(const std::string& key,
+                                           absl::optional<size_t> max_length) {
+  ASSERT(!key.empty());
+
+  const char* env_value = std::getenv(key.c_str());
+  if (env_value != nullptr) {
+    std::string env_string = env_value;
+    truncate(env_string, max_length);
+    str_.set_string_value(env_string);
+    return;
+  }
+  str_.set_string_value(DefaultUnspecifiedValueString);
+}
+
+absl::optional<std::string> EnvironmentFormatter::format(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo&,
+                                                         absl::string_view) const {
+  return str_.string_value();
+}
+ProtobufWkt::Value EnvironmentFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                     const Http::ResponseHeaderMap&,
+                                                     const Http::ResponseTrailerMap&,
+                                                     const StreamInfo::StreamInfo&,
+                                                     absl::string_view) const {
+  return str_;
 }
 
 } // namespace Formatter

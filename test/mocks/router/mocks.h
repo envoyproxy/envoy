@@ -176,10 +176,14 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, parseResetInterval,
               (const Http::ResponseHeaderMap& response_headers), (const));
   MOCK_METHOD(RetryStatus, shouldRetryHeaders,
-              (const Http::ResponseHeaderMap& response_headers, DoRetryCallback callback));
-  MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::ResponseHeaderMap& response_headers));
+              (const Http::ResponseHeaderMap& response_headers,
+               const Http::RequestHeaderMap& original_request, DoRetryHeaderCallback callback));
+  MOCK_METHOD(RetryState::RetryDecision, wouldRetryFromHeaders,
+              (const Http::ResponseHeaderMap& response_headers,
+               const Http::RequestHeaderMap& original_request, bool& retry_as_early_data));
   MOCK_METHOD(RetryStatus, shouldRetryReset,
-              (const Http::StreamResetReason reset_reason, DoRetryCallback callback));
+              (const Http::StreamResetReason reset_reason, Http3Used alternate_protocol_used,
+               DoRetryResetCallback callback));
   MOCK_METHOD(RetryStatus, shouldHedgeRetryPerTryTimeout, (DoRetryCallback callback));
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
@@ -187,6 +191,7 @@ public:
               (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
+  MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
 
   DoRetryCallback callback_;
 };
@@ -225,24 +230,6 @@ public:
   MOCK_METHOD(bool, empty, (), (const));
 
   std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
-};
-
-class TestShadowPolicy : public ShadowPolicy {
-public:
-  TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3::FractionalPercent default_value = {}, bool trace_sampled = true)
-      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value),
-        trace_sampled_(trace_sampled) {}
-  // Router::ShadowPolicy
-  const std::string& cluster() const override { return cluster_; }
-  const std::string& runtimeKey() const override { return runtime_key_; }
-  const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  bool traceSampled() const override { return trace_sampled_; }
-
-  std::string cluster_;
-  std::string runtime_key_;
-  envoy::type::v3::FractionalPercent default_value_;
-  bool trace_sampled_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -508,10 +495,11 @@ public:
   MockRouteConfigProvider();
   ~MockRouteConfigProvider() override;
 
-  MOCK_METHOD(ConfigConstSharedPtr, config, ());
-  MOCK_METHOD(absl::optional<ConfigInfo>, configInfo, (), (const));
+  MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const));
+  MOCK_METHOD(const absl::optional<ConfigInfo>&, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(void, onConfigUpdate, ());
+  MOCK_METHOD(ConfigConstSharedPtr, configCast, (), (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
               (const std::string&, Event::Dispatcher&,
                std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
@@ -586,6 +574,8 @@ public:
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(const Http::ConnectionPool::Instance::StreamOptions&, upstreamStreamOptions, (),
+              (const));
 };
 
 class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {

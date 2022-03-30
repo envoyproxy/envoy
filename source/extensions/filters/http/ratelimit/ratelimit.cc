@@ -64,8 +64,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                    headers);
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!descriptors.empty()) {
@@ -160,7 +158,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
-                        "rate limit status, status={}", status);
+                        "rate limit status, status={}", static_cast<int>(status));
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:

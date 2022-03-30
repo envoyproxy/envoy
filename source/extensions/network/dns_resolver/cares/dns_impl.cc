@@ -125,6 +125,9 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 
 void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     int status, int timeouts, ares_addrinfo* addrinfo) {
+  ASSERT(pending_resolutions_ > 0);
+  pending_resolutions_--;
+
   if (status != ARES_SUCCESS) {
     ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                     "dns resolution for {} failed with c-ares status {}", dns_name_, status);
@@ -132,6 +135,12 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
+    // In the destruction path we must wait until there are no more pending queries. Resolution is
+    // not truly finished until the last parallel query has been destroyed.
+    if (pending_resolutions_ > 0) {
+      return;
+    }
+
     ASSERT(owned_);
     // This destruction might have been triggered by a peer PendingResolution that received a
     // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
@@ -233,7 +242,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 void DnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
-                  pending_response_.status_);
+                  static_cast<int>(pending_response_.status_));
 
   if (!cancelled_) {
     // Use a raw try here because it is used in both main thread and filter.
@@ -260,7 +269,7 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
                     "dns resolution callback for {} not issued. Cancelled with reason={}",
-                    dns_name_, cancel_reason_);
+                    dns_name_, static_cast<int>(cancel_reason_));
   }
   if (owned_) {
     delete this;
@@ -372,6 +381,11 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
   }
 }
 
+DnsResolverImpl::AddrInfoPendingResolution::~AddrInfoPendingResolution() {
+  // All pending resolutions should be cleaned up at this point.
+  ASSERT(pending_resolutions_ == 0);
+}
+
 void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
   if (lookup_all_) {
     startResolutionImpl(AF_INET);
@@ -382,6 +396,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
+  pending_resolutions_++;
   if (parent_.filter_unroutable_families_) {
     switch (family) {
     case AF_INET:
@@ -430,7 +445,14 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  if (rc.return_value_ != 0) {
+    ENVOY_LOG_EVENT(debug, "cares_getiffaddrs_error",
+                    "dns resolution for {} could not obtain interface information with error={}",
+                    dns_name_, rc.errno_);
+    // Maintain no-op behavior if the system encountered an error while providing interface
+    // information.
+    return {true, true};
+  }
 
   DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces available_interfaces{false,
                                                                                        false};

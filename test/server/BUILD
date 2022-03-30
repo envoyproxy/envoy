@@ -88,6 +88,8 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -489,6 +491,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/server:worker_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",

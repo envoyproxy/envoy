@@ -1112,7 +1112,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1200,7 +1201,8 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1995,7 +1997,8 @@ TEST_F(HttpFilterTest, OutOfOrder) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
