@@ -94,12 +94,13 @@ wsamsgResult msghdrToWSAMSG(const msghdr* msg) {
 
 } // namespace
 
-SysCallIntResult OsSysCallsImpl::bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+SysCallIntResult OsSysCallsImpl::bind(os_fd_t sockfd, const sockaddr* addr,
+                                      socklen_t addrlen) const {
   const int rc = ::bind(sockfd, addr, addrlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
+SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) const {
   const int rc = ::_chmod(path.c_str(), mode);
   return {rc, rc != -1 ? 0 : errno};
 }
@@ -107,18 +108,18 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
 SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long control_code, void* in_buffer,
                                        unsigned long in_buffer_len, void* out_buffer,
                                        unsigned long out_buffer_len,
-                                       unsigned long* bytes_returned) {
+                                       unsigned long* bytes_returned) const {
   const int rc = ::WSAIoctl(sockfd, control_code, in_buffer, in_buffer_len, out_buffer,
                             out_buffer_len, bytes_returned, nullptr, nullptr);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
+SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) const {
   const int rc = ::closesocket(fd);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) {
+SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) const {
   DWORD bytes_sent;
   auto buffer = iovecToWSABUF(iov, num_iov);
 
@@ -129,7 +130,7 @@ SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_i
   return {bytes_sent, 0};
 }
 
-SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_iov) {
+SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_iov) const {
   DWORD bytes_received;
   DWORD flags = 0;
   auto buffer = iovecToWSABUF(iov, num_iov);
@@ -142,12 +143,25 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
   return {bytes_received, 0};
 }
 
-SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
+SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t length,
+                                         off_t offset) const {
+  const ssize_t rc = ::pwrite(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
+                                        off_t offset) const {
+  const ssize_t rc = ::pread(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length,
+                                       int flags) const {
   const ssize_t rc = ::recv(socket, static_cast<char*>(buffer), length, flags);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) {
+SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) const {
   DWORD bytes_received = 0;
   LPFN_WSARECVMSG recvmsg_fn_ptr = getFnPtrWSARecvMsg();
   wsamsgResult wsamsg = msghdrToWSAMSG(msg);
@@ -172,7 +186,7 @@ SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags
 }
 
 SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
-                                          int flags, struct timespec* timeout) {
+                                          int flags, struct timespec* timeout) const {
   PANIC("not implemented");
 }
 
@@ -201,17 +215,17 @@ bool OsSysCallsImpl::supportsMptcp() const {
   return false;
 }
 
-SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
+SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) const {
   const int rc = ::_chsize_s(fd, length);
   return {rc, rc == 0 ? 0 : errno};
 }
 
 SysCallPtrResult OsSysCallsImpl::mmap(void* addr, size_t length, int prot, int flags, int fd,
-                                      off_t offset) {
+                                      off_t offset) const {
   PANIC("mmap not implemented on Windows");
 }
 
-SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) {
+SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) const {
   const int rc = ::stat(pathname, buf);
   return {rc, rc != -1 ? 0 : errno};
 }
@@ -228,12 +242,12 @@ SysCallIntResult OsSysCallsImpl::getsockopt(os_fd_t sockfd, int level, int optna
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSocketResult OsSysCallsImpl::socket(int domain, int type, int protocol) {
+SysCallSocketResult OsSysCallsImpl::socket(int domain, int type, int protocol) const {
   const os_fd_t rc = ::socket(domain, type, protocol);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSizeResult OsSysCallsImpl::sendmsg(os_fd_t sockfd, const msghdr* msg, int flags) {
+SysCallSizeResult OsSysCallsImpl::sendmsg(os_fd_t sockfd, const msghdr* msg, int flags) const {
   DWORD bytes_received;
   // if overlapped and/or completion routines are supported adjust the arguments accordingly
   wsamsgResult wsamsg = msghdrToWSAMSG(msg);
@@ -245,38 +259,68 @@ SysCallSizeResult OsSysCallsImpl::sendmsg(os_fd_t sockfd, const msghdr* msg, int
   return {bytes_received, 0};
 }
 
-SysCallIntResult OsSysCallsImpl::getsockname(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+SysCallIntResult OsSysCallsImpl::getsockname(os_fd_t sockfd, sockaddr* addr,
+                                             socklen_t* addrlen) const {
   const int rc = ::getsockname(sockfd, addr, addrlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::gethostname(char* name, size_t length) {
+SysCallIntResult OsSysCallsImpl::gethostname(char* name, size_t length) const {
   const int rc = ::gethostname(name, length);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::getpeername(os_fd_t sockfd, sockaddr* name, socklen_t* namelen) {
+SysCallIntResult OsSysCallsImpl::getpeername(os_fd_t sockfd, sockaddr* name,
+                                             socklen_t* namelen) const {
   const int rc = ::getpeername(sockfd, name, namelen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::setsocketblocking(os_fd_t sockfd, bool blocking) {
+SysCallIntResult OsSysCallsImpl::setsocketblocking(os_fd_t sockfd, bool blocking) const {
   u_long io_mode = blocking ? 0 : 1;
   const int rc = ::ioctlsocket(sockfd, FIONBIO, &io_mode);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+SysCallIntResult OsSysCallsImpl::connect(os_fd_t sockfd, const sockaddr* addr,
+                                         socklen_t addrlen) const {
   const int rc = ::connect(sockfd, addr, addrlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) {
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags) const {
+  const int rc = ::open(pathname, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags, mode_t mode) const {
+  const int rc = ::open(pathname, flags, mode);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::unlink(const char* pathname) const {
+  const int rc = ::unlink(pathname);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
+                                        const char* newpath, int flags) const {
+  const int rc = ::linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const {
+  const int rc = ::mkstemp(tmplate);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) const {
   const int rc = ::shutdown(sockfd, how);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, os_fd_t sv[2]) {
+SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol,
+                                            os_fd_t sv[2]) const {
   if (sv == nullptr) {
     return {SOCKET_ERROR, SOCKET_ERROR_INVAL};
   }
@@ -361,17 +405,17 @@ SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, 
   return {0, 0};
 }
 
-SysCallIntResult OsSysCallsImpl::listen(os_fd_t sockfd, int backlog) {
+SysCallIntResult OsSysCallsImpl::listen(os_fd_t sockfd, int backlog) const {
   const int rc = ::listen(sockfd, backlog);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size_t length) {
+SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size_t length) const {
   const ssize_t rc = ::send(sockfd, static_cast<const char*>(buffer), length, 0);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
+SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) const {
   WSAPROTOCOL_INFO info;
   auto currentProcess = ::GetCurrentProcessId();
   auto rc = WSADuplicateSocket(oldfd, currentProcess, &info);
@@ -382,7 +426,8 @@ SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
   return {new_socket, SOCKET_VALID(new_socket) ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr,
+                                           socklen_t* addrlen) const {
   const os_fd_t rc = ::accept(sockfd, addr, addrlen);
   if (SOCKET_INVALID(rc)) {
     return {rc, ::WSAGetLastError()};
@@ -393,7 +438,7 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 }
 
 SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
-                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) const {
 #ifdef SIO_TCP_INFO
   TCP_INFO_v0 win_tcpinfo;
   DWORD infoVersion = 0;
@@ -417,7 +462,8 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
   return false;
 }
 
-SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
+SysCallIntResult
+OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) const {
   if (alternate_getifaddrs_.has_value()) {
     return alternate_getifaddrs_.value()(interfaces);
   }
