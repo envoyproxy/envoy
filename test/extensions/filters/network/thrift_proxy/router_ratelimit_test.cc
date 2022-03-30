@@ -40,7 +40,8 @@ public:
   void initializeClusters(const std::vector<std::string>& cluster_names) {
     factory_context_.server_factory_context_.cluster_manager_.initializeClusters(cluster_names, {});
   }
-  void initialize(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config, const std::vector<std::string>& cluster_names) {
+  void initialize(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
+                  const std::vector<std::string>& cluster_names) {
     initializeClusters(cluster_names);
     initialize(config);
   }

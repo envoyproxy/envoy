@@ -59,21 +59,21 @@ void RouteEntryImplBase::validateClusters(
   // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
     if (!cluster_info_maps.hasCluster(cluster_name_)) {
-      throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
+      throw EnvoyException(fmt::format("route: unknown thrift cluster '{}'", cluster_name_));
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
       if (!cluster->clusterName().empty()) {
         if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
           throw EnvoyException(
-              fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+              fmt::format("route: unknown thrift weighted cluster '{}'", cluster->clusterName()));
         }
       }
       // For weighted clusters with `cluster_header_name`, we only verify that this field is
       // not empty because the cluster name is not set yet at config time (hence the validation
       // here).
       else if (cluster->clusterHeader().get().empty()) {
-        throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
+        throw EnvoyException("route: unknown thrift weighted cluster with no cluster_header field");
       }
     }
   }
@@ -220,16 +220,16 @@ RouteMatcher::RouteMatcher(
     if (validation_clusters) {
       // Throw exception for unknown clusters.
       route_entry->validateClusters(*validation_clusters);
+
       for (const auto& mirror_policy : route_entry->requestMirrorPolicies()) {
-        ASSERT(!mirror_policy->clusterName().empty());
         if (!validation_clusters->hasCluster(mirror_policy->clusterName())) {
-          throw EnvoyException(
-              fmt::format("route: unknown shadow cluster '{}'", mirror_policy->clusterName()));
+          throw EnvoyException(fmt::format("route: unknown thrift shadow cluster '{}'",
+                                           mirror_policy->clusterName()));
         }
       }
     }
 
-    // Now we pass the validation, add the route to the table.
+    // Now we pass the validation. Add the route to the table.
     routes_.emplace_back(route_entry);
   }
 }
