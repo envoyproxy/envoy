@@ -1,8 +1,13 @@
-# This configuration takes incoming data on port 10000 and encapsulates it in a CONNECT
-# request which is sent upstream port 10001.
+# This configuration takes incoming data on port 10000,10002 and encapsulates it in a CONNECT
+# request which is sent upstream port 10001. The difference is that if the data was from port
+# 10002, Envoy adds a "foo: bar" header in the CONNECT request.
+# Seeing this "foo: bar" header, another Envoy running with the configuration ``terminate_http1_connect.yaml``
+# will terminate the CONNECT request and establish tcp connection to 127.0.0.1:10003.
+#
 # It can be used to test TCP tunneling as described in
 # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
-# and running `curl -x 127.0.0.1:10000 https://www.google.com`
+# and running `curl -x 127.0.0.1:10000 https://www.google.com`,
+# or running `curl -H "Host: the-hosted-domain-on-port-10003"  http://127.0.0.1:10002
 
 admin:
   address:
@@ -41,11 +46,12 @@ static_resources:
           stat_prefix: tcp_stats
           cluster: "cluster_0"
           tunneling_config:
+            # The upstream request content would be ``CONNECT 127.0.0.1:10003 HTTP/1.1``.
             hostname: 127.0.0.1:10003
             headers_to_add:
             - header:
-                key: to-original-dst
-                value: "true"
+                key: foo
+                value: bar
   clusters:
   - name: cluster_0
     connect_timeout: 5s

@@ -1,7 +1,10 @@
 # This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
 # It can be used to test TCP tunneling as described in
 # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
-# or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
+# or used to test CONNECT to domain such as www.google.com, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com.
+#
+# To test the CONNECT to tcp address 127.0.0.1:10003, run
+# `curl -k -v -x 127.0.0.1:10001 --proxy-header "foo: bar" https://127.0.0.1:10003`.
 admin:
   address:
     socket_address:
@@ -33,9 +36,9 @@ static_resources:
                   connect_matcher:
                     {}
                   headers:
-                    - name: to-original-dst
+                    - name: foo
                       string_match:
-                        exact: "true"
+                        exact: bar
                 route:
                   cluster: local_original_dst
                   upgrade_configs:
@@ -78,4 +81,4 @@ static_resources:
     lb_policy: CLUSTER_PROVIDED
     original_dst_lb_config:
       use_http_header: true
-      use_http_authority: true
+      http_header_name: ":authority"
