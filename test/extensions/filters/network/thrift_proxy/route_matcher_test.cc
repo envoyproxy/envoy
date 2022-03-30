@@ -7,9 +7,7 @@
 #include "source/extensions/filters/network/thrift_proxy/router/config.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
-#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -25,12 +23,11 @@ class ThriftRouteMatcherTest : public testing::Test {
 protected:
   RouteMatcher createMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route) {
-    return RouteMatcher(route, context_, false);
+    return RouteMatcher(route, absl::nullopt);
   }
 
   RouteMatcher createMatcher(const std::string& yaml) {
-    envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-        parseRouteConfigurationFromV3Yaml(yaml);
+    auto config = parseRouteConfigurationFromV3Yaml(yaml);
     return createMatcher(config);
   }
 
@@ -42,8 +39,6 @@ private:
     TestUtility::validate(route_config);
     return route_config;
   }
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(ThriftRouteMatcherTest, RouteByMethodNameWithNoInversion) {

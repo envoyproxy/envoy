@@ -48,6 +48,7 @@ RouteEntryImplBase::RouteEntryImplBase(
   }
 }
 
+// Similiar validation procedure with Envoy::Router::RouteEntryImplBase::validateCluster
 void RouteEntryImplBase::validateClusters(
     const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
   // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
@@ -200,11 +201,7 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 
 RouteMatcher::RouteMatcher(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-    Server::Configuration::ServerFactoryContext& factory_context, bool validate_clusters) {
-  absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
-  if (validate_clusters) {
-    validation_clusters = factory_context.clusterManager().clusters();
-  }
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
