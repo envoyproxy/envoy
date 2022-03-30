@@ -50,8 +50,6 @@ public:
 
   void closeStream() override;
 
-  void resetStream() override;
-
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
                                      Tracing::Span& parent_span,
