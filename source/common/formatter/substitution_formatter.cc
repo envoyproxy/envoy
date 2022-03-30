@@ -456,7 +456,7 @@ SubstitutionFormatParser::parse(const std::string& format,
   // contain SUBCOMMAND without "(" and ")". The index                                      |
   // of SUBCOMMAND group is 2.                                                              |
   //                                                                                        |
-  // Capturing group for LENGTH. If present, it wil -----------------------------------------
+  // Capturing group for LENGTH. If present, it will ----------------------------------------
   // contain just number without ":". The index of
   // LENGTH group is 3.
   // clang-format on

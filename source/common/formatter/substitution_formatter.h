@@ -41,7 +41,7 @@ public:
   parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
   /**
-   * Parse a header subcommandle of the form: X?Y .
+   * Parse a header subcommand of the form: X?Y .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules

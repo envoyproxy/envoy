@@ -59,8 +59,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     std::string type, filter_namespace;
     std::vector<std::string> path;
 
-    ::Envoy::Formatter::SubstitutionFormatParser::parseCommand(subcommand, ':', type,
-                                                               filter_namespace, path);
+    ::Envoy::Formatter::SubstitutionFormatParser::parseSubcommand(subcommand, ':', type,
+                                                                  filter_namespace, path);
 
     auto provider = metadata_formatter_providers_.find(type);
     if (provider == metadata_formatter_providers_.end()) {
