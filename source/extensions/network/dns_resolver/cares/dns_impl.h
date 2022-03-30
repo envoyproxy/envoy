@@ -94,6 +94,7 @@ private:
     AddrInfoPendingResolution(DnsResolverImpl& parent, ResolveCb callback,
                               Event::Dispatcher& dispatcher, ares_channel channel,
                               const std::string& dns_name, DnsLookupFamily dns_lookup_family);
+    ~AddrInfoPendingResolution() override;
 
     /**
      * ares_getaddrinfo query callback.
@@ -127,6 +128,11 @@ private:
     bool dual_resolution_ = false;
     // Whether or not to lookup both V4 and V6 address.
     bool lookup_all_ = false;
+    // The number of outstanding pending resolutions. This should always be 0 or 1 for all lookup
+    // types other than All. For all, this can be be 0-2 as both queries are issued in parallel.
+    // This is used mostly for assertions but is used in the ARES_EDESTRUCTION path to make sure
+    // all concurrent queries are unwound before cleaning up the resolution.
+    uint32_t pending_resolutions_ = 0;
     int family_ = AF_INET;
     const DnsLookupFamily dns_lookup_family_;
     // Queried for at construction time.

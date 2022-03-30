@@ -4,6 +4,10 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load(
+    "quiche.bzl",
+    "envoy_quiche_platform_impl_cc_test_library",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -35,7 +39,6 @@ envoy_cc_test(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
-        ":quic_platform_epoll_clock_lib",
         "//source/common/memory:stats_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "//test/common/buffer:utility_lib",
@@ -47,6 +50,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:epoll_server_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
+        "@com_github_google_quiche//:quic_core_quic_epoll_clock_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",
         "@com_github_google_quiche//:quic_platform_mock_log",
@@ -73,41 +77,23 @@ envoy_cc_test_library(
     ],
     external_deps = ["abseil_time"],
     deps = [
-        ":quiche_platform_expect_bug_impl_lib",
-        ":quiche_platform_thread_impl_lib",
+        ":quiche_expect_bug_impl_lib",
+        ":quiche_thread_impl_lib",
         "//envoy/network:address_interface",
-        "//source/common/quic/platform:quic_platform_base_impl_lib",
+        "//source/common/quic/platform:quic_base_impl_lib",
         "//test/test_common:environment_lib",
     ],
 )
 
-envoy_cc_test_library(
-    name = "quic_platform_epoll_clock_lib",
-    srcs = select({
-        "//bazel:linux": ["quic_epoll_clock.cc"],
-        "//conditions:default": [],
-    }),
-    hdrs = select({
-        "//bazel:linux": ["quic_epoll_clock.h"],
-        "//conditions:default": [],
-    }),
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quic_core_clock_lib",
-        "@com_github_google_quiche//:quic_platform",
-        "@com_github_google_quiche//:quic_platform_epoll_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_epoll_impl_lib",
-    hdrs = ["quic_epoll_impl.h"],
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_common_platform_epoll_impl_lib",
+    hdrs = ["quiche_epoll_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:epoll_server_lib"],
 )
 
-envoy_cc_test_library(
-    name = "quiche_platform_expect_bug_impl_lib",
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_expect_bug_impl_lib",
     hdrs = ["quiche_expect_bug_impl.h"],
     tags = ["nofips"],
     deps = [
@@ -116,15 +102,15 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "quiche_platform_mock_log_impl_lib",
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_mock_log_impl_lib",
     hdrs = ["quiche_mock_log_impl.h"],
     tags = ["nofips"],
     deps = ["@com_github_google_quiche//:quic_platform_base"],
 )
 
-envoy_cc_test_library(
-    name = "quiche_platform_thread_impl_lib",
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_thread_impl_lib",
     hdrs = ["quiche_thread_impl.h"],
     tags = ["nofips"],
     deps = [
@@ -134,8 +120,8 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "quiche_platform_test_output_impl_lib",
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_test_output_impl_lib",
     srcs = ["quiche_test_output_impl.cc"],
     hdrs = ["quiche_test_output_impl.h"],
     tags = ["nofips"],
@@ -146,16 +132,16 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "quiche_common_platform_test_impl_lib",
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_test_impl_lib",
     hdrs = ["quiche_test_impl.h"],
     deps = ["//source/common/common:assert_lib"],
 )
 
-envoy_cc_test_library(
-    name = "quiche_common_platform_test_helpers_impl_lib",
+envoy_quiche_platform_impl_cc_test_library(
+    name = "quiche_test_helpers_impl_lib",
     hdrs = ["quiche_test_helpers_impl.h"],
     deps = [
-        ":quiche_platform_expect_bug_impl_lib",
+        ":quiche_expect_bug_impl_lib",
     ],
 )

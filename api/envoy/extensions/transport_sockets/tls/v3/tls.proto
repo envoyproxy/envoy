@@ -131,8 +131,6 @@ message TlsKeyLog {
   // The path to save the TLS key log.
   string path = 1 [(validate.rules).string = {min_len: 1}];
 
-  // At least one of src or dst must be specified, or the config will be rejected as invalid.
-
   // The local IP address that will be used to filter the connection which should save the TLS key log
   // If it is not set, any local IP address  will be matched.
   repeated config.core.v3.CidrRange local_address_range = 2;
