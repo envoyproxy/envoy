@@ -65,10 +65,9 @@ static void BM_AccessLogFormatterSetup(benchmark::State& state) {
       "%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% "
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
-
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-  std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+    std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
+        std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
   }
 }
 BENCHMARK(BM_AccessLogFormatterSetup);

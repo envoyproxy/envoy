@@ -90,10 +90,10 @@ public:
 
   /**
    * Return a FormatterProviderPtr if subcommand and max_length
-   * are correct for the formatter provider associated 
+   * are correct for the formatter provider associated
    * with command.
-   * @param command - name of the FormatterProvider 
-   * @param subcommand - command specific data. (optional) 
+   * @param command - name of the FormatterProvider
+   * @param subcommand - command specific data. (optional)
    * @param max_length - length to which the output produced by FormatterProvider
    *   should be truncated to (optional)
    *

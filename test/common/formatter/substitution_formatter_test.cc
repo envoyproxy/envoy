@@ -1537,87 +1537,63 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   {
     DynamicMetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
     std::string val =
-        //formatter.format(request_headers, response_headers, response_trailers, stream_info, body)
-          //  .value();
-        formatter.extract(stream_info)
-            .value();
+        // formatter.format(request_headers, response_headers, response_trailers, stream_info, body)
+        //  .value();
+        formatter.extract(stream_info).value();
     EXPECT_TRUE(val.find("\"test_key\":\"test_value\"") != std::string::npos);
     EXPECT_TRUE(val.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
 
     ProtobufWkt::Value expected_val;
     expected_val.mutable_struct_value()->CopyFrom(metadata.filter_metadata().at("com.test"));
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(expected_val));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(expected_val));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
-    EXPECT_EQ("test_value", formatter.extract(
-                                             stream_info));
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_EQ("test_value", formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
-    EXPECT_EQ(
-        "{\"inner_key\":\"inner_value\"}",
-        formatter.extract(stream_info));
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", formatter.extract(stream_info));
 
     ProtobufWkt::Value expected_val;
     (*expected_val.mutable_struct_value()->mutable_fields())["inner_key"] =
         ValueUtil::stringValue("inner_value");
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(expected_val));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(expected_val));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj", "inner_key"},
                                        absl::optional<size_t>());
-    EXPECT_EQ("inner_value", formatter.extract(
-                                              stream_info));
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
+    EXPECT_EQ("inner_value", formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info),
                 ProtoEq(ValueUtil::stringValue("inner_value")));
   }
 
   // not found cases
   {
     DynamicMetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
-    EXPECT_EQ(absl::nullopt, formatter.extract(
-                                              stream_info));
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
-    EXPECT_EQ(absl::nullopt, formatter.extract(
-                                              stream_info));
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj", "notfound"},
                                        absl::optional<size_t>());
-    EXPECT_EQ(absl::nullopt, formatter.extract(
-                                              stream_info));
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // size limit
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
-    EXPECT_EQ("test_", formatter.extract(
-                                        stream_info));
+    EXPECT_EQ("test_", formatter.extract(stream_info));
 
     // N.B. Does not truncate.
-    EXPECT_THAT(formatter.extractValue(
-                                      stream_info),
-                ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
 }
 
@@ -1647,22 +1623,18 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key", absl::optional<size_t>(), false);
 
     EXPECT_EQ("\"test_value\"", formatter.extract(stream_info));
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
     FilterStateFormatter formatter("key-struct", absl::optional<size_t>(), false);
 
-    EXPECT_EQ(
-        "{\"inner_key\":\"inner_value\"}",
-        formatter.extract(stream_info));
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", formatter.extract(stream_info));
 
     ProtobufWkt::Value expected;
     (*expected.mutable_struct_value()->mutable_fields())["inner_key"] =
         ValueUtil::stringValue("inner_value");
 
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(expected));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(expected));
   }
 
   // not found case
@@ -1670,8 +1642,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-not-found", absl::optional<size_t>(), false);
 
     EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // no serialization case
@@ -1679,8 +1650,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), false);
 
     EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // serialization error case
@@ -1688,8 +1658,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>(), false);
 
     EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   // size limit
@@ -1699,8 +1668,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     EXPECT_EQ("\"test", formatter.extract(stream_info));
 
     // N.B. Does not truncate.
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(ValueUtil::stringValue("test_value")));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
   }
 
   // serializeAsString case
@@ -1722,8 +1690,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>(), true);
 
     EXPECT_EQ(absl::nullopt, formatter.extract(stream_info));
-    EXPECT_THAT(formatter.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(formatter.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 }
 
@@ -1739,8 +1706,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
     EXPECT_EQ(absl::nullopt, cert_start_formart.extract(stream_info));
-    EXPECT_THAT(cert_start_formart.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(cert_start_formart.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No validFromPeerCertificate
   {
@@ -1750,8 +1716,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, cert_start_formart.extract(stream_info));
-    EXPECT_THAT(cert_start_formart.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(cert_start_formart.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
@@ -1762,21 +1727,18 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              cert_start_format.extract(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format.extract(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format(
-        "%b %e %H:%M:%S %Y %Z");
+    DownstreamPeerCertVStartFormatter cert_start_format("%b %e %H:%M:%S %Y %Z");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
-              cert_start_format.extract(stream_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_start_format.extract(stream_info));
   }
 }
 
@@ -1792,8 +1754,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
     EXPECT_EQ(absl::nullopt, cert_end_format.extract(stream_info));
-    EXPECT_THAT(cert_end_format.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(cert_end_format.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // No expirationPeerCertificate
   {
@@ -1804,8 +1765,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
         .WillRepeatedly(Return(absl::nullopt));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, cert_end_format.extract(stream_info));
-    EXPECT_THAT(cert_end_format.extractValue(stream_info),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(cert_end_format.extractValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   // Default format string
   {
@@ -1816,21 +1776,18 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              cert_end_format.extract(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format.extract(stream_info));
   }
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format(
-        "%b %e %H:%M:%S %Y %Z");
+    DownstreamPeerCertVEndFormatter cert_end_format("%b %e %H:%M:%S %Y %Z");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
-              cert_end_format.extract(stream_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC", cert_end_format.extract(stream_info));
   }
 }
 
@@ -1855,8 +1812,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
     StartTimeFormatter start_time_format("");
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.extract(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), start_time_format.extract(stream_info));
     EXPECT_THAT(start_time_format.extractValue(stream_info),
                 ProtoEq(ValueUtil::stringValue(AccessLogDateTimeFormatter::fromTime(time))));
   }
@@ -3097,44 +3053,54 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
 }
 
 TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
-    std::vector<std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
-        // COMMAND_ONLY. Any additional params are not allowed
-        {CommandSyntaxChecker::COMMAND_ONLY,  "", 3},
-        {CommandSyntaxChecker::COMMAND_ONLY,  "PARAMS", 3},
-        {CommandSyntaxChecker::COMMAND_ONLY,  "PARAMS", absl::nullopt},
-        // PARAMS_REQUIRED. Length not allowed.
-        {CommandSyntaxChecker::PARAMS_REQUIRED, "", 3},
-        {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAM", 3},
-        {CommandSyntaxChecker::PARAMS_REQUIRED, "", absl::nullopt},
-    };
-    
-    for (const auto& test_case : test_cases) {
-        EXPECT_THROW(CommandSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)), EnvoyException);
-    }
+  std::vector<
+      std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>>
+      test_cases = {
+          // COMMAND_ONLY. Any additional params are not allowed
+          {CommandSyntaxChecker::COMMAND_ONLY, "", 3},
+          {CommandSyntaxChecker::COMMAND_ONLY, "PARAMS", 3},
+          {CommandSyntaxChecker::COMMAND_ONLY, "PARAMS", absl::nullopt},
+          // PARAMS_REQUIRED. Length not allowed.
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "", 3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAM", 3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "", absl::nullopt},
+      };
+
+  for (const auto& test_case : test_cases) {
+    EXPECT_THROW(CommandSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                    std::get<1>(test_case), std::get<2>(test_case)),
+                 EnvoyException);
+  }
 }
 
 TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
-    std::vector<std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>> test_cases = {
-        // COMMAND_ONLY. Any additional params are not allowed
-        {CommandSyntaxChecker::COMMAND_ONLY,  "", absl::nullopt},
-        // PARAMS_REQUIRED
-        {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
-        // PARAMS_REQUIRED and LENGTH_ALLOWED
-        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
-        {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
-        // ALLOWS_PARAMS
-        {CommandSyntaxChecker::PARAMS_OPTIONAL, "PARAMS", absl::nullopt},
-        {CommandSyntaxChecker::PARAMS_OPTIONAL, "", absl::nullopt},
-        // ALLOWS_PARAMS and LENGTH_ALLOWED
-        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS", 3},
-        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "", 3},
-        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS", absl::nullopt},
-        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "", absl::nullopt}
-    };
-    
-    for (const auto& test_case : test_cases) {
-        EXPECT_NO_THROW(CommandSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
-    }
+  std::vector<
+      std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>>
+      test_cases = {
+          // COMMAND_ONLY. Any additional params are not allowed
+          {CommandSyntaxChecker::COMMAND_ONLY, "", absl::nullopt},
+          // PARAMS_REQUIRED
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+          // PARAMS_REQUIRED and LENGTH_ALLOWED
+          {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS",
+           3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+          // ALLOWS_PARAMS
+          {CommandSyntaxChecker::PARAMS_OPTIONAL, "PARAMS", absl::nullopt},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL, "", absl::nullopt},
+          // ALLOWS_PARAMS and LENGTH_ALLOWED
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS",
+           3},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "", 3},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS",
+           absl::nullopt},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "",
+           absl::nullopt}};
+
+  for (const auto& test_case : test_cases) {
+    EXPECT_NO_THROW(CommandSyntaxChecker::VerifySyntax(
+        std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+  }
 }
 
 } // namespace

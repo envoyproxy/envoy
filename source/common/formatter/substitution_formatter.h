@@ -20,13 +20,15 @@ namespace Formatter {
 
 class CommandSyntaxChecker {
 public:
-using CommandSyntaxFlags = uint32_t ;
-static constexpr CommandSyntaxFlags    COMMAND_ONLY = 0;
-static constexpr CommandSyntaxFlags    PARAMS_REQUIRED = 1 << 0;
-static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
-static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
+  using CommandSyntaxFlags = uint32_t;
+  static constexpr CommandSyntaxFlags COMMAND_ONLY = 0;
+  static constexpr CommandSyntaxFlags PARAMS_REQUIRED = 1 << 0;
+  static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
+  static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
 
- static void VerifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags, const std::string& command, const std::string& subcommand, const absl::optional<size_t>& length);
+  static void VerifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
+                           const std::string& command, const std::string& subcommand,
+                           const absl::optional<size_t>& length);
 };
 
 /**
@@ -44,11 +46,11 @@ public:
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
-  static void parseSubcommandHeaders(const std::string& subcommand,
-                                 std::string& main_header, std::string& alternative_header);
+  static void parseSubcommandHeaders(const std::string& subcommand, std::string& main_header,
+                                     std::string& alternative_header);
 
   /* Variadic function template to parse the
-     subcommand and assign found tokens to sequence of params. 
+     subcommand and assign found tokens to sequence of params.
      subcommand must be a sequence
      of tokens separated by the same separator, like: header1:header2 or header1?header2?header3.
      params must be a sequence of std::string& with optional container storing std::string. Here are
@@ -63,7 +65,7 @@ public:
   */
   template <typename... Tokens>
   static void parseSubcommand(const std::string& subcommand, const char separator,
-                           Tokens&&... params) {
+                              Tokens&&... params) {
     std::vector<absl::string_view> tokens;
     tokens = absl::StrSplit(subcommand, separator);
     std::vector<absl::string_view>::iterator it = tokens.begin();
@@ -94,16 +96,20 @@ public:
    *
    * @param command - formatter's name.
    * @param subcommand - optional formatter specific data.
-   * @param length - optional max length of output produced by the formatter.  
+   * @param length - optional max length of output produced by the formatter.
    * @return FormattterProviderPtr substitution provider for the command or nullptr
    */
-  static FormatterProviderPtr parseBuiltinCommand(const std::string& command, const std::string& subcommand, absl::optional<size_t>& length);
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& command,
+                                                  const std::string& subcommand,
+                                                  absl::optional<size_t>& length);
 
 private:
-  using FormatterProviderCreateFunc = std::function<FormatterProviderPtr(const std::string&, absl::optional<size_t>&)>;
+  using FormatterProviderCreateFunc =
+      std::function<FormatterProviderPtr(const std::string&, absl::optional<size_t>&)>;
 
   using FormatterProviderLookupTbl =
-      absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags, FormatterProviderCreateFunc>>;
+      absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
+                                                       FormatterProviderCreateFunc>>;
   static const FormatterProviderLookupTbl& getKnownFormatters();
 };
 
@@ -151,7 +157,7 @@ private:
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
-template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+template <class... Ts> StructFormatMapVisitorHelper(Ts...)->StructFormatMapVisitorHelper<Ts...>;
 
 /**
  * An formatter for structured log formats, which returns a Struct proto that
@@ -411,7 +417,8 @@ public:
  */
 class StreamInfoFormatter : public FormatterProvider {
 public:
-  StreamInfoFormatter(const std::string&, const std::string& = "", const absl::optional<size_t>& = absl::nullopt);
+  StreamInfoFormatter(const std::string&, const std::string& = "",
+                      const absl::optional<size_t>& = absl::nullopt);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -429,18 +436,20 @@ public:
     virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
   };
   using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
-  using FieldExtractorCreateFunc = std::function<FieldExtractorPtr(const std::string&, const absl::optional<size_t>&)>;
+  using FieldExtractorCreateFunc =
+      std::function<FieldExtractorPtr(const std::string&, const absl::optional<size_t>&)>;
 
   enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
   StreamInfoFormatter(FieldExtractorPtr field_extractor) {
-        field_extractor_ = std::move(field_extractor);
-    }
+    field_extractor_ = std::move(field_extractor);
+  }
 
 private:
   FieldExtractorPtr field_extractor_;
 
   using FieldExtractorLookupTbl =
-      absl::flat_hash_map<absl::string_view, std::pair<uint32_t, StreamInfoFormatter::FieldExtractorCreateFunc>>;
+      absl::flat_hash_map<absl::string_view,
+                          std::pair<uint32_t, StreamInfoFormatter::FieldExtractorCreateFunc>>;
   static const FieldExtractorLookupTbl& getKnownFieldExtractors();
 };
 
@@ -455,8 +464,8 @@ public:
   MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
                     absl::optional<size_t> max_length, GetMetadataFunction get);
 
-    absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
-    ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
+  absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
 
 protected:
   absl::optional<std::string>
@@ -469,7 +478,6 @@ private:
   absl::optional<size_t> max_length_;
   GetMetadataFunction get_func_;
 };
-
 
 /**
  * FormatterProvider for DynamicMetadata from StreamInfo.
@@ -497,9 +505,9 @@ public:
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
                        bool serialize_as_string);
 
-    // FieldExtractor
-    absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
-    ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
+  // FieldExtractor
+  absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::StreamInfo::FilterState::Object*
@@ -521,8 +529,8 @@ public:
 
   SystemTimeFormatter(const std::string& format, TimeFieldExtractor f);
 
-    absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
-    ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
+  absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;

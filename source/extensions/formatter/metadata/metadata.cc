@@ -52,7 +52,8 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
-MetadataFormatterCommandParser::parse(const std::string& command, const std::string& subcommand, absl::optional<size_t>& max_length) const {
+MetadataFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
+                                      absl::optional<size_t>& max_length) const {
   if (command == "METADATA") {
     // Extract type of metadata and keys.
     std::string type, filter_namespace;
@@ -67,7 +68,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     }
 
     // Return a pointer to formatter provider.
-    return ::Envoy::Formatter::FormatterProviderPtr{new ::Envoy::Formatter::StreamInfoFormatter(provider->second(filter_namespace, path, max_length))};
+    return ::Envoy::Formatter::FormatterProviderPtr{new ::Envoy::Formatter::StreamInfoFormatter(
+        provider->second(filter_namespace, path, max_length))};
   }
   return nullptr;
 }
