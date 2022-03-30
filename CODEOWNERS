@@ -242,18 +242,14 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @lambdai @lizan
-
-# Maintainerless extensions (need maintainer owner)
-# formatter
-/*/extensions/formatter/req_without_query @UNOWNED @tsaarni @rgs1 @giantcroc
-# IP tagging
-/*/extensions/filters/http/ip_tagging @rgs1 @UNOWNED
 # mongo proxy
-/*/extensions/filters/network/mongo_proxy @mythra @giantcroc @UNOWNED
-
-# "Underowned" extensions (no backup reviewers, please volunter!)
+/*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
+# formatter
+/*/extensions/formatter/req_without_query @alyssawilk @tsaarni @rgs1 @giantcroc
+# IP tagging
+/*/extensions/filters/http/ip_tagging @rgs1 @alyssawilk
 # cors
-/*/extensions/filters/http/cors @wbpcode @UNOWNED
+/*/extensions/filters/http/cors @wbpcode @daixiang0
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
