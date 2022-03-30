@@ -618,6 +618,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
       if (!downstream_closed_) {
+        route_ = pickRoute();
         establishUpstreamConnection();
       }
     } else {
