@@ -55,6 +55,8 @@ message UdpProxyConfig {
     option (validate.required) = true;
 
     // The upstream cluster to connect to.
+    // This field is deprecated in favor of
+    // :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>`.
     string cluster = 2 [
       deprecated = true,
       (validate.rules).string = {min_len: 1},
@@ -62,6 +64,7 @@ message UdpProxyConfig {
     ];
 
     // The match tree to use when resolving route actions for incoming requests.
+    // See :ref:`Routing <config_udp_listener_filters_udp_proxy_routing>` for more information.
     xds.type.matcher.v3.Matcher matcher = 8
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
