@@ -1169,11 +1169,11 @@ if __name__ == "__main__":
         # https://github.com/envoyproxy/envoy/issues/9953
         # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
         exclude_list = (
-            "-- . ':(exclude)source/extensions/filters/http/buffer/BUILD' "
-            "':(exclude)source/extensions/filters/network/common/BUILD' "
-            "':(exclude)tools/code_format/check_format.py'")
+            "':(exclude)source/extensions/filters/http/buffer/BUILD' "
+            "':(exclude)source/extensions/filters/network/common/BUILD' ")
         command = (
-            "git diff $(tools/git/last_github_commit.sh) %s |grep -r source/extensions '+.*visibility ='" % exclude_list)
+            "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
+            % exclude_list)
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
