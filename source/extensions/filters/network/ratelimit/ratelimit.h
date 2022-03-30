@@ -102,7 +102,6 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  // const std::vector<RateLimit::Descriptor>& descriptors() { return confi; }
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
                 Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
