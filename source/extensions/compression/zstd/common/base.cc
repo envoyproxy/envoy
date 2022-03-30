@@ -10,14 +10,6 @@ Base::Base(const uint32_t chunk_size)
     : chunk_ptr_{std::make_unique<uint8_t[]>(chunk_size)}, output_{chunk_ptr_.get(), chunk_size, 0},
       input_{nullptr, 0, 0} {}
 
-bool Base::isDictionarySet() {
-  if (!is_dictionary_set_) {
-    is_dictionary_set_ = true;
-    return false;
-  }
-  return true;
-};
-
 void Base::setInput(const Buffer::RawSlice& input_slice) {
   input_.src = static_cast<uint8_t*>(input_slice.mem_);
   input_.pos = 0;

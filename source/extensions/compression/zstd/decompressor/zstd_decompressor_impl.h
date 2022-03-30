@@ -60,6 +60,7 @@ private:
   std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> dctx_;
   const ZstdDDictManagerPtr& ddict_manager_;
   const ZstdDecompressorStats stats_;
+  bool is_dictionary_set_{false};
 };
 
 } // namespace Decompressor

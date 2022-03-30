@@ -17,7 +17,6 @@ struct Base {
   Base(const uint32_t chunk_size);
 
 protected:
-  bool isDictionarySet();
   void setInput(const Buffer::RawSlice& input_slice);
   void getOutput(Buffer::Instance& output_buffer);
 
@@ -25,7 +24,6 @@ protected:
   ZSTD_outBuffer output_;
   ZSTD_inBuffer input_;
   unsigned dictionary_id_{0};
-  bool is_dictionary_set_{false};
 };
 
 } // namespace Common

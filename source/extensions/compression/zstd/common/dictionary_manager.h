@@ -98,10 +98,10 @@ private:
         tls_slot_->runOnAllThreads(
             [dictionary = std::move(dictionary), id, origin_id,
              replace_mode = replace_mode_](OptRef<DictionaryThreadLocalMap> dictionary_map) {
-              dictionary_map->emplace(id, dictionary);
               if (replace_mode) {
                 dictionary_map->erase(origin_id);
               }
+              dictionary_map->emplace(id, dictionary);
             });
       }
     }

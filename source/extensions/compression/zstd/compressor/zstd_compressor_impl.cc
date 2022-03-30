@@ -52,7 +52,7 @@ void ZstdCompressorImpl::compress(Buffer::Instance& buffer,
 void ZstdCompressorImpl::process(Buffer::Instance& output_buffer, const ZSTD_EndDirective mode) {
   bool finished;
   do {
-    size_t const remaining = ZSTD_compressStream2(cctx_.get(), &output_, &input_, mode);
+    const size_t remaining = ZSTD_compressStream2(cctx_.get(), &output_, &input_, mode);
     getOutput(output_buffer);
     // If we're on the last chunk we're finished when zstd returns 0,
     // which means its consumed all the input AND finished the frame.

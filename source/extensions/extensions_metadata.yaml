@@ -91,7 +91,7 @@ envoy.compression.zstd.compressor:
 envoy.compression.zstd.decompressor:
   categories:
   - envoy.compression.decompressor
-  security_posture: robust_to_untrusted_downstream
+  security_posture: requires_trusted_downstream_and_upstream
   status: stable
 envoy.config.validators.minimum_clusters:
   categories:

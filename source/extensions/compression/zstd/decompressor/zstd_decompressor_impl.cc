@@ -16,8 +16,9 @@ void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     if (input_slice.len_ > 0) {
-      if (ddict_manager_ && !isDictionarySet()) {
-        // If id == 0, the dictID could not be decoded.
+      if (ddict_manager_ && !is_dictionary_set_) {
+        is_dictionary_set_ = true;
+        // If id == 0, it means that dictionary id could not be decoded.
         dictionary_id_ =
             ZSTD_getDictID_fromFrame(static_cast<uint8_t*>(input_slice.mem_), input_slice.len_);
         if (dictionary_id_ != 0) {
