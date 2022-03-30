@@ -62,7 +62,8 @@ message RegexMatcher {
     GoogleRE2 google_re2 = 1 [(validate.rules).message = {required: true}];
   }
 
-  // The regex match string. The string must be supported by the configured engine.
+  // The regex match string. The string must be supported by the configured engine. The regex is matched
+  // against the full string, not as a partial match.
   string regex = 2 [(validate.rules).string = {min_len: 1}];
 }
 
