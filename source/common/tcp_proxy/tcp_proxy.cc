@@ -347,7 +347,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
           [this](Upstream::ClusterDiscoveryStatus cluster_status) {
             onClusterDiscoveryCompletion(cluster_status);
           });
-
+      config_->stats().on_demand_cluster_attempt_.inc();
       cluster_discovery_handle_ = odcds->requestOnDemandClusterDiscovery(
           cluster_name, std::move(callback), std::chrono::milliseconds(5000));
     }
@@ -419,10 +419,12 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
   case Upstream::ClusterDiscoveryStatus::Missing:
     ENVOY_CONN_LOG(debug, "On on demand cluster {} is missing", read_callbacks_->connection(),
                    cluster_name);
+    config_->stats().on_demand_cluster_missing_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Timeout:
     ENVOY_CONN_LOG(debug, "On on demand cluster {} was not found before time out.",
                    read_callbacks_->connection(), cluster_name);
+    config_->stats().on_demand_cluster_timeout_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Available:
     // cluster_discovery_handle_ must have cancelled when downstream is closed.

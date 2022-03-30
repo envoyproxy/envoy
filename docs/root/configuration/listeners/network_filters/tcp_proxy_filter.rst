@@ -60,5 +60,8 @@ statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
   downstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from downstream
   idle_timeout, Counter, Total number of connections closed due to idle timeout
   max_downstream_connection_duration, Counter, Total number of connections closed due to max_downstream_connection_duration timeout
+  on_demand_cluster_attempt, Counter, Total number of connections that requested on demand cluster
+  on_demand_cluster_missing, Counter, Total number of connections closed due to on demand cluster is missing
+  on_demand_cluster_timeout, Counter, Total number of connections closed due to on demand cluster lookup timeout
   upstream_flush_total, Counter, Total number of connections that continued to flush upstream data after the downstream connection was closed
   upstream_flush_active, Gauge, Total connections currently continuing to flush upstream data after the downstream connection was closed

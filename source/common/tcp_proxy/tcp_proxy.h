@@ -47,6 +47,9 @@ namespace TcpProxy {
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
+  COUNTER(on_demand_cluster_attempt)                                                               \
+  COUNTER(on_demand_cluster_timeout)                                                               \
+  COUNTER(on_demand_cluster_missing)                                                               \
   COUNTER(upstream_flush_total)                                                                    \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
