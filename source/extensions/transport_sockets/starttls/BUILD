@@ -15,7 +15,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":starttls_socket_lib",
         "//envoy/network:transport_socket_interface",

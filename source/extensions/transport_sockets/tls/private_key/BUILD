@@ -16,7 +16,6 @@ envoy_cc_library(
     hdrs = [
         "private_key_manager_impl.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/registry",

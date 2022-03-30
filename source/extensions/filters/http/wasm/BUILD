@@ -15,7 +15,6 @@ envoy_cc_library(
     name = "wasm_filter_lib",
     srcs = ["wasm_filter.cc"],
     hdrs = ["wasm_filter.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/server:filter_config_interface",

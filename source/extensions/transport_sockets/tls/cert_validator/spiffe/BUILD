@@ -21,7 +21,6 @@ envoy_cc_extension(
         "abseil_base",
         "abseil_hash",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",
