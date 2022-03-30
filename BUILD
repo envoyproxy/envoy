@@ -46,3 +46,10 @@ package_group(
         "//contrib/...",
     ],
 )
+
+package_group(
+    name = "examples_library",
+    packages = [
+        "//examples/...",
+    ],
+)
