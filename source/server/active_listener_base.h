@@ -15,6 +15,8 @@ namespace Server {
   COUNTER(downstream_cx_overload_reject)                                                           \
   COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
+  COUNTER(downstream_listener_filter_remote_close)                                                 \
+  COUNTER(downstream_listener_filter_error)                                                        \
   COUNTER(no_filter_chain_match)                                                                   \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_pre_cx_active, Accumulate)                                                      \
