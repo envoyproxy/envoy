@@ -193,17 +193,13 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
       0x30,
-      8,
-      // invalid version 1
+      5,
+      // invalid version field, the value of v2 is 1
       0xa0,
       0x03, // bit string
       0x02, // integer
       1,
-      1,
-      // Responder ID tag 1
-      1,
-      1,
-      0,
+      1, // version
   };
   CBS cbs;
   CBS_init(&cbs, data.data(), data.size());
