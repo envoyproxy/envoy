@@ -130,7 +130,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
   }
 
-  if (config.has_on_demand()) {
+  if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
     odcds_ = context.clusterManager().allocateOdCdsApi(config.on_demand().odcds_config(),
                                                        OptRef<xds::core::v3::ResourceLocator>(),
                                                        context.messageValidationVisitor());
@@ -417,12 +417,12 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
   switch (cluster_status) {
   case Upstream::ClusterDiscoveryStatus::Missing:
-    ENVOY_CONN_LOG(debug, "On on demand cluster {} is missing", read_callbacks_->connection(),
+    ENVOY_CONN_LOG(debug, "On demand cluster {} is missing", read_callbacks_->connection(),
                    cluster_name);
     config_->stats().on_demand_cluster_missing_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Timeout:
-    ENVOY_CONN_LOG(debug, "On on demand cluster {} was not found before time out.",
+    ENVOY_CONN_LOG(debug, "On demand cluster {} was not found before time out.",
                    read_callbacks_->connection(), cluster_name);
     config_->stats().on_demand_cluster_timeout_.inc();
     break;
