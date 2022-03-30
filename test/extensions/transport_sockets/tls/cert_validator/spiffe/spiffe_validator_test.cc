@@ -580,11 +580,7 @@ typed_config:
   )EOF"),
              time_system);
 
-  const absl::Time expiration =
-      TestUtility::parseTime(TEST_SPIFFE_SAN_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
-
-  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
-  EXPECT_EQ(days, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(-1, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {

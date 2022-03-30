@@ -267,9 +267,14 @@ size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
     return 0;
   }
-  int ret = INT_MAX;
+  size_t ret = SIZE_MAX;
   for (auto& cert : ca_certs_) {
-    ret = std::min<int>(ret, Utility::getDaysUntilExpiration(cert.get(), time_source_));
+    int32_t tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
+    if (tmp == -1) {
+      return tmp;
+    } else if (tmp < static_cast<int>(ret)) {
+      ret = tmp;
+    }
   }
   return ret;
 }

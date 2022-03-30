@@ -260,7 +260,7 @@ int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_sourc
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
-    return days;
+    return days < 0 ? -1 : days;
   }
   return 0;
 }
