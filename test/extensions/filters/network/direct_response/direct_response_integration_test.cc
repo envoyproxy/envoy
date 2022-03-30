@@ -43,7 +43,7 @@ TEST_P(DirectResponseIntegrationTest, DirectResponseOnConnection) {
         response.append(data.toString());
         conn.close(Network::ConnectionCloseType::FlushWrite);
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_EQ("hello, world!\n", response);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().DirectResponse));

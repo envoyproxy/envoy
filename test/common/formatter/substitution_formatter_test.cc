@@ -22,6 +22,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -3221,6 +3222,64 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
                                                stream_info, body));
   EXPECT_EQ("HTTP/1.1", providers[1]->format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
+}
+
+TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%"), EnvoyException,
+                              "Empty environment name is not allowed.");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    StreamInfo::MockStreamInfo stream_info;
+    std::string body;
+
+    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
+
+    ASSERT_EQ(providers.size(), 1);
+
+    EXPECT_EQ("-", providers[0]->format(request_headers, response_headers, response_trailers,
+                                        stream_info, body));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    StreamInfo::MockStreamInfo stream_info;
+    std::string body;
+
+    TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+    Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+
+    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
+
+    ASSERT_EQ(providers.size(), 1);
+
+    EXPECT_EQ("test", providers[0]->format(request_headers, response_headers, response_trailers,
+                                           stream_info, body));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    StreamInfo::MockStreamInfo stream_info;
+    std::string body;
+
+    TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+    Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+
+    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV):2%");
+
+    ASSERT_EQ(providers.size(), 1);
+
+    EXPECT_EQ("te", providers[0]->format(request_headers, response_headers, response_trailers,
+                                         stream_info, body));
+  }
 }
 
 } // namespace

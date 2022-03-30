@@ -271,6 +271,7 @@ typed_config:
 // Verify the grpc cached logger is available after the initial logger filter is destroyed.
 // Regression test for https://github.com/envoyproxy/envoy/issues/18066
 TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
+  config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   // The grpc access logger connection never closes. It's ok to see an incomplete logging stream.
   autonomous_allow_incomplete_streams_ = true;
@@ -301,16 +302,8 @@ TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
 
   // HTTP 1.1 is allowed and the connection is kept open until the listener update.
   std::string response;
-  auto connection =
-      createConnectionDriver(lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\n",
-                             [&response, &dispatcher = *dispatcher_](
-                                 Network::ClientConnection&, const Buffer::Instance& data) -> void {
-                               response.append(data.toString());
-                               if (response.find("\r\n\r\n") != std::string::npos) {
-                                 dispatcher.exit();
-                               }
-                             });
-  connection->run();
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 200") == 0);
 
   test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 2);

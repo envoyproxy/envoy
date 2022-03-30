@@ -145,6 +145,14 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
+std::string ConfigHelper::testInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.test"
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+}
+
 std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
   if (!enable_ja3_fingerprinting) {
     return R"EOF(
@@ -1047,6 +1055,12 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
         ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
   }
   connect_timeout_set_ = true;
+}
+
+void ConfigHelper::disableDelayClose() {
+  addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
 }
 
 void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {

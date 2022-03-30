@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
@@ -75,54 +76,15 @@ Config::Config(
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
-
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
-
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
-  Network::ConnectionSocket& socket = cb.socket();
   cb_ = &cb;
 
-  ParseState parse_state = onRead();
-  switch (parse_state) {
-  case ParseState::Error:
-    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
-    // we don't add new enum in FilterStatus so we have to signal the caller
-    // the new condition.
-    cb.socket().close();
-    return Network::FilterStatus::StopIteration;
-  case ParseState::Done:
-    return Network::FilterStatus::Continue;
-  case ParseState::Continue:
-    // do nothing but create the event
-    socket.ioHandle().initializeFileEvent(
-        cb.dispatcher(),
-        [this](uint32_t events) {
-          ASSERT(events == Event::FileReadyType::Read);
-          ParseState parse_state = onRead();
-          switch (parse_state) {
-          case ParseState::Error:
-            done(false);
-            break;
-          case ParseState::Done:
-            done(true);
-            break;
-          case ParseState::Continue:
-            // do nothing but wait for the next event
-            break;
-          }
-        },
-        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
-    return Network::FilterStatus::StopIteration;
-  }
-
-  IS_ENVOY_BUG("unexpected tcp filter parse_state");
   return Network::FilterStatus::StopIteration;
 }
 
@@ -158,50 +120,31 @@ void Filter::onServername(absl::string_view name) {
   clienthello_success_ = true;
 }
 
-ParseState Filter::onRead() {
-  // This receive code is somewhat complicated, because it must be done as a MSG_PEEK because
-  // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
-  // that get created later.
-  //
-  // We request from the file descriptor to get events every time new data is available,
-  // even if previous data has not been read, which is always the case due to MSG_PEEK. When
-  // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
-  // socket, so that new event is immediately signaled as readable because it is new and the socket
-  // is readable, even though no new events have occurred.
-  //
-  // TODO(ggreenway): write an integration test to ensure the events work as expected on all
-  // platforms.
-  const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
-  ENVOY_LOG(trace, "tls inspector: recv: {}", result.return_value_);
-
-  if (!result.ok()) {
-    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-      return ParseState::Continue;
-    }
-    config_->stats().read_error_.inc();
-    return ParseState::Error;
-  }
-
-  if (result.return_value_ == 0) {
-    config_->stats().connection_closed_.inc();
-    return ParseState::Error;
-  }
+Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
+  auto raw_slice = buffer.rawSlice();
+  ENVOY_LOG(trace, "tls inspector: recv: {}", raw_slice.len_);
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-  if (static_cast<uint64_t>(result.return_value_) > read_) {
-    const uint8_t* data = buf_ + read_;
-    const size_t len = result.return_value_ - read_;
-    read_ = result.return_value_;
-    return parseClientHello(data, len);
+  if (static_cast<uint64_t>(raw_slice.len_) > read_) {
+    const uint8_t* data = static_cast<const uint8_t*>(raw_slice.mem_) + read_;
+    const size_t len = raw_slice.len_ - read_;
+    read_ = raw_slice.len_;
+    ParseState parse_state = parseClientHello(data, len);
+    switch (parse_state) {
+    case ParseState::Error:
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
+    case ParseState::Done:
+      // Finish the inspect.
+      return Network::FilterStatus::Continue;
+    case ParseState::Continue:
+      // Do nothing but wait for the next event.
+      return Network::FilterStatus::StopIteration;
+    }
+    IS_ENVOY_BUG("unexpected tcp filter parse_state");
   }
-  return ParseState::Continue;
-}
-
-void Filter::done(bool success) {
-  ENVOY_LOG(trace, "tls inspector: done: {}", success);
-  cb_->socket().ioHandle().resetFileEvents();
-  cb_->continueFilterChain(success);
+  return Network::FilterStatus::StopIteration;
 }
 
 ParseState Filter::parseClientHello(const void* data, size_t len) {

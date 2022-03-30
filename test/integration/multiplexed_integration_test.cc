@@ -972,6 +972,7 @@ TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
+  config_helper_.disableDelayClose();
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // The "magic" payload is an HTTP/2 specific thing.
     return;
@@ -983,7 +984,7 @@ TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
       [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_EQ("", response);
 }
 
@@ -997,7 +998,7 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
       [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
 }
 
@@ -1324,14 +1325,14 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseAfterBadFrame) {
         connection.dispatcher().exit();
       });
 
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible the delayed close timer could fire and close the server socket
   // prior to the data callback above firing. Therefore, we may either still be connected, or have
   // received a remote close.
   if (connection->lastConnectionEvent() == Network::ConnectionEvent::Connected) {
-    connection->run();
+    ASSERT_TRUE(connection->run());
   }
   EXPECT_EQ(connection->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
@@ -1353,13 +1354,13 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
         connection.dispatcher().exit();
       });
 
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
   // prior to the FIN being received from the server.
   if (connection->lastConnectionEvent() == Network::ConnectionEvent::Connected) {
-    connection->run();
+    ASSERT_TRUE(connection->run());
   }
   EXPECT_EQ(connection->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),

@@ -15,6 +15,21 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "test_listener_filter_lib",
+    srcs = [
+        "test_listener_filter.cc",
+    ],
+    hdrs = [
+        "test_listener_filter.h",
+    ],
+    deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_body_filter_config_lib",
     srcs = [
         "add_body_filter.cc",
