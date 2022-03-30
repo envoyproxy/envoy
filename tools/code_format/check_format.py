@@ -1173,7 +1173,7 @@ if __name__ == "__main__":
             "':(exclude)source/extensions/filters/network/common/BUILD' "
             "':(exclude)tools/code_format/check_format.py'")
         command = (
-            "git diff `tools/git/last_github_commit.sh` %s |grep '+.*visibility ='" % exclude_list)
+            "git diff $(tools/git/last_github_commit.sh) %s |grep '+.*visibility ='" % exclude_list)
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
