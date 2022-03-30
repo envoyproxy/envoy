@@ -88,7 +88,7 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
 
 
 .. note::
-	If IPv6 is not supported in your environoment, please set ``dns_lookup_family`` of cluster to the ``V4_ONLY``.
+    If IPv6 is not supported in your environoment, please set ``dns_lookup_family`` of cluster to the ``V4_ONLY``.
 
 
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
