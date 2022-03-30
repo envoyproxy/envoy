@@ -61,7 +61,7 @@ TEST_P(SocketInterfaceIntegrationTest, Basic) {
         response.append(data.toString());
         conn.close(Network::ConnectionCloseType::FlushWrite);
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_EQ("hello", response);
 }
 
