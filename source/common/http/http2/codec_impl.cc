@@ -2121,7 +2121,8 @@ ServerConnectionImpl::ServerConnectionImpl(
   if (use_new_codec_wrapper_) {
     auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
-    auto adapter = http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
+    auto adapter =
+        http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
     auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
       p->RemoveStream(stream_id);
     };
