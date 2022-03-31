@@ -38,6 +38,10 @@ void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster)
 }
 
 void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
+  if (!cluster_infos_.contains(cluster)) {
+    return;
+  }
+
   ENVOY_LOG(debug, "udp proxy: detaching from cluster {}", cluster);
   cluster_infos_.erase(cluster);
 }
