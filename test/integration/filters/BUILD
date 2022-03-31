@@ -15,6 +15,21 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "test_listener_filter_lib",
+    srcs = [
+        "test_listener_filter.cc",
+    ],
+    hdrs = [
+        "test_listener_filter.h",
+    ],
+    deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_body_filter_config_lib",
     srcs = [
         "add_body_filter.cc",
@@ -40,6 +55,27 @@ envoy_cc_test_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tee_filter_lib",
+    srcs = [
+        "tee_filter.cc",
+    ],
+    hdrs = [
+        "tee_filter.h",
+    ],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
@@ -535,6 +571,20 @@ envoy_cc_test_library(
     name = "encoder_decoder_buffer_filter_lib",
     srcs = [
         "encoder_decoder_buffer_filter.cc",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "buffer_continue_filter_lib",
+    srcs = [
+        "buffer_continue_filter.cc",
     ],
     deps = [
         "//envoy/http:filter_interface",

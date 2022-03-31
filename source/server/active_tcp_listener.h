@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
@@ -26,9 +27,9 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
-                    uint32_t worker_index);
+                    Runtime::Loader& runtime, uint32_t worker_index);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+                    Network::ListenerConfig& config, Runtime::Loader& runtime);
   ~ActiveTcpListener() override;
 
   bool listenerConnectionLimitReached() const {

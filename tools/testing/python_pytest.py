@@ -22,6 +22,7 @@ from envoy.base import utils
 
 
 class PytestRunner(runner.Runner):
+    _use_uvloop = False
 
     @property
     def cov_collect(self) -> str:

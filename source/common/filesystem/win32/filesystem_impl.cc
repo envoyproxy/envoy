@@ -10,6 +10,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
 #include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -119,7 +120,12 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
+  // In ssl_integration_test::SslKeyLogTest cases, a temporary file is created, and then when
+  // we check whether some logs are printed into the file, CreateFileA will fail and report the
+  // error:"The process cannot access the file because it is being used by another process". Add
+  // FILE_SHARE_WRITE flag to avoid such issue.
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+                        OPEN_EXISTING, 0, NULL);
   if (fd == INVALID_HANDLE) {
     return -1;
   }

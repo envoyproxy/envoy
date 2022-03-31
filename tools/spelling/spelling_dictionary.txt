@@ -25,6 +25,7 @@ BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -32,9 +33,11 @@ cbor
 CDN
 CDS
 CEL
+CWND
 DSR
 DSS
 EBADF
+ENDIF
 ENOTCONN
 EPIPE
 HEXDIG
@@ -160,6 +163,7 @@ HTML
 HTTP
 HTTPS
 HV
+Hyperscan
 IAM
 IANA
 IDL
@@ -254,6 +258,7 @@ OVFL
 PAYLOADLEN
 PB
 PCC
+PCRE
 PEERCRED
 PEM
 PERF
@@ -298,6 +303,7 @@ RTDS
 RTOS
 RTTI
 RUNDIR
+RVCM
 RW
 RX
 RXQ
@@ -319,6 +325,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIO
 SMTP
 SNI
 SOTW
@@ -446,6 +453,7 @@ authlen
 authn
 auths
 authz
+automata
 autoscale
 backend
 backends
@@ -760,6 +768,8 @@ intra
 ints
 invariance
 invoker
+iov
+iovcnt
 iovec
 iovecs
 ips
@@ -1075,6 +1085,7 @@ retriable
 retriggers
 revalidated
 revalidation
+rfield
 rmdir
 rocketmq
 rewriter
@@ -1173,6 +1184,7 @@ subnets
 suboptimal
 subsecond
 subseconds
+subsegment
 subsequence
 subsetting
 substr
@@ -1232,6 +1244,7 @@ transcoded
 transcoder
 transcoding
 transferral
+trds
 triaged
 trie
 tuple
@@ -1331,3 +1344,8 @@ transid
 routable
 vhosts
 infos
+ElastiCache
+pinterest
+NSS
+SSLKEYLOGFILE
+

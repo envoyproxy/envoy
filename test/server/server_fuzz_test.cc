@@ -9,7 +9,6 @@
 #include "source/server/listener_hooks.h"
 #include "source/server/server.h"
 
-#include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/hot_restart.h"

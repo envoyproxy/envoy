@@ -75,11 +75,18 @@ function cp_binary_for_image_build() {
   echo "Copying binary for image build..."
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   cp -f "${FINAL_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     cp -f "${FINAL_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
+
+  # Tools for the tools image. Strip to save size.
+  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+
+  # Copy the su-exec utility binary into the image
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+
+  # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
   strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
@@ -115,6 +122,7 @@ function bazel_binary_build() {
 
   echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
   ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  echo "ENVOY_BIN=${ENVOY_BIN}"
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
@@ -134,8 +142,12 @@ function bazel_binary_build() {
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
+  # Validation tools for the tools image.
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" \
+    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -483,7 +495,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "wasm-cc|win32-front-proxy"
+  run_ci_verify "*" "wasm-cc|win32-front-proxy|shared"
   exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc

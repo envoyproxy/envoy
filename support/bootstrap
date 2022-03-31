@@ -31,7 +31,7 @@ relpath() {
           -a "${TO}" != "${FROM}"; do
     FROM="${FROM%/*}" UP="../${UP}"
   done
-  TO="${UP%/}${TO#${FROM}}"
+  TO="${UP%/}${TO#"${FROM}"}"
   echo "${TO:-.}"
 }
 

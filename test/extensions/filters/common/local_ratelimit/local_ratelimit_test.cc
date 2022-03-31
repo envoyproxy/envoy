@@ -172,6 +172,42 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMaxTokensGreaterThanTokensPerFill) {
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
 }
 
+// Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
+TEST_F(LocalRateLimiterImplTest, TokenBucketStatus) {
+  initialize(std::chrono::milliseconds(3000), 2, 2);
+
+  // 2 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(3000), nullptr));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 1);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 3);
+
+  // 1 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 2);
+
+  // 0 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 1);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  fill_timer_->invokeCallback();
+  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 2);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 3);
+}
+
 class LocalRateLimiterDescriptorImplTest : public LocalRateLimiterImplTest {
 public:
   void initializeWithDescriptor(const std::chrono::milliseconds fill_interval,
@@ -392,6 +428,97 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDiffere
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+}
+
+// Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
+TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
+                            *descriptors_.Add());
+  initializeWithDescriptor(std::chrono::milliseconds(3000), 2, 2);
+
+  // 2 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(3000), nullptr));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+
+  // 1 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 2);
+
+  // 0 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 1);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  fill_timer_->invokeCallback();
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+}
+
+// Verify token bucket status of max tokens, remaining tokens and remaining fill interval with
+// multiple descriptors.
+TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus) {
+  TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
+                            *descriptors_.Add());
+  initializeWithDescriptor(std::chrono::milliseconds(50), 2, 1);
+
+  // 2 -> 1 tokens for descriptor_
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+
+  // 1 -> 0 tokens for descriptor_ and descriptor2_
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+
+  // 0 -> 0 tokens for descriptor_ and descriptor2_
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+
+  // 0 -> 1 tokens for descriptor2_
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+  fill_timer_->invokeCallback();
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 1);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
+
+  // 0 -> 2 tokens for descriptor_
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(3000), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+  fill_timer_->invokeCallback();
+  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 2);
+  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
 }
 
 } // Namespace LocalRateLimit

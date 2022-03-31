@@ -8,7 +8,6 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -72,7 +71,6 @@ public:
 
 protected:
   Api::OsSysCalls& os_sys_calls_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, FileEventImplActivateTest,

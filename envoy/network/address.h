@@ -21,6 +21,9 @@ class SocketInterface;
 
 namespace Address {
 
+class Instance;
+using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
+
 /**
  * Interface for an Ipv4 address.
  */
@@ -50,6 +53,12 @@ public:
    * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
    */
   virtual bool v6only() const PURE;
+
+  /**
+   * @return Ipv4 address from Ipv4-compatible Ipv6 address. Return `nullptr`
+   * if the Ipv6 address isn't Ipv4 mapped.
+   */
+  virtual InstanceConstSharedPtr v4CompatibleAddress() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
@@ -206,8 +215,6 @@ public:
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
 };
-
-using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
 
 } // namespace Address
 } // namespace Network

@@ -8,8 +8,8 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/common/ratelimit_headers.h"
 #include "source/extensions/filters/http/ratelimit/config.h"
-#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -406,17 +406,18 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
           "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitRemaining,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
           "2"));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+          "3"));
 
   cleanup();
 
@@ -442,17 +443,18 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
           "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitRemaining,
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
           "2"));
   EXPECT_THAT(
       responses_[0].get()->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+          "3"));
 
   cleanup();
 

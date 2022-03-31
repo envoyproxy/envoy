@@ -70,8 +70,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
         std::make_unique<FilePerTapSink>(proto_config.output_config().sinks()[0].file_per_tap());
     sink_to_use_ = sink_.get();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:
+    PANIC("not implemented");
+  case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::OUTPUT_SINK_TYPE_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   envoy::config::common::matcher::v3::MatchPredicate match;
@@ -152,7 +154,7 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     break;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::TRACE_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
@@ -166,6 +168,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   if (!output_file_.is_open()) {
     std::string path = fmt::format("{}_{}", parent_.config_.path_prefix(), trace_id_);
     switch (format) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
       path += MessageUtil::FileExtensions::get().ProtoBinary;
       break;
@@ -179,8 +182,6 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
       path += MessageUtil::FileExtensions::get().Json;
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     ENVOY_LOG_MISC(debug, "Opening tap file for [id={}] to {}", trace_id_, path);
@@ -192,6 +193,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   ENVOY_LOG_MISC(trace, "Tap for [id={}]: {}", trace_id_, trace->DebugString());
 
   switch (format) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
     trace->SerializeToOstream(&output_file_);
     break;
@@ -209,8 +211,6 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
     output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

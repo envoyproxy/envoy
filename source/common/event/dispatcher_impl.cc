@@ -54,11 +54,21 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : name_(name), api_(api),
-      buffer_factory_(watermark_factory != nullptr
-                          ? watermark_factory
-                          : std::make_shared<Buffer::WatermarkBufferFactory>(
-                                api.bootstrap().overload_manager().buffer_factory_config())),
+    : DispatcherImpl(name, api.threadFactory(), api.timeSource(), api.randomGenerator(),
+                     api.fileSystem(), time_system, scaled_timer_factory,
+                     watermark_factory != nullptr
+                         ? watermark_factory
+                         : std::make_shared<Buffer::WatermarkBufferFactory>(
+                               api.bootstrap().overload_manager().buffer_factory_config())) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& thread_factory,
+                               TimeSource& time_source, Random::RandomGenerator& random_generator,
+                               Filesystem::Instance& file_system, Event::TimeSystem& time_system,
+                               const ScaledRangeTimerManagerFactory& scaled_timer_factory,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+    : name_(name), thread_factory_(thread_factory), time_source_(time_source),
+      random_generator_(random_generator), file_system_(file_system),
+      buffer_factory_(watermark_factory),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
@@ -166,16 +176,17 @@ FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTri
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
-  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
+  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, file_system_)};
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::TcpListenerCallbacks& cb,
-                                                    bool bind_to_port,
+                                                    Runtime::Loader& runtime, bool bind_to_port,
                                                     bool ignore_global_conn_limit) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, ignore_global_conn_limit);
+  return std::make_unique<Network::TcpListenerImpl>(*this, random_generator_, runtime,
+                                                    std::move(socket), cb, bind_to_port,
+                                                    ignore_global_conn_limit);
 }
 
 Network::UdpListenerPtr
@@ -267,7 +278,7 @@ void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr 
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = api_.threadFactory().currentThreadId();
+  run_tid_ = thread_factory_.currentThreadId();
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
@@ -312,7 +323,7 @@ void DispatcherImpl::shutdown() {
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
 
 void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
-  approximate_monotonic_time_ = api_.timeSource().monotonicTime();
+  approximate_monotonic_time_ = time_source_.monotonicTime();
 }
 
 void DispatcherImpl::runThreadLocalDelete() {
@@ -374,7 +385,7 @@ void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
   // Only run if this is the dispatcher of the current thread and
   // DispatcherImpl::Run has been called.
-  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+  if (run_tid_.isEmpty() || (run_tid_ != thread_factory_.currentThreadId())) {
     return;
   }
 

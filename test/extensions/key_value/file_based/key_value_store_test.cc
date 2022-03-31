@@ -103,6 +103,33 @@ TEST_F(KeyValueStoreTest, Iterate) {
   EXPECT_EQ(1, stop_early_counter);
 }
 
+#ifndef NDEBUG
+TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
+  store_->addOrUpdate("foo", "bar");
+  store_->addOrUpdate("baz", "eep");
+  KeyValueStore::ConstIterateCb update_value_callback = [this](const std::string& key,
+                                                               const std::string&) {
+    EXPECT_TRUE(key == "foo" || key == "baz");
+    store_->addOrUpdate("foo", "updated-bar");
+    return KeyValueStore::Iterate::Continue;
+  };
+
+  EXPECT_DEATH(store_->iterate(update_value_callback),
+               "Expected iterate to not modify the underlying store.");
+
+  KeyValueStore::ConstIterateCb add_key_callback = [this](const std::string& key,
+                                                          const std::string&) {
+    EXPECT_TRUE(key == "foo" || key == "baz" || key == "new-key");
+    if (key == "foo") {
+      store_->addOrUpdate("new-key", "new-value");
+    }
+    return KeyValueStore::Iterate::Continue;
+  };
+  EXPECT_DEATH(store_->iterate(add_key_callback),
+               "Expected iterate to not modify the underlying store.");
+}
+#endif
+
 TEST_F(KeyValueStoreTest, HandleBadFile) {
   auto checkBadFile = [this](std::string file, std::string error) {
     TestEnvironment::writeStringToFileForTest(filename_, file, true);
@@ -119,9 +146,9 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
 
 #ifndef WIN32
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
-  filename_ = "/foo";
+  filename_ = TestEnvironment::temporaryPath("some/unlikely/bad/path/bar");
   createStore();
-  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file /foo", store_->flush());
+  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file " + filename_, store_->flush());
 }
 #endif
 

@@ -11,8 +11,12 @@ envoy_extension_package()
 envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
-    # Used by core.  TODO(#9953) clean up.
-    visibility = ["//visibility:public"],
+    # This is useful code for classes implementing generic extensions.
+    visibility = [
+        "//contrib:__subpackages__",
+        "//source/extensions:__subpackages__",
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/server:filter_config_interface",
     ],

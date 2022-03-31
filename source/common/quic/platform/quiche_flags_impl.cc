@@ -4,8 +4,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_flags_impl.h"
-
 #include <set>
 
 #include "source/common/common/assert.h"
@@ -13,6 +11,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 namespace quiche {
 
@@ -35,8 +34,6 @@ absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
   // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
   // default.
   FLAGS_quic_reloadable_flag_quic_disable_version_draft_29->setValue(true);
-  // This flag fixes a QUICHE issue which may crash Envoy during connection close.
-  FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2->setValue(true);
   // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
   FLAGS_quic_reloadable_flag_quic_default_to_bbr->setValue(true);
 

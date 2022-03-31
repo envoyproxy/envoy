@@ -28,6 +28,8 @@ envoy_cc_library(
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/common:ratelimit_headers_lib",
+        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
     ],
 )

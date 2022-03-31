@@ -4,6 +4,7 @@ package envoy.extensions.filters.network.tcp_proxy.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/type/v3/hash_policy.proto";
 
 import "google/protobuf/duration.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -84,6 +85,25 @@ message TcpProxy {
         [(validate.rules).repeated = {max_items: 1000}];
   }
 
+  message OnDemand {
+    // An optional configuration for on-demand cluster discovery
+    // service. If not specified, the on-demand cluster discovery will
+    // be disabled. When it's specified, the filter will pause a request
+    // to an unknown cluster and will begin a cluster discovery
+    // process. When the discovery is finished (successfully or not),
+    // the request will be resumed.
+    config.core.v3.ConfigSource odcds_config = 1;
+
+    // xdstp:// resource locator for on-demand cluster collection.
+    // [#not-implemented-hide:]
+    string resources_locator = 2;
+
+    // The timeout for on demand cluster lookup. If the CDS cannot return the required cluster,
+    // the downstream request will be closed with the error code detail NO_CLUSTER_FOUND.
+    // [#not-implemented-hide:]
+    google.protobuf.Duration timeout = 3;
+  }
+
   reserved 6;
 
   reserved "deprecated_v1";
@@ -103,6 +123,14 @@ message TcpProxy {
     // assigned to each cluster.
     WeightedCluster weighted_clusters = 10;
   }
+
+  // The on demand policy for the upstream cluster.
+  // It applies to both
+  // :ref:`TcpProxy.cluster <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.cluster`
+  // and
+  // :ref:`TcpProxy.weighted_clusters <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.weighted_clusters`.
+  // [#not-implemented-hide:]
+  OnDemand on_demand = 14;
 
   // Optional endpoint metadata match criteria. Only endpoints in the upstream
   // cluster with metadata matching that set in metadata_match will be

@@ -124,6 +124,17 @@ contains all contrib extensions on top of an Ubuntu base. The
 image contains all contrib extensions on top of an Ubuntu base as well as debug symbols. Throughout
 the documentation, extensions are clearly marked as being a contrib extension or a core extension.
 
+.. _install_tools:
+
+Tools images
+~~~~~~~~~~~~
+
+The Envoy project ships images for tools that are separate from the proxy binary but are useful
+in supporting systems such as CI, configuration generation pipelines, etc. Currently installed
+tools in `/usr/local/bin` include:
+
+* :ref:`Schema validator check tool <install_tools_schema_validator_check_tool>`
+
 .. _install_binaries:
 
 Pre-built Envoy Docker images
@@ -184,6 +195,12 @@ The following table shows the available Docker images
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
+   * - `envoyproxy/envoy-tools <https://hub.docker.com/r/envoyproxy/envoy-tools/tags/>`_
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
    * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
      - Release binary with symbols stripped on top of an Ubuntu Bionic base.
      -
@@ -220,6 +237,12 @@ The following table shows the available Docker images
      -
      - latest
      -
+   * - `envoyproxy/envoy-tools-dev <https://hub.docker.com/r/envoyproxy/envoy-tools-dev/tags/>`_
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
    * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
      - Build image which includes tools for building multi-arch Envoy and containers.
      -

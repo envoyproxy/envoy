@@ -35,6 +35,7 @@ envoy_cc_library(
         ":connection_balancer_interface",
         ":listen_socket_interface",
         ":listener_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/ssl:context_interface",
         "//source/common/common:interval_value",
     ],
@@ -86,6 +87,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":listen_socket_interface",
+        ":listener_filter_buffer_interface",
         ":transport_socket_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -148,6 +150,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "listener_filter_buffer_interface",
+    hdrs = ["listener_filter_buffer.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "transport_socket_interface",
     hdrs = ["transport_socket.h"],
     deps = [
@@ -155,7 +165,9 @@ envoy_cc_library(
         ":post_io_action_interface",
         ":proxy_protocol_options_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )
 

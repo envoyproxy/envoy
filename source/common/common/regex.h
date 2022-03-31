@@ -4,7 +4,6 @@
 #include <regex>
 
 #include "envoy/common/regex.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"

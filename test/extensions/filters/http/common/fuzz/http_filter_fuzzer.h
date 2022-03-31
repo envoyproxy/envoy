@@ -88,7 +88,7 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     end_stream = true;
   }
   const auto& headersStatus = sendHeaders(filter, data, end_stream);
-  ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", headersStatus);
+  ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", static_cast<int>(headersStatus));
   if ((headersStatus != Http::FilterHeadersStatus::Continue &&
        headersStatus != Http::FilterHeadersStatus::StopIteration) ||
       !enabled_) {
@@ -102,7 +102,7 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     }
     Buffer::OwnedImpl buffer(data_chunks[i]);
     const auto& dataStatus = sendData(filter, buffer, end_stream);
-    ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", dataStatus);
+    ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", static_cast<int>(dataStatus));
     if (dataStatus != Http::FilterDataStatus::Continue || !enabled_) {
       return;
     }

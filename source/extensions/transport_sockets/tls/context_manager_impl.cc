@@ -14,62 +14,42 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+ContextManagerImpl::ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
+
 ContextManagerImpl::~ContextManagerImpl() {
-  removeEmptyContexts();
   KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
-}
-
-void ContextManagerImpl::removeEmptyContexts() {
-  contexts_.remove_if([](const std::weak_ptr<Envoy::Ssl::Context>& n) { return n.expired(); });
-}
-
-void ContextManagerImpl::removeOldContext(std::shared_ptr<Envoy::Ssl::Context> old_context) {
-  if (old_context) {
-    contexts_.remove_if([old_context](const std::weak_ptr<Envoy::Ssl::Context>& n) {
-      std::shared_ptr<Envoy::Ssl::Context> sp = n.lock();
-      if (sp) {
-        return old_context == sp;
-      }
-      return false;
-    });
-  }
 }
 
 Envoy::Ssl::ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
-                                           const Envoy::Ssl::ClientContextConfig& config,
-                                           Envoy::Ssl::ClientContextSharedPtr old_context) {
+                                           const Envoy::Ssl::ClientContextConfig& config) {
   if (!config.isReady()) {
     return nullptr;
   }
 
   Envoy::Ssl::ClientContextSharedPtr context =
       std::make_shared<ClientContextImpl>(scope, config, time_source_);
-  removeOldContext(old_context);
-  removeEmptyContexts();
-  contexts_.emplace_back(context);
+  contexts_.insert(context);
   return context;
 }
 
-Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
-    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-    const std::vector<std::string>& server_names, Envoy::Ssl::ServerContextSharedPtr old_context) {
+Envoy::Ssl::ServerContextSharedPtr
+ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
+                                           const Envoy::Ssl::ServerContextConfig& config,
+                                           const std::vector<std::string>& server_names) {
   if (!config.isReady()) {
     return nullptr;
   }
 
   Envoy::Ssl::ServerContextSharedPtr context =
       std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_);
-  removeOldContext(old_context);
-  removeEmptyContexts();
-  contexts_.emplace_back(context);
+  contexts_.insert(context);
   return context;
 }
 
 size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
   size_t ret = std::numeric_limits<int>::max();
-  for (const auto& ctx_weak_ptr : contexts_) {
-    Envoy::Ssl::ContextSharedPtr context = ctx_weak_ptr.lock();
+  for (const auto& context : contexts_) {
     if (context) {
       ret = std::min<size_t>(context->daysUntilFirstCertExpires(), ret);
     }
@@ -79,8 +59,7 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
 
 absl::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpires() const {
   absl::optional<uint64_t> ret;
-  for (const auto& ctx_weak_ptr : contexts_) {
-    Envoy::Ssl::ContextSharedPtr context = ctx_weak_ptr.lock();
+  for (const auto& context : contexts_) {
     if (context) {
       auto next_expiration = context->secondsUntilFirstOcspResponseExpires();
       if (next_expiration) {
@@ -93,11 +72,19 @@ absl::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpire
 }
 
 void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) {
-  for (const auto& ctx_weak_ptr : contexts_) {
-    Envoy::Ssl::ContextSharedPtr context = ctx_weak_ptr.lock();
+  for (const auto& context : contexts_) {
     if (context) {
       callback(*context);
     }
+  }
+}
+
+void ContextManagerImpl::removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) {
+  if (old_context != nullptr) {
+    auto erased = contexts_.erase(old_context);
+    // The contexts is expected to be added before is removed.
+    // And the prod ssl factory implementation guarantees any context is removed exactly once.
+    ASSERT(erased == 1);
   }
 }
 

@@ -34,8 +34,8 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         "//contrib/sip_proxy/filters/network/source:decoder_events_lib",
-        "//contrib/sip_proxy/filters/network/source:protocol_interface",
         "//contrib/sip_proxy/filters/network/source:sip_lib",
+        "//contrib/sip_proxy/filters/network/source:utility_interface",
         "//contrib/sip_proxy/filters/network/source/router:router_interface",
         "//contrib/sip_proxy/filters/network/source/tra:tra_lib",
         "//envoy/buffer:buffer_interface",

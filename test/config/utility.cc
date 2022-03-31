@@ -44,7 +44,8 @@ admin:
 dynamic_resources:
   lds_config:
     resource_api_version: V3
-    path: {}
+    path_config_source:
+      path: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -142,6 +143,14 @@ std::string ConfigHelper::startTlsConfig() {
 )EOF",
                   TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
+}
+
+std::string ConfigHelper::testInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.test"
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
 }
 
 std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
@@ -437,6 +446,34 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {{}}
+    )EOF",
+                  name, name, address, port, lb_policy));
+}
+
+envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
+    const std::string& name, int port, const std::string& address, const std::string& lb_policy) {
+  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+      fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 50s
+      type: STATIC
+      circuit_breakers:
+        thresholds:
+        - priority: DEFAULT
+          max_connections: 10000
+          max_pending_requests: 10000
+          max_requests: 10000
+          max_retries: 10000
+      load_assignment:
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      lb_policy: {}
     )EOF",
                   name, name, address, port, lb_policy));
 }
@@ -812,7 +849,7 @@ void ConfigHelper::configureUpstreamTls(
   });
 }
 
-void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
+void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
@@ -1020,6 +1057,12 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
+void ConfigHelper::disableDelayClose() {
+  addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
+}
+
 void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
   addConfigModifier(
       [max_requests_per_connection](
@@ -1085,7 +1128,8 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
 void ConfigHelper::configDownstreamTransportSocketWithTls(
     envoy::config::bootstrap::v3::Bootstrap& bootstrap,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-        configure_tls_context) {
+        configure_tls_context,
+    bool enable_quic_early_data) {
   for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
     ASSERT(listener.filter_chains_size() > 0);
     auto* filter_chain = listener.mutable_filter_chains(0);
@@ -1096,6 +1140,7 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
           quic_transport_socket_config;
       configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
                                  ->mutable_common_tls_context());
+      quic_transport_socket_config.mutable_enable_early_data()->set_value(enable_quic_early_data);
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     } else if (!listener.has_udp_listener_config()) {
       transport_socket->set_name("envoy.transport_sockets.tls");
@@ -1121,7 +1166,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1133,7 +1178,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
       bootstrap_,
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
-      });
+      },
+      enable_early_data);
 }
 
 bool ConfigHelper::setAccessLog(
@@ -1180,6 +1226,70 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
       ->mutable_typed_config()
       ->PackFrom(access_log_config);
   return true;
+}
+
+void ConfigHelper::initializeTlsKeyLog(
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context,
+    const ServerSslOptions& options) {
+  if (options.keylog_path_.empty()) {
+    return;
+  }
+  auto tls_keylog_path = tls_context.mutable_key_log()->mutable_path();
+  *tls_keylog_path = options.keylog_path_;
+
+  if (options.keylog_local_filter_) {
+    auto tls_keylog_local = tls_context.mutable_key_log()->mutable_local_address_range();
+    auto new_element_local = tls_keylog_local->Add();
+    if (options.keylog_local_negative_) {
+      if (options.ip_version_ == Network::Address::IpVersion::v6) {
+        new_element_local->set_address_prefix("1::2");
+        new_element_local->mutable_prefix_len()->set_value(128);
+      } else {
+        new_element_local->set_address_prefix("127.0.0.2");
+        new_element_local->mutable_prefix_len()->set_value(32);
+      }
+    } else {
+      new_element_local->set_address_prefix(
+          Network::Test::getLoopbackAddressString(options.ip_version_));
+      if (options.keylog_multiple_ips_) {
+        auto more_local = tls_keylog_local->Add();
+        if (options.ip_version_ == Network::Address::IpVersion::v6) {
+          more_local->set_address_prefix("1::2");
+          more_local->mutable_prefix_len()->set_value(128);
+        } else {
+          more_local->set_address_prefix("127.0.0.2");
+          more_local->mutable_prefix_len()->set_value(32);
+        }
+      }
+    }
+  }
+
+  if (options.keylog_remote_filter_) {
+    auto tls_keylog_remote = tls_context.mutable_key_log()->mutable_remote_address_range();
+    auto new_element_remote = tls_keylog_remote->Add();
+    if (options.keylog_remote_negative_) {
+      if (options.ip_version_ == Network::Address::IpVersion::v6) {
+        new_element_remote->set_address_prefix("1::2");
+        new_element_remote->mutable_prefix_len()->set_value(128);
+      } else {
+        new_element_remote->set_address_prefix("127.0.0.2");
+        new_element_remote->mutable_prefix_len()->set_value(32);
+      }
+    } else {
+      new_element_remote->set_address_prefix(
+          Network::Test::getLoopbackAddressString(options.ip_version_));
+      if (options.keylog_multiple_ips_) {
+        auto more_remote = tls_keylog_remote->Add();
+        if (options.ip_version_ == Network::Address::IpVersion::v6) {
+          more_remote->set_address_prefix("1::2");
+          more_remote->mutable_prefix_len()->set_value(128);
+        } else {
+          more_remote->set_address_prefix("127.0.0.2");
+          more_remote->mutable_prefix_len()->set_value(32);
+        }
+      }
+    }
+  }
 }
 
 void ConfigHelper::initializeTls(
@@ -1230,6 +1340,7 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
+  initializeTlsKeyLog(common_tls_context, options);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {
@@ -1330,7 +1441,8 @@ void ConfigHelper::setLds(absl::string_view version_info) {
     resource->PackFrom(listener);
   }
 
-  const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
+  const std::string lds_filename =
+      bootstrap().dynamic_resources().lds_config().path_config_source().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);

@@ -44,11 +44,8 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
   connection_->noDelay(true);
 }
 
-CodecClient::~CodecClient() {
-  ASSERT(connect_called_, "CodecClient::connect() is not called through out the life time.");
-}
-
 void CodecClient::connect() {
+  ASSERT(!connect_called_);
   connect_called_ = true;
   ASSERT(codec_ != nullptr);
   // In general, codecs are handed new not-yet-connected connections, but in the
@@ -172,6 +169,15 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
+    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator) {
+  connect();
+}
+
+NoConnectCodecClientProd::NoConnectCodecClientProd(CodecType type,
+                                                   Network::ClientConnectionPtr&& connection,
+                                                   Upstream::HostDescriptionConstSharedPtr host,
+                                                   Event::Dispatcher& dispatcher,
+                                                   Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case CodecType::HTTP1: {
@@ -203,7 +209,6 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
 #endif
   }
   }
-  connect();
 }
 
 } // namespace Http

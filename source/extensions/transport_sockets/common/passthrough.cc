@@ -42,6 +42,11 @@ Ssl::ConnectionInfoConstSharedPtr PassthroughSocket::ssl() const {
   return transport_socket_->ssl();
 }
 
+void PassthroughSocket::configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                         std::chrono::microseconds rtt) {
+  return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+}
+
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
