@@ -145,14 +145,12 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
 
 SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t length,
                                          off_t offset) const {
-  const ssize_t rc = ::pwrite(fd, buffer, length, offset);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  PANIC("not implemented");
 }
 
 SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
                                         off_t offset) const {
-  const ssize_t rc = ::pread(fd, buffer, length, offset);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  PANIC("not implemented");
 }
 
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length,
@@ -305,14 +303,10 @@ SysCallIntResult OsSysCallsImpl::unlink(const char* pathname) const {
 
 SysCallIntResult OsSysCallsImpl::linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
                                         const char* newpath, int flags) const {
-  const int rc = ::linkat(olddirfd, oldpath, newdirfd, newpath, flags);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  PANIC("not implemented");
 }
 
-SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const {
-  const int rc = ::mkstemp(tmplate);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
-}
+SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const { PANIC("not implemented"); }
 
 SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) const {
   const int rc = ::shutdown(sockfd, how);
