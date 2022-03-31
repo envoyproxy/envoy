@@ -106,9 +106,19 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(-1);
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::resolveUrl(request.pass_listen_socket().address());
+
   for (const auto& listener : server_->listenerManager().listeners()) {
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
-    if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
+    // we compare socket type only for Ip addresses since pipes only support
+    // Stream socket type and urls for pipes do not specify a socket type.
+    // (see ProdListenerComponentFactory::createListenSocket for the reason
+    //  why only Stream socket type is supported for pipes)
+    if (*socket_factory.localAddress() == *addr && listener.get().bindToPort() &&
+        (socket_factory.localAddress()->type() != Network::Address::Type::Ip ||
+         socket_factory.socketType() ==
+             (Network::Utility::urlIsTcpScheme(request.pass_listen_socket().address())
+                  ? Network::Socket::Type::Stream
+                  : Network::Socket::Type::Datagram))) {
       // worker_index() will default to 0 if not set which is the behavior before this field
       // was added. Thus, this should be safe for both roll forward and roll back.
       if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
