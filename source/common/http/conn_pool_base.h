@@ -28,8 +28,9 @@ public:
   // OnPoolSuccess for HTTP requires both the decoder and callbacks. OnPoolFailure
   // requires only the callbacks, but passes both for consistency.
   HttpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, Http::ResponseDecoder& decoder,
-                    Http::ConnectionPool::Callbacks& callbacks)
-      : Envoy::ConnectionPool::PendingStream(parent), context_(&decoder, &callbacks) {}
+                    Http::ConnectionPool::Callbacks& callbacks, bool can_send_early_data)
+      : Envoy::ConnectionPool::PendingStream(parent, can_send_early_data),
+        context_(&decoder, &callbacks) {}
 
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
   HttpAttachContext context_;
@@ -66,13 +67,14 @@ public:
   }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                         Http::ConnectionPool::Callbacks& callbacks) override;
+                                         Http::ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
   bool maybePreconnect(float ratio) override { return maybePreconnectImpl(ratio); }
   bool hasActiveConnections() const override;
 
   // Creates a new PendingStream and enqueues it into the queue.
-  ConnectionPool::Cancellable*
-  newPendingStream(Envoy::ConnectionPool::AttachContext& context) override;
+  ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                                                bool can_send_early_data) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {

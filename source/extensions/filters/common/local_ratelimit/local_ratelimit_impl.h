@@ -26,6 +26,10 @@ public:
   ~LocalRateLimiterImpl();
 
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  int64_t
+  remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
 
 private:
   struct TokenState {
@@ -59,8 +63,10 @@ private:
   };
 
   void onFillTimer();
-  void onFillTimerHelper(const TokenState& state, const RateLimit::TokenBucket& bucket);
+  void onFillTimerHelper(TokenState& state, const RateLimit::TokenBucket& bucket);
   void onFillTimerDescriptorHelper();
+  OptRef<const LocalDescriptorImpl>
+  descriptorHelper(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool requestAllowedHelper(const TokenState& tokens) const;
 
   RateLimit::TokenBucket token_bucket_;

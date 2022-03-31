@@ -80,6 +80,7 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
   absl::optional<std::string> interfaceName() override;
 
 protected:

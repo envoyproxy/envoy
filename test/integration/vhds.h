@@ -160,7 +160,7 @@ public:
 
   envoy::config::route::v3::VirtualHost buildVirtualHost() {
     return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-        virtualHostYaml("my_route/vhost_0", "host"));
+        virtualHostYaml("my_route/vhost_0", "sni.lyft.com"));
   }
 
   std::vector<envoy::config::route::v3::VirtualHost> buildVirtualHost1() {

@@ -152,7 +152,7 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
     return message;
   }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {

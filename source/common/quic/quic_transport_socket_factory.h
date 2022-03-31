@@ -6,7 +6,10 @@
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
+
+#include "quiche/quic/core/crypto/quic_crypto_client_config.h"
 
 namespace Envoy {
 namespace Quic {
@@ -34,7 +37,7 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
+class QuicTransportSocketFactoryBase : public Network::CommonTransportSocketFactory,
                                        protected Logger::Loggable<Logger::Id::quic> {
 public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
@@ -49,7 +52,6 @@ public:
     PANIC("not implemented");
   }
   bool implementsSecureTransport() const override { return true; }
-  bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
 
 protected:
@@ -61,8 +63,10 @@ protected:
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
+  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
+                                   Ssl::ServerContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)),
+        enable_early_data_(enable_early_data) {}
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
@@ -82,11 +86,14 @@ public:
     return config_->tlsCertificates();
   }
 
+  bool earlyDataEnabled() const { return enable_early_data_; }
+
 protected:
   void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
 
 private:
   Ssl::ServerContextConfigPtr config_;
+  bool enable_early_data_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
@@ -114,6 +121,10 @@ public:
     return fallback_factory_->config();
   }
 
+  // Returns a crypto config generated from the up-to-date client context config. Once the passed in
+  // context config gets updated, a new crypto config object will be returned by this method.
+  std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig();
+
 protected:
   // fallback_factory_ will update the context.
   void onSecretUpdated() override {}
@@ -121,6 +132,11 @@ protected:
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
   std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
+  // Latch the latest client context, to determine if it has updated since last
+  // checked.
+  Envoy::Ssl::ClientContextSharedPtr client_context_;
+  // If client_context_ changes, client config will be updated as well.
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client

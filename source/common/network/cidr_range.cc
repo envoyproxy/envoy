@@ -157,6 +157,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     uint32_t ip4 = ntohl(address->ip()->ipv4()->address());
     ip4 &= ~0U << (32 - length);
     sockaddr_in sa4;
+    memset(&sa4, 0, sizeof(sa4));
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(0);
     sa4.sin_addr.s_addr = htonl(ip4);
@@ -173,6 +174,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
       return std::make_shared<Ipv6Instance>(uint32_t(0));
     }
     sockaddr_in6 sa6;
+    memset(&sa6, 0, sizeof(sa6));
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(0);
 

@@ -152,6 +152,9 @@ validate
   path_redirect
     *(optional, string)* Match the returned redirect path.
 
+  code_redirect
+    *(optional, integer)* Match the redirect response code.
+
   request_header_fields, response_header_fields
     *(optional, array, deprecated)*  Match the listed header fields. Example header fields include the "path", "cookie",
     and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked

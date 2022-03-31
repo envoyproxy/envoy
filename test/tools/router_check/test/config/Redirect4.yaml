@@ -1,0 +1,15 @@
+virtual_hosts:
+- name: redirect
+  domains:
+  - redirect.lyft.com
+  routes:
+  - match:
+      prefix: /foo
+    redirect:
+      host_redirect: new.lyft.com
+  - match:
+      prefix: /bar
+    redirect:
+      host_redirect: new.lyft.com
+      path_redirect: /new_bar
+      response_code: "FOUND"

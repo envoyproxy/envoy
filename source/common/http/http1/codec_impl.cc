@@ -56,6 +56,10 @@ struct Http1HeaderTypesValues {
   const absl::string_view Trailers = "trailers";
 };
 
+// Pipelining is generally not well supported on the internet and has a series of dangerous
+// overflow bugs. As such Envoy disabled it.
+static constexpr uint32_t kMaxOutboundResponses = 2;
+
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
 using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
 
@@ -305,7 +309,7 @@ void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& outp
   auto fragment =
       Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), response_buffer_releasor_);
   output_buffer.addBufferFragment(*fragment.release());
-  ASSERT(outbound_responses_ < max_outbound_responses_);
+  ASSERT(outbound_responses_ < kMaxOutboundResponses);
   outbound_responses_++;
 }
 
@@ -313,7 +317,7 @@ Status ServerConnectionImpl::doFloodProtectionChecks() const {
   ASSERT(dispatching_);
   // Before processing another request, make sure that we are below the response flood protection
   // threshold.
-  if (outbound_responses_ >= max_outbound_responses_) {
+  if (outbound_responses_ >= kMaxOutboundResponses) {
     ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
                    connection_);
     stats_.response_flood_.inc();
@@ -365,7 +369,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
   connection_.readDisable(disable);
 }
 
-uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+uint32_t StreamEncoderImpl::bufferLimit() const { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
   return connection_.connection().connectionInfoProvider().localAddress();
@@ -960,13 +964,9 @@ ServerConnectionImpl::ServerConnectionImpl(
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
       }),
-      // Pipelining is generally not well supported on the internet and has a series of dangerous
-      // overflow bugs. As such we are disabling it for now, and removing this temporary override if
-      // no one objects. If you use this integer to restore prior behavior, contact the
-      // maintainer team as it will otherwise be removed entirely soon.
-      max_outbound_responses_(
-          Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
-      headers_with_underscores_action_(headers_with_underscores_action) {}
+      headers_with_underscores_action_(headers_with_underscores_action),
+      runtime_lazy_read_disable_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
   // Add in the size of the request URL if processing request headers.
@@ -1145,13 +1145,39 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   }
 }
 
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
+      active_request_->remote_complete_) {
+    // Eagerly read disable the connection if the downstream is sending pipelined requests as we
+    // serially process them. Reading from the connection will be re-enabled after the active
+    // request is completed.
+    active_request_->response_encoder_.readDisable(true);
+    return okStatus();
+  }
+
+  Http::Status status = ConnectionImpl::dispatch(data);
+
+  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
+      active_request_->remote_complete_) {
+    // Read disable the connection if the downstream is sending additional data while we are working
+    // on an existing request. Reading from the connection will be re-enabled after the active
+    // request is completed.
+    if (data.length() > 0) {
+      active_request_->response_encoder_.readDisable(true);
+    }
+  }
+  return status;
+}
+
 ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
   ASSERT(!handling_upgrade_);
   if (active_request_) {
 
     // The request_decoder should be non-null after we've called the newStream on callbacks.
     ASSERT(active_request_->request_decoder_);
-    active_request_->response_encoder_.readDisable(true);
+    if (!runtime_lazy_read_disable_) {
+      active_request_->response_encoder_.readDisable(true);
+    }
     active_request_->remote_complete_ = true;
 
     if (deferred_end_stream_headers_) {

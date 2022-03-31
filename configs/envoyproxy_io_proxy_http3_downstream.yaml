@@ -1,4 +1,4 @@
-# An example config which accepts HTTP/3 and forwarads the requests upstream over TCP.
+# An example config which accepts HTTP/3 and forwards the requests upstream over TCP.
 # This includes a TCP listener which advertises that HTTP/3 is available via the alt-svc header
 admin:
   address:

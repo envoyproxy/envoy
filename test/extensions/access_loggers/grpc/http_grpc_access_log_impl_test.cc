@@ -755,17 +755,20 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
         {":method", "POST"},
         {"x-envoy-max-retries", "3"}, // test inline header not otherwise logged
         {"x-custom-request", "custom_value"},
+        {"x-custom-request", "custome_value_second"},
         {"x-custom-empty", ""},
     };
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
         {"x-custom-response", "custom_value"},
+        {"x-custom-response", "custome_response_value"},
         {"x-custom-empty", ""},
     };
 
     Http::TestResponseTrailerMapImpl response_trailers{
         {"x-logged-trailer", "value"},
+        {"x-logged-trailer", "response_trailer_value"},
         {"x-empty-trailer", ""},
         {"x-unlogged-trailer", "2"},
     };
@@ -795,19 +798,19 @@ request:
   authority: "authority_value"
   path: "path_value"
   request_method: "POST"
-  request_headers_bytes: 132
+  request_headers_bytes: 168
   request_headers:
-    "x-custom-request": "custom_value"
+    "x-custom-request": "custom_value,custome_value_second"
     "x-custom-empty": ""
     "x-envoy-max-retries": "3"
 response:
-  response_headers_bytes: 92
+  response_headers_bytes: 131
   response_headers:
-    "x-custom-response": "custom_value"
+    "x-custom-response": "custom_value,custome_response_value"
     "x-custom-empty": ""
     "x-envoy-immediate-health-check-fail": "true"
   response_trailers:
-    "x-logged-trailer": "value"
+    "x-logged-trailer": "value,response_trailer_value"
     "x-empty-trailer": ""
 )EOF");
     access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);

@@ -1,8 +1,8 @@
 licenses(["notice"])  # Apache 2
 
 exports_files([
-    "VERSION",
-    "API_VERSION",
+    "VERSION.txt",
+    "API_VERSION.txt",
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
@@ -27,6 +27,7 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
+        "//test/tools/schema_validator/...",
         "//tools/extensions/...",
     ],
 )

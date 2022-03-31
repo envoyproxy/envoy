@@ -42,7 +42,8 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   absl::optional<RouteConfigProvider*>& route_config_providers);
+                   absl::optional<Rds::RouteConfigProvider*>& route_config_providers);
+
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
@@ -70,7 +71,7 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
-  absl::optional<RouteConfigProvider*>& route_config_provider_opt_;
+  absl::optional<Rds::RouteConfigProvider*>& route_config_provider_opt_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

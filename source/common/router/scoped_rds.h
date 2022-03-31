@@ -153,7 +153,7 @@ private:
         parent_.stats_.on_demand_scopes_.dec();
       }
     }
-    ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
+    ConfigConstSharedPtr routeConfig() { return route_provider_->configCast(); }
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
 

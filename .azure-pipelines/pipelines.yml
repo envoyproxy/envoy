@@ -299,6 +299,7 @@ stages:
   jobs:
   - job: docker
     displayName: "linux multiarch"
+    timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-18.04"
     steps:

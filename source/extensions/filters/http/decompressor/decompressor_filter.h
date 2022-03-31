@@ -6,6 +6,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"

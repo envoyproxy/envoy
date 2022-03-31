@@ -33,7 +33,9 @@ public:
   MOCK_METHOD(bool, isIdle, (), (const));
   MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
-  MOCK_METHOD(Cancellable*, newStream, (ResponseDecoder & response_decoder, Callbacks& callbacks));
+  MOCK_METHOD(Cancellable*, newStream,
+              (ResponseDecoder & response_decoder, Callbacks& callbacks,
+               const Instance::StreamOptions&));
   MOCK_METHOD(bool, maybePreconnect, (float));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(absl::string_view, protocolDescription, (), (const));

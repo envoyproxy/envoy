@@ -197,7 +197,7 @@ public:
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
   Ipv6Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr, bool v6only = true);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
@@ -234,6 +234,7 @@ private:
     absl::uint128 address() const override;
     bool v6only() const override;
     uint32_t port() const;
+    InstanceConstSharedPtr v4CompatibleAddress() const override;
 
     std::string makeFriendlyAddress() const;
 

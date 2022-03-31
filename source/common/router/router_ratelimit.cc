@@ -162,6 +162,7 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "header_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
       action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
 
@@ -170,7 +171,7 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
                                                 const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo&) const {
   if (expect_match_ == Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
-    descriptor_entry = {"header_match", descriptor_value_};
+    descriptor_entry = {descriptor_key_, descriptor_value_};
     return true;
   } else {
     return false;

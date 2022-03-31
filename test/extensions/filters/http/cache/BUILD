@@ -2,6 +2,7 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,6 +11,7 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "common",
+    srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
@@ -127,5 +129,23 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:cache_custom_headers",
+    ],
+)
+
+envoy_extension_cc_test_library(
+    name = "http_cache_implementation_test_common_lib",
+    srcs = ["http_cache_implementation_test_common.cc"],
+    hdrs = ["http_cache_implementation_test_common.h"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        "//source/extensions/filters/http/cache:cache_headers_utils_lib",
+        "//source/extensions/filters/http/cache:http_cache_lib",
+        "//test/extensions/filters/http/cache:common",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/synchronization",
+        "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
     ],
 )

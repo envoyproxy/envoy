@@ -114,7 +114,8 @@ api_listener:
     type: EDS
     eds_cluster_config:
       eds_config:
-        path: eds path
+        path_config_source:
+          path: eds path
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
@@ -123,7 +124,10 @@ api_listener:
   envoy::config::cluster::v3::Cluster expected_cluster_proto;
   expected_cluster_proto.set_name("cluster1");
   expected_cluster_proto.set_type(envoy::config::cluster::v3::Cluster::EDS);
-  expected_cluster_proto.mutable_eds_cluster_config()->mutable_eds_config()->set_path("eds path");
+  expected_cluster_proto.mutable_eds_cluster_config()
+      ->mutable_eds_config()
+      ->mutable_path_config_source()
+      ->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
@@ -171,6 +175,10 @@ api_listener:
   // ForTest function.
   http_api_listener.readCallbacksForTest().connection().addConnectionCallbacks(
       network_connection_callbacks);
+  EXPECT_FALSE(
+      http_api_listener.readCallbacksForTest().connection().lastRoundTripTime().has_value());
+  http_api_listener.readCallbacksForTest().connection().configureInitialCongestionWindow(
+      100, std::chrono::microseconds(123));
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.

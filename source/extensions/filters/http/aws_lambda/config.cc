@@ -22,13 +22,13 @@ InvocationMode
 getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config) {
   using namespace envoy::extensions::filters::http::aws_lambda::v3;
   switch (proto_config.invocation_mode()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case Config_InvocationMode_ASYNCHRONOUS:
     return InvocationMode::Asynchronous;
   case Config_InvocationMode_SYNCHRONOUS:
     return InvocationMode::Synchronous;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace

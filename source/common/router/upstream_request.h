@@ -37,7 +37,8 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public GenericConnectionPoolCallbacks,
                         public Event::DeferredDeletable {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
+  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
+                  bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
 
   // To be called from the destructor, or prior to deferred delete.
@@ -71,6 +72,11 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
+
+  // UpstreamToDownstream
+  const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
+    return stream_options_;
+  }
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -123,6 +129,7 @@ public:
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
+  bool hadUpstream() const { return had_upstream_; }
 
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
@@ -185,7 +192,8 @@ private:
   bool record_timeout_budget_ : 1;
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1;
-
+  bool had_upstream_ : 1;
+  Http::ConnectionPool::Instance::StreamOptions stream_options_;
   Event::TimerPtr max_stream_duration_timer_;
 };
 

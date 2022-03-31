@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_annotations",
+        "//source/common/network:transport_socket_options_lib",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )

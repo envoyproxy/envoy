@@ -62,7 +62,7 @@ public:
 
 // Check invalid policy type
 TEST_F(HashPolicyImplBaseTest, NotSupportedPolicy) {
-  EXPECT_DEATH(setup(), ".*panic: not reached.*");
+  EXPECT_DEATH(setup(), ".*panic: corrupted enum.*");
 }
 
 // Check if generate correct hash

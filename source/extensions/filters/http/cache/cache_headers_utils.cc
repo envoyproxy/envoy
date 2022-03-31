@@ -218,12 +218,9 @@ std::vector<absl::string_view>
 CacheHeadersUtils::parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry) {
   std::vector<absl::string_view> values;
   for (size_t i = 0; i < entry.size(); ++i) {
-    for (absl::string_view s : absl::StrSplit(entry[i]->value().getStringView(), ',')) {
-      if (s.empty()) {
-        continue;
-      }
-      values.emplace_back(absl::StripAsciiWhitespace(s));
-    }
+    std::vector<absl::string_view> tokens =
+        Http::HeaderUtility::parseCommaDelimitedHeader(entry[i]->value().getStringView());
+    values.insert(values.end(), tokens.begin(), tokens.end());
   }
   return values;
 }

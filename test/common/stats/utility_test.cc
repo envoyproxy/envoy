@@ -161,7 +161,7 @@ protected:
   StatNamePool pool_;
   std::unique_ptr<AllocatorImpl> alloc_;
   std::unique_ptr<Store> store_;
-  ScopePtr scope_;
+  ScopeSharedPtr scope_;
   absl::flat_hash_set<std::string> results_;
   StatNameTagVector tags_;
 };
@@ -170,7 +170,7 @@ INSTANTIATE_TEST_SUITE_P(StatsUtilityTest, StatsUtilityTest,
                          testing::ValuesIn({StoreType::ThreadLocal, StoreType::Isolated}));
 
 TEST_P(StatsUtilityTest, Counters) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Counter& c1 = Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
   EXPECT_EQ("scope.a.b", c1.name());
   StatName token = pool_.add("token");
@@ -189,7 +189,7 @@ TEST_P(StatsUtilityTest, Counters) {
 }
 
 TEST_P(StatsUtilityTest, Gauges) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Gauge& g1 = Utility::gaugeFromElements(*scope, {DynamicName("a"), DynamicName("b")},
                                          Gauge::ImportMode::NeverImport);
   EXPECT_EQ("scope.a.b", g1.name());
@@ -208,7 +208,7 @@ TEST_P(StatsUtilityTest, Gauges) {
 }
 
 TEST_P(StatsUtilityTest, Histograms) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Histogram& h1 = Utility::histogramFromElements(*scope, {DynamicName("a"), DynamicName("b")},
                                                  Histogram::Unit::Milliseconds);
   EXPECT_EQ("scope.a.b", h1.name());
@@ -227,7 +227,7 @@ TEST_P(StatsUtilityTest, Histograms) {
 }
 
 TEST_P(StatsUtilityTest, TextReadouts) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   TextReadout& t1 = Utility::textReadoutFromElements(*scope, {DynamicName("a"), DynamicName("b")});
   EXPECT_EQ("scope.a.b", t1.name());
   StatName token = pool_.add("token");

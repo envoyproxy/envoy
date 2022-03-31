@@ -1,29 +1,14 @@
 #include <cstddef>
 #include <string>
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/crypto/null_encrypter.h"
-#include "quiche/quic/test_tools/quic_connection_peer.h"
-#include "quiche/quic/test_tools/quic_session_peer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/http/headers.h"
-#include "source/server/active_listener_base.h"
-
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/server/active_listener_base.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"
@@ -33,6 +18,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/test_tools/quic_connection_peer.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 
 using testing::_;
 using testing::Invoke;

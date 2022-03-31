@@ -68,7 +68,7 @@ public:
     cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
 
     // Configure max pending to 1 so we can test circuit breaking.
-    cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
+    cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0, 100);
   }
 
   ~ProxyFilterTest() override {

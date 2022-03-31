@@ -142,8 +142,8 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     return nullptr;
   }
 
-  HostConstSharedPtr host =
-      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  HostConstSharedPtr host = LoadBalancerContextBase::selectOverrideHost(
+      cross_priority_host_map_.get(), override_host_status_, context);
   if (host != nullptr) {
     return host;
   }
@@ -188,7 +188,7 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
   lb->cross_priority_host_map_ = cross_priority_host_map_;
-
+  lb->override_host_status_ = override_host_status_;
   return lb;
 }
 

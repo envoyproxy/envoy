@@ -14,6 +14,7 @@
 #include "source/common/matcher/exact_map_matcher.h"
 #include "source/common/matcher/field_matcher.h"
 #include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/prefix_map_matcher.h"
 #include "source/common/matcher/validation_visitor.h"
 #include "source/common/matcher/value_input_matcher.h"
 
@@ -201,29 +202,17 @@ private:
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
     auto data_input = createDataInput(matcher.matcher_tree().input());
+    auto on_no_match = createOnMatch(matcher.on_no_match());
+
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
-      std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
-      match_children.reserve(matcher.matcher_tree().exact_match_map().map().size());
-
-      for (const auto& children : matcher.matcher_tree().exact_match_map().map()) {
-        match_children.push_back(
-            std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
-      }
-
-      auto on_no_match = createOnMatch(matcher.on_no_match());
-
-      return [match_children, data_input, on_no_match]() {
-        auto multimap_matcher = std::make_unique<ExactMapMatcher<DataType>>(
-            data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
-        for (const auto& children : match_children) {
-          multimap_matcher->addChild(children.first, children.second());
-        }
-        return multimap_matcher;
-      };
+      return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(), data_input,
+                                               on_no_match);
     }
-    case MatcherType::MatcherTree::kPrefixMatchMap:
-      PANIC("unexpected matcher type");
+    case MatcherType::MatcherTree::kPrefixMatchMap: {
+      return createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
+                                                data_input, on_no_match);
+    }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
     case MatcherType::MatcherTree::kCustomMatch: {
@@ -233,10 +222,32 @@ private:
           matcher.matcher_tree().custom_match().typed_config(),
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
-                                                  *this);
+                                                  on_no_match, *this);
     }
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  template <template <class> class MapMatcherType, class MapType>
+  MatchTreeFactoryCb<DataType>
+  createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
+                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match) {
+    std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
+    match_children.reserve(map.map().size());
+
+    for (const auto& children : map.map()) {
+      match_children.push_back(
+          std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
+    }
+
+    return [match_children, data_input, on_no_match]() {
+      auto multimap_matcher = std::make_unique<MapMatcherType<DataType>>(
+          data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+      for (const auto& children : match_children) {
+        multimap_matcher->addChild(children.first, children.second());
+      }
+      return multimap_matcher;
+    };
   }
 
   template <class OnMatchType>

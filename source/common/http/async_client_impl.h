@@ -44,6 +44,11 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
+// Limit the size of buffer for data used for retries.
+// This is currently fixed to 64KB.
+constexpr uint64_t kBufferLimitForRetry = 1 << 16;
+} // namespace
 
 class AsyncStreamImpl;
 class AsyncRequestImpl;
