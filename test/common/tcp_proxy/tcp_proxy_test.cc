@@ -144,7 +144,7 @@ public:
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy onDemandConfig() {
     auto config = defaultConfig();
-    config.mutable_on_demand();
+    config.mutable_on_demand()->mutable_odcds_config();
     return config;
   }
 
