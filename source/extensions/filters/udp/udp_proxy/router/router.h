@@ -30,7 +30,7 @@ public:
         Network::Address::InstanceConstSharedPtr source_address) const PURE;
 
   /**
-   * Returns all cluster names in the router. The UDP proxy filter requires every cluster names for
+   * Returns all cluster names in the router. The UDP proxy filter requires every cluster name for
    * initialization which will call this method on construction.
    * @return vector of all cluster names.
    */
