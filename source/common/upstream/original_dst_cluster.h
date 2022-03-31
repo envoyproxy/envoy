@@ -50,8 +50,7 @@ public:
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
     LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
-        : parent_(parent), original_host_provider_(createFromLbConfig(
-                               parent_->info()->stats(), parent_->info()->lbOriginalDstConfig())),
+        : parent_(parent), http_header_name_(parent->httpHeaderName()),
           host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
@@ -70,29 +69,16 @@ public:
       return {};
     }
 
+    Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
+
   private:
-    class OriginalHostProvider {
-    public:
-      OriginalHostProvider(ClusterStats& stats, const Http::LowerCaseString& header_name)
-          : stats_(stats), header_name_(header_name) {}
-
-      Network::Address::InstanceConstSharedPtr
-      getOriginalHost(const Http::RequestHeaderMap* headers) const;
-
-    private:
-      ClusterStats& stats_;
-      const Http::LowerCaseString header_name_;
-    };
-
-    static std::unique_ptr<OriginalHostProvider> createFromLbConfig(
-        ClusterStats& stats,
-        const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& config);
-
     const std::shared_ptr<OriginalDstCluster> parent_;
     // The optional original host provider that extracts the address from HTTP header map.
-    std::unique_ptr<OriginalHostProvider> original_host_provider_;
+    const absl::optional<Http::LowerCaseString>& http_header_name_;
     HostMapConstSharedPtr host_map_;
   };
+
+  const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
 
 private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
@@ -139,7 +125,7 @@ private:
 
   absl::Mutex host_map_lock_;
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
-
+  absl::optional<Http::LowerCaseString> http_header_name_;
   friend class OriginalDstClusterFactory;
 };
 

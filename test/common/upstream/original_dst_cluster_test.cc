@@ -602,31 +602,20 @@ TEST_F(OriginalDstClusterTest, UseHttpAuthorityHeader) {
   EXPECT_EQ("127.0.0.1:6666", host1->address()->asString());
 }
 
-// Verify clearing `use_http_header` is required to consume `http_header_name`.
-TEST_F(OriginalDstClusterTest, DoNotReadFromHttpAuthorityHeaderUnlessSetUseHttpHeader) {
+TEST_F(OriginalDstClusterTest, BadConfigWithHttpHeaderNameAndClearedUseHttpHeader) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
     lb_policy: CLUSTER_PROVIDED
     original_dst_lb_config:
-      # `use_http_header` is not set and default value is false.
       http_header_name: ":authority"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml);
-
-  OriginalDstCluster::LoadBalancer lb(cluster_);
-
-  // HTTP `:authority` header override is ignored.
-  TestLoadBalancerContext lb_context1(nullptr, Http::Headers::get().Host.get(), "127.0.0.1:6666");
-
-  EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(dispatcher_, post(_)).Times(0);
-  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
-  ASSERT_EQ(host1, nullptr);
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml), EnvoyException,
+      "ORIGINAL_DST cluster: invalid config http_header_name=:authority and use_http_header is "
+      "false. Set use_http_header to true if http_header_name is desired.");
 }
 
 TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
