@@ -1947,53 +1947,16 @@ route_config:
     - match:
         method_name: name
       route:
-        cluster: cluster
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml), EnvoyException, "unknown thrift cluster");
-}
-
-TEST_F(ThriftConnectionManagerTest, UnknownCluster2) {
-  const std::string yaml = R"EOF(
-transport: FRAMED
-protocol: BINARY
-stat_prefix: test
-route_config:
-  name: "routes"
-  routes:
-    - match:
-        method_name: name
-      route:
-        cluster: cluster
+        cluster: cluster1
     - match:
         method_name: name2
       route:
-        cluster: unknown_cluster
+        cluster: cluster2
 )EOF";
 
-  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster"}), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster1"}), EnvoyException,
                           "unknown thrift cluster");
-}
-
-TEST_F(ThriftConnectionManagerTest, UnknownCluster3) {
-  const std::string yaml = R"EOF(
-transport: FRAMED
-protocol: BINARY
-stat_prefix: test
-route_config:
-  name: "routes"
-  routes:
-    - match:
-        method_name: name
-      route:
-        cluster: unknown_cluster
-    - match:
-        method_name: name2
-      route:
-        cluster: cluster
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster"}), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster2"}), EnvoyException,
                           "unknown thrift cluster");
 }
 
@@ -2006,34 +1969,15 @@ TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster) {
     route->mutable_match()->set_method_name("foo");
     auto* action = route->mutable_route();
     auto* cluster1 = action->mutable_weighted_clusters()->add_clusters();
-    cluster1->set_name("thrift");
+    cluster1->set_name("cluster1");
     cluster1->mutable_weight()->set_value(50);
     auto* cluster2 = action->mutable_weighted_clusters()->add_clusters();
-    cluster2->set_name("unknown_cluster");
+    cluster2->set_name("cluster2");
     cluster2->mutable_weight()->set_value(50);
   }
-  // Intentionally miss "unknown_cluster" cluster.
-  EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"thrift"}), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"cluster1"}), EnvoyException,
                           "unknown thrift weighted cluster");
-}
-
-TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster2) {
-  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
-  {
-    auto* route_config = config.mutable_route_config();
-    route_config->set_name("config");
-    auto* route = route_config->add_routes();
-    route->mutable_match()->set_method_name("foo");
-    auto* action = route->mutable_route();
-    auto* cluster1 = action->mutable_weighted_clusters()->add_clusters();
-    cluster1->set_name("unknown_cluster");
-    cluster1->mutable_weight()->set_value(1);
-    auto* cluster2 = action->mutable_weighted_clusters()->add_clusters();
-    cluster2->set_name("cluster");
-    cluster2->mutable_weight()->set_value(100);
-  }
-  // Intentionally miss "unknown_cluster" cluster.
-  EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"cluster"}), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"cluster2"}), EnvoyException,
                           "unknown thrift weighted cluster");
 }
 
