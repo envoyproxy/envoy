@@ -276,6 +276,8 @@ SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const {
   return {rc, rc != -1 ? 0 : errno};
 }
 
+bool OsSysCallsImpl::supportsAllPosixFileOperations() const { return true; }
+
 SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) {
   const int rc = ::shutdown(sockfd, how);
   return {rc, rc != -1 ? 0 : errno};

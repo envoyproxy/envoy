@@ -223,6 +223,11 @@ public:
   virtual SysCallIntResult mkstemp(char* tmplate) const PURE;
 
   /**
+   * Returns true if mkstemp, linkat, unlink, open, close, pread and pwrite are fully supported.
+   */
+  virtual bool supportsAllPosixFileOperations() const PURE;
+
+  /**
    * @see man 2 shutdown
    */
   virtual SysCallIntResult shutdown(os_fd_t sockfd, int how) PURE;

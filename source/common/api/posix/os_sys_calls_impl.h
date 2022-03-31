@@ -52,6 +52,7 @@ public:
   SysCallIntResult linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
                           const char* newpath, int flags) const override;
   SysCallIntResult mkstemp(char* tmplate) const override;
+  bool supportsAllPosixFileOperations() const override;
   SysCallIntResult shutdown(os_fd_t sockfd, int how) override;
   SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) override;
   SysCallIntResult listen(os_fd_t sockfd, int backlog) override;

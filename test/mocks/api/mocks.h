@@ -113,6 +113,7 @@ public:
                int flags),
               (const));
   MOCK_METHOD(SysCallIntResult, mkstemp, (char* tmplate), (const));
+  MOCK_METHOD(bool, supportsAllPosixFileOperations, (), (const));
   MOCK_METHOD(SysCallIntResult, shutdown, (os_fd_t sockfd, int how));
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));

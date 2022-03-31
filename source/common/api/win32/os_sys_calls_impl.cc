@@ -303,6 +303,8 @@ SysCallIntResult OsSysCallsImpl::linkat(os_fd_t olddirfd, const char* oldpath, o
 
 SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const { PANIC("not implemented"); }
 
+bool OsSysCallsImpl::supportsAllPosixFileOperations() const { return false; }
+
 SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) {
   const int rc = ::shutdown(sockfd, how);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
