@@ -1822,11 +1822,11 @@ void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::str
     throw EnvoyException(fmt::format("{} does not take any parameters or length", command));
   }
 
-  if ((flags & PARAMS_REQUIRED) && (subcommand.length() == 0)) {
+  if ((flags & PARAMS_REQUIRED).any() && (subcommand.length() == 0)) {
     throw EnvoyException(fmt::format("{} requires parameters", command));
   }
 
-  if (!(flags & LENGTH_ALLOWED) && length.has_value()) {
+  if ((flags & LENGTH_ALLOWED).none() && length.has_value()) {
     throw EnvoyException(fmt::format("{} does not allow length to be specified.", command));
   }
 }

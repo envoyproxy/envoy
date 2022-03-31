@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <functional>
 #include <list>
 #include <string>
@@ -20,7 +21,7 @@ namespace Formatter {
 
 class CommandSyntaxChecker {
 public:
-  using CommandSyntaxFlags = uint32_t;
+  using CommandSyntaxFlags = std::bitset<4>;
   static constexpr CommandSyntaxFlags COMMAND_ONLY = 0;
   static constexpr CommandSyntaxFlags PARAMS_REQUIRED = 1 << 0;
   static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
@@ -449,7 +450,8 @@ private:
 
   using FieldExtractorLookupTbl =
       absl::flat_hash_map<absl::string_view,
-                          std::pair<uint32_t, StreamInfoFormatter::FieldExtractorCreateFunc>>;
+                          std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
+                                    StreamInfoFormatter::FieldExtractorCreateFunc>>;
   static const FieldExtractorLookupTbl& getKnownFieldExtractors();
 };
 
