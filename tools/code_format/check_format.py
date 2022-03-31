@@ -189,6 +189,7 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+# yapf: enable
 
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
@@ -206,58 +207,57 @@ CODE_CONVENTION_REPLACEMENTS = {
 }
 
 UNOWNED_EXTENSIONS = {
-  "extensions/filters/http/buffer",
-  "extensions/filters/http/rbac",
-  "extensions/filters/http/ip_tagging",
-  "extensions/filters/http/tap",
-  "extensions/filters/http/health_check",
-  "extensions/filters/http/cors",
-  "extensions/filters/http/dynamo",
-  "extensions/filters/http/lua",
-  "extensions/filters/http/common",
-  "extensions/filters/common",
-  "extensions/filters/common/rbac",
-  "extensions/filters/common/lua",
-  "extensions/filters/listener/original_dst",
-  "extensions/filters/listener/proxy_protocol",
-  "extensions/stat_sinks/statsd",
-  "extensions/stat_sinks/common",
-  "extensions/stat_sinks/common/statsd",
-  "extensions/health_checkers/redis",
-  "extensions/access_loggers/grpc",
-  "extensions/access_loggers/file",
-  "extensions/common/tap",
-  "extensions/transport_sockets/raw_buffer",
-  "extensions/transport_sockets/tap",
-  "extensions/tracers/zipkin",
-  "extensions/tracers/dynamic_ot",
-  "extensions/tracers/opencensus",
-  "extensions/tracers/lightstep",
-  "extensions/tracers/common",
-  "extensions/tracers/common/ot",
-  "extensions/retry/host/previous_hosts",
-  "extensions/filters/network/client_ssl_auth",
-  "extensions/filters/network/rbac",
-  "extensions/filters/network/tcp_proxy",
-  "extensions/filters/network/echo",
-  "extensions/filters/network/redis_proxy",
-  "extensions/filters/network/kafka",
-  "extensions/filters/network/kafka/broker",
-  "extensions/filters/network/kafka/mesh",
-  "extensions/filters/network/kafka/mesh/command_handlers",
-  "extensions/filters/network/kafka/protocol",
-  "extensions/filters/network/kafka/serialization",
-  "extensions/filters/network/mongo_proxy",
-  "extensions/filters/network/common",
-  "extensions/filters/network/common/redis",
+    "extensions/filters/http/buffer",
+    "extensions/filters/http/rbac",
+    "extensions/filters/http/ip_tagging",
+    "extensions/filters/http/tap",
+    "extensions/filters/http/health_check",
+    "extensions/filters/http/cors",
+    "extensions/filters/http/dynamo",
+    "extensions/filters/http/lua",
+    "extensions/filters/http/common",
+    "extensions/filters/common",
+    "extensions/filters/common/rbac",
+    "extensions/filters/common/lua",
+    "extensions/filters/listener/original_dst",
+    "extensions/filters/listener/proxy_protocol",
+    "extensions/stat_sinks/statsd",
+    "extensions/stat_sinks/common",
+    "extensions/stat_sinks/common/statsd",
+    "extensions/health_checkers/redis",
+    "extensions/access_loggers/grpc",
+    "extensions/access_loggers/file",
+    "extensions/common/tap",
+    "extensions/transport_sockets/raw_buffer",
+    "extensions/transport_sockets/tap",
+    "extensions/tracers/zipkin",
+    "extensions/tracers/dynamic_ot",
+    "extensions/tracers/opencensus",
+    "extensions/tracers/lightstep",
+    "extensions/tracers/common",
+    "extensions/tracers/common/ot",
+    "extensions/retry/host/previous_hosts",
+    "extensions/filters/network/client_ssl_auth",
+    "extensions/filters/network/rbac",
+    "extensions/filters/network/tcp_proxy",
+    "extensions/filters/network/echo",
+    "extensions/filters/network/redis_proxy",
+    "extensions/filters/network/kafka",
+    "extensions/filters/network/kafka/broker",
+    "extensions/filters/network/kafka/mesh",
+    "extensions/filters/network/kafka/mesh/command_handlers",
+    "extensions/filters/network/kafka/protocol",
+    "extensions/filters/network/kafka/serialization",
+    "extensions/filters/network/mongo_proxy",
+    "extensions/filters/network/common",
+    "extensions/filters/network/common/redis",
 }
 
 UNSORTED_FLAGS = {
-  "envoy.reloadable_features.activate_timers_next_event_loop",
-  "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.sanitize_http_header_referer",
+    "envoy.reloadable_features.activate_timers_next_event_loop",
+    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
+    "envoy.reloadable_features.sanitize_http_header_referer",
 }
-# yapf: enable
 
 
 class FormatChecker:
@@ -394,7 +394,7 @@ class FormatChecker:
         nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
         text = self.read_file(file_path)
         if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
-          not nolint in text:
+                not nolint in text:
             return [
                 "Unable to find %s namespace or %s for file: %s" %
                 (self.namespace_check, nolint, file_path)
@@ -414,8 +414,9 @@ class FormatChecker:
 
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
-        return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
-                any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
+        return (
+            file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL)
+            or any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
 
     # Real-world time sources should not be instantiated in the source, except for a few
     # specific cases. They should be passed down from where they are instantied to where
@@ -572,7 +573,7 @@ class FormatChecker:
             return False
         preceding = line[0:wait_for]
         if preceding.endswith("time_system") or preceding.endswith("timeSystem()") or \
-          preceding.endswith("time_system_"):
+                preceding.endswith("time_system_"):
             return False
         return True
 
@@ -791,10 +792,10 @@ class FormatChecker:
                 "Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
         if self.is_in_subdir(file_path, 'source') and file_path.endswith('.cc') and \
-          ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-            '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
-            '->counterFromString(' in line or '->gaugeFromString(' in line or \
-            '->histogramFromString(' in line or '->textReadoutFromString(' in line):
+            ('.counterFromString(' in line or '.gaugeFromString(' in line or
+             '.histogramFromString(' in line or '.textReadoutFromString(' in line or
+             '->counterFromString(' in line or '->gaugeFromString(' in line or
+                '->histogramFromString(' in line or '->textReadoutFromString(' in line):
             report_error(
                 "Don't lookup stats by name at runtime; use StatName saved during construction")
 
@@ -809,7 +810,10 @@ class FormatChecker:
                 "other sinks can add the suffix automatically on flush should they prefer to do so."
             )
 
-        if not self.allow_listed_for_std_regex(file_path) and "std::regex" in line:
+        normalized_target_path = file_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = f"./{normalized_target_path}"
+        if not self.allow_listed_for_std_regex(normalized_target_path) and "std::regex" in line:
             report_error(
                 "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
