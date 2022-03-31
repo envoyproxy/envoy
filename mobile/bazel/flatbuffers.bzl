@@ -23,10 +23,21 @@ def envoy_mobile_flatbuffers_library(name, srcs, namespace, types):
         deps = ["@maven//:com_google_flatbuffers_flatbuffers_java"],
     )
 
-    swift_outputs = ["{}_generated.swift".format(f.replace(".fbs", "")) for f in srcs]
+    swift_intermediate_outputs = ["{}_generated.swift".format(f.replace(".fbs", "")) for f in srcs]
     flatbuffer_library_public(
-        name = "{}_fb_swift_srcs".format(name),
+        name = "{}_fb_swift_intermediates".format(name),
         srcs = srcs,
-        outs = swift_outputs,
+        outs = swift_intermediate_outputs,
         language_flag = "--swift",
+    )
+
+    # TODO: Upstream Swift generation that can use @_implementationOnly
+    swift_outputs = ["{}_processed.swift".format(f.replace(".fbs", "")) for f in srcs]
+    native.genrule(
+        name = "{}_fb_swift_srcs".format(name),
+        outs = swift_outputs,
+        srcs = swift_intermediate_outputs,
+        cmd = """
+        sed -e 's/import FlatBuffers/@_implementationOnly import FlatBuffers/g' -e 's/public /internal /g' $(SRCS) > $(OUTS)
+        """,
     )
