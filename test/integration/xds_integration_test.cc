@@ -3,6 +3,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -140,8 +141,7 @@ public:
 
   void initialize() override {
     config_helper_.renameListener("tcp");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
 
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -168,6 +168,7 @@ public:
                                                                 const std::string& request,
                                                                 std::string& response) {
     Buffer::OwnedImpl buffer(request);
+    TestListenerFilter::setAlpn(alpn);
     return std::make_unique<RawConnectionDriver>(
         lookupPort("tcp"), buffer,
         [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
@@ -298,8 +299,7 @@ public:
     setUpstreamCount(2);
 
     config_helper_.renameListener("http");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -361,6 +361,7 @@ public:
   }
 
   IntegrationCodecClientPtr createHttpCodec(const std::string& alpn) {
+    TestListenerFilter::setAlpn(alpn);
     auto ssl_conn = dispatcher_->createClientConnection(
         address_, Network::Address::InstanceConstSharedPtr(),
         context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
