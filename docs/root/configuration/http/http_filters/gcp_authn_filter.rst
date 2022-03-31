@@ -2,10 +2,6 @@
 
 GCP Authentication Filter
 =========================
-TODO(tyxia) Add more
-This filter is used to fetch the authentication tokens from GCP Compute metadata server. 
-The context of this feature is for authenticating service-to-service. In multiple services architecture where these services likely need to communicate with each other. 
-Authentication will be required because many of these services may be private and require credentials for access.
 
 Configuration
 -------------
