@@ -7721,23 +7721,15 @@ virtual_hosts:
 
 TEST_F(RouteMatcherTest, PathSeparatedPrefixMatch) {
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_prefix
     domains: ["*"]
     routes:
       - match:
-          path_separated_prefix: "/rest/Api"
-          case_sensitive: true
-        route: { cluster: case-sensitive-cluster}
-      - match:
           path_separated_prefix: "/rest/api"
+          case_sensitive: false
         route: { cluster: path-separated-cluster}
-      - match:
-          path_separated_prefix: "/rewrite"
-        route:
-          prefix_rewrite: "/new/api"
-          cluster: rewrite-cluster
       - match:
           prefix: "/"
         route: { cluster: default-cluster}
@@ -7748,6 +7740,7 @@ virtual_hosts:
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
+  // Exact matches
   EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), 0)
                 ->routeEntry()
@@ -7761,6 +7754,7 @@ virtual_hosts:
                 ->routeEntry()
                 ->clusterName());
 
+  // Prefix matches
   EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"), 0)
                 ->routeEntry()
@@ -7774,31 +7768,32 @@ virtual_hosts:
                 ->routeEntry()
                 ->clusterName());
 
-  EXPECT_EQ("case-sensitive-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/Api", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
-  EXPECT_EQ("case-sensitive-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/Api?param=true", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
-  EXPECT_EQ("case-sensitive-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/Api/", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
-  EXPECT_EQ("case-sensitive-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/Api/thing?param=true", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
-
+  // Non-matching prefixes
   EXPECT_EQ("default-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/apithing", "GET"), 0)
                 ->routeEntry()
                 ->clusterName());
-  EXPECT_EQ("default-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/Apithing", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchRewrite) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rewrite"
+        route:
+          prefix_rewrite: "/new/api"
+          cluster: rewrite-cluster
+      - match:
+          prefix: "/"
+        route: { cluster: default-cluster}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"default-cluster", "rewrite-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   { // Prefix rewrite exact match
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -7825,9 +7820,61 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchCaseSensitivity) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/API"
+        route: { cluster: case-sensitive}
+      - match:
+          path_separated_prefix: "/REST/api"
+          case_sensitive: true
+        route: { cluster: case-sensitive-explicit}
+      - match:
+          path_separated_prefix: "/rest/api"
+          case_sensitive: false
+        route: { cluster: case-insensitive}
+      - match:
+          prefix: "/"
+        route: { cluster: default}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"case-sensitive", "case-sensitive-explicit", "case-insensitive", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_EQ("case-sensitive", config.route(genHeaders("path.prefix.com", "/rest/API", "GET"), 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  EXPECT_EQ("case-sensitive",
+            config.route(genHeaders("path.prefix.com", "/rest/API?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("case-sensitive", config.route(genHeaders("path.prefix.com", "/rest/API/", "GET"), 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  EXPECT_EQ("case-sensitive",
+            config.route(genHeaders("path.prefix.com", "/rest/API/thing?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("case-sensitive-explicit",
+            config.route(genHeaders("path.prefix.com", "/REST/api", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("case-insensitive", config.route(genHeaders("path.prefix.com", "/REST/API", "GET"), 0)
+                                    ->routeEntry()
+                                    ->clusterName());
+}
+
 TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchTrailingSlash) {
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_prefix
     domains: ["*"]
@@ -7844,7 +7891,7 @@ virtual_hosts:
 
 TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchQueryParam) {
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_prefix
     domains: ["*"]
@@ -7861,7 +7908,7 @@ virtual_hosts:
 
 TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchFragment) {
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_prefix
     domains: ["*"]
@@ -7878,7 +7925,7 @@ virtual_hosts:
 
 TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchBaseCondition) {
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_prefix
     domains: ["*"]
@@ -7889,6 +7936,8 @@ virtual_hosts:
             - name: param
               string_match:
                 exact: test
+          headers:
+            - name: cookies
         route: { cluster: some-cluster }
       - match:
           prefix: "/"
@@ -7898,15 +7947,25 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"some-cluster", "default"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  EXPECT_EQ("some-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api?param=test", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
+  {
+    auto headers = genHeaders("path.prefix.com", "/rest/api?param=test", "GET");
+    headers.addCopy("cookies", "");
 
-  EXPECT_EQ("default",
-            config.route(genHeaders("path.prefix.com", "/rest/api?param=testing", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
+    EXPECT_EQ("some-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("path.prefix.com", "/rest/api?param=test", "GET");
+    headers.addCopy("pizza", "");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    auto headers = genHeaders("path.prefix.com", "/rest/api?param=testing", "GET");
+    headers.addCopy("cookies", "");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
 }
 
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
