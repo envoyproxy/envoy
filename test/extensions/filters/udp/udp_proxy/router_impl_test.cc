@@ -64,7 +64,7 @@ cluster: udp_service
 
 // Route UDP packets to multiple clusters.
 TEST_F(RouterImplTest, RouteToMultipleClusters) {
-  // Route with source IP
+  // Route with source IP.
   {
     const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -100,7 +100,7 @@ matcher:
     EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
   }
 
-  // Route with source port
+  // Route with source port.
   {
     const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -136,7 +136,7 @@ matcher:
     EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:8080")));
   }
 
-  // Route with Destination IP
+  // Route with Destination IP.
   {
     const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -172,7 +172,7 @@ matcher:
     EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
   }
 
-  // Route with Destination port
+  // Route with Destination port.
   {
     const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -206,6 +206,61 @@ matcher:
               router_->route(parseAddress("0.0.0.0:443"), parseAddress("10.0.0.1:10000")));
     EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:8080"), parseAddress("10.0.0.1:10000")));
     EXPECT_EQ("", router_->route(parseAddress("[::]:8080"), parseAddress("[fc00::1]:10000")));
+  }
+
+  // Complex router in UDP proxy documentation.
+  {
+    const std::string yaml = R"EOF(
+stat_prefix: foo
+matcher:
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            name: envoy.matching.inputs.source_ip
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+          value_match:
+            exact: 127.0.0.1
+      on_match:
+        matcher:
+          matcher_tree:
+            input:
+              name: envoy.matching.inputs.source_port
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourcePortInput
+            exact_match_map:
+              map:
+                "80":
+                  action:
+                    name: route
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                      cluster: udp_service
+                "443":
+                  action:
+                    name: route
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                      cluster: udp_service2
+          on_no_match:
+            action:
+              name: route
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                cluster: udp_service3
+  )EOF";
+
+    setup(yaml);
+
+    EXPECT_EQ("udp_service",
+              router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.1:80")));
+    EXPECT_EQ("udp_service2",
+              router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.1:443")));
+    EXPECT_EQ("udp_service3",
+              router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.1:8080")));
+    EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.2:80")));
   }
 }
 

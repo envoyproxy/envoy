@@ -60,15 +60,11 @@ const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr des
     return cluster_.value();
   }
 
-  if (source_address->ip()) {
-    Network::Matching::UdpMatchingDataImpl data(destination_address, source_address);
-
-    auto result = matcher_->match(data);
-    if (result.match_state_ == Matcher::MatchState::MatchComplete) {
-      if (result.on_match_.has_value()) {
-        return result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
-      }
-    }
+  Network::Matching::UdpMatchingDataImpl data(destination_address, source_address);
+  const auto& result = Matcher::evaluateMatch<Network::UdpMatchingData>(*matcher_, data);
+  ASSERT(result.match_state_ == Matcher::MatchState::MatchComplete);
+  if (result.result_) {
+    return result.result_()->getTyped<RouteMatchAction>().cluster();
   }
 
   return EMPTY_STRING;
