@@ -59,10 +59,9 @@ private:
 // TODO: Move over to Fake (name is confusing)
 class FakeOsSysCalls : public Api::OsSysCallsImpl {
 public:
-  MOCK_METHOD(Api::SysCallSizeResult, recv, (os_fd_t, void*, size_t, int), (const));
+  MOCK_METHOD(Api::SysCallSizeResult, recv, (os_fd_t, void*, size_t, int));
   MOCK_METHOD(Api::SysCallIntResult, ioctl,
-              (os_fd_t, unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*),
-              (const));
+              (os_fd_t, unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
 };
 
 } // namespace ListenerFilters

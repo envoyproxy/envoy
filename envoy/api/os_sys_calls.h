@@ -46,14 +46,14 @@ public:
   virtual ~OsSysCalls() = default;
 
   /**
-   * @see man 2 bind
+   * @see bind (man 2 bind)
    */
-  virtual SysCallIntResult bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) const PURE;
+  virtual SysCallIntResult bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
-   * @see man 2 chmod
+   * @see chmod (man 2 chmod)
    */
-  virtual SysCallIntResult chmod(const std::string& path, mode_t mode) const PURE;
+  virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
    * This interface is based on Windows `WSAIoctl`. It becomes equivalent with the POSIX interface
@@ -63,18 +63,17 @@ public:
    */
   virtual SysCallIntResult ioctl(os_fd_t sockfd, unsigned long control_code, void* in_buffer,
                                  unsigned long in_buffer_len, void* out_buffer,
-                                 unsigned long out_buffer_len,
-                                 unsigned long* bytes_returned) const PURE;
+                                 unsigned long out_buffer_len, unsigned long* bytes_returned) PURE;
 
   /**
-   * @see man 2 writev
+   * @see writev (man 2 writev)
    */
-  virtual SysCallSizeResult writev(os_fd_t fd, const iovec* iov, int num_iov) const PURE;
+  virtual SysCallSizeResult writev(os_fd_t fd, const iovec* iov, int num_iov) PURE;
 
   /**
-   * @see man 2 readv
+   * @see readv (man 2 readv)
    */
-  virtual SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) const PURE;
+  virtual SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) PURE;
 
   /**
    * @see man 2 pwrite
@@ -88,20 +87,20 @@ public:
   virtual SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const PURE;
 
   /**
-   * @see man 2 recv
+   * @see recv (man 2 recv)
    */
-  virtual SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) const PURE;
+  virtual SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
 
   /**
-   * @see man 2 recvmsg
+   * @see recvmsg (man 2 recvmsg)
    */
-  virtual SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) const PURE;
+  virtual SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) PURE;
 
   /**
-   * @see man 2 recvmmsg
+   * @see recvmmsg (man 2 recvmmsg)
    */
   virtual SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
-                                    int flags, struct timespec* timeout) const PURE;
+                                    int flags, struct timespec* timeout) PURE;
 
   /**
    * return true if the OS supports recvmmsg() and sendmmsg().
@@ -132,23 +131,23 @@ public:
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */
-  virtual SysCallIntResult close(os_fd_t fd) const PURE;
+  virtual SysCallIntResult close(os_fd_t fd) PURE;
 
   /**
    * @see man 2 ftruncate
    */
-  virtual SysCallIntResult ftruncate(int fd, off_t length) const PURE;
+  virtual SysCallIntResult ftruncate(int fd, off_t length) PURE;
 
   /**
    * @see man 2 mmap
    */
   virtual SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
-                                off_t offset) const PURE;
+                                off_t offset) PURE;
 
   /**
    * @see man 2 stat
    */
-  virtual SysCallIntResult stat(const char* pathname, struct stat* buf) const PURE;
+  virtual SysCallIntResult stat(const char* pathname, struct stat* buf) PURE;
 
   /**
    * @see man 2 setsockopt
@@ -165,40 +164,37 @@ public:
   /**
    * @see man 2 socket
    */
-  virtual SysCallSocketResult socket(int domain, int type, int protocol) const PURE;
+  virtual SysCallSocketResult socket(int domain, int type, int protocol) PURE;
 
   /**
    * @see man 2 sendmsg
    */
-  virtual SysCallSizeResult sendmsg(os_fd_t sockfd, const msghdr* message, int flags) const PURE;
+  virtual SysCallSizeResult sendmsg(os_fd_t sockfd, const msghdr* message, int flags) PURE;
 
   /**
    * @see man 2 getsockname
    */
-  virtual SysCallIntResult getsockname(os_fd_t sockfd, sockaddr* addr,
-                                       socklen_t* addrlen) const PURE;
+  virtual SysCallIntResult getsockname(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) PURE;
 
   /**
    * @see man 2 gethostname
    */
-  virtual SysCallIntResult gethostname(char* name, size_t length) const PURE;
+  virtual SysCallIntResult gethostname(char* name, size_t length) PURE;
 
   /**
    * @see man 2 getpeername
    */
-  virtual SysCallIntResult getpeername(os_fd_t sockfd, sockaddr* name,
-                                       socklen_t* namelen) const PURE;
+  virtual SysCallIntResult getpeername(os_fd_t sockfd, sockaddr* name, socklen_t* namelen) PURE;
 
   /**
    * Toggle the blocking state bit using fcntl
    */
-  virtual SysCallIntResult setsocketblocking(os_fd_t sockfd, bool blocking) const PURE;
+  virtual SysCallIntResult setsocketblocking(os_fd_t sockfd, bool blocking) PURE;
 
   /**
    * @see man 2 connect
    */
-  virtual SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr,
-                                   socklen_t addrlen) const PURE;
+  virtual SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
    * @see man 2 open
@@ -229,37 +225,37 @@ public:
   /**
    * @see man 2 shutdown
    */
-  virtual SysCallIntResult shutdown(os_fd_t sockfd, int how) const PURE;
+  virtual SysCallIntResult shutdown(os_fd_t sockfd, int how) PURE;
 
   /**
    * @see man 2 socketpair
    */
-  virtual SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) const PURE;
+  virtual SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) PURE;
 
   /**
    * @see man 2 listen
    */
-  virtual SysCallIntResult listen(os_fd_t sockfd, int backlog) const PURE;
+  virtual SysCallIntResult listen(os_fd_t sockfd, int backlog) PURE;
 
   /**
    * @see man 2 write
    */
-  virtual SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) const PURE;
+  virtual SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) PURE;
 
   /**
    * @see man 2 accept. The fds returned are configured to be non-blocking.
    */
-  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) const PURE;
+  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
 
   /**
-   * @see man 2 dup
+   * @see man 2 dup(2).
    */
-  virtual SysCallSocketResult duplicate(os_fd_t oldfd) const PURE;
+  virtual SysCallSocketResult duplicate(os_fd_t oldfd) PURE;
 
   /**
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
-  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) const PURE;
+  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
 
   /**
    * return true if the OS supports getifaddrs.
@@ -269,7 +265,7 @@ public:
   /**
    * @see man getifaddrs
    */
-  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) const PURE;
+  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) PURE;
 
   /**
    * allows a platform to override getifaddrs or provide an implementation if one does not exist
