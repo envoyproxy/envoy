@@ -420,7 +420,7 @@ TEST_P(IntegrationTest, EnvoyProxyingLate1xxWithEncoderFilter) {
 }
 
 // When the runtime feature `http_100_continue_case_insensitive` is disabled, the "100-Continue"
-// (upper caes C) is not counted as "100-continue". As a consequence, the response does not contain
+// (upper case C) is not counted as "100-continue". As a consequence, the response does not contain
 // the `100` status code as if Envoy does not see `expect` header.
 TEST_P(IntegrationTest, RuntimeFeature100ContinueCaseInsensitiveDisabled) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_100_continue_case_insensitive",
