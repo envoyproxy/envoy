@@ -1056,7 +1056,7 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                                  {":path", "/dynamo/url"},
                                                                  {":scheme", "http"},
                                                                  {":authority", "sni.lyft.com"},
-                                                                 {"expect", "100-continue"}});
+                                                                 {"expect", "100-contINUE"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
