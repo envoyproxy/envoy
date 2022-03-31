@@ -90,11 +90,3 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :linenos:
     :emphasize-lines: 11, 17-18, 22-23
-
-.. note::
-    If IPv6 is not supported in your environoment, please set ``dns_lookup_family`` of cluster to the ``V4_ONLY`` just like
-    following example.
-
-    .. literalinclude:: _include/envoy-demo.yaml
-        :language: yaml
-        :lines: 34-46

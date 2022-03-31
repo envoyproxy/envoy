@@ -450,3 +450,14 @@ which are set to ``debug`` and ``trace`` respectively.
 .. tip::
 
    See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h#L29>` for a list of components.
+
+Reminder on docker networking
+-----------------------------
+
+In some environments, IPv6 is not supported by the docker networking. If you are running Envoy with any demo
+configurations, please set ``dns_lookup_family`` of cluster to the ``V4_ONLY`` just like following example.
+See `docker docs <https://docs.docker.com/config/daemon/ipv6/>`_ for more information about the IPv6 support.
+
+.. literalinclude:: _include/envoy-demo.yaml
+   :language: yaml
+   :lines: 34-46
