@@ -468,22 +468,29 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.setMethod("POST");
 
+  // Encode request headers.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Queue request body.
   Buffer::OwnedImpl request_body(std::string(1024, 'a'));
   request_encoder_->encodeData(request_body, true);
 
+  // Flush request body.
   EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
   driveToCompletion();
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
+  // Encode response headers.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
-  driveToCompletion();
+
+  // Queue response body.
   Buffer::OwnedImpl response_body(std::string(1024, 'b'));
   response_encoder_->encodeData(response_body, true);
 
+  // Flush response body.
   EXPECT_CALL(response_decoder_, decodeData(_, true)).Times(AtLeast(1));
   driveToCompletion();
 
