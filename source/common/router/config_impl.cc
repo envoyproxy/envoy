@@ -342,12 +342,16 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
-
   cluster_ = config.cluster();
 
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
     default_value_ = config.runtime_fraction().default_value();
+  } else {
+    // If there is no runtime fraction specified, the default is 100% sampled. By leaving
+    // runtime_key_ empty and forcing the default to 100% this will yield the expected behavior.
+    default_value_.set_numerator(100);
+    default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   }
   trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
 }
@@ -488,11 +492,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
-  if (!route.route().request_mirror_policies().empty()) {
-    for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-      shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(mirror_policy_config));
-    }
+  for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
+    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
+
+  // Inherit policies from the virtual host, which might be from the route config.
+  if (shadow_policies_.empty()) {
+    shadow_policies_ = vhost.shadowPolicies();
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
@@ -1439,6 +1447,15 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
+    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+  }
+
+  // Inherit policies from the global config.
+  if (shadow_policies_.empty()) {
+    shadow_policies_ = global_route_config_.shadowPolicies();
+  }
+
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
     throw EnvoyException("cannot set both matcher and routes on virtual host");
   }
@@ -1727,6 +1744,12 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
+  if (!config.request_mirror_policies().empty()) {
+    for (const auto& mirror_policy_config : config.request_mirror_policies()) {
+      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+    }
+  }
+
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, optional_http_filters, *this, factory_context, validator,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));

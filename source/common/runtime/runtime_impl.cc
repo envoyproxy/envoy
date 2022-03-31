@@ -28,7 +28,7 @@
 #include "absl/strings/numbers.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/platform/quiche_flags_impl.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {
