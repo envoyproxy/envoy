@@ -54,8 +54,9 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
   }
 }
 
-const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr destination_address,
-                                    Network::Address::InstanceConstSharedPtr source_address) const {
+const std::string
+RouterImpl::route(const Network::Address::InstanceConstSharedPtr destination_address,
+                  const Network::Address::InstanceConstSharedPtr source_address) const {
   if (cluster_.has_value()) {
     return cluster_.value();
   }

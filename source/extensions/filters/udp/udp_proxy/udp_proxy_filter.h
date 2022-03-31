@@ -100,8 +100,8 @@ public:
     }
   }
 
-  const std::string route(Network::Address::InstanceConstSharedPtr destination_address,
-                          Network::Address::InstanceConstSharedPtr source_address) const {
+  const std::string route(const Network::Address::InstanceConstSharedPtr destination_address,
+                          const Network::Address::InstanceConstSharedPtr source_address) const {
     return router_->route(destination_address, source_address);
   }
   const std::vector<std::string>& allClusterNames() const { return router_->allClusterNames(); }
