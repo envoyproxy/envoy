@@ -322,12 +322,16 @@ public:
 
   // Only safe to call when using the wrapped nghttp2 codec implementation.
   size_t getClientDataSourcesSize() {
-    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(*client_wrapper_->connection_->adapter_).sources_size();
+    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(
+               *client_wrapper_->connection_->adapter_)
+        .sources_size();
   }
 
   // Only safe to call when using the wrapped nghttp2 codec implementation.
   size_t getServerDataSourcesSize() {
-    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(*server_wrapper_->connection_->adapter_).sources_size();
+    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(
+               *server_wrapper_->connection_->adapter_)
+        .sources_size();
   }
 
   TestScopedRuntime scoped_runtime_;
