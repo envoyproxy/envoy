@@ -1808,8 +1808,9 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
       Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
   const Http2Frame settings_max_connections_frame = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 0}});
-  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
-                                              std::string(settings_max_connections_frame)));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(rst_stream), std::string(go_away_frame),
+                   std::string(settings_max_connections_frame))));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
 
@@ -1817,6 +1818,8 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
   tcp_client_->close();
 }
 
+// Verify that receiving a WINDOW_UPDATE frame after a GOAWAY does not trigger an assertion failure
+// complaining of continued dispatch after connection close.
 TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
@@ -1829,9 +1832,9 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
 
-  // Start a second request and wait for it to reach the upstream. This is to
-  // exercise the case where numActiveRequests > 0 at the time that GOAWAY is
-  // received from upstream.
+  // Start a second request and wait for it to reach the upstream. This is to exercise the case
+  // where numActiveRequests > 0 at the time that GOAWAY is received from upstream, which is needed
+  // to replicate the original assertion failure.
   sendFrame(
       Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/path/to/long/url"));
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
@@ -1845,8 +1848,8 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   const Http2Frame go_away_frame = Http2Frame::makeEmptyGoAwayFrame(
       /*last_stream_index=*/client_stream_idx, Http2Frame::ErrorCode::NoError);
   const Http2Frame window_update_frame = Http2Frame::makeWindowUpdateFrame(0, 10);
-  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
-                                              std::string(window_update_frame)));
+  ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
+      std::string(rst_stream), std::string(go_away_frame), std::string(window_update_frame))));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
 

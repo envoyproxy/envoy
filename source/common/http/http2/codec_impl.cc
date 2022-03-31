@@ -375,7 +375,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
-    if (auto status = parent_.onStreamClose(this, 0); !status.ok()) {
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
                      status.message());
     }
@@ -767,7 +767,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
         parent_.connection_, stream_id_);
     // The stream didn't originally have an NGHTTP2 error, since we buffered
     // its stream close.
-    if (auto status = parent_.onStreamClose(this, 0); !status.ok()) {
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
       ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
                      status.message());
     }
