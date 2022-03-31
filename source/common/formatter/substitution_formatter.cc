@@ -409,7 +409,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
   }
 
   // Check flags for the command.
-  CommandSyntaxChecker::VerifySyntax((*it).second.first, command, subcommand, length);
+  CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, length);
 
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.
@@ -1392,7 +1392,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& command, const std::
   }
 
   // Check flags for the command.
-  CommandSyntaxChecker::VerifySyntax((*it).second.first, command, subcommand, length);
+  CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, length);
 
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.
@@ -1815,7 +1815,7 @@ SystemTimeFormatter::extractValue(const StreamInfo::StreamInfo& stream_info) con
   return ValueUtil::optionalStringValue(extract(stream_info));
 }
 
-void CommandSyntaxChecker::VerifySyntax(CommandSyntaxFlags flags, const std::string& command,
+void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::string& command,
                                         const std::string& subcommand,
                                         const absl::optional<size_t>& length) {
   if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {

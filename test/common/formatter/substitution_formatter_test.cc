@@ -3168,7 +3168,7 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_THROW(CommandSyntaxChecker::VerifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+    EXPECT_THROW(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
                                                     std::get<1>(test_case), std::get<2>(test_case)),
                  EnvoyException);
   }
@@ -3199,7 +3199,7 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            absl::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_NO_THROW(CommandSyntaxChecker::VerifySyntax(
+    EXPECT_NO_THROW(CommandSyntaxChecker::verifySyntax(
         std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
   }
 }
