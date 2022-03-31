@@ -84,7 +84,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy): Re-enable after diagnosing #19761
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
-// TODO(birenroy) flip after Google tests
+// TODO(birenroy) flip after a burn-in period
 // Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
