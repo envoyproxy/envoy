@@ -188,8 +188,8 @@ public:
     return cluster_metadata_match_criteria_.get();
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
-
   Upstream::OdCdsApiHandle* odcds() const { return odcds_.get(); }
+  absl::optional<std::chrono::milliseconds>& odcdsTimeout() { return odcds_timeout_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -243,6 +243,7 @@ private:
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   Upstream::OdCdsApiHandlePtr odcds_;
+  absl::optional<std::chrono::milliseconds> odcds_timeout_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

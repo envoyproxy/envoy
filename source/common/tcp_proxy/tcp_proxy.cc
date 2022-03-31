@@ -134,6 +134,16 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     odcds_ = context.clusterManager().allocateOdCdsApi(config.on_demand().odcds_config(),
                                                        OptRef<xds::core::v3::ResourceLocator>(),
                                                        context.messageValidationVisitor());
+    if (config.on_demand().has_timeout()) {
+      const uint64_t timeout = DurationUtil::durationToMilliseconds(config.on_demand().timeout());
+      if (timeout > 0) {
+        odcds_timeout_ = std::chrono::milliseconds(timeout);
+      } else {
+        odcds_timeout_ = std::chrono::milliseconds::max();
+      }
+    } else {
+      odcds_timeout_ = std::chrono::seconds(60);
+    }
   }
 }
 
@@ -349,7 +359,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
           });
       config_->stats().on_demand_cluster_attempt_.inc();
       cluster_discovery_handle_ = odcds->requestOnDemandClusterDiscovery(
-          cluster_name, std::move(callback), std::chrono::milliseconds(5000));
+          cluster_name, std::move(callback), config_->odcdsTimeout().value());
     }
     return Network::FilterStatus::StopIteration;
   }
