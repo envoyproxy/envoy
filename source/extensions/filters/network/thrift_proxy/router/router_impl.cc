@@ -48,7 +48,7 @@ RouteEntryImplBase::RouteEntryImplBase(
   }
 }
 
-// Similiar validation procedure with Envoy::Router::RouteEntryImplBase::validateCluster
+// Similar validation procedure with Envoy::Router::RouteEntryImplBase::validateCluster
 void RouteEntryImplBase::validateClusters(
     const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
   // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
