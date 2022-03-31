@@ -7,7 +7,6 @@
 
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
-#include "source/extensions/common/async_files/posix_file_operations.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
@@ -35,7 +34,7 @@ public:
   std::function<void()> unlink(absl::string_view filename,
                                std::function<void(absl::Status)> on_complete) override;
   std::string describe() const override;
-  const PosixFileOperations& posix() const { return posix_; }
+  const Api::OsSysCalls& posix() const { return posix_; }
 
   // The first time we try to open an anonymous file, these values are used to capture whether
   // opening with O_TMPFILE works. If it does not, the first open is retried using 'mkstemp',
@@ -58,7 +57,7 @@ private:
   bool terminate_ ABSL_GUARDED_BY(queue_mutex_) = false;
 
   std::vector<std::thread> thread_pool_;
-  const PosixFileOperations& posix_;
+  const Api::OsSysCalls& posix_;
 };
 
 } // namespace AsyncFiles

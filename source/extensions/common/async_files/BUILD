@@ -32,20 +32,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "posix_file_operations",
-    srcs = [
-        "posix_file_operations.cc",
-    ],
-    hdrs = [
-        "posix_file_operations.h",
-    ],
-    tags = ["skip_on_windows"],
-    deps = [
-        "//source/common/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "async_files_thread_pool",
     srcs = [
         "async_file_context_thread_pool.cc",
@@ -59,8 +45,8 @@ envoy_cc_library(
     visibility = ["//visibility:private"],
     deps = [
         ":async_files_base",
-        ":posix_file_operations",
         ":status_after_file_error",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/status:statusor",

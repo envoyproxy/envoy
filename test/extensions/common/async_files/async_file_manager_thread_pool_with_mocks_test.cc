@@ -7,7 +7,7 @@
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 
-#include "test/mocks/extensions/common/async_files/mock_posix_file_operations.h"
+#include "test/mocks/api/mocks.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
@@ -24,6 +24,7 @@ using ::testing::_;
 using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Return;
+using ::testing::StrictMock;
 
 class AsyncFileManagerWithMockFilesTest : public ::testing::Test {
 public:
@@ -35,7 +36,7 @@ public:
   }
 
 protected:
-  MockPosixFileOperations mock_posix_file_operations_;
+  StrictMock<Api::MockOsSysCalls> mock_posix_file_operations_;
   std::unique_ptr<AsyncFileManager> manager_;
   static constexpr absl::string_view tmpdir_{"/mocktmp"};
 };

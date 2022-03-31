@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_context_base.h"
 #include "source/extensions/common/async_files/async_file_context_thread_pool.h"
@@ -30,7 +31,7 @@ static thread_local bool is_worker_thread_ = false;
 
 AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(const AsyncFileManagerConfig& config)
     : posix_(config.substitute_posix_file_operations == nullptr
-                 ? realPosixFileOperations()
+                 ? *Api::OsSysCallsSingleton::get()
                  : *config.substitute_posix_file_operations) {
   unsigned int thread_pool_size = config.thread_pool_size.value();
   if (thread_pool_size == 0) {
@@ -208,7 +209,7 @@ private:
 
 class ActionUnlink : public AsyncFileActionWithResult<absl::Status> {
 public:
-  ActionUnlink(const PosixFileOperations& posix, absl::string_view filename,
+  ActionUnlink(const Api::OsSysCalls& posix, absl::string_view filename,
                std::function<void(absl::Status)> on_complete)
       : AsyncFileActionWithResult(on_complete), posix_(posix), filename_(filename) {}
 
@@ -221,7 +222,7 @@ public:
   }
 
 private:
-  const PosixFileOperations& posix_;
+  const Api::OsSysCalls& posix_;
   const std::string filename_;
 };
 

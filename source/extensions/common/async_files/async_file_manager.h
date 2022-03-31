@@ -15,7 +15,6 @@ namespace Common {
 namespace AsyncFiles {
 
 class AsyncFileManager;
-class PosixFileOperations;
 
 // A configuration for an AsyncFileManager instance.
 // To create a thread-pool-based AsyncFileManager, set thread_pool_size.
@@ -23,7 +22,9 @@ struct AsyncFileManagerConfig {
   // A thread pool size of 0 will use std::thread::hardware_concurrency() for the number of
   // threads. If unset, will try to use a different implementation.
   absl::optional<uint32_t> thread_pool_size;
-  PosixFileOperations* substitute_posix_file_operations = nullptr;
+
+  // For testing, to inject mock/fake OsSysCalls. If unset will use real file operations.
+  Api::OsSysCalls* substitute_posix_file_operations = nullptr;
 
   // TODO(ravenblack): Put configuration options to instantiate different implementations
   // here (e.g. `io_uring`, or a Windows-compatible implementation.)
