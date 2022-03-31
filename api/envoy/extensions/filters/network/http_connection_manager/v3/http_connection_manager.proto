@@ -204,7 +204,7 @@ message HttpConnectionManager {
     // Whether unix socket addresses should be considered internal.
     bool unix_sockets = 1;
 
-    // List of CIDR ranges that are treated as internal. If unset, then RFC1918 / RFC4193 
+    // List of CIDR ranges that are treated as internal. If unset, then RFC1918 / RFC4193
     // IP addresses will be considered internal.
     repeated config.core.v3.CidrRange cidr_ranges = 2;
   }
