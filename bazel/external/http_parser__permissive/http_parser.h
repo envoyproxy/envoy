@@ -18,11 +18,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-#ifndef http_parser_h
-#define http_parser_h
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef http_parser_permissive_h
+#define http_parser_permissive_h
+
+namespace http_parser_permissive {
 
 /* Also update SONAME in the Makefile whenever you change these. */
 #define HTTP_PARSER_VERSION_MAJOR 2
@@ -319,8 +318,6 @@ struct http_parser_settings {
    */
   http_cb on_chunk_header;
   http_cb on_chunk_complete;
-
-  unsigned int permissive_parsing;
 };
 
 enum http_parser_url_fields {
@@ -398,8 +395,7 @@ const char* http_errno_description(enum http_errno err);
 void http_parser_url_init(struct http_parser_url* u);
 
 /* Parse a URL; return nonzero on failure */
-int http_parser_parse_url(const char* buf, size_t buflen, int is_connect, struct http_parser_url* u,
-                          int permissive);
+int http_parser_parse_url(const char* buf, size_t buflen, int is_connect, struct http_parser_url* u);
 
 /* Pause or un-pause the parser; a nonzero value pauses */
 void http_parser_pause(http_parser* parser, int paused);
@@ -410,7 +406,5 @@ int http_body_is_final(const http_parser* parser);
 /* Change the maximum header size provided at compile time. */
 void http_parser_set_max_header_size(uint32_t size);
 
-#ifdef __cplusplus
 }
-#endif
 #endif
