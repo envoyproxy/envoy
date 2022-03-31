@@ -36,3 +36,15 @@ envoy_cc_extension(
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_extension(
+    name = "domain_matcher_lib",
+    srcs = ["domain_matcher.cc"],
+    hdrs = ["domain_matcher.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+        "//envoy/registry",
+        "//source/common/matcher:matcher_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)
