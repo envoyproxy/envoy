@@ -43,7 +43,7 @@ trap trap_errors ERR
 trap exit 1 INT
 
 CURRENT=check
-time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check
+time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check -- --fix
 
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
@@ -63,5 +63,11 @@ if [[ "${#FAILED[@]}" -ne "0" ]]; then
     for failed in "${FAILED[@]}"; do
         echo "${BASH_ERR_PREFIX} $failed" >&2
     done
+    if [[ $(git status --porcelain) ]]; then
+        git diff > "$DIFF_OUTPUT"
+        echo
+        echo "Diff file with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline."
+        echo
+    fi
     exit 1
 fi

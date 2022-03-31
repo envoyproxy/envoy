@@ -64,7 +64,7 @@ protected:
 /**
  * Implementation of a filter config provider using discovery subscriptions.
  **/
-template <class Factory, class FactoryCb>
+template <class FactoryCb>
 class DynamicFilterConfigProviderImpl : public DynamicFilterConfigProviderImplBase,
                                         public DynamicFilterConfigProvider<FactoryCb> {
 public:
@@ -92,15 +92,6 @@ public:
     }
   }
 
-  // DynamicFilterConfigProviderImplBase
-  void validateMessage(const std::string& config_name, const Protobuf::Message& message,
-                       const std::string& factory_name) const override {
-    auto* factory = Registry::FactoryRegistry<Factory>::getFactory(factory_name);
-    bool is_terminal_filter = factory->isTerminalFilterByProto(message, factory_context_);
-    Config::Utility::validateTerminalFilters(config_name, factory_name, filter_chain_type_,
-                                             is_terminal_filter, last_filter_in_filter_chain_);
-  }
-
   // Config::ExtensionConfigProvider
   const std::string& name() override { return DynamicFilterConfigProviderImplBase::name(); }
   absl::optional<FactoryCb> config() override { return tls_->config_; }
@@ -126,11 +117,12 @@ public:
     }
   }
 
+protected:
+  const std::string& getStatPrefix() const { return stat_prefix_; }
+  Server::Configuration::FactoryContext& getFactoryContext() const { return factory_context_; }
+
 private:
-  FactoryCb instantiateFilterFactory(const Protobuf::Message& message) const {
-    auto* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, stat_prefix_, factory_context_);
-  }
+  virtual FactoryCb instantiateFilterFactory(const Protobuf::Message& message) const PURE;
 
   void update(absl::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
     // This call must not capture 'this' as it is invoked on all workers asynchronously.
@@ -163,6 +155,29 @@ private:
   std::shared_ptr<MainConfig> main_config_;
   const ProtobufTypes::MessagePtr default_configuration_;
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
+};
+
+// Implementation of a HTTP dynamic filter config provider.
+class HttpDynamicFilterConfigProviderImpl
+    : public DynamicFilterConfigProviderImpl<Http::FilterFactoryCb> {
+public:
+  using DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl;
+  void validateMessage(const std::string& config_name, const Protobuf::Message& message,
+                       const std::string& factory_name) const override {
+    auto* factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+            factory_name);
+    const bool is_terminal_filter = factory->isTerminalFilterByProto(message, getFactoryContext());
+    Config::Utility::validateTerminalFilters(config_name, factory_name, filter_chain_type_,
+                                             is_terminal_filter, last_filter_in_filter_chain_);
+  }
+
+private:
+  Http::FilterFactoryCb instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+        getFactoryByType(message.GetTypeName());
+    return factory->createFilterFactoryFromProto(message, getStatPrefix(), getFactoryContext());
+  }
 };
 
 /**
@@ -289,7 +304,7 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb>
+template <class FactoryCb>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb>,
                                         public Singleton::Instance {
@@ -332,7 +347,7 @@ public:
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
 
-    auto provider = std::make_unique<DynamicFilterConfigProviderImpl<Factory, FactoryCb>>(
+    auto provider = createFilterConfigProviderImpl(
         subscription, require_type_urls, factory_context, std::move(default_config),
         last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix);
 
@@ -358,11 +373,20 @@ protected:
                    Server::Configuration::FactoryContext& factory_context,
                    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const PURE;
+
+private:
+  virtual std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>
+  createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
+                                 const absl::flat_hash_set<std::string>& require_type_urls,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 ProtobufTypes::MessagePtr&& default_config,
+                                 bool last_filter_in_filter_chain,
+                                 const std::string& filter_chain_type,
+                                 absl::string_view stat_prefix) PURE;
 };
 
 class HttpFilterConfigProviderManagerImpl
-    : public FilterConfigProviderManagerImpl<Server::Configuration::NamedHttpFilterConfigFactory,
-                                             Http::FilterFactoryCb> {
+    : public FilterConfigProviderManagerImpl<Http::FilterFactoryCb> {
 public:
   std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
@@ -376,6 +400,20 @@ protected:
                    Server::Configuration::FactoryContext& factory_context,
                    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const override;
+
+private:
+  std::unique_ptr<DynamicFilterConfigProviderImpl<Http::FilterFactoryCb>>
+  createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
+                                 const absl::flat_hash_set<std::string>& require_type_urls,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 ProtobufTypes::MessagePtr&& default_config,
+                                 bool last_filter_in_filter_chain,
+                                 const std::string& filter_chain_type,
+                                 absl::string_view stat_prefix) override {
+    return std::make_unique<HttpDynamicFilterConfigProviderImpl>(
+        subscription, require_type_urls, factory_context, std::move(default_config),
+        last_filter_in_filter_chain, filter_chain_type, stat_prefix);
+  }
 };
 
 } // namespace Filter

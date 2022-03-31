@@ -33,7 +33,7 @@ GrpcClientImpl::~GrpcClientImpl() {
   }
 
   if (stream_ != nullptr) {
-    stream_.closeStream();
+    stream_.resetStream();
   }
 }
 
@@ -55,14 +55,6 @@ void GrpcClientImpl::closeStream() {
   ASSERT(callbacks_ != nullptr);
   if (stream_ != nullptr) {
     stream_.closeStream();
-  }
-}
-
-void GrpcClientImpl::resetStream() {
-  ASSERT(callbacks_ != nullptr);
-  if (stream_ != nullptr) {
-    stream_.resetStream();
-    stream_ = nullptr;
   }
 }
 
