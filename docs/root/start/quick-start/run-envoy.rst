@@ -390,6 +390,22 @@ Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additiona
 Envoy can be configured to log to :ref:`different formats <config_access_log>`, and to
 :ref:`different outputs <api-v3_config_accesslog>` in addition to files and ``stdout/err``.
 
+Envoy networking
+----------------
+
+By default Envoy can use both IPv4 and IPv6 networks. If your environment does not support IPv6 you should disable it.
+This may be the case when using Docker on a non-linux host (see here for more information regarding
+`IPv6 support in Docker <https://docs.docker.com/config/daemon/ipv6/>`_.
+You can disable IPv6 by setting the ``dns_lookup_family`` to ``V4_ONLY`` in your configuration as follows:
+
+.. literalinclude:: _include/envoy-demo.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 34
+   :lines: 34-46
+   :emphasize-lines: 4
+   :caption: :download:`envoy-demo.yaml <_include/envoy-demo.yaml>`
+
 Debugging Envoy
 ---------------
 
@@ -450,14 +466,3 @@ which are set to ``debug`` and ``trace`` respectively.
 .. tip::
 
    See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h#L29>` for a list of components.
-
-Reminder on docker networking
------------------------------
-
-In some environments, IPv6 is not supported by the docker networking. If you are running Envoy with any demo
-configurations, please set ``dns_lookup_family`` of cluster to the ``V4_ONLY`` just like following example.
-See `docker docs <https://docs.docker.com/config/daemon/ipv6/>`_ for more information about the IPv6 support.
-
-.. literalinclude:: _include/envoy-demo.yaml
-   :language: yaml
-   :lines: 34-46
