@@ -398,7 +398,7 @@ By default Envoy can use both IPv4 and IPv6 networks.
 If your environment does not support IPv6 you should disable it.
 
 This may be the case when using Docker on a non-linux host (see here for more information regarding
-`IPv6 support in Docker <https://docs.docker.com/config/daemon/ipv6/>`_.
+`IPv6 support in Docker <https://docs.docker.com/config/daemon/ipv6/>`_).
 
 You can disable IPv6 by setting the ``dns_lookup_family`` to ``V4_ONLY`` in your configuration as follows:
 
