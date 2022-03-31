@@ -117,12 +117,98 @@ public:
 };
 
 /**
- * Decoder filter interface.
+ * Encoder filter callbacks add additional callbacks.
  */
-class DecoderFilter : public virtual DecoderEventHandler {
+class EncoderFilterCallbacks {
 public:
-  ~DecoderFilter() override = default;
+  virtual ~EncoderFilterCallbacks() = default;
 
+  /**
+   * @return uint64_t the ID of the originating stream for logging purposes.
+   */
+  virtual uint64_t streamId() const PURE;
+
+  /**
+   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   */
+  virtual const Network::Connection* connection() const PURE;
+
+  /**
+   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Continue iterating through the filter chain with buffered data. This routine can only be
+   * called if the filter has previously returned StopIteration from one of the EncoderFilter
+   * methods. The connection manager will callbacks to the next filter in the chain. Further note
+   * that if the request is not complete, the calling filter may receive further callbacks and must
+   * return an appropriate status code depending on what the filter needs to do.
+   */
+  virtual void continueEncoding() PURE;
+
+  /**
+   * @return RouteConstSharedPtr the route for the current request.
+   */
+  virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * @return TransportType the originating transport.
+   */
+  virtual TransportType downstreamTransportType() const PURE;
+
+  /**
+   * @return ProtocolType the originating protocol.
+   */
+  virtual ProtocolType downstreamProtocolType() const PURE;
+
+  /**
+   * Create a locally generated response using the provided response object.
+   * @param response DirectResponse the response to send to the downstream client
+   * @param end_stream if true, the downstream connection should be closed after this response
+   */
+  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
+
+  /**
+   * Indicates the start of an upstream response. May only be called once.
+   * @param transport the transport used by the upstream response
+   * @param protocol the protocol used by the upstream response
+   */
+  virtual void startUpstreamResponse(Transport& transport, Protocol& protocol) PURE;
+
+  /**
+   * Called with upstream response data.
+   * @param data supplies the upstream's data
+   * @return ResponseStatus indicating if the upstream response requires more data, is complete,
+   *         or if an error occurred requiring the upstream connection to be reset.
+   */
+  virtual ResponseStatus upstreamData(Buffer::Instance& data) PURE;
+
+  /**
+   * Reset the downstream connection.
+   */
+  virtual void resetDownstreamConnection() PURE;
+
+  /**
+   * @return StreamInfo for logging purposes.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Response encoder metadata created by the connection manager.
+   */
+  virtual MessageMetadataSharedPtr responseMetadata() PURE;
+
+  /**
+   * @return Signal indicating whether or not the response encoder encountered a successful/void
+   * reply.
+   */
+  virtual bool responseSuccess() PURE;
+};
+
+class FilterBase {
+public:
+  virtual ~FilterBase() = default;
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
    * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
@@ -133,6 +219,14 @@ public:
    * onDestroy() invoked.
    */
   virtual void onDestroy() PURE;
+};
+
+/**
+ * Decoder filter interface.
+ */
+class DecoderFilter : public FilterBase, public DecoderEventHandler {
+public:
+  ~DecoderFilter() override = default;
 
   /**
    * Called by the connection manager once to initialize the filter decoder callbacks that the
@@ -149,6 +243,83 @@ public:
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 
+class EncoderFilter : public FilterBase, public DecoderEventHandler {
+public:
+  ~EncoderFilter() override = default;
+
+  /**
+   * Called by the connection manager once to initialize the filter decoder callbacks that the
+   * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
+   */
+  virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * @return True if payload passthrough is supported. Called by the connection manager once after
+   * messageBegin.
+   */
+  virtual bool passthroughSupported() const PURE;
+};
+
+using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
+
+class BidirectionFilter : public FilterBase {
+public:
+  virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
+  virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
+  virtual bool decodePassthroughSupported() const PURE;
+  virtual bool encodePassthroughSupported() const PURE;
+  virtual FilterStatus decodeTransportBegin(MessageMetadataSharedPtr metadata) PURE;
+  virtual FilterStatus encodeTransportBegin(MessageMetadataSharedPtr metadata) PURE;
+  virtual FilterStatus decodeTransportEnd() PURE;
+  virtual FilterStatus encodeTransportEnd() PURE;
+  virtual FilterStatus decodePassthroughData(Buffer::Instance& data) PURE;
+  virtual FilterStatus encodePassthroughData(Buffer::Instance& data) PURE;
+  virtual FilterStatus decodeMessageBegin(MessageMetadataSharedPtr metadata) PURE;
+  virtual FilterStatus encodeMessageBegin(MessageMetadataSharedPtr metadata) PURE;
+  virtual FilterStatus decodeMessageEnd() PURE;
+  virtual FilterStatus encodeMessageEnd() PURE;
+  virtual FilterStatus decodeStructBegin(absl::string_view name) PURE;
+  virtual FilterStatus encodeStructBegin(absl::string_view name) PURE;
+  virtual FilterStatus decodeStructEnd() PURE;
+  virtual FilterStatus encodeStructEnd() PURE;
+  virtual FilterStatus decodeFieldBegin(absl::string_view name, FieldType& field_type,
+                                        int16_t& field_id) PURE;
+  virtual FilterStatus encodeFieldBegin(absl::string_view name, FieldType& field_type,
+                                        int16_t& field_id) PURE;
+  virtual FilterStatus decodeFieldEnd() PURE;
+  virtual FilterStatus encodeFieldEnd() PURE;
+  virtual FilterStatus decodeBoolValue(bool& value) PURE;
+  virtual FilterStatus encodeBoolValue(bool& value) PURE;
+  virtual FilterStatus decodeByteValue(uint8_t& value) PURE;
+  virtual FilterStatus encodeByteValue(uint8_t& value) PURE;
+  virtual FilterStatus decodeInt16Value(int16_t& value) PURE;
+  virtual FilterStatus encodeInt16Value(int16_t& value) PURE;
+  virtual FilterStatus decodeInt32Value(int32_t& value) PURE;
+  virtual FilterStatus encodeInt32Value(int32_t& value) PURE;
+  virtual FilterStatus decodeInt64Value(int64_t& value) PURE;
+  virtual FilterStatus encodeInt64Value(int64_t& value) PURE;
+  virtual FilterStatus decodeDoubleValue(double& value) PURE;
+  virtual FilterStatus encodeDoubleValue(double& value) PURE;
+  virtual FilterStatus decodeStringValue(absl::string_view value) PURE;
+  virtual FilterStatus encodeStringValue(absl::string_view value) PURE;
+  virtual FilterStatus decodeMapBegin(FieldType& key_type, FieldType& value_type,
+                                      uint32_t& size) PURE;
+  virtual FilterStatus encodeMapBegin(FieldType& key_type, FieldType& value_type,
+                                      uint32_t& size) PURE;
+  virtual FilterStatus decodeMapEnd() PURE;
+  virtual FilterStatus encodeMapEnd() PURE;
+  virtual FilterStatus decodeListBegin(FieldType& elem_type, uint32_t& size) PURE;
+  virtual FilterStatus encodeListBegin(FieldType& elem_type, uint32_t& size) PURE;
+  virtual FilterStatus decodeListEnd() PURE;
+  virtual FilterStatus encodeListEnd() PURE;
+  virtual FilterStatus decodeSetBegin(FieldType& elem_type, uint32_t& size) PURE;
+  virtual FilterStatus encodeSetBegin(FieldType& elem_type, uint32_t& size) PURE;
+  virtual FilterStatus decodeSetEnd() PURE;
+  virtual FilterStatus encodeSetEnd() PURE;
+};
+
+using BidirectionFilterSharedPtr = std::shared_ptr<BidirectionFilter>;
+
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
@@ -162,6 +333,8 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addDecoderFilter(DecoderFilterSharedPtr filter) PURE;
+  // virtual void addEncoderFilter(EncoderFilterSharedPtr filter) PURE;
+  // virtual void addBidirectionFilter(BidirectionFilterSharedPtr filter) PURE;
 };
 
 /**

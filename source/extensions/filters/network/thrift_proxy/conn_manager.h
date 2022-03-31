@@ -234,6 +234,8 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
     std::list<ActiveRpcDecoderFilterPtr> decoder_filters_;
+    // std::list<ActiveRpcEncoderFilterPtr> encoder_filters_;
+    // std::list<ActiveRpcFilterPtr> filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
