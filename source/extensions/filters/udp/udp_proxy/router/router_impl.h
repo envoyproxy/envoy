@@ -61,7 +61,6 @@ public:
   const std::vector<std::string>& allClusterNames() const override;
 
 private:
-  absl::optional<std::string> cluster_;
   Matcher::MatchTreeSharedPtr<Network::UdpMatchingData> matcher_;
   std::vector<std::string> cluster_names_;
 };
