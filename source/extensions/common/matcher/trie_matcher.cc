@@ -9,6 +9,8 @@ namespace Matcher {
 
 REGISTER_FACTORY(NetworkTrieMatcherFactory,
                  ::Envoy::Matcher::CustomMatcherFactory<Network::MatchingData>);
+REGISTER_FACTORY(UdpNetworkTrieMatcherFactory,
+                 ::Envoy::Matcher::CustomMatcherFactory<Network::UdpMatchingData>);
 
 } // namespace Matcher
 } // namespace Common

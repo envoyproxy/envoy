@@ -48,16 +48,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 
   std::vector<Http::AlternateProtocolsCache::AlternateProtocol> protocols;
   for (size_t i = 0; i < alt_svc.size(); ++i) {
-    absl::optional<Http::AlternateProtocolsCacheImpl::OriginData> origin_data =
-        Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc[i]->value().getStringView(),
-                                                                time_source_);
-    if (!origin_data.has_value()) {
+    std::vector<Http::AlternateProtocolsCache::AlternateProtocol> advertised_protocols =
+        Http::AlternateProtocolsCacheImpl::alternateProtocolsFromString(
+            alt_svc[i]->value().getStringView(), time_source_, false);
+    if (advertised_protocols.empty()) {
       ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
                 alt_svc[i]->value().getStringView());
       return Http::FilterHeadersStatus::Continue;
     }
-    std::vector<Http::AlternateProtocolsCache::AlternateProtocol>& advertised_protocols =
-        origin_data.value().protocols;
     protocols.insert(protocols.end(), std::make_move_iterator(advertised_protocols.begin()),
                      std::make_move_iterator(advertised_protocols.end()));
   }
@@ -68,8 +66,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // balanced across them.
   Upstream::HostDescriptionConstSharedPtr host =
       encoder_callbacks_->streamInfo().upstreamInfo()->upstreamHost();
+  absl::string_view hostname = host->hostname();
+  if (encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection() &&
+      !encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni().empty()) {
+    // In the case the configured hostname and SNI differ, prefer SNI where
+    // available.
+    hostname = encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni();
+  }
   const uint32_t port = host->address()->ip()->port();
-  const std::string& hostname = host->hostname();
   Http::AlternateProtocolsCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                port);
   cache_->setAlternatives(origin, protocols);

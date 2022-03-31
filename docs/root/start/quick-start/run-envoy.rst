@@ -182,6 +182,10 @@ Save the following snippet to ``envoy-override.yaml``:
          address: 127.0.0.1
          port_value: 9902
 
+.. warning::
+
+  If you run Envoy inside a Docker container you may wish to use ``0.0.0.0``. Exposing the admin interface in this way may give unintended control of your Envoy server. Please see the :ref:`admin section <start_quick_start_admin_config>` for more information.
+
 Next, start the Envoy server using the override configuration:
 
 .. tabs::

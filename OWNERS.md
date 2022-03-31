@@ -47,6 +47,8 @@ routing PRs, questions, etc. to the right place.
   * Data plane, overload management, flow control.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
   * Performance, Dubbo.
+* Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
+  * Bazel, CI, compilers, linkers, general build issues, etc.
 
 
 # Senior extension maintainers
