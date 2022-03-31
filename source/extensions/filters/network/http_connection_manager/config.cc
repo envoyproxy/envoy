@@ -89,7 +89,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
     decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
-                                       absl::nullopt, EMPTY_STRING);
+                                       absl::nullopt, nullptr, EMPTY_STRING);
     return Http::FilterHeadersStatus::StopIteration;
   }
 };

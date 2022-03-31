@@ -373,8 +373,9 @@ private:
 /**
  * Default O(1) response headers and trailers.
  */
-#define INLINE_RESP_STRING_HEADERS_TRAILERS(HEADER_FUNC) HEADER_FUNC(GrpcMessage)
-
+#define INLINE_RESP_STRING_HEADERS_TRAILERS(HEADER_FUNC)                                           \
+  HEADER_FUNC(GrpcMessage)                                                                         \
+  HEADER_FUNC(GrpcStatusDetailsBin)
 #define INLINE_RESP_NUMERIC_HEADERS_TRAILERS(HEADER_FUNC) HEADER_FUNC(GrpcStatus)
 
 #define INLINE_RESP_HEADERS_TRAILERS(HEADER_FUNC)                                                  \

@@ -6,18 +6,21 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/core/v3/protocol.pb.validate.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/fmt.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http1/settings.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "google/rpc/error_details.pb.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -823,9 +826,9 @@ TEST(HttpUtility, SendLocalReply) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
   EXPECT_CALL(callbacks, streamInfo());
-  Utility::sendLocalReply(
-      is_reset, callbacks,
-      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+  Utility::sendLocalReply(is_reset, callbacks,
+                          Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large",
+                                                  absl::nullopt, nullptr, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReply) {
@@ -842,9 +845,9 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
-  Utility::sendLocalReply(
-      is_reset, callbacks,
-      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+  Utility::sendLocalReply(is_reset, callbacks,
+                          Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
+                                                  absl::nullopt, nullptr, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
@@ -864,7 +867,7 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
   Utility::sendLocalReply(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
-                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
+                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, nullptr, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
@@ -893,7 +896,7 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
   Utility::sendLocalReply(
       is_reset, encode_functions,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
-                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
+                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, nullptr, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
@@ -922,9 +925,52 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
       }));
   Utility::sendLocalReply(
       is_reset, callbacks,
-      Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, false});
+      Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, nullptr, false});
 }
 
+TEST(HttpUtility, SendLocalGrpcReplyWithErrorDetails) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  const std::string json = R"EOF(this-is-message)EOF";
+
+  google::rpc::DebugInfo e;
+  e.set_detail("this-is-detail");
+  google::protobuf::Any a;
+  a.PackFrom(e);
+  std::unique_ptr<google::rpc::Status> error_details = std::make_unique<google::rpc::Status>();
+  error_details->set_message("to-be-overwritten-message");
+  error_details->set_code(999);
+  *error_details->mutable_details()->Add() = a;
+
+  EXPECT_CALL(callbacks, streamInfo());
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.getGrpcStatusValue(),
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        const auto& encoded = Utility::PercentEncoding::encode(json);
+        EXPECT_EQ(headers.getGrpcMessageValue(), encoded);
+        auto grpc_status_details = ::Envoy::Base64::decode(headers.getGrpcStatusDetailsBinValue());
+        google::rpc::Status got;
+        got.ParseFromString(grpc_status_details);
+
+        google::rpc::Status expected;
+        // The gRPC status code is from sendLocalReply's `grpc_status` arg.
+        expected.set_code(16);
+        // The gRPC status message is from sendLocalReply's `body_text` arg.
+        expected.set_message("this-is-message");
+        // The gRPC status error details is from sendLocalReply's `grpc_error_details` arg.
+        *expected.mutable_details()->Add() = a;
+        Envoy::Protobuf::util::MessageDifferencer::Equals(got, expected);
+      }));
+
+  Utility::sendLocalReply(is_reset, callbacks,
+                          Utility::LocalReplyData{true, Http::Code::Unauthorized, json,
+                                                  absl::nullopt, std::move(error_details), false});
+}
 TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
@@ -935,9 +981,9 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
-  Utility::sendLocalReply(
-      false, callbacks,
-      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", absl::nullopt, false});
+  Utility::sendLocalReply(false, callbacks,
+                          Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
+                                                  absl::nullopt, nullptr, false});
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -950,7 +996,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
                               absl::make_optional<Grpc::Status::GrpcStatus>(
                                   Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
-                              false});
+                              nullptr, false});
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -962,9 +1008,9 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(
-      is_reset, callbacks,
-      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+  Utility::sendLocalReply(is_reset, callbacks,
+                          Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large",
+                                                  absl::nullopt, nullptr, false});
 }
 
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
@@ -975,9 +1021,9 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
       }));
-  Utility::sendLocalReply(
-      is_reset, callbacks,
-      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, true});
+  Utility::sendLocalReply(is_reset, callbacks,
+                          Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large",
+                                                  absl::nullopt, nullptr, true});
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {

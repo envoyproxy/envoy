@@ -375,6 +375,10 @@ struct LocalReplyData {
   absl::string_view body_text_;
   // gRPC status code to override the httpToGrpcStatus mapping with.
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+
+  // Supplies gRPC status error details.
+  std::unique_ptr<::google::rpc::Status> grpc_error_details_;
+
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
 };

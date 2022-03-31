@@ -103,10 +103,12 @@ envoy_cc_test(
     srcs = ["filter_manager_test.cc"],
     deps = [
         "//source/common/http:filter_manager_lib",
+        "//source/common/protobuf",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_reply:local_reply_mocks",
         "//test/mocks/network:network_mocks",
+        "@com_google_googleapis//google/rpc:error_details_cc_proto",
     ],
 )
 
@@ -378,10 +380,12 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/protobuf",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_google_googleapis//google/rpc:error_details_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

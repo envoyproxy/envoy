@@ -74,9 +74,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     if (!error_msg.empty()) {
       stats_.denied_.inc();
       state_ = Responded;
-      decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
-                                         absl::StrCat("Failed JWT authentication: ", error_msg),
-                                         nullptr, absl::nullopt, generateRcDetails(error_msg));
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::Forbidden, absl::StrCat("Failed JWT authentication: ", error_msg), nullptr,
+          absl::nullopt, nullptr, generateRcDetails(error_msg));
       return Http::FilterHeadersStatus::StopIteration;
     }
   } else {
@@ -128,7 +128,7 @@ void Filter::onComplete(const Status& status) {
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
-        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        absl::nullopt, nullptr, generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

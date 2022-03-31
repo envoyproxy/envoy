@@ -181,7 +181,7 @@ void HealthCheckFilter::onComplete() {
           headers.setEnvoyDegraded("");
         }
       },
-      absl::nullopt, *details);
+      absl::nullopt, nullptr, *details);
 }
 
 } // namespace HealthCheck

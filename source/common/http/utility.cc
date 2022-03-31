@@ -12,6 +12,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -594,10 +595,14 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
     if (response_headers->getGrpcStatusValue().empty()) {
-      response_headers->setGrpcStatus(std::to_string(
+      auto final_grpc_status_code =
           enumToInt(local_reply_data.grpc_status_
                         ? local_reply_data.grpc_status_.value()
-                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
+      response_headers->setGrpcStatus(std::to_string(final_grpc_status_code));
+      if (local_reply_data.grpc_error_details_) {
+        local_reply_data.grpc_error_details_->set_code(final_grpc_status_code);
+      }
     }
 
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
@@ -609,7 +614,16 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
           body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
-      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
+      auto encoded_body_text = PercentEncoding::encode(body_text);
+      response_headers->setGrpcMessage(encoded_body_text);
+      if (local_reply_data.grpc_error_details_) {
+        local_reply_data.grpc_error_details_->set_message(encoded_body_text);
+      }
+    }
+    if (local_reply_data.grpc_error_details_) {
+      auto status_detail_str = local_reply_data.grpc_error_details_->SerializeAsString();
+      response_headers->setGrpcStatusDetailsBin(
+          ::Envoy::Base64::encode(status_detail_str.data(), status_detail_str.size(), false));
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();

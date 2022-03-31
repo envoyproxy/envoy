@@ -401,7 +401,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     ENVOY_STREAM_LOG(debug, "no route match for URL '{}'", *callbacks_, headers.getPathValue());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt,
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt, nullptr,
                                StreamInfo::ResponseCodeDetails::get().RouteNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -429,7 +429,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
+        absl::nullopt, nullptr, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -455,7 +455,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
     callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", modify_headers,
-                               absl::nullopt,
+                               absl::nullopt, nullptr,
                                StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -481,7 +481,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         const std::string details =
             absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
                          StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");
-        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, absl::nullopt, details);
+        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, absl::nullopt, nullptr,
+                                   details);
         return Http::FilterHeadersStatus::StopIteration;
       }
     }
@@ -508,7 +509,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           // Note: append_cluster_info does not respect suppress_envoy_headers.
           modify_headers(headers);
         },
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
+        absl::nullopt, nullptr, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -606,7 +607,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           debug_config->not_forwarded_header_.value_or(Http::Headers::get().EnvoyNotForwarded),
           "true");
     };
-    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt, "");
+    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt, nullptr,
+                               "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -728,7 +730,7 @@ void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
-                             absl::nullopt,
+                             absl::nullopt, nullptr,
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
@@ -761,7 +763,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       cleanup();
       callbacks_->sendLocalReply(
           Http::Code::InsufficientStorage, "exceeded request buffer limit while retrying upstream",
-          modify_headers_, absl::nullopt,
+          modify_headers_, absl::nullopt, nullptr,
           StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -1048,7 +1050,7 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
   callbacks_->sendLocalReply(
       Http::Utility::maybeRequestTimeoutCode(downstream_decode_complete),
-      "upstream max stream duration reached", modify_headers_, absl::nullopt,
+      "upstream max stream duration reached", modify_headers_, absl::nullopt, nullptr,
       StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
 }
 
@@ -1114,7 +1116,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
         }
         modify_headers_(headers);
       },
-      absl::nullopt, details);
+      absl::nullopt, nullptr, details);
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,

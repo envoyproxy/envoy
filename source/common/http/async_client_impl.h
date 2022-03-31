@@ -360,6 +360,7 @@ private:
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      std::unique_ptr<::google::rpc::Status> grpc_error_details,
                       absl::string_view details) override {
     if (encoded_response_headers_) {
       resetStream();
@@ -378,7 +379,8 @@ private:
                                  [this](Buffer::Instance& data, bool end_stream) -> void {
                                    encodeData(data, end_stream);
                                  }},
-        Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
+        Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status,
+                                std::move(grpc_error_details), is_head_request_});
   }
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}

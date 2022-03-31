@@ -4,10 +4,12 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/http/filter_manager.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/matcher/exact_map_matcher.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
@@ -16,6 +18,7 @@
 #include "test/mocks/local_reply/mocks.h"
 #include "test/mocks/network/mocks.h"
 
+#include "google/rpc/error_details.pb.h"
 #include "gtest/gtest.h"
 
 using testing::InSequence;
@@ -57,7 +60,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
         headers.setContentType("text/plain");
 
         filter->callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, absl::nullopt,
-                                           "");
+                                           nullptr, "");
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -114,7 +117,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         encoder_filter->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
-                                                           absl::nullopt, "");
+                                                           absl::nullopt, nullptr, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -141,6 +144,126 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
       .WillOnce(Invoke([](auto& response_headers) {
         EXPECT_THAT(response_headers,
                     HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc"));
+      }));
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+std::unique_ptr<google::rpc::Status> generateErrorDetails() {
+  google::rpc::DebugInfo e;
+  e.set_detail("this-is-detail");
+  google::protobuf::Any a;
+  a.PackFrom(e);
+  std::unique_ptr<google::rpc::Status> error_details = std::make_unique<google::rpc::Status>();
+  *error_details->mutable_details()->Add() = a;
+  return error_details;
+}
+
+TEST_F(FilterManagerTest, SendLocalReplyWithGrpcErrorDetailsDuringDecoding) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        filter->callbacks_->sendLocalReply(Code::InternalServerError, "this-is-message", nullptr,
+                                           absl::nullopt, generateErrorDetails(), "");
+        return FilterHeadersStatus::StopIteration;
+      }));
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"content-type", "application/grpc"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  filter_manager_->createFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
+  EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
+      .WillOnce(Invoke([](ResponseHeaderMap& response_headers) {
+        auto grpc_status_details =
+            ::Envoy::Base64::decode(response_headers.getGrpcStatusDetailsBinValue());
+        google::rpc::Status got;
+        got.ParseFromString(grpc_status_details);
+
+        auto expected = generateErrorDetails();
+        // The gRPC status code is from sendLocalReply's `grpc_status` arg.
+        expected->set_code(2);
+        // The gRPC status message is from sendLocalReply's `body_text` arg.
+        expected->set_message("this-is-message");
+
+        EXPECT_TRUE(Envoy::Protobuf::util::MessageDifferencer::Equals(got, *expected));
+      }));
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, SendLocalReplyWithGrpcErrorDetailsDuringEncoding) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        decoder_filter->callbacks_->encodeHeaders(std::move(response_headers), true, "test");
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  std::shared_ptr<MockStreamFilter> encoder_filter(new NiceMock<MockStreamFilter>());
+
+  EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        encoder_filter->encoder_callbacks_->sendLocalReply(
+            Code::InternalServerError, "this-is-message", nullptr, absl::nullopt,
+            generateErrorDetails(), "");
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+        callbacks.addStreamFilter(encoder_filter);
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
+  EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
+      .WillOnce(Invoke([](auto&) {}))
+      .WillOnce(Invoke([](ResponseHeaderMap& response_headers) {
+        auto grpc_status_details =
+            ::Envoy::Base64::decode(response_headers.getGrpcStatusDetailsBinValue());
+        google::rpc::Status got;
+        got.ParseFromString(grpc_status_details);
+
+        auto expected = generateErrorDetails();
+        // The gRPC status code is from sendLocalReply's `grpc_status` arg.
+        expected->set_code(2);
+        // The gRPC status message is from sendLocalReply's `body_text` arg.
+        expected->set_message("this-is-message");
+
+        EXPECT_TRUE(Envoy::Protobuf::util::MessageDifferencer::Equals(got, *expected));
       }));
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
@@ -479,7 +602,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_CALL(*encoder_filter, onLocalReply(_));
   EXPECT_CALL(filter_manager_callbacks_, resetStream());
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                             absl::nullopt, "details");
+                                             absl::nullopt, nullptr, "details");
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.
@@ -528,7 +651,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*encoder_filter, encodeHeaders(_, _))
         .WillOnce(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
           decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body2", nullptr,
-                                                     absl::nullopt, "details2");
+                                                     absl::nullopt, nullptr, "details2");
           return FilterHeadersStatus::StopIteration;
         }));
 
@@ -541,7 +664,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                               absl::nullopt, "details");
+                                               absl::nullopt, nullptr, "details");
   }
 
   // The final details should be details2.

@@ -462,7 +462,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
     error_ = true;
     decoder_callbacks_->sendLocalReply(
-        static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
+        static_cast<Http::Code>(http_code), std::string(status.message()), nullptr, absl::nullopt,
+        nullptr,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                      StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                      "}"));
@@ -482,7 +483,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           "Transcoding of query arguments of HttpBody request is not done (unexpected state)");
       error_ = true;
       decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
+          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt, nullptr,
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -744,7 +745,7 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
         absl::string_view(request_status.message().data(), request_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, absl::nullopt, nullptr,
         absl::StrCat(
             details, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
@@ -905,7 +906,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::PayloadTooLarge,
         "Request rejected because the transcoder's internal buffer size exceeds the configured "
         "limit.",
-        nullptr, absl::nullopt,
+        nullptr, absl::nullopt, nullptr,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{request_buffer_size_limit_reached}"));
     return true;
   }
@@ -923,7 +924,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::InternalServerError,
         "Response not transcoded because the transcoder's internal buffer size exceeds the "
         "configured limit.",
-        nullptr, absl::nullopt,
+        nullptr, absl::nullopt, nullptr,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{response_buffer_size_limit_reached}"));
     return true;
   }

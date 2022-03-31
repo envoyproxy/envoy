@@ -523,7 +523,7 @@ void UpstreamRequest::onPoolReady(
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
                      "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
     parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
-                                        absl::nullopt, details);
+                                        absl::nullopt, nullptr, details);
     return;
   }
 
