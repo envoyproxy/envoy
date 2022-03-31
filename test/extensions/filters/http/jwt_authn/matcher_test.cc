@@ -19,7 +19,7 @@ namespace {
 
 class MatcherTest : public testing::Test {
 public:
-  MatcherConstPtr CreateMatcher(const char* config) {
+  MatcherConstPtr createMatcher(const char* config) {
     RequirementRule rule;
     TestUtility::loadFromYaml(config, rule);
     return Matcher::create(rule);
@@ -29,7 +29,7 @@ public:
 TEST_F(MatcherTest, TestMatchPrefix) {
   const char config[] = R"(match:
   prefix: "/match")";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/match/this"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/MATCH"}};
@@ -49,7 +49,7 @@ match:
     google_re2: {}
     regex: "/[^c][au]t")";
 
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/but"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/mat?ok=bye"}};
@@ -66,7 +66,7 @@ TEST_F(MatcherTest, TestMatchPath) {
   const char config[] = R"(match:
   path: "/match"
   case_sensitive: false)";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/match"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/MATCH"}};
@@ -88,7 +88,7 @@ TEST_F(MatcherTest, TestMatchQuery) {
   - name: foo
     string_match:
       exact: bar)";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/boo?ok=bye"}};
@@ -106,7 +106,7 @@ TEST_F(MatcherTest, TestMatchHeader) {
   prefix: "/"
   headers:
   - name: a)";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/"}, {"a", ""}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/"}, {"a", "some"}, {"b", ""}};
@@ -126,7 +126,7 @@ TEST_F(MatcherTest, TestMatchPathAndHeader) {
   - name: foo
     string_match:
       exact: bar)";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/boo?ok=bye"}};
@@ -142,7 +142,7 @@ TEST_F(MatcherTest, TestMatchPathAndHeader) {
 TEST_F(MatcherTest, TestMatchConnect) {
   const char config[] = R"(match:
   connect_matcher: {})";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":method", "CONNECT"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":method", "GET"}};
@@ -156,7 +156,7 @@ TEST_F(MatcherTest, TestMatchConnectQuery) {
   - name: foo
     string_match:
       exact: "bar")";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/boo?foo=bar"}};
@@ -168,7 +168,7 @@ TEST_F(MatcherTest, TestMatchConnectQuery) {
 TEST_F(MatcherTest, TestMatchPathSeparatedPrefix) {
   const char config[] = R"(match:
   path_separated_prefix: "/rest/api")";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
 
   // Exact matches
   auto headers = TestRequestHeaderMapImpl{{":path", "/rest/api"}};
@@ -195,17 +195,17 @@ TEST_F(MatcherTest, TestMatchPathSeparatedPrefixCaseSensitivity) {
 
   const char configCaseSensitive[] = R"(match:
   path_separated_prefix: "/rest/API")";
-  MatcherConstPtr matcherSensitive = CreateMatcher(configCaseSensitive);
+  MatcherConstPtr matcherSensitive = createMatcher(configCaseSensitive);
 
   const char configCaseSensitiveExplicit[] = R"(match:
   path_separated_prefix: "/rest/API"
   case_sensitive: true)";
-  MatcherConstPtr matcherSensitiveExplicit = CreateMatcher(configCaseSensitiveExplicit);
+  MatcherConstPtr matcherSensitiveExplicit = createMatcher(configCaseSensitiveExplicit);
 
   const char configCaseInsensitive[] = R"(match:
   path_separated_prefix: "/rest/api"
   case_sensitive: false)";
-  MatcherConstPtr matcherInsensitive = CreateMatcher(configCaseInsensitive);
+  MatcherConstPtr matcherInsensitive = createMatcher(configCaseInsensitive);
 
   auto headers = TestRequestHeaderMapImpl{{":path", "/rest/API"}};
   EXPECT_TRUE(matcherSensitive->matches(headers));
@@ -242,7 +242,7 @@ TEST_F(MatcherTest, TestMatchPathSeparatedPrefixBaseCondition) {
       exact: test
   headers:
   - name: cookies)";
-  MatcherConstPtr matcher = CreateMatcher(config);
+  MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/rest/api?param=test"}, {"cookies", ""}};
   EXPECT_TRUE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/rest/api?param=test"}, {"pizza", ""}};
