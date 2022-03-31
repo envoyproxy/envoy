@@ -16,6 +16,9 @@ void SslCertValidatorIntegrationTest::initialize() {
   context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   registerTestServerPorts({"http"});
+
+  test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->reset();
+  test_server_->counter(listenerStatPrefix("ssl.handshake"))->reset();
 }
 
 void SslCertValidatorIntegrationTest::TearDown() {
@@ -38,13 +41,6 @@ SslCertValidatorIntegrationTest::makeSslClientConnection(const ClientSslTranspor
       client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
 }
 
-void SslCertValidatorIntegrationTest::checkVerifyErrorCouter(uint64_t value) {
-  Stats::CounterSharedPtr counter =
-      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
-  EXPECT_EQ(value, counter->value());
-  counter->reset();
-}
-
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientVersions, SslCertValidatorIntegrationTest,
     testing::Combine(
@@ -61,37 +57,25 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidated) {
                                   .setClientWithIntermediateCert(true));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec;
-  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  } else {
-    codec = makeHttpConnection(std::move(conn));
-  }
+  IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
   ASSERT_TRUE(codec->connected());
-  checkVerifyErrorCouter(0);
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
 
 // With verify-depth set, certificate validation fails
 TEST_P(SslCertValidatorIntegrationTest, CertValidationFailed) {
-  absl::optional<uint32_t> depth(1);
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true)
                                   .setClientWithIntermediateCert(true)
-                                  .setVerifyDepth(depth));
+                                  .setVerifyDepth(1));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec;
-  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
-    codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-    ASSERT_FALSE(codec->connected());
-  } else {
-    codec = makeHttpConnection(std::move(conn));
-    ASSERT_TRUE(codec->waitForDisconnect());
-    codec->close();
-  }
-  checkVerifyErrorCouter(1);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  ASSERT_TRUE(codec->waitForDisconnect());
 }
 
 } // namespace Ssl
