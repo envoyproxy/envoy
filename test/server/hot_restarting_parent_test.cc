@@ -69,8 +69,6 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildSocketType) {
   MockListenerManager listener_manager;
   Network::MockListenerConfig tcp_listener_config;
   Network::MockListenerConfig udp_listener_config;
-  Network::Address::InstanceConstSharedPtr local_address =
-      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 80);
   MockOptions options;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   InSequence s;
@@ -84,16 +82,12 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildSocketType) {
   EXPECT_CALL(tcp_listener_config, listenSocketFactory());
   EXPECT_CALL(tcp_listener_config.socket_factory_, localAddress());
   EXPECT_CALL(tcp_listener_config, bindToPort()).WillOnce(Return(true));
-  EXPECT_CALL(tcp_listener_config.socket_factory_, localAddress())
-      .WillOnce(ReturnRef(local_address));
   EXPECT_CALL(tcp_listener_config.socket_factory_, socketType())
       .WillOnce(Return(Network::Socket::Type::Stream));
 
   EXPECT_CALL(udp_listener_config, listenSocketFactory());
   EXPECT_CALL(udp_listener_config.socket_factory_, localAddress());
   EXPECT_CALL(udp_listener_config, bindToPort()).WillOnce(Return(true));
-  EXPECT_CALL(udp_listener_config.socket_factory_, localAddress())
-      .WillOnce(ReturnRef(local_address));
   EXPECT_CALL(udp_listener_config.socket_factory_, socketType())
       .WillOnce(Return(Network::Socket::Type::Datagram));
 
@@ -124,7 +118,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildUnixDomainSocket) {
   EXPECT_CALL(listener_config, listenSocketFactory());
   EXPECT_CALL(listener_config.socket_factory_, localAddress()).WillOnce(ReturnRef(local_address));
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(true));
-  EXPECT_CALL(listener_config.socket_factory_, localAddress()).WillOnce(ReturnRef(local_address));
+  EXPECT_CALL(listener_config.socket_factory_, socketType())
+      .WillOnce(Return(Network::Socket::Type::Stream));
 
   EXPECT_CALL(server_, options()).WillOnce(ReturnRef(options));
   EXPECT_CALL(options, concurrency()).WillOnce(Return(1));

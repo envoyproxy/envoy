@@ -109,25 +109,23 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 
   for (const auto& listener : server_->listenerManager().listeners()) {
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
-    // we compare socket type only for Ip addresses since pipes only support
-    // Stream socket type and urls for pipes do not specify a socket type.
-    // (see ProdListenerComponentFactory::createListenSocket for the reason
-    //  why only Stream socket type is supported for pipes)
-    if (*socket_factory.localAddress() == *addr && listener.get().bindToPort() &&
-        (socket_factory.localAddress()->type() != Network::Address::Type::Ip ||
-         socket_factory.socketType() ==
-             (Network::Utility::urlIsTcpScheme(request.pass_listen_socket().address())
-                  ? Network::Socket::Type::Stream
-                  : Network::Socket::Type::Datagram))) {
-      // worker_index() will default to 0 if not set which is the behavior before this field
-      // was added. Thus, this should be safe for both roll forward and roll back.
-      if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
-        wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.getListenSocket(request.pass_listen_socket().worker_index())
-                ->ioHandle()
-                .fdDoNotUse());
+    if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
+      StatusOr<Network::Socket::Type> socket_type =
+          Network::Utility::socketTypeFromUrl(request.pass_listen_socket().address());
+      // socketTypeFromUrl should return a valid value since resolveUrl returned a valid address.
+      ASSERT(socket_type.ok());
+
+      if (socket_factory.socketType() == *socket_type) {
+        // worker_index() will default to 0 if not set which is the behavior before this field
+        // was added. Thus, this should be safe for both roll forward and roll back.
+        if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
+          wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
+              socket_factory.getListenSocket(request.pass_listen_socket().worker_index())
+                  ->ioHandle()
+                  .fdDoNotUse());
+        }
+        break;
       }
-      break;
     }
   }
   return wrapped_reply;
