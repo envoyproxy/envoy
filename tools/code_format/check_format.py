@@ -188,6 +188,7 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+# yapf: enable
 
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
@@ -256,7 +257,6 @@ UNSORTED_FLAGS = {
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.sanitize_http_header_referer",
 }
-# yapf: enable
 
 
 class FormatChecker:
@@ -816,7 +816,7 @@ class FormatChecker:
 
         normalized_target_path = file_path
         if not normalized_target_path.startswith("./"):
-            normalized_target_path = "./" + normalized_target_path
+            normalized_target_path = f"./{normalized_target_path}"
         if not self.allow_listed_for_std_regex(normalized_target_path) and "std::regex" in line:
             report_error(
                 "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
