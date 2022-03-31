@@ -129,7 +129,6 @@ public:
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};
   NiceMock<Network::MockConnection> connection_;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::shared_ptr<Router::MockRoute> route_;
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
 };
@@ -167,7 +166,7 @@ public:
   MockRouteEntry();
   ~MockRouteEntry() override;
 
-  //  // SipProxy::Router::RouteEntry
+  // SipProxy::Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));
   MOCK_METHOD(const Envoy::Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));
   std::string cluster_name_{"fake_cluster"};
@@ -221,25 +220,6 @@ public:
   MOCK_METHOD(std::shared_ptr<SipSettings>, settings, (), (const));
 };
 
-namespace TrafficRoutingAssistant {
-class MockGrpcClientImpl : public GrpcClientImpl {
-public:
-  MockGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                     const absl::optional<std::chrono::milliseconds>& timeout)
-      : GrpcClientImpl(async_client, timeout) {
-    async_client_ = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-    request_ = new Grpc::MockAsyncRequest();
-  }
-  ~MockGrpcClientImpl() override { delete request_; }
-
-  std::shared_ptr<Grpc::MockAsyncClient> asyncClient() { return async_client_; }
-
-private:
-  std::shared_ptr<NiceMock<Grpc::MockAsyncClient>> async_client_;
-  Grpc::MockAsyncRequest* request_;
-};
-} // namespace TrafficRoutingAssistant
-
 class MockTrafficRoutingAssistantHandlerDeep : public TrafficRoutingAssistantHandler {
 public:
   MockTrafficRoutingAssistantHandlerDeep(
@@ -248,6 +228,13 @@ public:
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
       : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {}
   MOCK_METHOD(TrafficRoutingAssistant::ClientPtr&, traClient, (), (override));
+};
+
+class MockRequestCallbacks : public TrafficRoutingAssistant::RequestCallbacks {
+public:
+  MOCK_METHOD(void, complete,
+              (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
+              ());
 };
 
 } // namespace SipProxy

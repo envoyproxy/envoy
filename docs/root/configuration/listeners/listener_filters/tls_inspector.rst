@@ -49,9 +49,7 @@ This filter has a statistics tree rooted at *tls_inspector* with the following s
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  connection_closed, Counter, Total connections closed
   client_hello_too_large, Counter, Total unreasonably large Client Hello received
-  read_error, Counter, Total read errors
   tls_found, Counter, Total number of times TLS was found
   tls_not_found, Counter, Total number of times TLS was not found
   alpn_found, Counter, Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ was successful

@@ -179,12 +179,14 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
-  void expectProxyProtoError() {
+  void expectConnectionError() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
-
+  }
+  void expectProxyProtoError() {
+    expectConnectionError();
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
@@ -381,8 +383,7 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   connect(false);
   write(buffer, sizeof(buffer));
 
-  errno = 0;
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, ErrorRecv_1) {
@@ -457,7 +458,7 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
   connect(false);
   write(buffer, sizeof(buffer));
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, V2NotLocalOrOnBehalf) {
@@ -637,18 +638,34 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
 
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
+  bool header_writed = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int iovcnt) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, iovcnt);
+        if (header_writed) {
+          return Api::SysCallSizeResult{-1, 0};
+        }
+        return x;
+      }));
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
-        if (x.return_value_ == sizeof(tlv)) {
+        if (header_writed) {
           return Api::SysCallSizeResult{-1, 0};
-        } else {
-          return x;
         }
+        return x;
       }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -658,11 +675,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -702,9 +714,10 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  header_writed = true;
   write(tlv, sizeof(tlv));
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensionsFrag) {
@@ -826,25 +839,28 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  bool partial_writed = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillOnce(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
+      .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, num_iov);
+        if (partial_writed) {
+          return Api::SysCallSizeResult{-1, 0};
+        }
         return x;
-      }))
-      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
+      }));
 #else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (partial_writed) {
+          return Api::SysCallSizeResult{-1, 0};
+        }
+        return x;
       }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
-      .Times(AnyNumber())
-      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
@@ -898,8 +914,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       }));
   connect(false);
   write(buffer, 17);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  partial_writed = true;
+  write(buffer, 11);
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
@@ -913,9 +932,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  bool partial_write = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
 #ifdef WIN32
-  bool partial_write = false;
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
@@ -928,12 +947,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
 #else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (partial_write) {
+          return Api::SysCallSizeResult{-1, 0};
+        }
+        return x;
       }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
-      .Times(AnyNumber())
-      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
@@ -988,12 +1008,10 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-#ifdef WIN32
   partial_write = true;
-#endif
   write(buffer + 10, 10);
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, PartialRead) {
@@ -1043,6 +1061,47 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
 }
 
 const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
+
+TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0xff, 0xff, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // The TLV has 65520 size data.
+  constexpr uint8_t tlv_begin[] = {0x02, 0xff, 0xf0};
+  std::string tlv_data(65520, 'a');
+
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0x02);
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_begin, sizeof(tlv_begin));
+  write(tlv_data);
+
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(1, fields.size());
+
+  EXPECT_EQ(1, fields.count("PP2 type authority"));
+  auto value_s = fields.at("PP2 type authority").string_value();
+  EXPECT_EQ(tlv_data, value_s);
+
+  disconnect();
+}
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
@@ -1391,6 +1450,81 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   conn_->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
+
+// There is no chance to have error for Windows since it emulate the drain
+// from a memory buffer.
+#ifndef WIN32
+TEST_P(ProxyProtocolTest, DrainError) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+        if (flags != MSG_PEEK) {
+          return Api::SysCallSizeResult{-1, 0};
+        } else {
+          const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+          return x;
+        }
+      }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
+  }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+
+  connect(false);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+
+  expectProxyProtoError();
+}
+#endif
 
 class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
