@@ -820,8 +820,8 @@ sphinxext-rediraffe==0.2.7 \
     # via
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
-thrift==0.15.0 \
-    --hash=sha256:87c8205a71cf8bbb111cb99b1f7495070fbc9cabb671669568854210da5b3e29
+thrift==0.16.0 \
+    --hash=sha256:2b5b6488fcded21f9d312aa23c9ff6a0195d0f6ae26ddbd5ad9e3e25dfc14408
     # via -r requirements.in
 tomli==1.2.1 \
     --hash=sha256:8dd0e9524d6f386271a36b41dbf6c57d8e32fd96fd22b6584679dc569d20899f \
