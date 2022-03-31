@@ -2587,9 +2587,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         destination_port: 8080
@@ -2634,9 +2634,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         direct_source_prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2681,9 +2681,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2728,9 +2728,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "server1.example.com"
@@ -2776,9 +2776,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
@@ -2819,9 +2819,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         application_protocols: "http/1.1"
@@ -2867,9 +2867,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -2927,9 +2927,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -2988,9 +2988,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -3029,9 +3029,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_ports:
@@ -3077,9 +3077,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -3166,9 +3166,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3253,9 +3253,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3349,9 +3349,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3436,9 +3436,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3536,9 +3536,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3582,9 +3582,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3631,9 +3631,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3695,9 +3695,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -3740,9 +3740,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -3781,9 +3781,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: a.b.c.d, prefix_len: 32 }
@@ -3799,9 +3799,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "*w.example.com"
@@ -3819,9 +3819,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - name : foo
       filter_chain_match:
@@ -3844,9 +3844,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -3868,9 +3868,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"

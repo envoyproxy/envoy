@@ -34,6 +34,10 @@ mappers:
           key: foo
           value: bar
         append: false
+      - header:
+          key: content-type
+          value: "application/json-custom"
+        append: false
 body_format:
   json_format:
     level: TRACE
@@ -78,7 +82,7 @@ body_format:
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("application/json-custom", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ("150", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("550", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response->headers().getProxyStatusValue(),

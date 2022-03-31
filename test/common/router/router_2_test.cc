@@ -532,6 +532,43 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
+class RouterTestNoChildSpan : public RouterTestBase {
+public:
+  RouterTestNoChildSpan()
+      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+};
+
+TEST_F(RouterTestNoChildSpan, BasicFlow) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            EXPECT_CALL(callbacks_.active_span_, injectContext(_));
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 namespace {
 
 Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::string>& v) {

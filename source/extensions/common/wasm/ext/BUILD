@@ -16,7 +16,6 @@ envoy_cc_library(
         "envoy_null_vm_wasm_api.h",
         "envoy_proxy_wasm_api.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
@@ -29,7 +28,6 @@ envoy_cc_library(
         "envoy_null_plugin.h",
         "envoy_proxy_wasm_api.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         ":declare_property_cc_proto",
         "//source/common/grpc:async_client_lib",
@@ -43,7 +41,6 @@ cc_library(
     srcs = ["envoy_proxy_wasm_api.cc"],
     hdrs = ["envoy_proxy_wasm_api.h"],
     tags = ["manual"],
-    visibility = ["//visibility:public"],
     deps = [
         ":declare_property_cc_proto",
         ":node_subset_cc_proto",
@@ -55,20 +52,17 @@ cc_library(
 filegroup(
     name = "envoy_proxy_wasm_api_js",
     srcs = ["envoy_proxy_wasm_api.js"],
-    visibility = ["//visibility:public"],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
 proto_library(
     name = "declare_property_proto",
     srcs = ["declare_property.proto"],
-    visibility = ["//visibility:public"],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
 cc_proto_library(
     name = "declare_property_cc_proto",
-    visibility = ["//visibility:public"],
     deps = [":declare_property_proto"],
 )
 
@@ -76,7 +70,6 @@ cc_proto_library(
 proto_library(
     name = "node_subset_proto",
     srcs = ["node_subset.proto"],
-    visibility = ["//visibility:public"],
     deps = [
         "@com_google_protobuf//:struct_proto",
     ],
@@ -85,7 +78,6 @@ proto_library(
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
 cc_proto_library(
     name = "node_subset_cc_proto",
-    visibility = ["//visibility:public"],
     deps = [
         ":node_subset_proto",
         # "//external:protobuf_clib",
