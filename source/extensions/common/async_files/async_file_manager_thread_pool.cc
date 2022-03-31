@@ -8,26 +8,24 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/extensions/common/async_files/async_file_action.h"
-#include "source/extensions/common/async_files/async_file_context_base.h"
 #include "source/extensions/common/async_files/async_file_context_thread_pool.h"
-#include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/status_after_file_error.h"
-
-#include "absl/base/thread_annotations.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
-// next_action_ is per worker thread; if enqueue is called from a callback
-// the action goes directly into next_action_, otherwise it goes into the
-// queue and is eventually pulled out into next_action_ by a worker thread.
-static thread_local std::shared_ptr<AsyncFileAction> next_action_;
+namespace {
+// ThreadNextAction is per worker thread; if enqueue is called from a callback
+// the action goes directly into ThreadNextAction, otherwise it goes into the
+// queue and is eventually pulled out into ThreadNextAction by a worker thread.
+static thread_local std::shared_ptr<AsyncFileAction> ThreadNextAction;
 
-// is_worker_thread_ is set to true for worker threads, and will be false
+// ThreadIsWorker is set to true for worker threads, and will be false
 // for all other threads.
-static thread_local bool is_worker_thread_ = false;
+static thread_local bool ThreadIsWorker = false;
+} // namespace
 
 AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(const AsyncFileManagerConfig& config)
     : posix_(config.substitute_posix_file_operations == nullptr
@@ -61,9 +59,9 @@ std::string AsyncFileManagerThreadPool::describe() const {
 std::function<void()> AsyncFileManagerThreadPool::enqueue(std::shared_ptr<AsyncFileAction> action) {
   auto cancelFunc = [action]() { action->cancel(); };
   absl::MutexLock lock(&queue_mutex_);
-  if (is_worker_thread_) {
-    ASSERT(!next_action_); // only do one file action per callback.
-    next_action_ = std::move(action);
+  if (ThreadIsWorker) {
+    ASSERT(!ThreadNextAction); // only do one file action per callback.
+    ThreadNextAction = std::move(action);
     return cancelFunc;
   }
   queue_.push(std::move(action));
@@ -71,7 +69,7 @@ std::function<void()> AsyncFileManagerThreadPool::enqueue(std::shared_ptr<AsyncF
 }
 
 void AsyncFileManagerThreadPool::worker() {
-  is_worker_thread_ = true;
+  ThreadIsWorker = true;
   while (true) {
     const auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_) {
       return !queue_.empty() || terminate_;
@@ -82,7 +80,7 @@ void AsyncFileManagerThreadPool::worker() {
       if (terminate_) {
         return;
       }
-      next_action_ = std::move(queue_.front());
+      ThreadNextAction = std::move(queue_.front());
       queue_.pop();
     }
     resolveActions();
@@ -90,10 +88,10 @@ void AsyncFileManagerThreadPool::worker() {
 }
 
 void AsyncFileManagerThreadPool::resolveActions() {
-  while (next_action_) {
-    // Move the action out of next_action_ so that its callback can enqueue
-    // a different next_action_ without self-destructing.
-    std::shared_ptr<AsyncFileAction> action = std::move(next_action_);
+  while (ThreadNextAction) {
+    // Move the action out of ThreadNextAction so that its callback can enqueue
+    // a different ThreadNextAction without self-destructing.
+    std::shared_ptr<AsyncFileAction> action = std::move(ThreadNextAction);
     action->execute();
   }
 }
