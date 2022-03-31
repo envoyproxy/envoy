@@ -100,7 +100,9 @@ public:
       return unix_sockets_;
     }
 
-    if (!cidr_ranges_.isEmpty()) {
+    // TODO: cleanup isInternalAddress and default to initializing cidr_ranges_
+    // based on RFC1918 / RFC4193, if config is unset.
+    if (cidr_ranges_.getIpListSize() != 0 && address.type() == Network::Address::Type::Ip) {
       return cidr_ranges_.contains(address);
     }
     return Network::Utility::isInternalAddress(address);
