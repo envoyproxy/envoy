@@ -38,11 +38,7 @@ public:
     parser_.allow_chunked_length = 1;
   }
 
-  Impl(http_parser_type type, void* data,
-       const Http::CodecHeaderValidationMode codec_header_validation_mode)
-      : Impl(type) {
-    unsigned permissive_parsing =
-        codec_header_validation_mode == Http::CodecHeaderValidationMode::Disabled ? 1 : 0;
+  Impl(http_parser_type type, void* data) : Impl(type) {
     parser_.data = data;
     settings_ = {
         [](http_parser* parser) -> int {
@@ -93,8 +89,7 @@ public:
           static_cast<ParserCallbacks*>(parser->data)->onChunkHeader(is_final_chunk);
           return 0;
         },
-        nullptr,           // on_chunk_complete
-        permissive_parsing // permissive_parsing
+        nullptr // on_chunk_complete
     };
   }
 
@@ -141,9 +136,7 @@ private:
   http_parser_settings settings_;
 };
 
-LegacyHttpParserImpl::LegacyHttpParserImpl(
-    MessageType type, ParserCallbacks* data,
-    const Http::CodecHeaderValidationMode codec_header_validation_mode) {
+LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* data) {
   http_parser_type parser_type;
   switch (type) {
   case MessageType::Request:
@@ -154,7 +147,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(
     break;
   }
 
-  impl_ = std::make_unique<Impl>(parser_type, data, codec_header_validation_mode);
+  impl_ = std::make_unique<Impl>(parser_type, data);
 }
 
 // Because we have a pointer-to-impl using std::unique_ptr, we must place the destructor in the
