@@ -577,6 +577,10 @@ def _com_github_nodejs_http_parser():
         name = "http_parser",
         actual = "@envoy//bazel/external/http_parser",
     )
+    native.bind(
+        name = "http_parser__permissive",
+        actual = "@envoy//bazel/external/http_parser__permissive",
+    )
 
 def _com_github_alibaba_hessian2_codec():
     external_http_archive("com_github_alibaba_hessian2_codec")
