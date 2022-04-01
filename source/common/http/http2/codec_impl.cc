@@ -360,6 +360,8 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
 
   // Restore crash dump context when processing buffered data.
   Event::Dispatcher& dispatcher = parent_.connection_.dispatcher();
+  // This method is only called from a callback placed directly on the
+  // dispatcher, as such the dispatcher shouldn't have any tracked objects.
   ASSERT(dispatcher.trackedObjectStackIsEmpty());
   Envoy::ScopeTrackedObjectStack stack;
   stack.add(parent_.connection_);
@@ -369,7 +371,7 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
   // deferred closed streams we can use their stream id here.
   if (!stream_manager_.buffered_on_stream_close_) {
     ASSERT(!parent_.current_stream_id_.has_value());
-    parent_.current_stream_id_.emplace(stream_id_);
+    parent_.current_stream_id_ = stream_id_;
   }
 
   stack.add(parent_);
