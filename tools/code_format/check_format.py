@@ -23,7 +23,8 @@ EXCLUDED_PREFIXES = (
     "./test/extensions/filters/network/wasm/test_data",
     "./test/extensions/stats_sinks/wasm/test_data", "./test/extensions/bootstrap/wasm/test_data",
     "./test/extensions/common/wasm/test_data", "./test/extensions/access_loggers/wasm/test_data",
-    "./source/extensions/common/wasm/ext", "./examples/wasm-cc", "./bazel/external/http_parser/")
+    "./source/extensions/common/wasm/ext", "./examples/wasm-cc", "./bazel/external/http_parser/",
+    "./bazel/external/http_parser__permissive/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".mm", ".proto")
 PROTO_SUFFIX = (".proto")
 
