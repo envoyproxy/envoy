@@ -56,7 +56,7 @@ public:
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
         http_context_(http_context), stat_names_(scope.symbolTable()),
-        status_(toErrorCode(config.status().code())) {}
+        rate_limited_status_(toErrorCode(config.rate_limited_status().code())) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -71,7 +71,7 @@ public:
   }
   Http::Context& httpContext() { return http_context_; }
   Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
-  Http::Code status() { return status_; }
+  Http::Code rateLimitedStatus() { return rate_limited_status_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -105,7 +105,7 @@ private:
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
   Filters::Common::RateLimit::StatNames stat_names_;
-  const Http::Code status_;
+  const Http::Code rate_limited_status_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

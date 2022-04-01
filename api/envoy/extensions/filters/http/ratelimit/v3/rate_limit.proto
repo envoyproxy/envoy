@@ -119,7 +119,7 @@ message RateLimit {
   //
   // .. note::
   //   If this is set to < 400, 429 will be used instead.
-  type.v3.HttpStatus status = 10;
+  type.v3.HttpStatus rate_limited_status = 10;
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.

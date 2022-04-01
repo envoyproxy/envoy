@@ -166,7 +166,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
-                                           enumToInt(config_->status()),
+                                           enumToInt(config_->rateLimitedStatus()),
                                            true,
                                            empty_stat_name,
                                            empty_stat_name,
@@ -200,7 +200,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     state_ = State::Responded;
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
     callbacks_->sendLocalReply(
-        config_->status(), response_body,
+        config_->rateLimitedStatus(), response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
         },
