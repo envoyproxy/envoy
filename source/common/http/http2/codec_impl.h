@@ -649,10 +649,10 @@ private:
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
   // Pass through invoking with the actual stream.
-  int onStreamClose(int32_t stream_id, uint32_t error_code);
+  Status onStreamClose(int32_t stream_id, uint32_t error_code);
   // Should be invoked directly in buffered onStreamClose scenarios
   // where nghttp2 might have already forgotten about the stream.
-  int onStreamClose(StreamImpl* stream, uint32_t error_code);
+  Status onStreamClose(StreamImpl* stream, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
   // Called iff use_new_codec_wrapper_ is false.

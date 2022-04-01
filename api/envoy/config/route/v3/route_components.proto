@@ -453,7 +453,7 @@ message WeightedCluster {
   }
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -518,6 +518,17 @@ message RouteMatch {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
+
+    // If specified, the route is a path-separated prefix rule meaning that the
+    // ``:path`` header (without the query string) must either exactly match the
+    // ``path_separated_prefix`` or have it as a prefix, followed by ``/``
+    //
+    // For example, ``/api/dev`` would match
+    // ``/api/dev``, ``/api/dev/``, ``/api/dev/v1``, and ``/api/dev?param=true``
+    // but would not match ``/api/developer``
+    //
+    // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
+    string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
