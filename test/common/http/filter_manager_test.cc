@@ -465,6 +465,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
         callbacks.addStreamDecoderFilter(decoder_filter);
         callbacks.addStreamFilter(stream_filter);
         callbacks.addStreamEncoderFilter(encoder_filter);
+        callbacks.addStreamEncoderFilter(encoder_filter, createRequestAndResponseMatchingTree());
       }));
 
   filter_manager_->createFilterChain();
