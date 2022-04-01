@@ -22,7 +22,6 @@ Config::Config(Stats::Scope& scope)
     : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config) {
   http_parser_init(&parser_, HTTP_REQUEST);
@@ -31,6 +30,27 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config) {
 http_parser_settings Filter::settings_{
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 };
+
+Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
+  auto raw_slice = buffer.rawSlice();
+  const char* buf = static_cast<const char*>(raw_slice.mem_);
+  const auto parse_state = parseHttpHeader(absl::string_view(buf, raw_slice.len_));
+  switch (parse_state) {
+  case ParseState::Error:
+    done(false);
+    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
+    // we don't add new enum in FilterStatus so we have to signal the caller
+    // the new condition.
+    cb_->socket().close();
+    return Network::FilterStatus::StopIteration;
+  case ParseState::Done:
+    done(true);
+    return Network::FilterStatus::Continue;
+  case ParseState::Continue:
+    return Network::FilterStatus::StopIteration;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM
+}
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "http inspector: new connection accepted");
@@ -45,75 +65,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   }
 
   cb_ = &cb;
-  const ParseState parse_state = onRead();
-  switch (parse_state) {
-  case ParseState::Error:
-    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
-    // we don't add new enum in FilterStatus so we have to signal the caller
-    // the new condition.
-    cb.socket().close();
-    return Network::FilterStatus::StopIteration;
-  case ParseState::Done:
-    return Network::FilterStatus::Continue;
-  case ParseState::Continue:
-    // do nothing but create the event
-    cb.socket().ioHandle().initializeFileEvent(
-        cb.dispatcher(),
-        [this](uint32_t events) {
-          ENVOY_LOG(trace, "http inspector event: {}", events);
-
-          const ParseState parse_state = onRead();
-          switch (parse_state) {
-          case ParseState::Error:
-            cb_->socket().ioHandle().resetFileEvents();
-            cb_->continueFilterChain(false);
-            break;
-          case ParseState::Done:
-            cb_->socket().ioHandle().resetFileEvents();
-            // Do not skip following listener filters.
-            cb_->continueFilterChain(true);
-            break;
-          case ParseState::Continue:
-            // do nothing but wait for the next event
-            break;
-          }
-        },
-        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
-    return Network::FilterStatus::StopIteration;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM
-}
-
-ParseState Filter::onRead() {
-  auto result = cb_->socket().ioHandle().recv(buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
-  ENVOY_LOG(trace, "http inspector: recv: {}", result.return_value_);
-  if (!result.ok()) {
-    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-      return ParseState::Continue;
-    }
-    config_->stats().read_error_.inc();
-    return ParseState::Error;
-  }
-
-  // Remote closed
-  if (result.return_value_ == 0) {
-    return ParseState::Error;
-  }
-
-  const auto parse_state =
-      parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.return_value_));
-  switch (parse_state) {
-  case ParseState::Continue:
-    // do nothing but wait for the next event
-    return ParseState::Continue;
-  case ParseState::Error:
-    done(false);
-    return ParseState::Done;
-  case ParseState::Done:
-    done(true);
-    return ParseState::Done;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  return Network::FilterStatus::StopIteration;
 }
 
 ParseState Filter::parseHttpHeader(absl::string_view data) {

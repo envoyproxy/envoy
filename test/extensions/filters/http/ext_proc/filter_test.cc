@@ -1997,7 +1997,8 @@ TEST_F(HttpFilterTest, OutOfOrder) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
