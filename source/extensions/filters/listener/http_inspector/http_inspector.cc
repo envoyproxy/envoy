@@ -43,7 +43,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
               transport_protocol);
     return Network::FilterStatus::Continue;
   }
-  ENVOY_LOG(trace, "http inspector: set transport protocol to raw_buffer");
 
   cb_ = &cb;
   const ParseState parse_state = onRead();
@@ -125,7 +124,6 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     }
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
-    ENVOY_LOG(trace, "http inspector: set application protocol to %s", protocol_);
     return ParseState::Done;
   } else {
     absl::string_view new_data = data.substr(parser_.nread);
@@ -184,6 +182,7 @@ void Filter::done(bool success) {
       // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
       protocol = Http::Utility::AlpnNames::get().Http2c;
     }
+    ENVOY_LOG(trace, "http inspector: set application protocol to %s", protocol);
 
     cb_->socket().setRequestedApplicationProtocols({protocol});
   } else {

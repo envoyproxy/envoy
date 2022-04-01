@@ -199,6 +199,7 @@ ParseState Filter::onRead() {
 }
 
 void Filter::done(bool success) {
+  ENVOY_LOG(trace, "tls inspector: set transport protocol to {}", cb_->socket().detectedTransportProtocol());
   ENVOY_LOG(trace, "tls inspector: done: {}", success);
   cb_->socket().ioHandle().resetFileEvents();
   cb_->continueFilterChain(success);
