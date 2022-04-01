@@ -8,7 +8,7 @@ namespace Decompressor {
 
 ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                            const ZstdDDictManagerPtr& ddict_manager,
-                                           const uint32_t chunk_size)
+                                           uint32_t chunk_size)
     : Common::Base(chunk_size), dctx_(ZSTD_createDCtx(), &ZSTD_freeDCtx),
       ddict_manager_(ddict_manager), stats_(generateStats(stats_prefix, scope)) {}
 
@@ -55,7 +55,7 @@ bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer) {
   return true;
 }
 
-bool ZstdDecompressorImpl::isError(const size_t result) {
+bool ZstdDecompressorImpl::isError(size_t result) {
   switch (ZSTD_getErrorCode(result)) {
   case ZSTD_error_no_error:
     return false;

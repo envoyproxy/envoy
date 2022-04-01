@@ -22,15 +22,14 @@ class ZstdCompressorImpl : public Common::Base,
                            public Envoy::Compression::Compressor::Compressor,
                            NonCopyable {
 public:
-  ZstdCompressorImpl(const uint32_t compression_level, const bool enable_checksum,
-                     const uint32_t strategy, const ZstdCDictManagerPtr& cdict_manager,
-                     const uint32_t chunk_size);
+  ZstdCompressorImpl(uint32_t compression_level, bool enable_checksum, uint32_t strategy,
+                     const ZstdCDictManagerPtr& cdict_manager, uint32_t chunk_size);
 
   // Compression::Compressor::Compressor
   void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;
 
 private:
-  void process(Buffer::Instance& output_buffer, const ZSTD_EndDirective mode);
+  void process(Buffer::Instance& output_buffer, ZSTD_EndDirective mode);
 
   std::unique_ptr<ZSTD_CCtx, decltype(&ZSTD_freeCCtx)> cctx_;
   const ZstdCDictManagerPtr& cdict_manager_;

@@ -8,10 +8,9 @@ namespace Compression {
 namespace Zstd {
 namespace Compressor {
 
-ZstdCompressorImpl::ZstdCompressorImpl(const uint32_t compression_level, const bool enable_checksum,
-                                       const uint32_t strategy,
-                                       const ZstdCDictManagerPtr& cdict_manager,
-                                       const uint32_t chunk_size)
+ZstdCompressorImpl::ZstdCompressorImpl(uint32_t compression_level, bool enable_checksum,
+                                       uint32_t strategy, const ZstdCDictManagerPtr& cdict_manager,
+                                       uint32_t chunk_size)
     : Common::Base(chunk_size), cctx_(ZSTD_createCCtx(), &ZSTD_freeCCtx),
       cdict_manager_(cdict_manager), compression_level_(compression_level) {
   size_t result;
@@ -49,7 +48,7 @@ void ZstdCompressorImpl::compress(Buffer::Instance& buffer,
   }
 }
 
-void ZstdCompressorImpl::process(Buffer::Instance& output_buffer, const ZSTD_EndDirective mode) {
+void ZstdCompressorImpl::process(Buffer::Instance& output_buffer, ZSTD_EndDirective mode) {
   bool finished;
   do {
     const size_t remaining = ZSTD_compressStream2(cctx_.get(), &output_, &input_, mode);

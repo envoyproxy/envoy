@@ -6,7 +6,7 @@ namespace Compression {
 namespace Zstd {
 namespace Common {
 
-Base::Base(const uint32_t chunk_size)
+Base::Base(uint32_t chunk_size)
     : chunk_ptr_{std::make_unique<uint8_t[]>(chunk_size)}, output_{chunk_ptr_.get(), chunk_size, 0},
       input_{nullptr, 0, 0} {}
 

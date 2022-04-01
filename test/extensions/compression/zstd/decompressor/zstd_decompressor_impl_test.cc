@@ -158,7 +158,7 @@ TEST_F(ZstdDecompressorImplTest, IllegalConfig) {
 
 class ZstdDecompressorStatsTest : public testing::Test {
 protected:
-  bool isError(const size_t result) { return decompressor_.isError(result); }
+  bool isError(size_t result) { return decompressor_.isError(result); }
 
   Stats::IsolatedStoreImpl stats_store_{};
   ZstdDDictManagerPtr ddict_manager_{nullptr};

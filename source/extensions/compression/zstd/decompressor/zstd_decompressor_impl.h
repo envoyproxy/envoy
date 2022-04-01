@@ -43,7 +43,7 @@ class ZstdDecompressorImpl : public Common::Base,
                              NonCopyable {
 public:
   ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
-                       const ZstdDDictManagerPtr& ddict_manager, const uint32_t chunk_size);
+                       const ZstdDDictManagerPtr& ddict_manager, uint32_t chunk_size);
 
   // Envoy::Compression::Decompressor::Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
@@ -55,7 +55,7 @@ private:
 
   friend class ZstdDecompressorStatsTest;
   bool process(Buffer::Instance& output_buffer);
-  bool isError(const size_t result);
+  bool isError(size_t result);
 
   std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> dctx_;
   const ZstdDDictManagerPtr& ddict_manager_;

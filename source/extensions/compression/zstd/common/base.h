@@ -14,7 +14,7 @@ namespace Common {
 
 // Keeps a `Zstd` compression stream's state.
 struct Base {
-  Base(const uint32_t chunk_size);
+  Base(uint32_t chunk_size);
 
 protected:
   void setInput(const Buffer::RawSlice& input_slice);
