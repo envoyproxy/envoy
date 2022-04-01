@@ -509,7 +509,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
                                                                         {":path", "/dynamo/url"},
                                                                         {":scheme", "http"},
                                                                         {":authority", "host"},
-                                                                        {"expect", "100-continue"}},
+                                                                        {"expect", "100-contINUE"}},
                                          10);
 
   waitForNextUpstreamRequest();
