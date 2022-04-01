@@ -39,7 +39,7 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
                        Server::Configuration::ServerFactoryContext& factory_context) {
   xds::type::matcher::v3::Matcher matcher;
   if (config.has_cluster()) {
-    // Converted depreacted cluster field into a matcher config.
+    // Convert deprecated cluster field into a matcher config.
     auto action = matcher.mutable_on_no_match()->mutable_action();
     action->set_name("route");
     envoy::extensions::filters::udp::udp_proxy::v3::Route route;
