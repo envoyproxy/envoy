@@ -405,6 +405,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "buffer_accounting_integration_test",
+    size = "large",
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
