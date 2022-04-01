@@ -58,7 +58,7 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
       std::make_shared<icu::Locale>(default_locale), locale_matcher, stats_prefix, context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    auto filter = new LanguageFilter(config);
+    auto filter = std::make_shared<LanguageFilter>(config);
     callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
   };
 }
