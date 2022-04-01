@@ -1,6 +1,6 @@
+#include "source/common/json/json_internal.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/json/json_internal.h"
 
 #include "benchmark/benchmark.h"
 

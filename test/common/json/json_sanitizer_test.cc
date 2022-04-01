@@ -3,6 +3,7 @@
 #include "source/common/json/json_internal.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
+
 #include "test/common/json/json_sanitizer_test_util.h"
 
 #include "absl/strings/str_format.h"
@@ -200,7 +201,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
   }
   EXPECT_EQ(61440, num_included);
   EXPECT_EQ(4096, num_excluded);
-  EXPECT_EQ(16*64*64, num_included + num_excluded);
+  EXPECT_EQ(16 * 64 * 64, num_included + num_excluded);
   EXPECT_EQ(61440, num_matches);
   EXPECT_EQ(0, num_mismatches);
 }

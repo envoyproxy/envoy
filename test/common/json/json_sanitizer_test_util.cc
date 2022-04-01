@@ -90,7 +90,7 @@ bool isProtoSerializableUtf8(absl::string_view in) {
 
 // Implements strtol for hex, but accepting a non-nul-terminated string_view,
 // and with one branch per character. This can be done with only one branch
-// per string if we use a table instaed of a switch statment, and have all
+// per string if we use a table instead of a switch statement, and have all
 // the non-hex character inputs map to 0x80, and accumulate the OR of all
 // mapped values to test after the loop, but that would be harder to read.
 //
@@ -105,34 +105,38 @@ bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
     for (char c : str.substr(2, 4)) {
       uint32_t val = 0;
       switch (c) {
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          val = c - '0'; break;
-        case 'A':
-        case 'B':
-        case 'C':
-        case 'D':
-        case 'E':
-        case 'F':
-          val = c - 'A' + 10; break;
-        case 'a':
-        case 'b':
-        case 'c':
-        case 'd':
-        case 'e':
-        case 'f':
-          val = c - 'a' + 10; break;
-        default: return false;
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+        val = c - '0';
+        break;
+      case 'A':
+      case 'B':
+      case 'C':
+      case 'D':
+      case 'E':
+      case 'F':
+        val = c - 'A' + 10;
+        break;
+      case 'a':
+      case 'b':
+      case 'c':
+      case 'd':
+      case 'e':
+      case 'f':
+        val = c - 'a' + 10;
+        break;
+      default:
+        return false;
       }
-      hex_value = 16*hex_value + val;
+      hex_value = 16 * hex_value + val;
     }
     return true;
   }
@@ -171,12 +175,11 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b) {
     } else if (a[0] == b[0]) {
       a = a.substr(1, a.size() - 1);
       b = b.substr(1, b.size() - 1);
-    } else if (!compareUnicodeEscapeAgainstUtf8(a, b) &&
-               !compareUnicodeEscapeAgainstUtf8(b, a)) {
+    } else if (!compareUnicodeEscapeAgainstUtf8(a, b) && !compareUnicodeEscapeAgainstUtf8(b, a)) {
       return false;
     }
   }
 }
 
 } // namespace Json
-} // namespace oEnvoy
+} // namespace Envoy
