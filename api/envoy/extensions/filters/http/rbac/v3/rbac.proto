@@ -4,6 +4,9 @@ package envoy.extensions.filters.http.rbac.v3;
 
 import "envoy/config/rbac/v3/rbac.proto";
 
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -18,19 +21,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.rbac]
 
 // RBAC filter config.
+// [#next-free-field: 6]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rbac.v2.RBAC";
 
-  // Specify the RBAC rules to be applied globally.
-  // If absent, no enforcing RBAC policy will be applied.
-  // If present and empty, DENY.
-  config.rbac.v3.RBAC rules = 1;
+  oneof rules_specifier {
+    // Specify the RBAC rules to be applied globally.
+    // If absent, no enforcing RBAC policy will be applied.
+    // If present and empty, DENY.
+    config.rbac.v3.RBAC rules = 1;
 
-  // Shadow rules are not enforced by the filter (i.e., returning a 403)
-  // but will emit stats and logs and can be used for rule testing.
-  // If absent, no shadow RBAC policy will be applied.
-  config.rbac.v3.RBAC shadow_rules = 2;
+    // The match tree to use when resolving RBAC action for incoming requests.
+    xds.type.matcher.v3.Matcher matcher = 4
+        [(xds.annotations.v3.field_status).work_in_progress = true];
+  }
+
+  oneof shadow_rules_specifier {
+    // Shadow rules are not enforced by the filter (i.e., returning a 403)
+    // but will emit stats and logs and can be used for rule testing.
+    // If absent, no shadow RBAC policy will be applied.
+    config.rbac.v3.RBAC shadow_rules = 2;
+
+    // The match tree to use for emitting stats and logs which can be used for rule testing for
+    // incoming requests.
+    xds.type.matcher.v3.Matcher shadow_matcher = 5
+        [(xds.annotations.v3.field_status).work_in_progress = true];
+  }
 
   // If specified, shadow rules will emit stats with the given prefix.
   // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with

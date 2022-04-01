@@ -4,6 +4,9 @@ package envoy.extensions.filters.network.rbac.v3;
 
 import "envoy/config/rbac/v3/rbac.proto";
 
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -22,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Header should not be used in rules/shadow_rules in RBAC network filter as
 // this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.rbac.v2.RBAC";
@@ -38,15 +41,28 @@ message RBAC {
     CONTINUOUS = 1;
   }
 
-  // Specify the RBAC rules to be applied globally.
-  // If absent, no enforcing RBAC policy will be applied.
-  // If present and empty, DENY.
-  config.rbac.v3.RBAC rules = 1;
+  oneof rules_specifier {
+    // Specify the RBAC rules to be applied globally.
+    // If absent, no enforcing RBAC policy will be applied.
+    // If present and empty, DENY.
+    config.rbac.v3.RBAC rules = 1;
 
-  // Shadow rules are not enforced by the filter but will emit stats and logs
-  // and can be used for rule testing.
-  // If absent, no shadow RBAC policy will be applied.
-  config.rbac.v3.RBAC shadow_rules = 2;
+    // The match tree to use when resolving RBAC action for incoming connections.
+    xds.type.matcher.v3.Matcher matcher = 6
+        [(xds.annotations.v3.field_status).work_in_progress = true];
+  }
+
+  oneof shadow_rules_specifier {
+    // Shadow rules are not enforced by the filter but will emit stats and logs
+    // and can be used for rule testing.
+    // If absent, no shadow RBAC policy will be applied.
+    config.rbac.v3.RBAC shadow_rules = 2;
+
+    // The match tree to use for emitting stats and logs which can be used for rule testing for
+    // incoming connections.
+    xds.type.matcher.v3.Matcher shadow_matcher = 7
+        [(xds.annotations.v3.field_status).work_in_progress = true];
+  }
 
   // If specified, shadow rules will emit stats with the given prefix.
   // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
