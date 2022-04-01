@@ -131,6 +131,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     const size_t len = raw_slice.len_ - read_;
     read_ = raw_slice.len_;
     ParseState parse_state = parseClientHello(data, len);
+    ENVOY_LOG(trace, "tls inspector: set transport protocol to {}", cb_->socket().detectedTransportProtocol());
     switch (parse_state) {
     case ParseState::Error:
       cb_->socket().ioHandle().close();
