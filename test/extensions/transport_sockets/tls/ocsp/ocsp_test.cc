@@ -192,8 +192,7 @@ TEST_F(Asn1OcspUtilityTest, ParseMethodWrongTagTest) {
 TEST_F(Asn1OcspUtilityTest, ParseResponseDataUnsupportedVersionTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
-      0x30,
-      5,
+      0x30, 5,
       // invalid version field, the value of v2 is 1
       0xa0,
       0x03, // bit string
