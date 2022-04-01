@@ -22,6 +22,19 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
                                          max_concurrent_streams, 100);
 }
 
+const Envoy::Ssl::ClientContextConfig&
+getConfig(Network::TransportSocketFactory& transport_socket_factory) {
+  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
+      .clientContextConfig();
+}
+
+std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                Upstream::HostConstSharedPtr host) {
+  return options && options->serverNameOverride().has_value()
+             ? options->serverNameOverride().value()
+             : getConfig(host->transportSocketFactory()).serverNameIndication();
+}
+
 } // namespace
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
@@ -54,12 +67,6 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   }
 }
 
-const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::TransportSocketFactory& transport_socket_factory) {
-  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
-      .clientContextConfig();
-}
-
 ConnectionPool::Cancellable* Http3ConnPoolImpl::newStream(Http::ResponseDecoder& response_decoder,
                                                           ConnectionPool::Callbacks& callbacks,
                                                           const Instance::StreamOptions& options) {
@@ -78,7 +85,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
-      server_id_(getConfig(host_->transportSocketFactory()).serverNameIndication(),
+      server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port()), false),
       connect_callback_(connect_callback) {}
 
