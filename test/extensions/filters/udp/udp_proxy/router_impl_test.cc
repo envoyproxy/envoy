@@ -53,13 +53,13 @@ cluster: udp_service
   setup(yaml);
 
   EXPECT_EQ("udp_service",
-            router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+            router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:10000")));
   EXPECT_EQ("udp_service",
-            router_->route(parseAddress("0.0.0.0:80"), parseAddress("172.16.0.1:10000")));
+            router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("172.16.0.1:10000")));
   EXPECT_EQ("udp_service",
-            router_->route(parseAddress("0.0.0.0:80"), parseAddress("192.168.0.1:10000")));
+            router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("192.168.0.1:10000")));
   EXPECT_EQ("udp_service",
-            router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
+            router_->route(*parseAddress("[::]:80"), *parseAddress("[fc00::1]:10000")));
 }
 
 // Route UDP packets to multiple clusters.
@@ -93,11 +93,11 @@ matcher:
     setup(yaml);
 
     EXPECT_EQ("udp_service",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:10000")));
     EXPECT_EQ("udp_service2",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("172.16.0.1:10000")));
-    EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:80"), parseAddress("192.168.0.1:10000")));
-    EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("172.16.0.1:10000")));
+    EXPECT_EQ("", router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("192.168.0.1:10000")));
+    EXPECT_EQ("", router_->route(*parseAddress("[::]:80"), *parseAddress("[fc00::1]:10000")));
   }
 
   // Route with source port.
@@ -129,11 +129,11 @@ matcher:
     setup(yaml);
 
     EXPECT_EQ("udp_service",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:80")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:80")));
     EXPECT_EQ("udp_service2",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:443")));
-    EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:8080")));
-    EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:8080")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:443")));
+    EXPECT_EQ("", router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:8080")));
+    EXPECT_EQ("", router_->route(*parseAddress("[::]:80"), *parseAddress("[fc00::1]:8080")));
   }
 
   // Route with Destination IP.
@@ -165,11 +165,11 @@ matcher:
     setup(yaml);
 
     EXPECT_EQ("udp_service",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:10000")));
     EXPECT_EQ("udp_service2",
-              router_->route(parseAddress("127.0.0.1:80"), parseAddress("10.0.0.1:10000")));
-    EXPECT_EQ("", router_->route(parseAddress("127.0.0.2:80"), parseAddress("10.0.0.1:10000")));
-    EXPECT_EQ("", router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
+              router_->route(*parseAddress("127.0.0.1:80"), *parseAddress("10.0.0.1:10000")));
+    EXPECT_EQ("", router_->route(*parseAddress("127.0.0.2:80"), *parseAddress("10.0.0.1:10000")));
+    EXPECT_EQ("", router_->route(*parseAddress("[::]:80"), *parseAddress("[fc00::1]:10000")));
   }
 
   // Route with Destination port.
@@ -201,11 +201,11 @@ matcher:
     setup(yaml);
 
     EXPECT_EQ("udp_service",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:10000")));
     EXPECT_EQ("udp_service2",
-              router_->route(parseAddress("0.0.0.0:443"), parseAddress("10.0.0.1:10000")));
-    EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:8080"), parseAddress("10.0.0.1:10000")));
-    EXPECT_EQ("", router_->route(parseAddress("[::]:8080"), parseAddress("[fc00::1]:10000")));
+              router_->route(*parseAddress("0.0.0.0:443"), *parseAddress("10.0.0.1:10000")));
+    EXPECT_EQ("", router_->route(*parseAddress("0.0.0.0:8080"), *parseAddress("10.0.0.1:10000")));
+    EXPECT_EQ("", router_->route(*parseAddress("[::]:8080"), *parseAddress("[fc00::1]:10000")));
   }
 
   // Complex router in UDP proxy documentation.
@@ -255,12 +255,12 @@ matcher:
     setup(yaml);
 
     EXPECT_EQ("udp_service",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.1:80")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("127.0.0.1:80")));
     EXPECT_EQ("udp_service2",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.1:443")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("127.0.0.1:443")));
     EXPECT_EQ("udp_service3",
-              router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.1:8080")));
-    EXPECT_EQ("", router_->route(parseAddress("0.0.0.0:80"), parseAddress("127.0.0.2:80")));
+              router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("127.0.0.1:8080")));
+    EXPECT_EQ("", router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("127.0.0.2:80")));
   }
 }
 
@@ -299,13 +299,13 @@ matcher:
   setup(yaml);
 
   EXPECT_EQ("udp_service",
-            router_->route(parseAddress("0.0.0.0:80"), parseAddress("10.0.0.1:10000")));
+            router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("10.0.0.1:10000")));
   EXPECT_EQ("udp_service2",
-            router_->route(parseAddress("0.0.0.0:80"), parseAddress("172.16.0.1:10000")));
+            router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("172.16.0.1:10000")));
   EXPECT_EQ("udp_service3",
-            router_->route(parseAddress("0.0.0.0:80"), parseAddress("192.168.0.1:10000")));
+            router_->route(*parseAddress("0.0.0.0:80"), *parseAddress("192.168.0.1:10000")));
   EXPECT_EQ("udp_service3",
-            router_->route(parseAddress("[::]:80"), parseAddress("[fc00::1]:10000")));
+            router_->route(*parseAddress("[::]:80"), *parseAddress("[fc00::1]:10000")));
 }
 
 // All cluster names in the router with a single cluster.

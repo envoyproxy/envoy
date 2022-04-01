@@ -25,9 +25,8 @@ public:
    * Based on the address of the incoming UDP data, determine the target route for the data.
    * @return the cluster name or empty string if there is not matching route for the data.
    */
-  virtual const std::string
-  route(const Network::Address::InstanceConstSharedPtr destination_address,
-        const Network::Address::InstanceConstSharedPtr source_address) const PURE;
+  virtual const std::string route(const Network::Address::Instance& destination_address,
+                                  const Network::Address::Instance& source_address) const PURE;
 
   /**
    * Returns all cluster names in the router. The UDP proxy filter requires every cluster name for
