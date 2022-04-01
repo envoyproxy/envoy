@@ -432,12 +432,12 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
     config_->stats().on_demand_cluster_missing_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Timeout:
-    ENVOY_CONN_LOG(debug, "On demand cluster {} was not found before time out.",
+    ENVOY_CONN_LOG(debug, "On demand cluster {} was not found before timeout.",
                    read_callbacks_->connection(), cluster_name);
     config_->stats().on_demand_cluster_timeout_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Available:
-    // cluster_discovery_handle_ must have cancelled when downstream is closed.
+    // cluster_discovery_handle_ would have been cancelled if the downstream were closed.
     ASSERT(!downstream_closed_);
     establishUpstreamConnection();
     return;
