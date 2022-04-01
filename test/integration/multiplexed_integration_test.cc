@@ -1819,7 +1819,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
 
 // Verify that Envoy correctly handles connection level errors after request headers have been
 // proxied.
-TEST_P(Http2FrameIntegrationTest, TwoHeaderFrames) {
+TEST_P(Http2FrameIntegrationTest, CollidingStreamId) {
   beginSession(Http::CodecType::HTTP1);
 
   const uint32_t client_stream_idx = 0;
@@ -1829,8 +1829,8 @@ TEST_P(Http2FrameIntegrationTest, TwoHeaderFrames) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  // Send another HEADERS frame with the same stream ID. This should result in connection level
-  // error and disconnect both upstream and downstream connections.
+  // Send another HEADERS frame with the same stream ID. This should result in connection level error,
+  // because it Envoy considers it as another request on open stream, and disconnect both upstream and downstream connections.
   sendFrame(Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(client_stream_idx), "host",
                                         "/path/to/long/url"));
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(1000)));
