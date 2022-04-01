@@ -1,5 +1,6 @@
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/json/json_internal.h"
 
 #include "benchmark/benchmark.h"
 
@@ -35,6 +36,14 @@ static void BM_JsonSanitizerNoEscape(benchmark::State& state) {
 BENCHMARK(BM_JsonSanitizerNoEscape);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_NlohmannNoEscape(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT
+    Envoy::Json::Nlohmann::Factory::serialize(pass_through_encoding);
+  }
+}
+BENCHMARK(BM_NlohmannNoEscape);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StaticJsonSanitizerNoEscape(benchmark::State& state) {
   std::string buffer;
 
@@ -54,6 +63,16 @@ static void BM_ProtoEncoderWithEscape(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_ProtoEncoderWithEscape);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_NlohmannWithEscape(benchmark::State& state) {
+  const std::string str = std::string(escaped_encoding);
+
+  for (auto _ : state) { // NOLINT
+    Envoy::Json::Nlohmann::Factory::serialize(str);
+  }
+}
+BENCHMARK(BM_NlohmannWithEscape);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonSanitizerWithEscape(benchmark::State& state) {

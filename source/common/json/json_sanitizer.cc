@@ -214,6 +214,9 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
       (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_2ByteMask;
     unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
+    if (unicode < 0x80) {
+      return UnicodeSizePair(0, 0);
+    }
     consumed = 2;
   } else if (size >= 3 && (bytes[0] & Utf8_3ByteMask) == Utf8_3BytePattern &&
              (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
@@ -221,6 +224,9 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
     unicode = bytes[0] & ~Utf8_3ByteMask;
     unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
     unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
+    if (unicode < 0x800) { // 3-byte starts at 0x800
+      return UnicodeSizePair(0, 0);
+    }
     consumed = 3;
   } else if (size >= 4 && (bytes[0] & Utf8_4ByteMask) == Utf8_4BytePattern &&
              (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
@@ -230,6 +236,16 @@ std::pair<uint32_t, uint32_t> JsonSanitizer::decodeUtf8(const uint8_t* bytes, ui
     unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
     unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
     unicode = (unicode << Utf8_Shift) | (bytes[3] & ~Utf8_ContinueMask);
+
+    // 4-byte starts at 0x10000
+    //
+    // Note from https://en.wikipedia.org/wiki/UTF-8:
+    // The earlier RFC2279 allowed UTF-8 encoding through code point U+7FFFFFF.
+    // But the current RFC3629 section 3 limits UTF-8 encoding through code
+    // point U+10FFFF, to match the limits of UTF-16.
+    if (unicode < 0x10000 || unicode > 0x10ffff) {
+      return UnicodeSizePair(0, 0);
+    }
     consumed = 4;
   }
   return UnicodeSizePair(unicode, consumed);
