@@ -226,7 +226,7 @@ public:
   virtual uint32_t concurrency() const PURE;
 
   /**
-   * Makes a chunked request for static text. The version that takes the
+   * Makes a request for streamed static text. The version that takes the
    * Buffer::Instance& transfers the content from the passed-in buffer.
    *
    * @param response_text the text to populate response with

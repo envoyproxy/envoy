@@ -28,9 +28,6 @@ public:
 
   // Completes rendering any buffered data.
   virtual void finalize(Buffer::Instance& response) PURE;
-
-protected:
-  using UInt64Vec = std::vector<uint64_t>;
 };
 
 // Implements the Render interface for simple textual representation of stats.
@@ -96,7 +93,8 @@ private:
 
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
-                      const UInt64Vec& interval_buckets, const UInt64Vec& cumulative_buckets);
+                      const std::vector<uint64_t>& interval_buckets,
+                      const std::vector<uint64_t>& cumulative_buckets);
 
   std::vector<ProtobufWkt::Value> stats_array_;
   ProtobufWkt::Struct histograms_obj_;

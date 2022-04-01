@@ -54,8 +54,9 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   Stats::ConstSupportedBuckets& supported_buckets = interval_statistics.supportedBuckets();
-  const UInt64Vec disjoint_interval_buckets = interval_statistics.computeDisjointBuckets();
-  const UInt64Vec disjoint_cumulative_buckets =
+  const std::vector<uint64_t> disjoint_interval_buckets =
+      interval_statistics.computeDisjointBuckets();
+  const std::vector<uint64_t> disjoint_cumulative_buckets =
       histogram.cumulativeStatistics().computeDisjointBuckets();
   // Make sure all vectors are the same size.
   ASSERT(disjoint_interval_buckets.size() == disjoint_cumulative_buckets.size());
@@ -121,15 +122,17 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     break;
   case Utility::HistogramBucketsMode::Cumulative: {
     const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
-    const UInt64Vec& interval_buckets = interval_statistics.computedBuckets();
-    const UInt64Vec& cumulative_buckets = histogram.cumulativeStatistics().computedBuckets();
+    const std::vector<uint64_t>& interval_buckets = interval_statistics.computedBuckets();
+    const std::vector<uint64_t>& cumulative_buckets =
+        histogram.cumulativeStatistics().computedBuckets();
     collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
   }
   case Utility::HistogramBucketsMode::Disjoint: {
     const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
-    const UInt64Vec interval_buckets = interval_statistics.computeDisjointBuckets();
-    const UInt64Vec cumulative_buckets = histogram.cumulativeStatistics().computeDisjointBuckets();
+    const std::vector<uint64_t> interval_buckets = interval_statistics.computeDisjointBuckets();
+    const std::vector<uint64_t> cumulative_buckets =
+        histogram.cumulativeStatistics().computeDisjointBuckets();
     collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
   }
@@ -283,8 +286,8 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
 // cumulative or disjoint views, as controlled by buckets_fn.
 void StatsJsonRender::collectBuckets(const std::string& name,
                                      const Stats::ParentHistogram& histogram,
-                                     const UInt64Vec& interval_buckets,
-                                     const UInt64Vec& cumulative_buckets) {
+                                     const std::vector<uint64_t>& interval_buckets,
+                                     const std::vector<uint64_t>& cumulative_buckets) {
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   Stats::ConstSupportedBuckets& supported_buckets = interval_statistics.supportedBuckets();
 

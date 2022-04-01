@@ -338,8 +338,6 @@ Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
     query_index = path_and_query.size();
   }
 
-  // TODO(jmarantz): consider using an absl::btree_map or std::map rather than
-  // linearly searching for the first prefix match.
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       if (handler.mutates_server_state_) {
