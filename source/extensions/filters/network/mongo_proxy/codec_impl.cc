@@ -356,7 +356,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   data.drain(sizeof(int32_t));
   if (message_length < Message::MessageHeaderSize) {
-    ENVOY_LOG(error, "message size {} less than min. message size {}", message_length,
+    ENVOY_LOG(debug, "message size {} less than min. message size {}", message_length,
               Message::MessageHeaderSize);
     return false;
   }
