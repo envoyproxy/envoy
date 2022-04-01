@@ -179,6 +179,7 @@ proto_library(
         "//envoy/extensions/filters/http/on_demand/v3:pkg",
         "//envoy/extensions/filters/http/original_src/v3:pkg",
         "//envoy/extensions/filters/http/ratelimit/v3:pkg",
+        "//envoy/extensions/filters/http/rate_limit_quota/v3:pkg",
         "//envoy/extensions/filters/http/rbac/v3:pkg",
         "//envoy/extensions/filters/http/router/v3:pkg",
         "//envoy/extensions/filters/http/set_metadata/v3:pkg",
