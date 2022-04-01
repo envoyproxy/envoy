@@ -86,11 +86,18 @@ back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing impro
 the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
 to stay aprised of the latest and greatest changes.
 
+.. _arch_overview_happy_eyeballs:
+
 Happy Eyeballs Support
 ----------------------
 
 Envoy supports Happy Eyeballs, `RFC6555 <https://tools.ietf.org/html/rfc6555>`_,
-for upstream TCP connections. This behavior is configured by setting the DNS IP address resolution policy in
+for upstream TCP connections, guarded by the runtime flag
+``envoy.reloadable_features.allow_multiple_dns_addresses``.
+For cluster which use either
+:ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` or
+:ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
+this behavior is configured by setting the DNS IP address resolution policy in
 :ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
 to the :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return
 both IPv4 and IPv6 addresses. The returned addresses will be sorted according the the Happy Eyeballs

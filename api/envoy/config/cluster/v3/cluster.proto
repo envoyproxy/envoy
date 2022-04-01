@@ -131,7 +131,9 @@ message Cluster {
   // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
   // target will only get v6 addresses if there were NO v4 addresses to return.
   // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
-  // and return all resolved addresses.
+  // and return all resolved addresses. When this is used, Happy Eyeballs will be enabled for
+  // upstream connections. Refer to :ref:`Happy Eyeballs Support <arch_overview_happy_eyeballs>`
+  // for more information.
   // For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
