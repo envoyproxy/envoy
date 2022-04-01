@@ -106,8 +106,7 @@ public:
    * Determine the socket type for a URL.
    *
    * @param url supplies the url to resolve.
-   * @return Socket::Type the socket type
-   * @throw EnvoyException if url is invalid.
+   * @return StatusOr<Socket::Type> of the socket type, or an error status if url is invalid.
    */
   static StatusOr<Socket::Type> socketTypeFromUrl(const std::string& url);
 
