@@ -301,23 +301,23 @@ void StreamEncoderImpl::endEncode() {
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) {
-  // It's messy and complicated to try to tag the final write of an HTTP response for response
-  // tracking for flood protection. Instead, write an empty buffer fragment after the response,
-  // to allow for tracking.
-  // When the response is written out, the fragment will be deleted and the counter will be updated
-  // by ServerConnectionImpl::releaseOutboundResponse()
+  // It's messy and complicated to try to tag the final write of an HTTP
+  // response for response tracking for flood protection. Instead, write an
+  // empty buffer fragment after the response, to allow for tracking. When the
+  // response is written out, the fragment will be deleted and the counter will
+  // be updated by response_buffer_releasor_.
   auto fragment =
       Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), response_buffer_releasor_);
   output_buffer.addBufferFragment(*fragment.release());
-  ASSERT(outbound_responses_ < kMaxOutboundResponses);
-  outbound_responses_++;
+  ASSERT(*outbound_responses_ < kMaxOutboundResponses);
+  (*outbound_responses_)++;
 }
 
 Status ServerConnectionImpl::doFloodProtectionChecks() const {
   ASSERT(dispatching_);
   // Before processing another request, make sure that we are below the response flood protection
   // threshold.
-  if (outbound_responses_ >= kMaxOutboundResponses) {
+  if (*outbound_responses_ >= kMaxOutboundResponses) {
     ENVOY_CONN_LOG(trace, "error accepting request: too many pending responses queued",
                    connection_);
     stats_.response_flood_.inc();
@@ -961,8 +961,11 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks),
-      response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
-        releaseOutboundResponse(fragment);
+      response_buffer_releasor_([outbound_responses = outbound_responses_](
+                                    const Buffer::OwnedBufferFragmentImpl* fragment) {
+        ASSERT(*outbound_responses >= 1);
+        --(*outbound_responses);
+        delete fragment;
       }),
       headers_with_underscores_action_(headers_with_underscores_action),
       runtime_lazy_read_disable_(
@@ -1231,13 +1234,6 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   if (active_request_) {
     active_request_->response_encoder_.runLowWatermarkCallbacks();
   }
-}
-
-void ServerConnectionImpl::releaseOutboundResponse(
-    const Buffer::OwnedBufferFragmentImpl* fragment) {
-  ASSERT(outbound_responses_ >= 1);
-  --outbound_responses_;
-  delete fragment;
 }
 
 Status ServerConnectionImpl::checkHeaderNameForUnderscores() {

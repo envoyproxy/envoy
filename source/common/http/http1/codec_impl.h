@@ -520,16 +520,15 @@ private:
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
 
-  void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
 
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
 
+  std::shared_ptr<uint32_t> outbound_responses_ = std::make_shared<uint32_t>(0);
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
-  uint32_t outbound_responses_{};
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
