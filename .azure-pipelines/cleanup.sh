@@ -23,6 +23,7 @@ PURGE_PACKAGES=(
      'zulu-*-azure-jdk')
 
 PURGE_EXTRA_PACKAGES=(
+    "ant"
     "nginx*"
     "mongodb*"
     "mono*"
@@ -50,10 +51,6 @@ df -h
 
 sudo apt-get autoremove --purge -y
 echo "Disk space after autoremove extra"
-df -h
-
-sudo apt-get clean
-echo "Disk space after apt clean extra"
 df -h
 
 dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -rn

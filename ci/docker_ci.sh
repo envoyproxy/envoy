@@ -88,8 +88,12 @@ push_images() {
   read -ra args <<< "$_args"
   PLATFORM="$(build_platforms "${TYPE}")"
   # docker buildx doesn't do push with default builder
+  echo "Pushing ${BUILD_TAG}"
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
   docker push "${BUILD_TAG}"
+  echo
+  docker images
+  echo
 }
 
 MAIN_BRANCH="refs/heads/main"
