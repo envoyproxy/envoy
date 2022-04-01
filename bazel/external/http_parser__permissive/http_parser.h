@@ -21,13 +21,6 @@
 #ifndef http_parser_permissive_h
 #define http_parser_permissive_h
 
-namespace http_parser_permissive {
-
-/* Also update SONAME in the Makefile whenever you change these. */
-#define HTTP_PARSER_VERSION_MAJOR 2
-#define HTTP_PARSER_VERSION_MINOR 9
-#define HTTP_PARSER_VERSION_PATCH 4
-
 #include <stddef.h>
 
 #if defined(_WIN32) && !defined(__MINGW32__) && (!defined(_MSC_VER) || _MSC_VER < 1600) &&         \
@@ -46,6 +39,13 @@ typedef unsigned __int64 uint64_t;
 #else
 #include <stdint.h>
 #endif
+
+namespace http_parser_permissive {
+
+/* Also update SONAME in the Makefile whenever you change these. */
+#define HTTP_PARSER_VERSION_MAJOR 2
+#define HTTP_PARSER_VERSION_MINOR 9
+#define HTTP_PARSER_VERSION_PATCH 4
 
 /* Maximium header size allowed. If the macro is not defined
  * before including this header then the default is used. To

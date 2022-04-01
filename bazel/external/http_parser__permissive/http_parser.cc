@@ -19,6 +19,7 @@
  * IN THE SOFTWARE.
  */
 #include "http_parser.h"
+
 #include <assert.h>
 #include <stddef.h>
 #include <ctype.h>
@@ -753,22 +754,18 @@ reexecute:
       }
 
       case s_res_H:
-        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_res_HT);
         break;
 
       case s_res_HT:
-        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_res_HTT);
         break;
 
       case s_res_HTT:
-        STRICT_CHECK(ch != 'P');
         UPDATE_STATE(s_res_HTTP);
         break;
 
       case s_res_HTTP:
-        STRICT_CHECK(ch != '/');
         UPDATE_STATE(s_res_http_major);
         break;
 
@@ -887,7 +884,6 @@ reexecute:
         break;
 
       case s_res_line_almost_done:
-        STRICT_CHECK(ch != LF);
         UPDATE_STATE(s_header_field_start);
         break;
 
@@ -1081,32 +1077,26 @@ reexecute:
         break;
 
       case s_req_http_H:
-        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_req_http_HT);
         break;
 
       case s_req_http_HT:
-        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_req_http_HTT);
         break;
 
       case s_req_http_HTT:
-        STRICT_CHECK(ch != 'P');
         UPDATE_STATE(s_req_http_HTTP);
         break;
 
       case s_req_http_I:
-        STRICT_CHECK(ch != 'C');
         UPDATE_STATE(s_req_http_IC);
         break;
 
       case s_req_http_IC:
-        STRICT_CHECK(ch != 'E');
         UPDATE_STATE(s_req_http_HTTP);  /* Treat "ICE" as "HTTP". */
         break;
 
       case s_req_http_HTTP:
-        STRICT_CHECK(ch != '/');
         UPDATE_STATE(s_req_http_major);
         break;
 
@@ -1718,7 +1708,6 @@ reexecute:
 
       case s_header_value_discard_ws_almost_done:
       {
-        STRICT_CHECK(ch != LF);
         UPDATE_STATE(s_header_value_discard_lws);
         break;
       }
@@ -1761,8 +1750,6 @@ reexecute:
 
       case s_headers_almost_done:
       {
-        STRICT_CHECK(ch != LF);
-
         if (parser->flags & F_TRAILING) {
           /* End of a chunked request */
           UPDATE_STATE(s_message_done);
@@ -1841,7 +1828,6 @@ reexecute:
       case s_headers_done:
       {
         int hasBody;
-        STRICT_CHECK(ch != LF);
 
         parser->nread = 0;
         nread = 0;
@@ -2027,7 +2013,6 @@ reexecute:
       case s_chunk_size_almost_done:
       {
         assert(parser->flags & F_CHUNKED);
-        STRICT_CHECK(ch != LF);
 
         parser->nread = 0;
         nread = 0;
@@ -2068,14 +2053,12 @@ reexecute:
       case s_chunk_data_almost_done:
         assert(parser->flags & F_CHUNKED);
         assert(parser->content_length == 0);
-        STRICT_CHECK(ch != CR);
         UPDATE_STATE(s_chunk_data_done);
         CALLBACK_DATA(body);
         break;
 
       case s_chunk_data_done:
         assert(parser->flags & F_CHUNKED);
-        STRICT_CHECK(ch != LF);
         parser->nread = 0;
         nread = 0;
         UPDATE_STATE(s_chunk_size_start);
