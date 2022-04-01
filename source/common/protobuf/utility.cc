@@ -516,7 +516,9 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     blockFormat(node);
   }
   YAML::Emitter out;
-  out.SetStringFormat(YAML::EMITTER_MANIP::DoubleQuoted);
+  if (!node.IsScalar()) {
+    out.SetStringFormat(YAML::EMITTER_MANIP::DoubleQuoted);
+  }
   out << node;
   return out.c_str();
 }
