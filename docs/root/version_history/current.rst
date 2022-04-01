@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* cryptomb: remove RSA PKCS1 v1.5 padding support.
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -19,7 +21,6 @@ Removed Config or Runtime
 
 New Features
 ------------
-
 
 Deprecated
 ----------
