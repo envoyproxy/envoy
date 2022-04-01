@@ -266,7 +266,7 @@ enum http_errno { HTTP_ERRNO_MAP(HTTP_ERRNO_GEN) };
 #undef HTTP_ERRNO_GEN
 
 /* Get an http_errno value from an http_parser */
-#define HTTP_PARSER_ERRNO(p) ((enum http_errno)(p)->http_errno)
+#define HTTP_PARSER_ERRNO(p) ((enum http_parser_permissive::http_errno)(p)->http_errno)
 
 struct http_parser {
   /** PRIVATE **/
