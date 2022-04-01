@@ -671,6 +671,7 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   internal_address_config:
+    unix_sockets: false
     cidr_ranges:
     - address_prefix: 100.64.0.0
       prefix_len: 10
@@ -693,10 +694,14 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   // config.
   Network::Address::Ipv4Instance defaultIpAddress{"10.48.179.130", 0, nullptr};
   Network::Address::Ipv4Instance externalIpAddress{"90.60.0.10", 0, nullptr};
+  // This test validates that unixAddress is not treated as internal since unix_sockets is set to
+  // false.
+  Network::Address::PipeInstance unixAddress{"/foo"};
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(firstInternalIpAddress));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(secondInternalIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(defaultIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unixAddress));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
