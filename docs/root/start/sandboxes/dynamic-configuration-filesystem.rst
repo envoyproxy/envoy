@@ -100,12 +100,9 @@ You can do this using ``sed`` inside the container:
 
    docker-compose exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
 
-Notice that `sed -i` means replace not edit in place.
-You can create a new file and useing `mv` to do:
+.. note::
 
-.. code-block:: console
-
-   docker-compose exec -T proxy move /path/to/new_fle /var/lib/envoy/cds.yaml
+   The above example uses ``sed -i``, which works as an inplace edit as `sed` does copy, edit and move in order to do this.
 
 Step 5: Check Envoy uses updated configuration
 **********************************************
