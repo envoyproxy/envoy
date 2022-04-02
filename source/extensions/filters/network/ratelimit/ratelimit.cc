@@ -50,7 +50,8 @@ void Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> origi
 
       std::string value = descriptorEntry.value_;
       std::shared_ptr<Formatter::FormatterImpl> formatter_ptr = *formatter_it;
-      value = formatter_ptr->format(*Config::request_headers_.get(), *Config::response_headers_.get(),
+      value =
+          formatter_ptr->format(*Config::request_headers_.get(), *Config::response_headers_.get(),
                                 *Config::response_trailers_.get(), stream_info, value);
       formatter_it++;
       new_descriptor.entries_.push_back({descriptorEntry.key_, value});
