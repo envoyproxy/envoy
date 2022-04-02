@@ -162,11 +162,11 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
         if (unicode >= 0x800 && unicode < 0xd800) {
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
-            auto [unicode, consumed] = TestUtil::decodeUtf8(
-                reinterpret_cast<const uint8_t*>(utf8.data()), 3);
+            auto [unicode, consumed] =
+                TestUtil::decodeUtf8(reinterpret_cast<const uint8_t*>(utf8.data()), 3);
             EXPECT_EQ(3, consumed);
-            std::string proto_sanitized =
-                MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(utf8), false, true);
+            std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
+                ValueUtil::stringValue(utf8), false, true);
             EXPECT_UTF8_EQ(TestUtil::stripDoubleQuotes(proto_sanitized), sanitized,
                            absl::StrFormat("0x%x(%d,%d,%d)", unicode, byte1, byte2, byte3));
           }
@@ -191,15 +191,15 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
           utf8[3] = byte4 | TestUtil::Utf8_ContinuePattern;
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
-            auto [unicode, consumed] = TestUtil::decodeUtf8(
-                reinterpret_cast<const uint8_t*>(utf8.data()), 4);
+            auto [unicode, consumed] =
+                TestUtil::decodeUtf8(reinterpret_cast<const uint8_t*>(utf8.data()), 4);
             EXPECT_EQ(4, consumed);
             std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
                 ValueUtil::stringValue(utf8), false, true);
 
-            EXPECT_UTF8_EQ(TestUtil::stripDoubleQuotes(proto_sanitized), sanitized,
-                           absl::StrFormat("0x%x(%d,%d,%d,%d)",
-                                           unicode, byte1, byte2, byte3, byte4));
+            EXPECT_UTF8_EQ(
+                TestUtil::stripDoubleQuotes(proto_sanitized), sanitized,
+                absl::StrFormat("0x%x(%d,%d,%d,%d)", unicode, byte1, byte2, byte3, byte4));
           }
         }
       }
@@ -257,16 +257,15 @@ TEST_F(JsonSanitizerTest, High8Bit) {
   // exception, which Json::sanitizer catches and just escapes the characters so
   // we don't lose information in the encoding. All bytes with the high-bit set
   // are invalid utf-8 in isolation, so we fall through to escaping these.
-  EXPECT_EQ(
-      "\\200\\201\\202\\203\\204\\205\\206\\207\\210\\211\\212\\213\\214\\215\\216\\217"
-      "\\220\\221\\222\\223\\224\\225\\226\\227\\230\\231\\232\\233\\234\\235\\236\\237"
-      "\\240\\241\\242\\243\\244\\245\\246\\247\\250\\251\\252\\253\\254\\255\\256\\257"
-      "\\260\\261\\262\\263\\264\\265\\266\\267\\270\\271\\272\\273\\274\\275\\276\\277"
-      "\\300\\301\\302\\303\\304\\305\\306\\307\\310\\311\\312\\313\\314\\315\\316\\317"
-      "\\320\\321\\322\\323\\324\\325\\326\\327\\330\\331\\332\\333\\334\\335\\336\\337"
-      "\\340\\341\\342\\343\\344\\345\\346\\347\\350\\351\\352\\353\\354\\355\\356\\357"
-      "\\360\\361\\362\\363\\364\\365\\366\\367\\370\\371\\372\\373\\374\\375\\376\\377",
-      sanitize(x80_ff));
+  EXPECT_EQ("\\200\\201\\202\\203\\204\\205\\206\\207\\210\\211\\212\\213\\214\\215\\216\\217"
+            "\\220\\221\\222\\223\\224\\225\\226\\227\\230\\231\\232\\233\\234\\235\\236\\237"
+            "\\240\\241\\242\\243\\244\\245\\246\\247\\250\\251\\252\\253\\254\\255\\256\\257"
+            "\\260\\261\\262\\263\\264\\265\\266\\267\\270\\271\\272\\273\\274\\275\\276\\277"
+            "\\300\\301\\302\\303\\304\\305\\306\\307\\310\\311\\312\\313\\314\\315\\316\\317"
+            "\\320\\321\\322\\323\\324\\325\\326\\327\\330\\331\\332\\333\\334\\335\\336\\337"
+            "\\340\\341\\342\\343\\344\\345\\346\\347\\350\\351\\352\\353\\354\\355\\356\\357"
+            "\\360\\361\\362\\363\\364\\365\\366\\367\\370\\371\\372\\373\\374\\375\\376\\377",
+            sanitize(x80_ff));
 }
 
 TEST_F(JsonSanitizerTest, InvalidUtf8) {
@@ -283,9 +282,8 @@ TEST_F(JsonSanitizerTest, InvalidUtf8) {
   EXPECT_EQ("\\360\\375\\204\\236", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
 
   // Invalid input embedded in normal text.
-  EXPECT_EQ(
-      "Hello, \\360\\235\\204, World!",
-      sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+  EXPECT_EQ("Hello, \\360\\235\\204, World!",
+            sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
 
   // Replicate a few other cases that were discovered during initial fuzzing,
   // to ensure we see these as invalid utf8 and avoid them in comparisons.

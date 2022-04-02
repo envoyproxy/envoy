@@ -9,7 +9,7 @@
 constexpr absl::string_view pass_through_encoding = "Now is the time for all good men";
 constexpr absl::string_view escaped_encoding = "Now <is the \"time\"> for all good men";
 
-//const Envoy::Json::JsonSanitizer& staticSanitizer() {
+// const Envoy::Json::JsonSanitizer& staticSanitizer() {
 //  CONSTRUCT_ON_FIRST_USE(Envoy::Json::JsonSanitizer);
 //}
 

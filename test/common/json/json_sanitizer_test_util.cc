@@ -31,11 +31,11 @@ public:
 
     // Avoid ranges where the protobuf serialization fails, returning
     // an empty string.
-    //invalid_3byte_intervals_.insert(0xd800, 0xe000);
+    // invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
-    // Avoid differntial testing of unicode ranges generated from 4-byte utf-8
+    // Avoid differential testing of unicode ranges generated from 4-byte utf-8
     // where protobuf serialization generates two small unicode values instead
-    // of the correct one.  This must be a protobuf serialization issue.
+    // of the correct one. This must be a protobuf serialization issue.
     invalid_4byte_intervals_.insert(0x1d173, 0x1d17b);
     invalid_4byte_intervals_.insert(0xe0001, 0xe0002);
     invalid_4byte_intervals_.insert(0xe0020, 0xe0080);
@@ -178,11 +178,9 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
       a = a.substr(1, a.size() - 1);
       b = b.substr(1, b.size() - 1);
     } else if (!compareUnicodeEscapeAgainstUtf8(a, b) && !compareUnicodeEscapeAgainstUtf8(b, a)) {
-      diffs = absl::StrFormat(
-          "%s != %s, [%d]%c(0x02%x, \\%03o) != [%d] %c(0x02%x, \\%03o)",
-          all_a, all_b,
-          a.data() - all_a.data(), a[0], a[0], a[0],
-          b.data() - all_b.data(), b[0], b[0], b[0]);
+      diffs = absl::StrFormat("%s != %s, [%d]%c(0x02%x, \\%03o) != [%d] %c(0x02%x, \\%03o)", all_a,
+                              all_b, a.data() - all_a.data(), a[0], a[0], a[0],
+                              b.data() - all_b.data(), b[0], b[0], b[0]);
       return false;
     }
   }
@@ -210,7 +208,7 @@ UnicodeSizePair decodeUtf8(const uint8_t* bytes, uint32_t size) {
     unicode = bytes[0] & ~Utf8_1ByteMask;
     consumed = 1;
   } else if (size >= 2 && (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
-      (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
+             (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
     unicode = bytes[0] & ~Utf8_2ByteMask;
     unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
     if (unicode < 0x80) {

@@ -40,10 +40,11 @@ absl::string_view stripDoubleQuotes(absl::string_view str);
 bool isProtoSerializableUtf8(absl::string_view in);
 
 bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& errmsg);
-#define EXPECT_UTF8_EQ(a, b, context) {            \
-  std::string errmsg; \
-  EXPECT_TRUE(TestUtil::utf8Equivalent(a, b, errmsg)) << context << "\n" << errmsg; \
-}
+#define EXPECT_UTF8_EQ(a, b, context)                                                              \
+  {                                                                                                \
+    std::string errmsg;                                                                            \
+    EXPECT_TRUE(TestUtil::utf8Equivalent(a, b, errmsg)) << context << "\n" << errmsg;              \
+  }
 
 /** The Unicode code-point and the number of utf8-bytes consumed */
 using UnicodeSizePair = std::pair<uint32_t, uint32_t>;
