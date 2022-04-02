@@ -99,7 +99,6 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
         // Set other HTTP protocols to HTTP/1.0
         protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
       }
-      ENVOY_LOG(trace, "http inspector: set application protocol to %s", protocol_);
       return ParseState::Done;
     } else {
       ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
@@ -134,7 +133,7 @@ void Filter::done(bool success) {
       // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
       protocol = Http::Utility::AlpnNames::get().Http2c;
     }
-    ENVOY_LOG(trace, "http inspector: set application protocol to %s", protocol);
+    ENVOY_LOG(trace, "http inspector: set application protocol to {}", protocol);
 
     cb_->socket().setRequestedApplicationProtocols({protocol});
   } else {
