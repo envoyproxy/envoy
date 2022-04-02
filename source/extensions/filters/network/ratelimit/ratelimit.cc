@@ -1,7 +1,11 @@
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include <cstdint>
+#include <iterator>
+#include <memory>
 #include <string>
+#include <tuple>
+#include <vector>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/stats/scope.h"
@@ -23,11 +27,12 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
       request_headers_(Http::RequestHeaderMapImpl::create()),
       response_headers_(Http::ResponseHeaderMapImpl::create()),
       response_trailers_(Http::ResponseTrailerMapImpl::create()) {
-
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
+      substitution_formatters_.push_back(
+          std::make_shared<Formatter::FormatterImpl>(entry.value(), false));
     }
     descriptors_.push_back(new_descriptor);
   }
@@ -37,25 +42,22 @@ void Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> origi
                                         StreamInfo::StreamInfo& stream_info) {
 
   std::vector<RateLimit::Descriptor> dynamic_descriptors = std::vector<RateLimit::Descriptor>();
+  std::vector<std::shared_ptr<Formatter::FormatterImpl>>::iterator it1 =
+      substitution_formatters_.begin();
   for (const RateLimit::Descriptor& descriptor : original_descriptors) {
     RateLimit::Descriptor new_descriptor;
     for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
+
       std::string value = descriptorEntry.value_;
-      value = formatValue(value, stream_info);
+      std::shared_ptr<Formatter::FormatterImpl> fmt = *it1;
+      value = fmt.get()->format(*Config::request_headers_.get(), *Config::response_headers_.get(),
+                                *Config::response_trailers_.get(), stream_info, value);
+      it1++;
       new_descriptor.entries_.push_back({descriptorEntry.key_, value});
     }
     dynamic_descriptors.push_back(new_descriptor);
   }
   descriptors_ = dynamic_descriptors;
-}
-
-std::string Config::formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info) {
-
-  Formatter::FormatterImpl formatter(descriptor_value);
-  std::string value =
-      formatter.format(*Config::request_headers_.get(), *Config::response_headers_.get(),
-                       *Config::response_trailers_.get(), stream_info, descriptor_value);
-  return value;
 }
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {

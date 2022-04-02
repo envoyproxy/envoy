@@ -57,13 +57,12 @@ public:
   Formatter::FormatterImpl substitutionFormatter() { return Formatter::FormatterImpl(""); }
   void applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
                                   StreamInfo::StreamInfo& stream_info);
-  std::string formatValue(std::string descriptor_value, StreamInfo::StreamInfo& stream_info);
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   std::string domain_;
   std::vector<RateLimit::Descriptor> descriptors_;
-  std::vector<Formatter::FormatterImpl> substitution_formatters_;
+  std::vector<std::shared_ptr<Formatter::FormatterImpl>> substitution_formatters_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
