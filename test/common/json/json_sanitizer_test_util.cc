@@ -2,14 +2,14 @@
 
 #include <string>
 
-#include "source/common/common/utility.h"
-#include "source/common/json/json_sanitizer.h"
+#include "source/common/common/utility.h" // for IntervalSet.
 
 #include "absl/strings/match.h"
-#include "absl/strings/numbers.h"
+#include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Json {
+namespace TestUtil {
 
 absl::string_view stripDoubleQuotes(absl::string_view str) {
   if (str.size() >= 2 && str[0] == '"' && str[str.size() - 1] == '"') {
@@ -31,11 +31,11 @@ public:
 
     // Avoid ranges where the protobuf serialization fails, returning
     // an empty string.
-    invalid_3byte_intervals_.insert(0xd800, 0xe000);
+    //invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
-    // Avoid unicode ranges generated from 4-byte utf-8 where protobuf
-    // serialization generates two small unicode values instead of the correct one.
-    // This must be a protobuf serialization issue.
+    // Avoid differntial testing of unicode ranges generated from 4-byte utf-8
+    // where protobuf serialization generates two small unicode values instead
+    // of the correct one.  This must be a protobuf serialization issue.
     invalid_4byte_intervals_.insert(0x1d173, 0x1d17b);
     invalid_4byte_intervals_.insert(0xe0001, 0xe0002);
     invalid_4byte_intervals_.insert(0xe0020, 0xe0080);
@@ -63,7 +63,7 @@ bool isProtoSerializableUtf8(absl::string_view in) {
       ++data;
       --size;
     } else {
-      auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(data, size);
+      auto [unicode, consumed] = decodeUtf8(data, size);
       data += consumed;
       size -= consumed;
 
@@ -94,8 +94,8 @@ bool isProtoSerializableUtf8(absl::string_view in) {
 // the non-hex character inputs map to 0x80, and accumulate the OR of all
 // mapped values to test after the loop, but that would be harder to read.
 //
-// It is good for this code to be somewhat faster (ie not create a temp string)
-// so that fuzzers can run faster and cover more cases.
+// It is good for this code to be somewhat fast (ie not create a temp string) so
+// that fuzzers can run fast and cover more cases.
 //
 // If a string-view based hex decoder is useful in production code, this
 // could be factored into a decode() variant in source/common/common.hex.cc.
@@ -147,12 +147,11 @@ bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
 // one that is utf8-encoded.
 bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_view& utf8) {
   uint32_t escaped_unicode;
-  if (utf8.size() >= 3 && parseUnicode(escaped, escaped_unicode)) {
+  if (parseUnicode(escaped, escaped_unicode)) {
     // If one side of the comparison is a unicode escape,
-    auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(
-        reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size());
-    if (consumed == 3 && unicode == escaped_unicode) {
-      utf8 = utf8.substr(3, utf8.size() - 3);
+    auto [unicode, consumed] = decodeUtf8(utf8);
+    if (consumed != 0 && unicode == escaped_unicode) {
+      utf8 = utf8.substr(consumed, utf8.size() - consumed);
       escaped = escaped.substr(6, escaped.size() - 6);
       return true;
     }
@@ -166,20 +165,91 @@ bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_vi
 // protobuf json serialization. The protobuf implementation has made
 // some hard-to-understand decisions about what to encode via unicode
 // escapes versus what to pass through as utf-8.
-bool utf8Equivalent(absl::string_view a, absl::string_view b) {
+bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs) {
+  absl::string_view all_a = a;
+  absl::string_view all_b = b;
   while (true) {
     if (a.empty() && b.empty()) {
       return true;
     } else if (a.empty() || b.empty()) {
+      diffs = absl::StrFormat("`%s' and `%s` have different lengths", a, b);
       return false;
     } else if (a[0] == b[0]) {
       a = a.substr(1, a.size() - 1);
       b = b.substr(1, b.size() - 1);
     } else if (!compareUnicodeEscapeAgainstUtf8(a, b) && !compareUnicodeEscapeAgainstUtf8(b, a)) {
+      diffs = absl::StrFormat(
+          "%s != %s, [%d]%c(0x02%x, \\%03o) != [%d] %c(0x02%x, \\%03o)",
+          all_a, all_b,
+          a.data() - all_a.data(), a[0], a[0], a[0],
+          b.data() - all_b.data(), b[0], b[0], b[0]);
       return false;
     }
   }
 }
 
+UnicodeSizePair decodeUtf8(const uint8_t* bytes, uint32_t size) {
+  uint32_t unicode = 0;
+  uint32_t consumed = 0;
+
+  // See table in https://en.wikipedia.org/wiki/UTF-8, "Encoding" section.
+  //
+  // See also https://en.cppreference.com/w/cpp/locale/codecvt_utf8 which is
+  // marked as deprecated. There is also support in Windows libraries and Boost,
+  // which can be discovered on StackOverflow. I could not find a usable OSS
+  // implementation. However it's easily derived from the spec on Wikipedia.
+  //
+  // Note that the code below could be optimized a bit, e.g. by factoring out
+  // repeated lookups of the same index in the bytes array and using SSE
+  // instructions for the multi-word bit hacking.
+  //
+  // See also http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ which might be a lot
+  // faster, though less readable. As coded, though, it looks like it would read
+  // past the end of the input if the input is malformed.
+  if (size >= 1 && (bytes[0] & Utf8_1ByteMask) == Utf8_1BytePattern) {
+    unicode = bytes[0] & ~Utf8_1ByteMask;
+    consumed = 1;
+  } else if (size >= 2 && (bytes[0] & Utf8_2ByteMask) == Utf8_2BytePattern &&
+      (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
+    unicode = bytes[0] & ~Utf8_2ByteMask;
+    unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
+    if (unicode < 0x80) {
+      return UnicodeSizePair(0, 0);
+    }
+    consumed = 2;
+  } else if (size >= 3 && (bytes[0] & Utf8_3ByteMask) == Utf8_3BytePattern &&
+             (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
+             (bytes[2] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
+    unicode = bytes[0] & ~Utf8_3ByteMask;
+    unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
+    if (unicode < 0x800) { // 3-byte starts at 0x800
+      return UnicodeSizePair(0, 0);
+    }
+    consumed = 3;
+  } else if (size >= 4 && (bytes[0] & Utf8_4ByteMask) == Utf8_4BytePattern &&
+             (bytes[1] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
+             (bytes[2] & Utf8_ContinueMask) == Utf8_ContinuePattern &&
+             (bytes[3] & Utf8_ContinueMask) == Utf8_ContinuePattern) {
+    unicode = bytes[0] & ~Utf8_4ByteMask;
+    unicode = (unicode << Utf8_Shift) | (bytes[1] & ~Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[2] & ~Utf8_ContinueMask);
+    unicode = (unicode << Utf8_Shift) | (bytes[3] & ~Utf8_ContinueMask);
+
+    // 4-byte starts at 0x10000
+    //
+    // Note from https://en.wikipedia.org/wiki/UTF-8:
+    // The earlier RFC2279 allowed UTF-8 encoding through code point U+7FFFFFF.
+    // But the current RFC3629 section 3 limits UTF-8 encoding through code
+    // point U+10FFFF, to match the limits of UTF-16.
+    if (unicode < 0x10000 || unicode > 0x10ffff) {
+      return UnicodeSizePair(0, 0);
+    }
+    consumed = 4;
+  }
+  return UnicodeSizePair(unicode, consumed);
+}
+
+} // namespace TestUtil
 } // namespace Json
 } // namespace Envoy

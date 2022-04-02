@@ -39,5 +39,9 @@ envoy_cc_library(
     name = "json_sanitizer_lib",
     srcs = ["json_sanitizer.cc"],
     hdrs = ["json_sanitizer.h"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        ":json_internal_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
+    ],
 )
