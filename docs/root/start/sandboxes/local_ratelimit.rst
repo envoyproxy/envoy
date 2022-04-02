@@ -22,7 +22,7 @@ This sandbox provides an example of rate limiting of L4 connections.
 Step 1: Start all of our containers
 ***********************************
 
-Change to the ``examples/ratelimit`` directory and bring up the docker composition.
+Change to the ``examples/local_ratelimit`` directory and bring up the docker composition.
 
 .. code-block:: console
 
