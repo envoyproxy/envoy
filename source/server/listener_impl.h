@@ -377,11 +377,17 @@ private:
     Network::UdpListenerWorkerRouterPtr listener_worker_router_;
   };
 
-  struct InternalListenerConfigImpl : public Network::InternalListenerConfig {
-    InternalListenerConfigImpl(
-        const envoy::config::listener::v3::Listener_InternalListenerConfig config)
-        : config_(config) {}
-    const envoy::config::listener::v3::Listener_InternalListenerConfig config_;
+  class InternalListenerConfigImpl : public Network::InternalListenerConfig {
+  public:
+    InternalListenerConfigImpl(Network::InternalListenerRegistry& internal_listener_registry)
+        : internal_listener_registry_(internal_listener_registry) {}
+
+    Network::InternalListenerRegistry& internalListenerRegistry() override {
+      return internal_listener_registry_;
+    }
+
+  private:
+    Network::InternalListenerRegistry& internal_listener_registry_;
   };
 
   /**
