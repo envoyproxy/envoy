@@ -42,17 +42,17 @@ void Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> origi
                                         StreamInfo::StreamInfo& stream_info) {
 
   std::vector<RateLimit::Descriptor> dynamic_descriptors = std::vector<RateLimit::Descriptor>();
-  std::vector<std::shared_ptr<Formatter::FormatterImpl>>::iterator it1 =
+  std::vector<std::shared_ptr<Formatter::FormatterImpl>>::iterator formatter_it =
       substitution_formatters_.begin();
   for (const RateLimit::Descriptor& descriptor : original_descriptors) {
     RateLimit::Descriptor new_descriptor;
     for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
 
       std::string value = descriptorEntry.value_;
-      std::shared_ptr<Formatter::FormatterImpl> fmt = *it1;
-      value = fmt.get()->format(*Config::request_headers_.get(), *Config::response_headers_.get(),
+      std::shared_ptr<Formatter::FormatterImpl> formatter_ptr = *formatter_it;
+      value = formatter_ptr->format(*Config::request_headers_.get(), *Config::response_headers_.get(),
                                 *Config::response_trailers_.get(), stream_info, value);
-      it1++;
+      formatter_it++;
       new_descriptor.entries_.push_back({descriptorEntry.key_, value});
     }
     dynamic_descriptors.push_back(new_descriptor);
