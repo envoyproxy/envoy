@@ -29,9 +29,10 @@ public:
     //     ./bazel-bin/test/common/json/json_sanitizer_test |&
     //     grep -v 'contains invalid UTF-8'
 
-    // Avoid ranges where the protobuf serialization fails, returning
-    // an empty string.
-    // invalid_3byte_intervals_.insert(0xd800, 0xe000);
+    // Avoid ranges where the protobuf serialization fails, returning an empty
+    // string. Nlohmann also fails (throws exceptions) in this range but
+    // sanitizer() will catch that an do simple escapes on tne string.
+    invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
     // Avoid differential testing of unicode ranges generated from 4-byte utf-8
     // where protobuf serialization generates two small unicode values instead

@@ -155,11 +155,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
         utf8[2] = byte3 | TestUtil::Utf8_ContinuePattern;
         auto [unicode, num_consumed] = TestUtil::decodeUtf8(utf8);
-
-        // 3-byte unicode values start at 0x800. The spec says nothing
-        // I can find about 3-byte codes over 0xd800, but neither protobufs
-        // or Nlohmann appear to allow those.
-        if (unicode >= 0x800 && unicode < 0xd800) {
+        if (unicode >= 0x800) { // 3-byte unicode values start at 0x800.
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
             auto [unicode, consumed] =
