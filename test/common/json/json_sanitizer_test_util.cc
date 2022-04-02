@@ -5,6 +5,7 @@
 #include "source/common/common/utility.h" // for IntervalSet.
 
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
@@ -31,7 +32,7 @@ public:
 
     // Avoid ranges where the protobuf serialization fails, returning an empty
     // string. Nlohmann also fails (throws exceptions) in this range but
-    // sanitizer() will catch that an do simple escapes on tne string.
+    // sanitizer() will catch that an do simple escapes on the string.
     invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
     // Avoid differential testing of unicode ranges generated from 4-byte utf-8
@@ -89,57 +90,18 @@ bool isProtoSerializableUtf8(absl::string_view in) {
   return true;
 }
 
-// Implements strtol for hex, but accepting a non-nul-terminated string_view,
-// and with one branch per character. This can be done with only one branch
-// per string if we use a table instead of a switch statement, and have all
-// the non-hex character inputs map to 0x80, and accumulate the OR of all
-// mapped values to test after the loop, but that would be harder to read.
-//
-// It is good for this code to be somewhat fast (ie not create a temp string) so
-// that fuzzers can run fast and cover more cases.
-//
-// If a string-view based hex decoder is useful in production code, this
-// could be factored into a decode() variant in source/common/common.hex.cc.
+// Decodes unicode hex escape \u1234 into 0x1234, returning success.
 bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
   if (absl::StartsWith(str, "\\u") && str.size() >= 6) {
-    hex_value = 0;
-    for (char c : str.substr(2, 4)) {
-      uint32_t val = 0;
-      switch (c) {
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        val = c - '0';
-        break;
-      case 'A':
-      case 'B':
-      case 'C':
-      case 'D':
-      case 'E':
-      case 'F':
-        val = c - 'A' + 10;
-        break;
-      case 'a':
-      case 'b':
-      case 'c':
-      case 'd':
-      case 'e':
-      case 'f':
-        val = c - 'a' + 10;
-        break;
-      default:
-        return false;
-      }
-      hex_value = 16 * hex_value + val;
-    }
-    return true;
+    // TODO(jmarantz): Github master,
+    // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/numbers.h
+    // has absl::SimpleHexAtoi, enabling this impl to be
+    //   return absl::SimpleHexAtoi(str.substr(2, 4), &hex_value);
+    // In the meantime we must nul-terminate.
+    std::string hex_str(str.data() + 2, 4);
+    char* str_end;
+    hex_value = strtoul(hex_str.c_str(), &str_end, 16);
+    return str_end != nullptr && *str_end == '\0';
   }
   return false;
 }
@@ -238,9 +200,9 @@ UnicodeSizePair decodeUtf8(const uint8_t* bytes, uint32_t size) {
     // 4-byte starts at 0x10000
     //
     // Note from https://en.wikipedia.org/wiki/UTF-8:
-    // The earlier RFC2279 allowed UTF-8 encoding through code point U+7FFFFFF.
+    // The earlier RFC2279 allowed UTF-8 encoding through code point 0x7FFFFFF.
     // But the current RFC3629 section 3 limits UTF-8 encoding through code
-    // point U+10FFFF, to match the limits of UTF-16.
+    // point 0x10FFFF, to match the limits of UTF-16.
     if (unicode < 0x10000 || unicode > 0x10ffff) {
       return UnicodeSizePair(0, 0);
     }

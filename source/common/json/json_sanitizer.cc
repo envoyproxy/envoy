@@ -9,9 +9,9 @@
 namespace Envoy {
 namespace Json {
 
+// clang-format off
+// SPELLCHECKER(off)
 static constexpr bool needs_slow_sanitizer[256] = {
-  // clang-format off
-
   // Control-characters 0-31 all require escapes.
   true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
   true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
@@ -40,9 +40,9 @@ static constexpr bool needs_slow_sanitizer[256] = {
   true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
   true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
   true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-
-  // clang-format on
 };
+// SPELLCHECKER(on)
+// clang-format on
 
 absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   // Fast-path to see whether any escapes or utf-encoding are needed. If str has
@@ -60,7 +60,7 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
     need_slow |= needs_slow_sanitizer[static_cast<uint8_t>(c)];
   }
   if (!need_slow) {
-    return str; // Fast path, should be executed most of the time (modulo anglo bias).
+    return str; // Fast path, should be executed most of the time.
   }
   TRY_ASSERT_MAIN_THREAD {
     // The Nlohmann JSON library supports serialization and is not too slow. A
