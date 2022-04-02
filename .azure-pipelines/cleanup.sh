@@ -2,55 +2,37 @@
 
 set -e
 
-echo "Disk space before cleanup"
+echo "Disk space before package removal"
 df -h
 
 # Temporary script to remove tools from Azure pipelines agent to create more disk space room.
 
 PURGE_PACKAGES=(
-     'adoptopenjdk-*'
-     azure-cli
-     'ghc-*'
-     'libllvm*'
-     'mysql-*'
-     'dotnet-*'
-     firefox
-     google-chrome-stable
-     hhvm
-     libgl1
-     mongodb-mongosh
-     'temurin-*-jdk'
-     'zulu-*-azure-jdk')
-
-PURGE_EXTRA_PACKAGES=(
+    "adoptopenjdk-*"
     "ant"
+    azure-cli
+    "dotnet-*"
+    firefox
+    "ghc-*"
+    google-chrome-stable
+    hhvm
+    libgl1
+    "libllvm*"
     "nginx*"
     "mongodb*"
     "mono*"
     "mssql*"
+    "mysql-*"
     "podman"
     "powershell"
-    "php*")
+    "php*"
+    "temurin-*-jdk"
+    "zulu-*-azure-jdk")
 
 sudo apt-get update -y || true
 sudo apt-get purge -y --no-upgrade "${PURGE_PACKAGES[@]}"
-echo "Disk space after package removal current"
-df -h
-
-sudo apt-get autoremove --purge -y
-echo "Disk space after autoremove current"
-df -h
-
-sudo apt-get clean
-echo "Disk space after apt clean current"
-df -h
-
-sudo apt-get purge -y --no-upgrade "${PURGE_EXTRA_PACKAGES[@]}"
-echo "Disk space after package removal extra"
-df -h
-
-sudo apt-get autoremove --purge -y
-echo "Disk space after autoremove extra"
-df -h
 
 dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -rn
+
+echo "Disk space after package removal"
+df -h
