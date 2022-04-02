@@ -306,6 +306,14 @@ protected:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
+  class DumbInternalListenerRegistry : public Singleton::Instance,
+                                       public Network::InternalListenerRegistry {
+  public:
+    MOCK_METHOD(Network::LocalInternalListenerRegistry*, getLocalRegistry, ());
+  };
+  std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
+      std::make_shared<DumbInternalListenerRegistry>()};
+
   NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
