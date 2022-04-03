@@ -1,5 +1,6 @@
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/quic/codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -16,6 +17,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/mocks/api/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -27,6 +29,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::Return;
+using testing::AnyNumber;
 
 namespace Envoy {
 namespace Quic {
@@ -149,6 +152,7 @@ protected:
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   QuicHttpClientConnectionImpl http_connection_;
+  Api::OsSysCallsImpl os_sys_calls_actual_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
@@ -357,6 +361,24 @@ TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
   envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, ConnectedAfterHandshake) {
+  Api::MockOsSysCalls os_sys_calls;
+  if (quic_version_[0].UsesTls()) {
+    EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+    EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+        .Times(AnyNumber())
+        .WillRepeatedly(
+            Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+    EXPECT_CALL(os_sys_calls, getifaddrs(_))
+        .Times(AnyNumber())
+        .WillRepeatedly(
+            Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+              return os_sys_calls_actual_.getifaddrs(vector);
+            }));
+    envoy_quic_session_.OnTlsHandshakeComplete();
+  }
 }
 
 } // namespace Quic

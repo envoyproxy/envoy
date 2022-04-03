@@ -150,6 +150,17 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   streamInfo().upstreamInfo()->upstreamTiming().onUpstreamHandshakeComplete(
       dispatcher_.timeSource());
 
+  const auto quicConn = static_cast<EnvoyQuicClientConnection*>(quicConnection());
+  if (quicConn != nullptr) {
+    quicConn->connectionSocket()->connectionInfoProvider().maybeSetInterfaceName(
+        quicConn->connectionSocket()->ioHandle());
+    const auto maybe_interface_name =
+        quicConn->connectionSocket()->connectionInfoProvider().interfaceName();
+    if (maybe_interface_name.has_value()) {
+      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
+                           maybe_interface_name.value());
+    }
+  }
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
