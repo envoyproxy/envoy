@@ -35,10 +35,6 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-        "//test/common/filter:__subpackages__",
-    ],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
