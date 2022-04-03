@@ -25,17 +25,19 @@ constexpr absl::string_view TrebleClefUtf8{"\360\235\204\236"};
 
 class JsonSanitizerTest : public testing::Test {
 protected:
-  absl::string_view sanitize(absl::string_view str) {
-    return TestUtil::stripDoubleQuotes(Envoy::Json::sanitize(buffer_, str));
+  absl::string_view sanitize(absl::string_view str) { return Envoy::Json::sanitize(buffer_, str); }
+
+  absl::string_view protoSanitize(absl::string_view str) {
+    proto_serialization_buffer_ = MessageUtil::getJsonStringFromMessageOrDie(
+        ValueUtil::stringValue(std::string(str)), false, true);
+    return stripDoubleQuotes(proto_serialization_buffer_);
   }
 
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
     EXPECT_TRUE(TestUtil::isProtoSerializableUtf8(str)) << "str=" << str;
     absl::string_view sanitized = sanitize(str);
     if (TestUtil::isProtoSerializableUtf8(str)) {
-      std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
-          ValueUtil::stringValue(std::string(str)), false, true);
-      EXPECT_UTF8_EQ(TestUtil::stripDoubleQuotes(proto_sanitized), sanitized, str);
+      EXPECT_UTF8_EQ(protoSanitize(str), sanitized, str);
     }
     return sanitized;
   }
@@ -63,6 +65,7 @@ protected:
   }
 
   std::string buffer_;
+  std::string proto_serialization_buffer_;
 };
 
 TEST_F(JsonSanitizerTest, Empty) { expectUnchanged(""); }
@@ -162,9 +165,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
             auto [unicode, consumed] =
                 Utf8::decode(reinterpret_cast<const uint8_t*>(utf8.data()), 3);
             EXPECT_EQ(3, consumed);
-            std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
-                ValueUtil::stringValue(utf8), false, true);
-            EXPECT_UTF8_EQ(TestUtil::stripDoubleQuotes(proto_sanitized), sanitized,
+            EXPECT_UTF8_EQ(protoSanitize(utf8), sanitized,
                            absl::StrFormat("0x%x(%d,%d,%d)", unicode, byte1, byte2, byte3));
           }
         }
@@ -191,11 +192,8 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
             auto [unicode, consumed] =
                 Utf8::decode(reinterpret_cast<const uint8_t*>(utf8.data()), 4);
             EXPECT_EQ(4, consumed);
-            std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
-                ValueUtil::stringValue(utf8), false, true);
-
             EXPECT_UTF8_EQ(
-                TestUtil::stripDoubleQuotes(proto_sanitized), sanitized,
+                TestUtil::stripDoubleQuotes(protoSanitize(utf8)), sanitized,
                 absl::StrFormat("0x%x(%d,%d,%d,%d)", unicode, byte1, byte2, byte3, byte4));
           }
         }

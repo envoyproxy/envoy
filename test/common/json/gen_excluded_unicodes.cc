@@ -6,6 +6,7 @@
 
 namespace Envoy {
 namespace Json {
+namespace {
 
 // Collects unicode values that cannot be handled by the protobuf json encoder.
 // This is not needed for correct operation of the json sanitizer, but it is
@@ -58,7 +59,7 @@ bool isInvalidProtobufSerialization(const std::string& str) {
   return (str.size() == 2 && str[0] == '"' && str[1] == '"') || str.size() > 8;
 }
 
-void AllThreeByteUtf8() {
+void allThreeByteUtf8() {
   std::string utf8("abc");
   InvalidUnicodeCollector invalid;
 
@@ -85,7 +86,7 @@ void AllThreeByteUtf8() {
   invalid.emit("invalid_3byte_intervals_");
 }
 
-void AllFourByteUtf8() {
+void allFourByteUtf8() {
   std::string utf8("abcd");
   InvalidUnicodeCollector invalid;
 
@@ -114,11 +115,12 @@ void AllFourByteUtf8() {
   invalid.emit("invalid_4byte_intervals_");
 }
 
+} // namespace
 } // namespace Json
 } // namespace Envoy
 
 int main() {
-  Envoy::Json::AllThreeByteUtf8();
-  Envoy::Json::AllFourByteUtf8();
+  Envoy::Json::allThreeByteUtf8();
+  Envoy::Json::allFourByteUtf8();
   return 0;
 }

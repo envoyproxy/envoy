@@ -14,13 +14,6 @@ namespace Envoy {
 namespace Json {
 namespace TestUtil {
 
-absl::string_view stripDoubleQuotes(absl::string_view str) {
-  if (str.size() >= 2 && str[0] == '"' && str[str.size() - 1] == '"') {
-    return str.substr(1, str.size() - 2);
-  }
-  return str;
-}
-
 namespace {
 
 class InvalidUnicodeSet {

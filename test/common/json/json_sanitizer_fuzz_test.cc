@@ -24,7 +24,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     if (Envoy::Json::TestUtil::isProtoSerializableUtf8(input)) {
       buffer2 =
           MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(input), false, true);
-      absl::string_view proto_sanitized = Envoy::Json::TestUtil::stripDoubleQuotes(buffer2);
+      absl::string_view proto_sanitized = Envoy::Json::stripDoubleQuotes(buffer2);
       RELEASE_ASSERT(Envoy::Json::TestUtil::utf8Equivalent(sanitized, proto_sanitized, errmsg),
                      errmsg);
     }

@@ -73,9 +73,10 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
     // #20428 can be revived which is faster and doesn't throw exceptions, but
     // adds complexity to the production code base.
     buffer = Nlohmann::Factory::serialize(str);
+    return stripDoubleQuotes(buffer);
   }
   END_TRY
-  catch (std::exception) {
+  catch (std::exception&) {
     // If Nlohmann throws an error, emit an octal escape for any character
     // requireing it.
     buffer.clear();
@@ -92,6 +93,13 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   }
 
   return buffer;
+}
+
+absl::string_view stripDoubleQuotes(absl::string_view str) {
+  if (str.size() >= 2 && str[0] == '"' && str[str.size() - 1] == '"') {
+    str = str.substr(1, str.size() - 2);
+  }
+  return str;
 }
 
 } // namespace Json
