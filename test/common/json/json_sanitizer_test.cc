@@ -174,18 +174,25 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
   }
 }
 
-// This test takes 17 seconds without optimization.
-#ifdef NDEBUG
 TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
   std::string utf8("abcd");
 
-  for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
+  // This test takes 46 seconds without optimization and 46 seconds without,
+  // so we'll just stride all loop by 2 in non-optimized mode to cover the
+  // space in under 5 seconds.
+#ifdef NDEBUG
+  const uint32_t inc = 1;
+#else
+  const uint32_t inc = 2;
+#endif
+
+  for (uint32_t byte1 = 0; byte1 < 16; byte1 += inc) {
     utf8[0] = byte1 | Utf8::Pattern4Byte;
-    for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
+    for (uint32_t byte2 = 0; byte2 < 64; byte2 += inc) {
       utf8[1] = byte2 | Utf8::ContinuePattern;
-      for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
+      for (uint32_t byte3 = 0; byte3 < 64; byte3 += inc) {
         utf8[2] = byte3 | Utf8::ContinuePattern;
-        for (uint32_t byte4 = 0; byte4 < 64; ++byte4) {
+        for (uint32_t byte4 = 0; byte4 < 64; byte4 += inc) {
           utf8[3] = byte4 | Utf8::ContinuePattern;
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
@@ -193,7 +200,7 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
                 Utf8::decode(reinterpret_cast<const uint8_t*>(utf8.data()), 4);
             EXPECT_EQ(4, consumed);
             EXPECT_UTF8_EQ(
-                TestUtil::stripDoubleQuotes(protoSanitize(utf8)), sanitized,
+                protoSanitize(utf8), sanitized,
                 absl::StrFormat("0x%x(%d,%d,%d,%d)", unicode, byte1, byte2, byte3, byte4));
           }
         }
@@ -201,7 +208,6 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
     }
   }
 }
-#endif
 
 TEST_F(JsonSanitizerTest, MultiByteUtf8) {
   EXPECT_EQ(Utf8::UnicodeSizePair(0x3bb, 2), decode(Lambda));
