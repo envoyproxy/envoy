@@ -1,9 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_benchmark_binary",
-    "envoy_cc_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -73,61 +73,48 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "gen_excluded_unicodes",
     srcs = ["gen_excluded_unicodes.cc"],
     deps = [
-        "//source/common/json:json_sanitizer_lib",
+        ":utf8_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
 
-#genrule(
-#    name = "extensions_security_rst",
-#    srcs = [
-#        "//source/extensions:extensions_metadata.yaml",
-#        "//contrib:extensions_metadata.yaml",
-#    ],
-#    outs = ["extensions_security_rst.tar"],
-#    cmd = """
-#    $(location //tools/docs:generate_extensions_security_rst) \\
-#        $(location //source/extensions:extensions_metadata.yaml) \\
-#        $(location //contrib:extensions_metadata.yaml) $@
-#    """,
-#    tools = ["//tools/docs:generate_extensions_security_rst"],
-#)
-#
-#envoy_directory_genrule(
-#    name = "corpus_from_config_impl",
-#    testonly = 1,
-#    srcs = [
-#        # This is deliberately in srcs, since we run into host/target confusion
-#        # otherwise in oss-fuzz builds.
-#        ":config_impl_test_static",
-#    ],
-#    cmd = " ".join([
-#        "$(location corpus_from_config_impl_sh)",
-#        "$(location //test/common/router:config_impl_test_static)",
-#    ]),
-#    tools = [":corpus_from_config_impl_sh"],
-#)
-#
-#genrule(
-#    name = "generate_excluded_unicodes",
-#    srcs = [
-#        "admin_head_start.html",
-#        "admin.css",
-#    ],
-#    outs = ["admin_html_gen.h"],
-#    cmd = "./$(location :generate_admin_html.sh) \
-#        $(location admin_head_start.html) $(location admin.css) > $@",
-#    visibility = ["//visibility:private"],
-#    deps = [":generate_excluded_unicodes"],
-#)
+# It seems like this should work, but it doesn not, so we leave instructins
+# to manually run the generator.
+# genrule(
+#     name = "protobuf_incompatible_unicodes",
+#     testonly = 1,
+#     outs = ["protobuf_incompatible_unicodes.h"],
+#     cmd = """
+#       $(location //test/common/json:gen_excluded_unicodes) | \\
+#       grep -v 'contains invalid UTF-8'
+#     """,
+#     tools = [":gen_excluded_unicodes"],
+# )
 
 envoy_cc_test_library(
     name = "json_sanitizer_test_util_lib",
-    srcs = ["json_sanitizer_test_util.cc"],
+    srcs = [
+        "json_sanitizer_test_util.cc",
+    ],
     hdrs = ["json_sanitizer_test_util.h"],
-    deps = ["//source/common/common:utility_lib"],
+    deps = [
+        ":utf8_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "utf8_lib",
+    srcs = ["utf8.cc"],
+    hdrs = ["utf8.h"],
+)
+
+envoy_cc_test(
+    name = "utf8_test",
+    srcs = ["utf8_test.cc"],
+    deps = [":utf8_lib"],
 )

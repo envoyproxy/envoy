@@ -5,6 +5,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/common/json/json_sanitizer_test_util.h"
+#include "test/common/json/utf8.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
@@ -53,12 +54,12 @@ protected:
   }
 
   absl::string_view sanitizeInvalid(absl::string_view str) {
-    EXPECT_EQ(TestUtil::UnicodeSizePair(0, 0), decode(str));
+    EXPECT_EQ(Utf8::UnicodeSizePair(0, 0), decode(str));
     return sanitize(str);
   }
 
   std::pair<uint32_t, uint32_t> decode(absl::string_view str) {
-    return TestUtil::decodeUtf8(reinterpret_cast<const uint8_t*>(str.data()), str.size());
+    return Utf8::decode(reinterpret_cast<const uint8_t*>(str.data()), str.size());
   }
 
   std::string buffer_;
@@ -135,11 +136,11 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
   char buf[2];
   absl::string_view utf8(buf, 2);
   for (uint32_t byte1 = 2; byte1 < 32; ++byte1) {
-    buf[0] = byte1 | TestUtil::Utf8_2BytePattern;
+    buf[0] = byte1 | Utf8::Pattern2Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
-      buf[1] = byte2 | TestUtil::Utf8_ContinuePattern;
+      buf[1] = byte2 | Utf8::ContinuePattern;
       auto [unicode, consumed] =
-          Envoy::Json::TestUtil::decodeUtf8(reinterpret_cast<const uint8_t*>(buf), 2);
+          Envoy::Json::Utf8::decode(reinterpret_cast<const uint8_t*>(buf), 2);
       ASSERT_EQ(2, consumed);
       sanitizeAndCheckAgainstProtobufJson(utf8);
     }
@@ -149,17 +150,17 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
 TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
   std::string utf8("abc");
   for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
-    utf8[0] = byte1 | TestUtil::Utf8_3BytePattern;
+    utf8[0] = byte1 | Utf8::Pattern3Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
-      utf8[1] = byte2 | TestUtil::Utf8_ContinuePattern;
+      utf8[1] = byte2 | Utf8::ContinuePattern;
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
-        utf8[2] = byte3 | TestUtil::Utf8_ContinuePattern;
-        auto [unicode, num_consumed] = TestUtil::decodeUtf8(utf8);
+        utf8[2] = byte3 | Utf8::ContinuePattern;
+        auto [unicode, num_consumed] = Utf8::decode(utf8);
         if (unicode >= 0x800) { // 3-byte unicode values start at 0x800.
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
             auto [unicode, consumed] =
-                TestUtil::decodeUtf8(reinterpret_cast<const uint8_t*>(utf8.data()), 3);
+                Utf8::decode(reinterpret_cast<const uint8_t*>(utf8.data()), 3);
             EXPECT_EQ(3, consumed);
             std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
                 ValueUtil::stringValue(utf8), false, true);
@@ -178,17 +179,17 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
   std::string utf8("abcd");
 
   for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
-    utf8[0] = byte1 | TestUtil::Utf8_4BytePattern;
+    utf8[0] = byte1 | Utf8::Pattern4Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
-      utf8[1] = byte2 | TestUtil::Utf8_ContinuePattern;
+      utf8[1] = byte2 | Utf8::ContinuePattern;
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
-        utf8[2] = byte3 | TestUtil::Utf8_ContinuePattern;
+        utf8[2] = byte3 | Utf8::ContinuePattern;
         for (uint32_t byte4 = 0; byte4 < 64; ++byte4) {
-          utf8[3] = byte4 | TestUtil::Utf8_ContinuePattern;
+          utf8[3] = byte4 | Utf8::ContinuePattern;
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
             auto [unicode, consumed] =
-                TestUtil::decodeUtf8(reinterpret_cast<const uint8_t*>(utf8.data()), 4);
+                Utf8::decode(reinterpret_cast<const uint8_t*>(utf8.data()), 4);
             EXPECT_EQ(4, consumed);
             std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
                 ValueUtil::stringValue(utf8), false, true);
@@ -205,15 +206,15 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
 #endif
 
 TEST_F(JsonSanitizerTest, MultiByteUtf8) {
-  EXPECT_EQ(TestUtil::UnicodeSizePair(0x3bb, 2), decode(Lambda));
-  EXPECT_EQ(TestUtil::UnicodeSizePair(0x3bb, 2), decode(LambdaUtf8));
-  EXPECT_EQ(TestUtil::UnicodeSizePair(0x1f79, 3), decode(Omicron));
-  EXPECT_EQ(TestUtil::UnicodeSizePair(0x1f79, 3), decode(OmicronUtf8));
+  EXPECT_EQ(Utf8::UnicodeSizePair(0x3bb, 2), decode(Lambda));
+  EXPECT_EQ(Utf8::UnicodeSizePair(0x3bb, 2), decode(LambdaUtf8));
+  EXPECT_EQ(Utf8::UnicodeSizePair(0x1f79, 3), decode(Omicron));
+  EXPECT_EQ(Utf8::UnicodeSizePair(0x1f79, 3), decode(OmicronUtf8));
 
   // It's hard to find large unicode characters, but to test the utf8 decoder
   // there are some in https://unicode-table.com/en/blocks/musical-symbols/
   // with reference utf8 encoding from https://unicode-table.com/en/1D11E/
-  EXPECT_EQ(TestUtil::UnicodeSizePair(0x1d11e, 4), decode(TrebleClefUtf8));
+  EXPECT_EQ(Utf8::UnicodeSizePair(0x1d11e, 4), decode(TrebleClefUtf8));
 }
 
 TEST_F(JsonSanitizerTest, Low8Bit) {

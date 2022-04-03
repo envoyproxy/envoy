@@ -1,5 +1,6 @@
-#include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
+
+#include "test/common/json/utf8.h"
 
 #include "absl/strings/str_format.h"
 
@@ -12,14 +13,9 @@ namespace Json {
 // for differential fuzzing. We need to avoid comparing sanitization results for
 // strings containing utf-8 sequences that protobufs cannot serialize.
 //
-// Normally when running tests, nothing will be passed to collect(), and emit()
-// will return false. But if the protobuf library changes and different unicode
-// sets become invalid, we can re-run the collector with:
-//
 // bazel build -c opt test/common/json:json_sanitizer_test
-// GENERATE_INVALID_UTF8_RANGES=1
 //   ./bazel-bin/test/common/json/json_sanitizer_test |&
-//   grep -v 'contains invalid UTF-8'
+//       grep -v 'contains invalid UTF-8'
 //
 // The grep pipe is essential as otherwise you will be buried in thousands of
 // messages from the protobuf library that cannot otherwise be trapped. The
@@ -59,7 +55,7 @@ private:
 };
 
 bool isInvalidProtobufSerialization(const std::string& str) {
-  return str.size() == 2 && str[0] == '"' && str[1] == '"';
+  return (str.size() == 2 && str[0] == '"' && str[1] == '"') || str.size() > 8;
 }
 
 void AllThreeByteUtf8() {
@@ -67,13 +63,12 @@ void AllThreeByteUtf8() {
   InvalidUnicodeCollector invalid;
 
   for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
-    utf8[0] = byte1 | JsonSanitizer::Utf8_3BytePattern;
+    utf8[0] = byte1 | Utf8::Pattern3Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
-      utf8[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
+      utf8[1] = byte2 | Utf8::ContinuePattern;
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
-        utf8[2] = byte3 | JsonSanitizer::Utf8_ContinuePattern;
-        auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(
-            reinterpret_cast<const uint8_t*>(utf8.data()), 3);
+        utf8[2] = byte3 | Utf8::ContinuePattern;
+        auto [unicode, consumed] = Utf8::decode(utf8);
         if (consumed == 3) {
           std::string proto_sanitized =
               MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(utf8), false, true);
@@ -95,15 +90,14 @@ void AllFourByteUtf8() {
   InvalidUnicodeCollector invalid;
 
   for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
-    utf8[0] = byte1 | JsonSanitizer::Utf8_4BytePattern;
+    utf8[0] = byte1 | Utf8::Pattern4Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
-      utf8[1] = byte2 | JsonSanitizer::Utf8_ContinuePattern;
+      utf8[1] = byte2 | Utf8::ContinuePattern;
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
-        utf8[2] = byte3 | JsonSanitizer::Utf8_ContinuePattern;
+        utf8[2] = byte3 | Utf8::ContinuePattern;
         for (uint32_t byte4 = 0; byte4 < 64; ++byte4) {
-          utf8[3] = byte4 | JsonSanitizer::Utf8_ContinuePattern;
-          auto [unicode, consumed] = Envoy::Json::JsonSanitizer::decodeUtf8(
-              reinterpret_cast<const uint8_t*>(utf8.data()), 4);
+          utf8[3] = byte4 | Utf8::ContinuePattern;
+          auto [unicode, consumed] = Utf8::decode(utf8);
           if (consumed == 4) {
             std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
                 ValueUtil::stringValue(utf8), false, true);
