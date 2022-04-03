@@ -12,9 +12,9 @@
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/json/json_loader.h"
 
+#include "test/integration/filters/add_body_filter.pb.h"
 #include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/filters/test_listener_filter.pb.h"
-#include "test/integration/filters/add_body_filter.pb.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -84,14 +84,12 @@ public:
   FilterConfigDiscoveryImplTest() {
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
   }
-  ~FilterConfigDiscoveryImplTest() override {
-    factory_context_.thread_local_.shutdownThread();
-  }
+  ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
   // Create listener filter config provider callbacks.
-  DynamicFilterConfigProviderPtr<FactoryCb> createProvider(
-      std::string name, bool warm, bool default_configuration,
-      bool last_filter_config = true) {
+  DynamicFilterConfigProviderPtr<FactoryCb> createProvider(std::string name, bool warm,
+                                                           bool default_configuration,
+                                                           bool last_filter_config = true) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ExtensionConfigSource config_source;
     envoy::config::core::v3::AggregatedConfigSource ads;
@@ -146,21 +144,15 @@ public:
     EXPECT_CALL(init_watcher_, ready());
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
     EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(
-        1UL,
-        scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(0UL,
-              scope_.counter(getConfigFailCounter()).value());
+    EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
 
     // Ensure that we honor resource removals.
     Protobuf::RepeatedPtrField<std::string> remove;
     *remove.Add() = "foo";
     callbacks_->onConfigUpdate({}, remove, "1");
-    EXPECT_EQ(
-        2UL,
-        scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(0UL,
-              scope_.counter(getConfigFailCounter()).value());
+    EXPECT_EQ(2UL, scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
   }
 
   // Test functions will be called by all three filter types.
@@ -184,11 +176,8 @@ public:
       EXPECT_CALL(init_watcher_, ready());
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
       EXPECT_NE(absl::nullopt, provider_->config());
-      EXPECT_EQ(
-          1UL,
-          scope_.counter(getConfigReloadCounter()).value());
-      EXPECT_EQ(0UL,
-                scope_.counter(getConfigFailCounter()).value());
+      EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
+      EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
     }
 
     // 2nd request with same response. Based on hash should not reload config.
@@ -198,13 +187,9 @@ public:
           TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
 
-      EXPECT_EQ(
-          1UL,
-          scope_.counter(getConfigReloadCounter()).value());
-      EXPECT_EQ(0UL,
-                scope_.counter(getConfigFailCounter()).value());
+      EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
+      EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
     }
-
   }
 
   void testBasicDeprecatedStatPrefix() {
@@ -232,10 +217,8 @@ public:
     setup();
     EXPECT_CALL(init_watcher_, ready());
     callbacks_->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::FetchTimedout, {});
-    EXPECT_EQ(0UL,
-                  scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(1UL,
-                  scope_.counter(getConfigFailCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(1UL, scope_.counter(getConfigFailCounter()).value());
   }
 
   void testTooManyResources() {
@@ -252,8 +235,7 @@ public:
     EXPECT_THROW_WITH_MESSAGE(
         callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
         EnvoyException, "Unexpected number of resources in ExtensionConfigDS response: 2");
-    EXPECT_EQ(0UL,
-                  scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
   }
 
   void testWrongName() {
@@ -266,13 +248,12 @@ public:
     EXPECT_THROW_WITH_MESSAGE(
         callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
         EnvoyException, "Unexpected resource name in ExtensionConfigDS response: bar");
-    EXPECT_EQ(0UL,
-                  scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
   }
 
   // Without default config.
-  // First adding a listener filter configuration by send a extension discovery response, then removes
-  // it.
+  // First adding a listener filter configuration by send a extension discovery response, then
+  // removes it.
   void testIncrementalWithOutDefault() {
     InSequence s;
     setup();
@@ -282,8 +263,8 @@ public:
   }
 
   // With default config.
-  // First adding a listener filter configuration by send a extension discovery response, then removes
-  // it.
+  // First adding a listener filter configuration by send a extension discovery response, then
+  // removes it.
   void testIncrementalWithDefault() {
     InSequence s;
     setup(true, true);
@@ -297,10 +278,8 @@ public:
     setup(false);
     EXPECT_EQ("foo", provider_->name());
     EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(0UL,
-                  scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(0UL,
-                  scope_.counter(getConfigFailCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
   }
 
   void testDualProviders() {
@@ -316,8 +295,7 @@ public:
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
     EXPECT_NE(absl::nullopt, provider_->config());
     EXPECT_NE(absl::nullopt, provider2->config());
-    EXPECT_EQ(1UL,
-                  scope_.counter(getConfigReloadCounter()).value());
+    EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
   }
 
   void testDualProvidersInvalid() {
@@ -343,9 +321,8 @@ public:
         EnvoyException,
         "Error: filter config has type URL test.integration.filters.AddBodyFilterConfig but "
         "expect " +
-        getTypeUrl() + ".");
-    EXPECT_EQ(0UL,
-                  scope_.counter(getConfigReloadCounter()).value());
+            getTypeUrl() + ".");
+    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
   }
 
   // Throw Envoy exception when default config is wrong.
@@ -355,32 +332,32 @@ public:
     // Set up the default config with a bogus type url.
     config_source.mutable_default_config()->set_type_url(
         "type.googleapis.com/test.integration.filters.Bogus");
-    EXPECT_THROW_WITH_MESSAGE(filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, "foo", factory_context_, "xds.", true, getFilterType()),
-                              EnvoyException,
-                              "Error: cannot find filter factory foo for default filter "
-                              "configuration with type URL "
-                              "type.googleapis.com/test.integration.filters.Bogus.");
+    EXPECT_THROW_WITH_MESSAGE(
+        filter_config_provider_manager_->createDynamicFilterConfigProvider(
+            config_source, "foo", factory_context_, "xds.", true, getFilterType()),
+        EnvoyException,
+        "Error: cannot find filter factory foo for default filter "
+        "configuration with type URL "
+        "type.googleapis.com/test.integration.filters.Bogus.");
   }
 
-  std::unique_ptr<FilterConfigProviderManager<FactoryCb,FactoryCtx>> filter_config_provider_manager_;
+  std::unique_ptr<FilterConfigProviderManager<FactoryCb, FactoryCtx>>
+      filter_config_provider_manager_;
   DynamicFilterConfigProviderPtr<FactoryCb> provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
 
 // HTTP filter test
-class HttpFilterConfigDiscoveryImplTest : public FilterConfigDiscoveryImplTest<
-    Http::FilterFactoryCb,
-    Server::Configuration::FactoryContext,
-    HttpFilterConfigProviderManagerImpl,
-    envoy::extensions::filters::http::router::v3::Router> {
+class HttpFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<Http::FilterFactoryCb,
+                                           Server::Configuration::FactoryContext,
+                                           HttpFilterConfigProviderManagerImpl,
+                                           envoy::extensions::filters::http::router::v3::Router> {
 public:
   const std::string getTypeUrl() const override {
     return "envoy.extensions.filters.http.router.v3.Router";
   }
-  const std::string getFilterType() const override {
-    return "http";
-  }
+  const std::string getFilterType() const override { return "http"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_reload";
   }
@@ -389,29 +366,19 @@ public:
   }
 };
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, DestroyReady) {
-  testDestroyReady();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, DestroyReady) { testDestroyReady(); }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, Basic) {
-  testBasic();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, Basic) { testBasic(); }
 
 TEST_F(HttpFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
   testBasicDeprecatedStatPrefix();
 }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, ConfigFailed) {
-  testConfigFailed();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, ConfigFailed) { testConfigFailed(); }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, TooManyResources) {
-  testTooManyResources();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, TooManyResources) { testTooManyResources(); }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, WrongName) {
-  testWrongName();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, WrongName) { testWrongName(); }
 
 // Without default config.
 // First adding a listener filter configuration by send a extension discovery response, then removes
@@ -423,26 +390,16 @@ TEST_F(HttpFilterConfigDiscoveryImplTest, IncrementalWithOutDefault) {
 // With default config.
 // First adding a listener filter configuration by send a extension discovery response, then removes
 // it.
-TEST_F(HttpFilterConfigDiscoveryImplTest, IncrementalWithDefault) {
-  testIncrementalWithDefault();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, IncrementalWithDefault) { testIncrementalWithDefault(); }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
-  testApplyWithoutWarming();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, ApplyWithoutWarming) { testApplyWithoutWarming(); }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, DualProviders) {
-  testDualProviders();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, DualProviders) { testDualProviders(); }
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, DualProvidersInvalid) {
-  testDualProvidersInvalid();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, DualProvidersInvalid) { testDualProvidersInvalid(); }
 
 // Throw Envoy exception when default config is wrong.
-TEST_F(HttpFilterConfigDiscoveryImplTest, WrongDefaultConfig) {
-  testWrongDefaultConfig();
-}
+TEST_F(HttpFilterConfigDiscoveryImplTest, WrongDefaultConfig) { testWrongDefaultConfig(); }
 
 // Raise exception when filter is not the last filter in filter chain, but the filter is terminal
 // filter. This test is HTTP filter specific.
@@ -471,18 +428,13 @@ TEST_F(HttpFilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
 }
 
 // TCP listener test
-class TcpListenerFilterConfigDiscoveryImplTest : public FilterConfigDiscoveryImplTest<
-    Network::ListenerFilterFactoryCb,
-    Server::Configuration::ListenerFactoryContext,
-    TcpListenerFilterConfigProviderManagerImpl,
-    Envoy::ProtobufWkt::Struct> {
+class TcpListenerFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          TcpListenerFilterConfigProviderManagerImpl, Envoy::ProtobufWkt::Struct> {
 public:
-  const std::string getTypeUrl() const override {
-    return "google.protobuf.Struct";
-  }
-  const std::string getFilterType() const override {
-    return "listener";
-  }
+  const std::string getTypeUrl() const override { return "google.protobuf.Struct"; }
+  const std::string getFilterType() const override { return "listener"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_reload";
   }
@@ -491,30 +443,19 @@ public:
   }
 };
 
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DestroyReady) { testDestroyReady(); }
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DestroyReady) {
-  testDestroyReady();
-}
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, Basic) {
-  testBasic();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, Basic) { testBasic(); }
 
 TEST_F(TcpListenerFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
   testBasicDeprecatedStatPrefix();
 }
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, ConfigFailed) {
-  testConfigFailed();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, ConfigFailed) { testConfigFailed(); }
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, TooManyResources) {
-  testTooManyResources();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, TooManyResources) { testTooManyResources(); }
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, WrongName) {
-  testWrongName();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, WrongName) { testWrongName(); }
 
 // Without default config.
 // First adding a listener filter configuration by send a extension discovery response, then removes
@@ -530,36 +471,28 @@ TEST_F(TcpListenerFilterConfigDiscoveryImplTest, IncrementalWithDefault) {
   testIncrementalWithDefault();
 }
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
-  testApplyWithoutWarming();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) { testApplyWithoutWarming(); }
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DualProviders) {
-  testDualProviders();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DualProviders) { testDualProviders(); }
 
 TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   testDualProvidersInvalid();
 }
 
 // Throw Envoy exception when default config is wrong.
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, WrongDefaultConfig) {
-  testWrongDefaultConfig();
-}
+TEST_F(TcpListenerFilterConfigDiscoveryImplTest, WrongDefaultConfig) { testWrongDefaultConfig(); }
 
 // UDP listener test
-class UdpListenerFilterConfigDiscoveryImplTest : public FilterConfigDiscoveryImplTest<
-    Network::UdpListenerFilterFactoryCb,
-    Server::Configuration::ListenerFactoryContext,
-    UdpListenerFilterConfigProviderManagerImpl,
-    test::integration::filters::TestUdpListenerFilterConfig> {
+class UdpListenerFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          UdpListenerFilterConfigProviderManagerImpl,
+          test::integration::filters::TestUdpListenerFilterConfig> {
 public:
   const std::string getTypeUrl() const override {
     return "test.integration.filters.TestUdpListenerFilterConfig";
   }
-  const std::string getFilterType() const override {
-    return "listener";
-  }
+  const std::string getFilterType() const override { return "listener"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_reload";
   }
@@ -568,29 +501,19 @@ public:
   }
 };
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DestroyReady) {
-  testDestroyReady();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DestroyReady) { testDestroyReady(); }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, Basic) {
-  testBasic();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, Basic) { testBasic(); }
 
 TEST_F(UdpListenerFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
   testBasicDeprecatedStatPrefix();
 }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, ConfigFailed) {
-  testConfigFailed();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, ConfigFailed) { testConfigFailed(); }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, TooManyResources) {
-  testTooManyResources();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, TooManyResources) { testTooManyResources(); }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, WrongName) {
-  testWrongName();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, WrongName) { testWrongName(); }
 
 // Without default config.
 // First adding a listener filter configuration by send a extension discovery response, then removes
@@ -606,23 +529,16 @@ TEST_F(UdpListenerFilterConfigDiscoveryImplTest, IncrementalWithDefault) {
   testIncrementalWithDefault();
 }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
-  testApplyWithoutWarming();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) { testApplyWithoutWarming(); }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DualProviders) {
-  testDualProviders();
-}
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DualProviders) { testDualProviders(); }
 
 TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   testDualProvidersInvalid();
 }
 
 // Throw Envoy exception when default config is wrong.
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, WrongDefaultConfig) {
-  testWrongDefaultConfig();
-}
-
+TEST_F(UdpListenerFilterConfigDiscoveryImplTest, WrongDefaultConfig) { testWrongDefaultConfig(); }
 
 } // namespace
 } // namespace Filter

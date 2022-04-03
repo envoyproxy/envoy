@@ -37,8 +37,8 @@ private:
  */
 class TestUdpListenerFilter : public Network::UdpListenerReadFilter {
 public:
-  TestUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks):
-      UdpListenerReadFilter(callbacks) {}
+  TestUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks)
+      : UdpListenerReadFilter(callbacks) {}
 
   // Network::UdpListenerReadFilter callbacks
   Network::FilterStatus onData(Network::UdpRecvData&) override {
@@ -47,8 +47,6 @@ public:
   Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
     return Network::FilterStatus::Continue;
   }
-
 };
-
 
 } // namespace Envoy

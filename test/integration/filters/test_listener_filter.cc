@@ -30,15 +30,16 @@ public:
 absl::Mutex TestListenerFilter::alpn_lock_;
 std::string TestListenerFilter::alpn_;
 
-
 /**
  * Config registration for the UDP test filter.
  */
-class TestUdpInspectorConfigFactory : public Server::Configuration::NamedUdpListenerFilterConfigFactory {
+class TestUdpInspectorConfigFactory
+    : public Server::Configuration::NamedUdpListenerFilterConfigFactory {
 public:
   // NamedUdpListenerFilterConfigFactory
-  Network::UdpListenerFilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message&, Server::Configuration::ListenerFactoryContext&) override {
+  Network::UdpListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::ListenerFactoryContext&) override {
     return [](Network::UdpListenerFilterManager& filter_manager,
               Network::UdpReadFilterCallbacks& callbacks) -> void {
       filter_manager.addReadFilter(std::make_unique<TestUdpListenerFilter>(callbacks));
@@ -51,8 +52,6 @@ public:
 
   std::string name() const override { return "envoy.filters.udp_listener.test"; }
 };
-
-
 
 REGISTER_FACTORY(TestInspectorConfigFactory,
                  Server::Configuration::NamedListenerFilterConfigFactory){"envoy.listener.test"};
