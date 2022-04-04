@@ -1984,6 +1984,30 @@ TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster) {
                           "unknown thrift weighted cluster");
 }
 
+TEST_F(ThriftConnectionManagerTest, WeightedClusterNotSpecified) {
+  const std::string yaml = R"EOF(
+  transport: FRAMED
+  protocol: BINARY
+  stat_prefix: test
+  route_config:
+    name: "routes"
+    routes:
+      - match:
+          method_name: name
+        route:
+          cluster: cluster
+      - match:
+          method_name: name2
+        route:
+          weighted_clusters:
+            clusters:
+              - weight: 2000
+      )EOF";
+
+  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster"}), EnvoyException,
+                          "Proto constraint validation failed");
+}
+
 TEST_F(ThriftConnectionManagerTest, UnknownMirrorPolicyCluster) {
   const std::string yaml = R"EOF(
 transport: FRAMED

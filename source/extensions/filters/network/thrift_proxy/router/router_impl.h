@@ -188,7 +188,7 @@ public:
   // validation_clusters = absl::nullopt means that clusters are not validated.
   RouteMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters);
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 

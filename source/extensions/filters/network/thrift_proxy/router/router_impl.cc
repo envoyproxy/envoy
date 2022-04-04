@@ -63,17 +63,9 @@ void RouteEntryImplBase::validateClusters(
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cluster->clusterName().empty()) {
-        if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
-          throw EnvoyException(
-              fmt::format("route: unknown thrift weighted cluster '{}'", cluster->clusterName()));
-        }
-      }
-      // For weighted clusters with `cluster_header_name`, we only verify that this field is
-      // not empty because the cluster name is not set yet at config time (hence the validation
-      // here).
-      else if (cluster->clusterHeader().get().empty()) {
-        throw EnvoyException("route: unknown thrift weighted cluster with no cluster_header field");
+      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
+        throw EnvoyException(
+            fmt::format("route: unknown thrift weighted cluster '{}'", cluster->clusterName()));
       }
     }
   }
@@ -201,7 +193,7 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 
 RouteMatcher::RouteMatcher(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters) {
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
