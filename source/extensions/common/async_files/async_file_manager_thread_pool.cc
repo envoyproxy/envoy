@@ -6,7 +6,6 @@
 #include <utility>
 #include <vector>
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_context_thread_pool.h"
 #include "source/extensions/common/async_files/status_after_file_error.h"
@@ -27,14 +26,19 @@ static thread_local std::shared_ptr<AsyncFileAction> ThreadNextAction;
 static thread_local bool ThreadIsWorker = false;
 } // namespace
 
-AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(const AsyncFileManagerConfig& config)
-    : posix_(config.substitute_posix_file_operations == nullptr
-                 ? *Api::OsSysCallsSingleton::get()
-                 : *config.substitute_posix_file_operations) {
-  unsigned int thread_pool_size = config.thread_pool_size.value();
+AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(
+    const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
+    Api::OsSysCalls& posix)
+    : posix_(posix) {
+  if (!posix.supportsAllPosixFileOperations()) {
+    PANIC("AsyncFileManagerThreadPool not supported");
+  }
+  unsigned int thread_pool_size = config.thread_pool().thread_count();
   if (thread_pool_size == 0) {
     thread_pool_size = std::thread::hardware_concurrency();
   }
+  ENVOY_LOG(info, fmt::format("AsyncFileManagerThreadPool created with id '{}', with {} threads",
+                              config.id(), thread_pool_size));
   thread_pool_.reserve(thread_pool_size);
   while (thread_pool_.size() < thread_pool_size) {
     thread_pool_.emplace_back([this]() { worker(); });
@@ -111,7 +115,7 @@ protected:
     }
   }
   AsyncFileManagerThreadPool& manager_;
-  const PosixFileOperations& posix() { return manager_.posix(); }
+  const Api::OsSysCalls& posix() { return manager_.posix(); }
 };
 
 class ActionCreateAnonymousFile : public ActionWithFileResult {
@@ -242,16 +246,6 @@ AsyncFileManagerThreadPool::unlink(absl::string_view filename,
                                    std::function<void(absl::Status)> on_complete) {
   return enqueue(std::make_shared<ActionUnlink>(posix(), filename, on_complete));
 }
-
-class AsyncFileManagerThreadPoolFactory : public AsyncFileManagerFactory {
-  bool shouldUseThisFactory(const AsyncFileManagerConfig& config) const override {
-    return config.thread_pool_size.has_value();
-  }
-  std::unique_ptr<AsyncFileManager> create(const AsyncFileManagerConfig& config) const override {
-    return std::make_unique<AsyncFileManagerThreadPool>(config);
-  }
-};
-static AsyncFileManagerThreadPoolFactory registered;
 
 } // namespace AsyncFiles
 } // namespace Common

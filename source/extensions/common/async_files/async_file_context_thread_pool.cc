@@ -30,7 +30,7 @@ protected:
     return static_cast<AsyncFileContextThreadPool*>(handle_.get());
   }
 
-  const PosixFileOperations& posix() const {
+  const Api::OsSysCalls& posix() const {
     return static_cast<AsyncFileManagerThreadPool&>(context()->manager()).posix();
   }
 

@@ -8,13 +8,14 @@
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
-
-#include "test/mocks/extensions/common/async_files/mock_posix_file_operations.h"
+#include "source/extensions/common/async_files/async_file_manager_factory.h"
 
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "test/mocks/server/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +26,7 @@ using ::testing::_;
 using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::Return;
+using ::testing::StrictMock;
 
 class AsyncFileHandleHelpers {
 public:
@@ -60,25 +62,31 @@ public:
   }
   const char* test_tmpdir = std::getenv("TEST_TMPDIR");
   std::string tmpdir_ = test_tmpdir ? test_tmpdir : "/tmp";
-  std::unique_ptr<AsyncFileManager> manager_;
+
+  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
+  std::shared_ptr<AsyncFileManagerFactory> factory_;
+  AsyncFileManager* manager_;
 };
 
 class AsyncFileHandleTest : public testing::Test, public AsyncFileHandleHelpers {
 public:
   void SetUp() override {
-    AsyncFileManagerConfig config;
-    config.thread_pool_size = 1;
-    manager_ = config.createManager();
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
+    envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+    config.mutable_thread_pool()->set_thread_count(1);
+    manager_ = factory_->getAsyncFileManager(config);
   }
 };
 
 class AsyncFileHandleWithMockPosixTest : public testing::Test, public AsyncFileHandleHelpers {
 public:
   void SetUp() override {
-    AsyncFileManagerConfig config;
-    config.thread_pool_size = 1;
-    config.substitute_posix_file_operations = &mock_posix_file_operations_;
-    manager_ = config.createManager();
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
+    envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+    config.mutable_thread_pool()->set_thread_count(1);
+    manager_ = factory_->getAsyncFileManager(config, &mock_posix_file_operations_);
     EXPECT_CALL(mock_posix_file_operations_, open(_, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Return(1));
@@ -86,8 +94,11 @@ public:
         .Times(AnyNumber())
         .WillRepeatedly(Return(1));
     EXPECT_CALL(mock_posix_file_operations_, close(_)).Times(AnyNumber()).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(true));
   }
-  MockPosixFileOperations mock_posix_file_operations_;
+  StrictMock<Api::MockOsSysCalls> mock_posix_file_operations_;
 };
 
 TEST_F(AsyncFileHandleTest, WriteReadClose) {

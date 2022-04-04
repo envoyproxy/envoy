@@ -25,21 +25,6 @@ std::function<void()> AsyncFileManager::whenReady(std::function<void(absl::Statu
   return enqueue(std::make_shared<ActionWhenReady>(std::move(on_complete)));
 }
 
-std::vector<const AsyncFileManagerFactory*>& registeredFactories() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::vector<const AsyncFileManagerFactory*>);
-};
-
-AsyncFileManagerFactory::AsyncFileManagerFactory() { registeredFactories().emplace_back(this); }
-
-std::unique_ptr<AsyncFileManager> AsyncFileManagerConfig::createManager() const {
-  for (auto factory : registeredFactories()) {
-    if (factory->shouldUseThisFactory(*this)) {
-      return factory->create(*this);
-    }
-  }
-  PANIC("Invalid AsyncFileManagerConfig");
-}
-
 } // namespace AsyncFiles
 } // namespace Common
 } // namespace Extensions

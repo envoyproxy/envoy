@@ -10,6 +10,7 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,9 +22,12 @@ namespace AsyncFiles {
 // received, except when operations are chained, in which case the thread that
 // performed the previous action in the chain immediately performs the newly chained
 // action.
-class AsyncFileManagerThreadPool : public AsyncFileManager {
+class AsyncFileManagerThreadPool : public AsyncFileManager,
+                                   protected Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  explicit AsyncFileManagerThreadPool(const AsyncFileManagerConfig& config);
+  explicit AsyncFileManagerThreadPool(
+      const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
+      Api::OsSysCalls& posix);
   ~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(queue_mutex_) override;
   std::function<void()>
   createAnonymousFile(absl::string_view path,

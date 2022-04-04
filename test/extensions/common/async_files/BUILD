@@ -32,6 +32,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "async_file_manager_factory_test",
+    srcs = [
+        "async_file_manager_Factory_test.cc",
+    ],
+    deps = [
+        "//source/extensions/common/async_files",
+        "//test/mocks/extensions/common/async_files:async_files_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "status_after_file_error_test",
     srcs = ["status_after_file_error_test.cc"],
     tags = ["skip_on_windows"],

@@ -16,24 +16,6 @@ namespace AsyncFiles {
 
 class AsyncFileManager;
 
-// A configuration for an AsyncFileManager instance.
-// To create a thread-pool-based AsyncFileManager, set thread_pool_size.
-struct AsyncFileManagerConfig {
-  // A thread pool size of 0 will use std::thread::hardware_concurrency() for the number of
-  // threads. If unset, will try to use a different implementation.
-  absl::optional<uint32_t> thread_pool_size;
-
-  // For testing, to inject mock/fake OsSysCalls. If unset will use real file operations.
-  Api::OsSysCalls* substitute_posix_file_operations = nullptr;
-
-  // TODO(ravenblack): Put configuration options to instantiate different implementations
-  // here (e.g. `io_uring`, or a Windows-compatible implementation.)
-
-  // Create an AsyncFileManager. This must outlive all AsyncFileHandles it generates.
-  // If no registered factory accepts the configuration object, this will PANIC.
-  std::unique_ptr<AsyncFileManager> createManager() const;
-};
-
 // An AsyncFileManager should be a singleton or singleton-like.
 // Possible subclasses currently are:
 //   * AsyncFileManagerThreadPool
@@ -108,20 +90,6 @@ private:
 
   friend class AsyncFileContextBase;
   friend class AsyncFileManagerTest;
-};
-
-// Overriding this class and instantiating a static singleton registers a
-// factory type. For an example see async_file_manager_thread_pool.cc
-class AsyncFileManagerFactory {
-public:
-  AsyncFileManagerFactory();
-  virtual ~AsyncFileManagerFactory() = default;
-
-  // Returns true if the config should instantiate from this factory instance.
-  virtual bool shouldUseThisFactory(const AsyncFileManagerConfig& config) const PURE;
-
-  // Returns an instance of an AsyncFileManager based on the config.
-  virtual std::unique_ptr<AsyncFileManager> create(const AsyncFileManagerConfig& config) const PURE;
 };
 
 } // namespace AsyncFiles

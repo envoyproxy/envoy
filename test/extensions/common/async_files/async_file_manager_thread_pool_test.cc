@@ -5,13 +5,16 @@
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
-#include "source/extensions/common/async_files/posix_file_operations.h"
+#include "source/extensions/common/async_files/async_file_manager_factory.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -108,11 +111,19 @@ private:
 };
 
 class AsyncFileManagerTest : public testing::Test {
+public:
+  void SetUp() override {
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
+  }
+
 protected:
+  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
+  std::shared_ptr<AsyncFileManagerFactory> factory_;
   const char* test_tmpdir = std::getenv("TEST_TMPDIR");
   std::string tmpdir_ = test_tmpdir ? test_tmpdir : "/tmp";
   absl::Mutex control_mutex_;
-  std::unique_ptr<AsyncFileManager> manager_;
+  AsyncFileManager* manager_;
 
   AsyncFileActionBlockedUntilReleased* blocker_[3];
   std::atomic<BlockerState> blocker_last_state_[3];
@@ -128,26 +139,27 @@ protected:
 using AsyncFileManagerDeathTest = AsyncFileManagerTest;
 
 TEST_F(AsyncFileManagerDeathTest, PanicsWithUnspecifiedConfig) {
-  AsyncFileManagerConfig config;
-  EXPECT_DEATH({ manager_ = config.createManager(); }, "Invalid AsyncFileManagerConfig");
+  envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+  EXPECT_DEATH({ factory_->getAsyncFileManager(config); },
+               "unrecognized AsyncFileManagerConfig::ManagerType");
 }
 
 TEST_F(AsyncFileManagerTest, WorksWithThreadPoolSizeZero) {
-  AsyncFileManagerConfig config;
-  config.thread_pool_size = 0;
-  manager_ = config.createManager();
+  envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+  config.mutable_thread_pool()->set_thread_count(0);
+  manager_ = factory_->getAsyncFileManager(config);
   // A crafty regex to string-match any number higher than 0, including a
   // number that ends in 0.
   EXPECT_THAT(manager_->describe(), testing::ContainsRegex("thread_pool_size = [1-9]\\d*"));
   enqueueBlocker(0);
   EXPECT_TRUE(blocker_[0]->doWholeFlow());
-  manager_.reset();
+  factory_.reset();
 }
 
 TEST_F(AsyncFileManagerTest, ThreadsBlockAppropriately) {
-  AsyncFileManagerConfig config;
-  config.thread_pool_size = 2;
-  manager_ = config.createManager();
+  envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+  config.mutable_thread_pool()->set_thread_count(2);
+  manager_ = factory_->getAsyncFileManager(config);
   EXPECT_THAT(manager_->describe(), testing::ContainsRegex("thread_pool_size = 2"));
   enqueueBlocker(0);
   enqueueBlocker(1);
@@ -161,16 +173,21 @@ TEST_F(AsyncFileManagerTest, ThreadsBlockAppropriately) {
   EXPECT_TRUE(blocker_[2]->isStarted());
   EXPECT_TRUE(blocker_[1]->doWholeFlow());
   EXPECT_TRUE(blocker_[2]->doWholeFlow());
-  manager_.reset();
+  factory_.reset();
 }
 
 class AsyncFileManagerSingleThreadTest : public AsyncFileManagerTest {
 public:
   void SetUp() override {
-    AsyncFileManagerConfig config;
-    config.thread_pool_size = 1;
-    manager_ = config.createManager();
+    envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+    config.mutable_thread_pool()->set_thread_count(1);
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    auto factory = AsyncFileManagerFactory::singleton(singleton_manager_.get());
+    manager_ = factory->getAsyncFileManager(config);
   }
+
+private:
+  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
 };
 
 TEST_F(AsyncFileManagerSingleThreadTest, AbortingDuringExecutionCancelsTheCallback) {
@@ -267,8 +284,8 @@ TEST_F(AsyncFileManagerSingleThreadTest, CreateAnonymousFileWorks) {
 TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileAndUnlinkWork) {
   char filename[1024];
   snprintf(filename, sizeof(filename), "%s/async_file.XXXXXX", tmpdir_.c_str());
-  int fd = realPosixFileOperations().mkstemp(filename);
-  realPosixFileOperations().close(fd);
+  int fd = Api::OsSysCallsSingleton().mkstemp(filename);
+  Api::OsSysCallsSingleton().close(fd);
   WaitForResult<absl::StatusOr<AsyncFileHandle>> handle_blocker;
   manager_->openExistingFile(filename, AsyncFileManager::Mode::ReadWrite,
                              handle_blocker.callback());
@@ -298,21 +315,6 @@ TEST_F(AsyncFileManagerSingleThreadTest, UnlinkFailsForNonexistent) {
   manager_->unlink(absl::StrCat(tmpdir_, "/nonexistent_file"), handle_blocker.callback());
   absl::Status status = handle_blocker.getResult().status();
   EXPECT_EQ(absl::StatusCode::kNotFound, status.code()) << status;
-}
-
-class AsyncFileManagerFactoryDummy : public AsyncFileManagerFactory {
-  bool shouldUseThisFactory(const AsyncFileManagerConfig&) const override { return false; }
-  std::unique_ptr<AsyncFileManager> create(const AsyncFileManagerConfig&) const override {
-    return std::unique_ptr<AsyncFileManager>();
-  }
-};
-
-TEST(DestructorCoverageTest, AsyncFileManagerFactoryDestructorDoesntMeltYourFaceOff) {
-  AsyncFileManagerFactoryDummy dummy;
-  // This test just provides coverage of the mandatory virtual destructor on
-  // AsyncFileManagerFactory. The destructor doesn't do anything, so we don't actually have to test
-  // anything, but being a registry factory class, the destructor doesn't get called any natural
-  // way.
 }
 
 } // namespace AsyncFiles

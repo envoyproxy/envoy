@@ -6,12 +6,16 @@
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
+#include "source/extensions/common/async_files/async_file_manager_factory.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -21,6 +25,7 @@ namespace Common {
 namespace AsyncFiles {
 
 using ::testing::_;
+using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Return;
@@ -29,15 +34,21 @@ using ::testing::StrictMock;
 class AsyncFileManagerWithMockFilesTest : public ::testing::Test {
 public:
   void SetUp() override {
-    AsyncFileManagerConfig config;
-    config.substitute_posix_file_operations = &mock_posix_file_operations_;
-    config.thread_pool_size = 1;
-    manager_ = config.createManager();
+    EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(true));
+    envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+    config.mutable_thread_pool()->set_thread_count(1);
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
+    manager_ = factory_->getAsyncFileManager(config, &mock_posix_file_operations_);
   }
 
 protected:
+  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
   StrictMock<Api::MockOsSysCalls> mock_posix_file_operations_;
-  std::unique_ptr<AsyncFileManager> manager_;
+  std::shared_ptr<AsyncFileManagerFactory> factory_;
+  AsyncFileManager* manager_;
   static constexpr absl::string_view tmpdir_{"/mocktmp"};
 };
 
