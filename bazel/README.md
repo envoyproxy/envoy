@@ -260,10 +260,11 @@ for how to update or override dependencies.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
-1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
-   in your shell for buildifier to work.
-1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
-   in your shell for buildozer to work.
+   Make sure you have go version 1.17 or later.
+1. `go install github.com/bazelbuild/buildtools/buildifier@latest` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
+   in your shell for buildifier to work. If GOPATH is not set, it is $HOME/go by default.
+1. `go install github.com/bazelbuild/buildtools/buildozer@latest` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
+   in your shell for buildozer to work. If GOPATH is not set, it is $HOME/go by default.
 1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
 
@@ -916,29 +917,41 @@ Edit the paths shown here to reflect the installation locations on your system:
 export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
-The easiest way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
+
+A relatively easy way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
+
 * Run the ci docker image
+
 ```shell
 ci/run_envoy_docker.sh bash
 ```
+
 * Get the docker container ID
+
 ```shell
 dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
 ```
+
 * Copy the `clang-format` to host machine
+
 ```shell
-docker  copy $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
+docker cp $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
 ```
-* Replace the host `clang-format` with the new one. Ensure that the copied `clang-format` is the default one. You can do this by ensuring it is in `$PATH`:
+
+* Ensure that the copied `clang-format` is the default one, by ensuring it is in `$PATH`:
+
 ```shell
 cp clang-format-ci /usr/local/bin/clang-format
 ```
-If you are a non-root user, alternatively you can use a bin dir and add that to `$PATH`
+
+Alternatively, if you are a non-root user, you can use a bin dir and add that to `$PATH`
+
 ```shell
 mkdir bin
 mv clang-format-ci bin/clang-format
 export PATH=$PATH:$PWD/bin/
 ```
+
 Once this is set up, you can run clang-format without docker:
 
 ```shell

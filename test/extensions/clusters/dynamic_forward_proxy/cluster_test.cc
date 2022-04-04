@@ -43,7 +43,7 @@ public:
     Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
     }
@@ -139,6 +139,7 @@ public:
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 
   const std::string default_yaml_config_ = R"EOF(
 name: name

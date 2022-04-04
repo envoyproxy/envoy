@@ -75,6 +75,8 @@ public:
   bool isHalfCloseEnabled() override;
   std::string nextProtocol() const override;
   // Note, this might change before connect finishes.
+  ConnectionInfoSetter& connectionInfoSetter() override;
+  // Note, this might change before connect finishes.
   const ConnectionInfoProvider& connectionInfoProvider() const override;
   // Note, this might change before connect finishes.
   ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override;

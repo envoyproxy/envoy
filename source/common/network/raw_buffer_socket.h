@@ -25,9 +25,12 @@ public:
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 
+protected:
+  TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };
+
 private:
-  TransportSocketCallbacks* callbacks_{};
   bool shutdown_{};
+  TransportSocketCallbacks* callbacks_{};
 };
 
 class RawBufferSocketFactory : public CommonTransportSocketFactory {

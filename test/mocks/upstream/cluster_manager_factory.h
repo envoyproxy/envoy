@@ -31,7 +31,8 @@ public:
                    alternate_protocol_options,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-               TimeSource& source, ClusterConnectivityState& state));
+               TimeSource& source, ClusterConnectivityState& state,
+               Http::PersistentQuicInfoPtr& quic_info));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,

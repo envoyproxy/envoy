@@ -63,6 +63,7 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/extensions/filters/common/expr/context_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
     "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
+    "./test/tools/router_check/router_check.cc",
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
@@ -144,7 +145,7 @@ BUILD_URLS_ALLOWLIST = (
     "./api/bazel/envoy_http_archive.bzl",
 )
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-11")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-12")
 BUILDIFIER_PATH = paths.get_buildifier()
 BUILDOZER_PATH = paths.get_buildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -188,6 +189,7 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+# yapf: enable
 
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
@@ -205,58 +207,57 @@ CODE_CONVENTION_REPLACEMENTS = {
 }
 
 UNOWNED_EXTENSIONS = {
-  "extensions/filters/http/buffer",
-  "extensions/filters/http/rbac",
-  "extensions/filters/http/ip_tagging",
-  "extensions/filters/http/tap",
-  "extensions/filters/http/health_check",
-  "extensions/filters/http/cors",
-  "extensions/filters/http/dynamo",
-  "extensions/filters/http/lua",
-  "extensions/filters/http/common",
-  "extensions/filters/common",
-  "extensions/filters/common/rbac",
-  "extensions/filters/common/lua",
-  "extensions/filters/listener/original_dst",
-  "extensions/filters/listener/proxy_protocol",
-  "extensions/stat_sinks/statsd",
-  "extensions/stat_sinks/common",
-  "extensions/stat_sinks/common/statsd",
-  "extensions/health_checkers/redis",
-  "extensions/access_loggers/grpc",
-  "extensions/access_loggers/file",
-  "extensions/common/tap",
-  "extensions/transport_sockets/raw_buffer",
-  "extensions/transport_sockets/tap",
-  "extensions/tracers/zipkin",
-  "extensions/tracers/dynamic_ot",
-  "extensions/tracers/opencensus",
-  "extensions/tracers/lightstep",
-  "extensions/tracers/common",
-  "extensions/tracers/common/ot",
-  "extensions/retry/host/previous_hosts",
-  "extensions/filters/network/client_ssl_auth",
-  "extensions/filters/network/rbac",
-  "extensions/filters/network/tcp_proxy",
-  "extensions/filters/network/echo",
-  "extensions/filters/network/redis_proxy",
-  "extensions/filters/network/kafka",
-  "extensions/filters/network/kafka/broker",
-  "extensions/filters/network/kafka/mesh",
-  "extensions/filters/network/kafka/mesh/command_handlers",
-  "extensions/filters/network/kafka/protocol",
-  "extensions/filters/network/kafka/serialization",
-  "extensions/filters/network/mongo_proxy",
-  "extensions/filters/network/common",
-  "extensions/filters/network/common/redis",
+    "extensions/filters/http/buffer",
+    "extensions/filters/http/rbac",
+    "extensions/filters/http/ip_tagging",
+    "extensions/filters/http/tap",
+    "extensions/filters/http/health_check",
+    "extensions/filters/http/cors",
+    "extensions/filters/http/dynamo",
+    "extensions/filters/http/lua",
+    "extensions/filters/http/common",
+    "extensions/filters/common",
+    "extensions/filters/common/rbac",
+    "extensions/filters/common/lua",
+    "extensions/filters/listener/original_dst",
+    "extensions/filters/listener/proxy_protocol",
+    "extensions/stat_sinks/statsd",
+    "extensions/stat_sinks/common",
+    "extensions/stat_sinks/common/statsd",
+    "extensions/health_checkers/redis",
+    "extensions/access_loggers/grpc",
+    "extensions/access_loggers/file",
+    "extensions/common/tap",
+    "extensions/transport_sockets/raw_buffer",
+    "extensions/transport_sockets/tap",
+    "extensions/tracers/zipkin",
+    "extensions/tracers/dynamic_ot",
+    "extensions/tracers/opencensus",
+    "extensions/tracers/lightstep",
+    "extensions/tracers/common",
+    "extensions/tracers/common/ot",
+    "extensions/retry/host/previous_hosts",
+    "extensions/filters/network/client_ssl_auth",
+    "extensions/filters/network/rbac",
+    "extensions/filters/network/tcp_proxy",
+    "extensions/filters/network/echo",
+    "extensions/filters/network/redis_proxy",
+    "extensions/filters/network/kafka",
+    "extensions/filters/network/kafka/broker",
+    "extensions/filters/network/kafka/mesh",
+    "extensions/filters/network/kafka/mesh/command_handlers",
+    "extensions/filters/network/kafka/protocol",
+    "extensions/filters/network/kafka/serialization",
+    "extensions/filters/network/mongo_proxy",
+    "extensions/filters/network/common",
+    "extensions/filters/network/common/redis",
 }
 
 UNSORTED_FLAGS = {
-  "envoy.reloadable_features.activate_timers_next_event_loop",
-  "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.sanitize_http_header_referer",
+    "envoy.reloadable_features.activate_timers_next_event_loop",
+    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
+    "envoy.reloadable_features.sanitize_http_header_referer",
 }
-# yapf: enable
 
 
 class FormatChecker:
@@ -348,13 +349,13 @@ class FormatChecker:
                     "users".format(CLANG_FORMAT_PATH))
         else:
             error_messages.append(
-                "Command {} not found. If you have clang-format in version 10.x.x "
+                "Command {} not found. If you have clang-format in version 12.x.x "
                 "installed, but the binary name is different or it's not available in "
                 "PATH, please use CLANG_FORMAT environment variable to specify the path. "
                 "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-11.0.1\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-11\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@11/bin/clang-format".format(
+                "    export CLANG_FORMAT=clang-format-12.0.1\n"
+                "    export CLANG_FORMAT=/opt/bin/clang-format-12\n"
+                "    export CLANG_FORMAT=/usr/local/opt/llvm@12/bin/clang-format".format(
                     CLANG_FORMAT_PATH))
 
         def check_bazel_tool(name, path, var):
@@ -393,7 +394,7 @@ class FormatChecker:
         nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
         text = self.read_file(file_path)
         if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
-          not nolint in text:
+                not nolint in text:
             return [
                 "Unable to find %s namespace or %s for file: %s" %
                 (self.namespace_check, nolint, file_path)
@@ -413,8 +414,9 @@ class FormatChecker:
 
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
-        return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
-                any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
+        return (
+            file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL)
+            or any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
 
     # Real-world time sources should not be instantiated in the source, except for a few
     # specific cases. They should be passed down from where they are instantied to where
@@ -571,7 +573,7 @@ class FormatChecker:
             return False
         preceding = line[0:wait_for]
         if preceding.endswith("time_system") or preceding.endswith("timeSystem()") or \
-          preceding.endswith("time_system_"):
+                preceding.endswith("time_system_"):
             return False
         return True
 
@@ -790,10 +792,10 @@ class FormatChecker:
                 "Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
         if self.is_in_subdir(file_path, 'source') and file_path.endswith('.cc') and \
-          ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-            '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
-            '->counterFromString(' in line or '->gaugeFromString(' in line or \
-            '->histogramFromString(' in line or '->textReadoutFromString(' in line):
+            ('.counterFromString(' in line or '.gaugeFromString(' in line or
+             '.histogramFromString(' in line or '.textReadoutFromString(' in line or
+             '->counterFromString(' in line or '->gaugeFromString(' in line or
+                '->histogramFromString(' in line or '->textReadoutFromString(' in line):
             report_error(
                 "Don't lookup stats by name at runtime; use StatName saved during construction")
 
@@ -808,7 +810,10 @@ class FormatChecker:
                 "other sinks can add the suffix automatically on flush should they prefer to do so."
             )
 
-        if not self.allow_listed_for_std_regex(file_path) and "std::regex" in line:
+        normalized_target_path = file_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = f"./{normalized_target_path}"
+        if not self.allow_listed_for_std_regex(normalized_target_path) and "std::regex" in line:
             report_error(
                 "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
@@ -1163,6 +1168,34 @@ if __name__ == "__main__":
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
 
+    def check_visibility(error_messages):
+        # https://github.com/envoyproxy/envoy/issues/20589
+        # https://github.com/envoyproxy/envoy/issues/9953
+        # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
+        exclude_list = (
+            "':(exclude)source/extensions/filters/http/buffer/BUILD' "
+            "':(exclude)source/extensions/filters/network/common/BUILD' ")
+        command = (
+            "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
+            % exclude_list)
+        try:
+            output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
+            if output:
+                error_messages.append(
+                    "This change appears to add visibility rules. Please get senior maintainer "
+                    "approval to add an exemption to check_visibility tools/code_format/check_format.py"
+                )
+            output = subprocess.check_output(
+                "grep -r --include BUILD envoy_package source/extensions/*",
+                shell=True,
+                stderr=subprocess.STDOUT).strip()
+            if output:
+                error_messages.append(
+                    "envoy_package is not allowed to be used in source/extensions BUILD files.")
+        except subprocess.CalledProcessError as e:
+            if (e.returncode != 0 and e.returncode != 1):
+                error_messages.append("Failed to check visibility with command %s" % command)
+
     # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
     # error_messages.
     def owned_directories(error_messages):
@@ -1238,6 +1271,9 @@ if __name__ == "__main__":
     # Calculate the list of owned directories once per run.
     error_messages = []
     owned_directories = owned_directories(error_messages)
+
+    check_visibility(error_messages)
+
     if os.path.isfile(args.target_path):
         # All of our EXCLUDED_PREFIXES start with "./", but the provided
         # target path argument might not. Add it here if it is missing,

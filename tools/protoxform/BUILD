@@ -30,7 +30,7 @@ py_binary(
     ],
     data = [
         "//:.clang-format",
-        "//:API_VERSION",
+        "//:API_VERSION.txt",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
     visibility = ["//visibility:public"],

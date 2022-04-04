@@ -28,9 +28,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
-      heap_allocator_(alloc.symbolTable()), null_counter_(alloc.symbolTable()),
-      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()),
-      null_text_readout_(alloc.symbolTable()),
+      null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
+      null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable()),
       well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
