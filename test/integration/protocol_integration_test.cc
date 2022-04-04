@@ -74,7 +74,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound()
 
 TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualClusters(); }
 
-TEST_P(ProtocolIntegrationTest, RouterVirtualClustersOnVirtualHost) { testRouterVirtualClustersOnVirtualHostHeader();}
+TEST_P(ProtocolIntegrationTest, RouterVirtualClustersOnVirtualHost) {
+  testRouterVirtualClustersOnVirtualHostHeader();
+}
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {

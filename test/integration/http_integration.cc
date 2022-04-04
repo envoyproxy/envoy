@@ -672,10 +672,10 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
           headers->set_present_match(true);
         }
         {
-                envoy::config::core::v3::HeaderValueOption* header =
-          virtual_host->mutable_request_headers_to_add()->Add();
-      header->mutable_header()->set_key(matching_header);
-      header->mutable_header()->set_value("value");
+          envoy::config::core::v3::HeaderValueOption* header =
+              virtual_host->mutable_request_headers_to_add()->Add();
+          header->mutable_header()->set_key(matching_header);
+          header->mutable_header()->set_value("value");
         }
       });
   initialize();
@@ -686,7 +686,8 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
                                                  {":scheme", "http"},
                                                  {":authority", "sni.lyft.com"}};
 
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
@@ -700,7 +701,8 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
 }
 
-// Make sure virtual cluster stats are charged to the virtual cluster based on header specified in virtual host.
+// Make sure virtual cluster stats are charged to the virtual cluster based on header specified in
+// virtual host.
 void HttpIntegrationTest::testRouterVirtualClustersOnVirtualHostHeader() {
   const std::string matching_header = "x-use-test-vcluster";
   config_helper_.addConfigModifier(
@@ -718,10 +720,10 @@ void HttpIntegrationTest::testRouterVirtualClustersOnVirtualHostHeader() {
           headers->set_present_match(true);
         }
         {
-                envoy::config::core::v3::HeaderValueOption* header =
-          virtual_host->mutable_request_headers_to_add()->Add();
-      header->mutable_header()->set_key(matching_header);
-      header->mutable_header()->set_value("value");
+          envoy::config::core::v3::HeaderValueOption* header =
+              virtual_host->mutable_request_headers_to_add()->Add();
+          header->mutable_header()->set_key(matching_header);
+          header->mutable_header()->set_value("value");
         }
       });
   initialize();
@@ -732,7 +734,8 @@ void HttpIntegrationTest::testRouterVirtualClustersOnVirtualHostHeader() {
                                                  {":scheme", "http"},
                                                  {":authority", "sni.lyft.com"}};
 
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
