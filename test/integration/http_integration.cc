@@ -697,8 +697,8 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response2.get());
 
-  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 2);
-  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
+  test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
 }
 
 // Make sure virtual cluster stats are charged to the virtual cluster based on header specified in
