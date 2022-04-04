@@ -27,7 +27,7 @@ public:
                           std::unique_ptr<FilterStateObjects> filter_state_objects) PURE;
 
   /**
-   * Merge the passthrough state into a receipient stream metadata and filter state.
+   * Merge the passthrough state into a recipient stream metadata and filter state.
    */
   virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
                          StreamInfo::FilterState& filter_state) const PURE;
