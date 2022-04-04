@@ -53,6 +53,10 @@ public:
    * guaranteed to match with the return value of ProtoTraits::resourceType.
    * Both dynamic or static cast can be applied to downcast the message
    * to the corresponding route configuration class.
+   * @param rc supplies the RouteConfiguration.
+   * @param context supplies the context of the server factory.
+   * @param validate_clusters_default specifies whether the clusters that the route
+   *    table refers to will be validated by the cluster manager.
    * @throw EnvoyException if the new config can't be applied of.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,

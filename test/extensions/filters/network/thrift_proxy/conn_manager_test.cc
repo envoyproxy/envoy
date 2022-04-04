@@ -85,9 +85,7 @@ public:
 
   void initializeFilter() { initializeFilter(""); }
 
-  void initializeFilter(const std::string& yaml) { initializeFilter(yaml, {}); }
-
-  void initializeFilter(const std::string& yaml, const std::vector<std::string>& cluster_names) {
+  void initializeFilter(const std::string& yaml, const std::vector<std::string>& cluster_names = {}) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
     if (yaml.empty()) {
       config.set_stat_prefix("test");
@@ -101,7 +99,7 @@ public:
     initializeFilter(config, cluster_names);
   }
   void initializeFilter(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
-                        const std::vector<std::string>& cluster_names) {
+                        const std::vector<std::string>& cluster_names = {}) {
     // Destroy any existing filter first.
     filter_ = nullptr;
 
@@ -1954,6 +1952,8 @@ route_config:
         cluster: cluster2
 )EOF";
 
+  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml), EnvoyException,
+                          "unknown thrift cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster1"}), EnvoyException,
                           "unknown thrift cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster2"}), EnvoyException,
@@ -1975,6 +1975,9 @@ TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster) {
     cluster2->set_name("cluster2");
     cluster2->mutable_weight()->set_value(50);
   }
+
+  EXPECT_THROW_WITH_REGEX(initializeFilter(config), EnvoyException,
+                          "unknown thrift weighted cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"cluster1"}), EnvoyException,
                           "unknown thrift weighted cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"cluster2"}), EnvoyException,
