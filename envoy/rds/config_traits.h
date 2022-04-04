@@ -56,7 +56,9 @@ public:
    * @param rc supplies the RouteConfiguration.
    * @param context supplies the context of the server factory.
    * @param validate_clusters_default specifies whether the clusters that the route
-   *    table refers to will be validated by the cluster manager.
+   *    table refers to will be validated by the cluster manager. Currently thrift
+   *    route config provider manager validates the clusters for static route config
+   *    by default but doesn't validate the clusters for TRDS.
    * @throw EnvoyException if the new config can't be applied of.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
