@@ -103,6 +103,13 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
   }
 }
 
+void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& client) {
+  ASSERT(client.numActiveStreams() == 0);
+  if (static_cast<ActiveClient&>(client).hasCreatedStream()) {
+    // TODO(danzh) notify callback about the 0-RTT handshake failure.
+  }
+}
+
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
