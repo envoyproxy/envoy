@@ -651,16 +651,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
-  // Inject the active span's tracing context into the request headers.
-  callbacks_->activeSpan().injectContext(headers);
-
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
-                                       !config_.suppress_envoy_headers_);
-  // Set up stat prefixes, etc.
-  request_vcluster_ = route_entry_->virtualCluster(headers);
-  if (request_vcluster_ != nullptr) {
-    callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
-  }
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
 
