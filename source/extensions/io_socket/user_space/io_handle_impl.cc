@@ -54,9 +54,10 @@ const Network::Address::InstanceConstSharedPtr& IoHandleImpl::getCommonInternalA
                              "internal_address_for_user_space_io_handle"));
 }
 
-IoHandleImpl::IoHandleImpl()
+IoHandleImpl::IoHandleImpl(PassthroughStateSharedPtr passthrough_state)
     : pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
-                             [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}) {}
+                             [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}),
+      passthrough_state_(passthrough_state) {}
 
 IoHandleImpl::~IoHandleImpl() {
   if (!closed_) {

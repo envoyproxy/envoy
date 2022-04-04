@@ -2,12 +2,27 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
+
+// Shared state between peering user space IO handles.
+class PassthroughState {
+public:
+  virtual ~PassthroughState() = default;
+
+  /**
+   * Merge the passthrough state into a receipient stream metadata and filter state.
+   */
+  virtual void mergeInto(envoy::config::core::v3::Metadata& metadata, StreamInfo::FilterState& filter_state) const PURE;
+};
+
+using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
 
 /**
  * The interface for the peer as a writer and supplied read status query.
@@ -63,19 +78,9 @@ public:
   virtual bool isReadable() const PURE;
 
   /**
-   * @return user space socket metadata.
+   * @return shared state between peering user space IO handles.
    */
-  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
-
-  /**
-   * @return peer user space socket metadata if available.
-   */
-  virtual const envoy::config::core::v3::Metadata* peerMetadata() const PURE;
-
-  /**
-   * Set user space socket metadata by merging the protobuf.
-   */
-  virtual void setMetadata(const envoy::config::core::v3::Metadata& metadata) PURE;
+  virtual PassthroughStateSharedPtr passthroughState() PURE;
 };
 } // namespace UserSpace
 } // namespace IoSocket

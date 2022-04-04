@@ -22,12 +22,16 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "io_handle_lib",
     hdrs = ["io_handle.h"],
-    # This is core Envoy config.
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//source/server:__pkg__",
+        "//source/extensions/transport_socket/internal:__pkg__",
+        "//test/extensions/io_socket/user_space:__pkg__",
+    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:empty_string",
+        "//envoy/stream_info:filter_state_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

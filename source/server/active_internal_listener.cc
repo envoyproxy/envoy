@@ -54,11 +54,12 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   // connections.
   incNumConnections();
 
-  auto* handle = dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
+  auto* io_handle = dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
   auto active_socket = std::make_unique<ActiveTcpSocket>(
       *this, std::move(socket), false /* do not hand off at internal listener */);
-  if (handle != nullptr && handle->peerMetadata() != nullptr) {
-    active_socket->dynamicMetadata().MergeFrom(*handle->peerMetadata());
+  // Transfer internal passthrough state to the active socket from downstream.
+  if (io_handle != nullptr && io_handle->passthroughState()) {
+    io_handle->passthroughState()->mergeInto(active_socket->dynamicMetadata(), active_socket->filterState());
   }
 
   onSocketAccepted(std::move(active_socket));

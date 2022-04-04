@@ -42,7 +42,7 @@ public:
   }
   const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
 
-  std::shared_ptr<const Upstream::HostDescription> host() const override { return nullptr; }
+  const std::shared_ptr<const Upstream::HostDescription>& host() const override { return host_; }
 
 private:
   const absl::optional<std::string> override_server_name_;
@@ -51,6 +51,7 @@ private:
   const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
   const StreamInfo::FilterStateSharedPtr filter_state_;
+  const std::shared_ptr<const Upstream::HostDescription> host_;
 };
 
 class TransportSocketOptionsUtility {
@@ -105,8 +106,8 @@ public:
     return inner_options_ ? inner_options_->filterState()
                           : EmptyTransportSocketOptions::get().filterState();
   }
-  std::shared_ptr<const Upstream::HostDescription> host() const override {
-    return inner_options_ ? inner_options_->host() : nullptr;
+  const std::shared_ptr<const Upstream::HostDescription>& host() const override {
+    return inner_options_ ? inner_options_->host() : EmptyTransportSocketOptions::get().host();
   }
 
 private:
@@ -120,6 +121,7 @@ public:
                                        TransportSocketOptionsConstSharedPtr inner_options)
       : BaseWrapperTransportSocketOptions(std::move(inner_options)),
         alpn_fallback_(std::move(alpn)) {}
+  // Network::TransportSocketOptions
   const std::vector<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
@@ -134,7 +136,8 @@ public:
   HostDecoratingTransportSocketOptions(std::shared_ptr<const Upstream::HostDescription>& host,
                                        TransportSocketOptionsConstSharedPtr inner_options)
       : BaseWrapperTransportSocketOptions(std::move(inner_options)), host_(host) {}
-  std::shared_ptr<const Upstream::HostDescription> host() const override { return host_; }
+  // Network::TransportSocketOptions
+  const std::shared_ptr<const Upstream::HostDescription>& host() const override { return host_; }
 
 private:
   const std::shared_ptr<const Upstream::HostDescription> host_;

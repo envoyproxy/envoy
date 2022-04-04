@@ -5,8 +5,6 @@ package envoy.extensions.transport_sockets.internal.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -23,16 +21,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // a loopback user space socket residing in the same proxy instance. This
 // extension allows passing additional structured state across the user space
 // socket in addition to the regular byte stream. The purpose is to facilitate
-// communication between filters on the physical and the internal connections.
+// communication between filters on the downstream and the upstream internal
+// connections.
 //
 // Because the passthrough state is transferred once per the upstream
-// connection, the passthrough state is included in the hash key used to select
-// an upstream connection.
+// connection, the passthrough filter state is included in the hash key used to
+// select an upstream connection if it provides a hashing interface.
 //
 // .. note::
 //
-//  Using internal upstream transport affects load balancing decisions if the passthrough
-//  state is derived from the downstream connection.
+//  Using internal upstream transport affects load balancing decisions if the
+//  passthrough state is derived from the downstream connection attributes. As
+//  an example, using source IP in the passthrough state will prevent sharing
+//  of an upstream internal connection between different source IPs.
 message InternalUpstreamTransport {
   // Describes the location of the imported metadata value.
   message MetadataValueSource {
@@ -56,8 +57,7 @@ message InternalUpstreamTransport {
   // Specifies the list of filter state object names to insert into the downstream
   // internal connection when an internal address is used as a host. The filter state
   // objects must be mutable. These objects participate in the connection hashing decisions.
-  repeated FilterStateSource passthrough_filter_state_objects = 2
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+  repeated FilterStateSource passthrough_filter_state_objects = 2;
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];

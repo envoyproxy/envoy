@@ -243,7 +243,7 @@ public:
   /**
    * @return optional upstream host description.
    */
-  virtual std::shared_ptr<const Upstream::HostDescription> host() const PURE;
+  virtual const std::shared_ptr<const Upstream::HostDescription>& host() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

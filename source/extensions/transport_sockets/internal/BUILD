@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "internal_lib",
+    name = "internal",
     srcs = ["internal.cc"],
     hdrs = ["internal.h"],
     deps = [
@@ -31,7 +31,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":internal_lib",
+        ":internal",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
