@@ -876,8 +876,8 @@ public:
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    * @param grpc_error_details the gRPC status error details. It will be seralized and encoded in
    * grpc-status-details-bin header. Please be aware, inside `grpc_error_details`, only the
-   * `details` field will be effective and the `code`/`message` fields will be overwritten by the
-   * provided parameters.
+   * `details` field will be effective and the `code`/`message` fields will be overwritten by other
+   * provided parameters in this function.
    * @param details a string detailing why this local reply was sent.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
