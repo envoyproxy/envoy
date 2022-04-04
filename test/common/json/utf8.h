@@ -29,10 +29,10 @@ using UnicodeSizePair = std::pair<uint32_t, uint32_t>;
 /**
  * Decodes a single Utf8-encoded code-point from the string,
  * @param str A possibly Utf-8 encoded string.
- * @return the pair containing the first unicode symbol from str, and the number of bytes
+ * @return the pair containing the first Unicode symbol from str, and the number of bytes
  *         consumed from str. If str does not start with a valid UTF-8 code sequence,
  *         then zero is returned for the size (UnicodeSizePair.second) and the returned
- *         unicode value should be ignored.
+ *         Unicode value should be ignored.
  */
 UnicodeSizePair decode(const uint8_t* bytes, uint32_t size);
 inline UnicodeSizePair decode(absl::string_view str) {

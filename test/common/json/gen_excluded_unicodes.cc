@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Json {
 namespace {
 
-// Collects unicode values that cannot be handled by the protobuf json encoder.
-// This is not needed for correct operation of the json sanitizer, but it is
+// Collects Unicode values that cannot be handled by the protobuf JSON encoder.
+// This is not needed for correct operation of the JSON sanitizer, but it is
 // needed for comparing sanitization results against the proto serializer, and
 // for differential fuzzing. We need to avoid comparing sanitization results for
 // strings containing utf-8 sequences that protobufs cannot serialize.
@@ -31,14 +31,14 @@ namespace {
 class InvalidUnicodeCollector {
 public:
   /**
-   * Collects a unicode value that cannot be parsed as utf8 by the protobuf serializer.
+   * Collects a Unicode value that cannot be parsed as utf8 by the protobuf serializer.
    *
    * @param unicode the unicode value
    */
   void collect(uint32_t unicode) { invalid_.insert(unicode, unicode + 1); }
 
   /**
-   * Emits the collection of invalid unicode ranges to stdout.
+   * Emits the collection of invalid Unicode ranges to stdout.
    *
    * @return true if any invalid ranges were found.
    */

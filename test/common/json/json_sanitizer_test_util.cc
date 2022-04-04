@@ -19,6 +19,10 @@ namespace {
 class InvalidUnicodeSet {
 public:
   InvalidUnicodeSet() {
+    // Workaround limitations in protobuf serialization by skipping certain
+    // unicodes from differential fuzzing. See
+    // https://github.com/protocolbuffers/protobuf/issues/9729
+
     // The invalid intervals are generated with the command:
     // bazel -c opt run test/common/json:gen_excluded_unicodes |& grep -v 'contains invalid UTF-8'
 
@@ -27,15 +31,15 @@ public:
     // sanitizer() will catch that an do simple escapes on the string.
     invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
-    // Avoid differential testing of unicode ranges generated from 4-byte utf-8
-    // where protobuf serialization generates two small unicode values instead
+    // Avoid differential testing of Unicode ranges generated from 4-byte utf-8
+    // where protobuf serialization generates two small Unicode values instead
     // of the correct one. This must be a protobuf serialization issue.
     invalid_4byte_intervals_.insert(0x1d173, 0x1d17b);
     invalid_4byte_intervals_.insert(0xe0001, 0xe0002);
     invalid_4byte_intervals_.insert(0xe0020, 0xe0080);
   }
 
-  // Helper functions to see if the specified unicode is in the 3-byte utf-8
+  // Helper functions to see if the specified Unicode is in the 3-byte utf-8
   // exclusion set or the 4-byte utf-8 exclusion-set.
   bool isInvalid3Byte(uint32_t unicode) const { return invalid_3byte_intervals_.test(unicode); }
   bool isInvalid4Byte(uint32_t unicode) const { return invalid_4byte_intervals_.test(unicode); }
@@ -98,12 +102,12 @@ bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
   return false;
 }
 
-// Compares a string that's possibly an escaped unicode, e.g. \u1234, to
+// Compares a string that's possibly an escaped Unicode, e.g. \u1234, to
 // one that is utf8-encoded.
 bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_view& utf8) {
   uint32_t escaped_unicode;
   if (parseUnicode(escaped, escaped_unicode)) {
-    // If one side of the comparison is a unicode escape,
+    // If one side of the comparison is a Unicode escape,
     auto [unicode, consumed] = Utf8::decode(utf8);
     if (consumed != 0 && unicode == escaped_unicode) {
       utf8 = utf8.substr(consumed, utf8.size() - consumed);
@@ -115,10 +119,10 @@ bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_vi
 }
 
 // Determines whether two strings differ only in whether they have
-// literal utf-8 or escaped 3-byte unicode. We do this equivalence
-// comparison to enable differential fuzzing between JsonSanitizer and
-// protobuf json serialization. The protobuf implementation has made
-// some hard-to-understand decisions about what to encode via unicode
+// literal utf-8 or escaped 3-byte Unicode. We do this equivalence
+// comparison to enable differential fuzzing between sanitize() and
+// protobuf JSON serialization. The protobuf implementation has made
+// some hard-to-understand decisions about what to encode via Unicode
 // escapes versus what to pass through as utf-8.
 bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs) {
   absl::string_view all_a = a;

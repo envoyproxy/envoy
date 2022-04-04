@@ -213,7 +213,7 @@ TEST_F(JsonSanitizerTest, MultiByteUtf8) {
   EXPECT_EQ(Utf8::UnicodeSizePair(0x1f79, 3), decode(Omicron));
   EXPECT_EQ(Utf8::UnicodeSizePair(0x1f79, 3), decode(OmicronUtf8));
 
-  // It's hard to find large unicode characters, but to test the utf8 decoder
+  // It's hard to find large Unicode characters, but to test the utf8 decoder
   // there are some in https://unicode-table.com/en/blocks/musical-symbols/
   // with reference utf8 encoding from https://unicode-table.com/en/1D11E/
   EXPECT_EQ(Utf8::UnicodeSizePair(0x1d11e, 4), decode(TrebleClefUtf8));
@@ -221,7 +221,7 @@ TEST_F(JsonSanitizerTest, MultiByteUtf8) {
 
 TEST_F(JsonSanitizerTest, Low8Bit) {
   // The characters from 0 to 0xBF (191) inclusive are all rendered identically
-  // to the protobuf json encoder.
+  // to the protobuf JSON encoder.
   std::string x0_7f;
   for (uint32_t i = 0; i <= 0x7f; ++i) {
     char ch = i;
@@ -236,7 +236,7 @@ TEST_F(JsonSanitizerTest, Low8Bit) {
       // Printable characters starting with space. Double-quote is back-slashed.
       " !\\\"#$%&'()*+,-./0123456789:;"
 
-      // < and > are serialized by json as unicode.
+      // < and > are serialized by JSON as Unicode.
       "<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
       // Remaining 7-bit codes ending with 127.
@@ -252,7 +252,7 @@ TEST_F(JsonSanitizerTest, High8Bit) {
     x80_ff.push_back(ch);
   }
 
-  // Whenever there's an encoding error, the nlohmann json handler throws an
+  // Whenever there's an encoding error, the nlohmann JSON handler throws an
   // exception, which Json::sanitizer catches and just escapes the characters so
   // we don't lose information in the encoding. All bytes with the high-bit set
   // are invalid utf-8 in isolation, so we fall through to escaping these.

@@ -629,6 +629,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
         version = "3.19.4",
+        # When upgrading the protobuf library, please re-run
+        # test/common/json:gen_excluded_unicodes to recompute the ranges
+        # excluded from differential fuzzing that are populated in
+        # test/common/json/json_sanitizer_test_util.cc.
         sha256 = "ba0650be1b169d24908eeddbe6107f011d8df0da5b1a5a4449a913b10e578faf",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],

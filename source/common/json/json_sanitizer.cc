@@ -78,7 +78,11 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   END_TRY
   catch (std::exception&) {
     // If Nlohmann throws an error, emit an octal escape for any character
-    // requiring it.
+    // requiring it. This can occur for invalid utf-8 sequences, and we don't
+    // want to crash the server if such a sequence makes its way into a string
+    // we need to serialize. For example, if admin endpoint /stats?format=json
+    // is called, and a stat name was synthesized from dynamic content such as a
+    // gRPC method.
     buffer.clear();
     for (char c : str) {
       if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
@@ -88,9 +92,6 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
       }
     }
   }
-  if (buffer.size() >= 2 && buffer[0] == '"' && buffer[buffer.size() - 1] == '"') {
-    return absl::string_view(buffer).substr(1, buffer.size() - 2);
-  }
 
   return buffer;
 }
@@ -99,7 +100,8 @@ absl::string_view stripDoubleQuotes(absl::string_view str) {
   if (str.size() >= 2 && str[0] == '"' && str[str.size() - 1] == '"') {
     str = str.substr(1, str.size() - 2);
   } else {
-    IS_ENVOY_BUG(absl::StrCat("stripDoubleQuotes called on a str that lacks double-quotes: ", str));
+    ASSERT(false,
+           absl::StrCat("stripDoubleQuotes called on a str that lacks double-quotes: ", str));
   }
   return str;
 }

@@ -82,19 +82,6 @@ envoy_cc_test_binary(
     ],
 )
 
-# It seems like this should work, but it doesn not, so we leave instructins
-# to manually run the generator.
-# genrule(
-#     name = "protobuf_incompatible_unicodes",
-#     testonly = 1,
-#     outs = ["protobuf_incompatible_unicodes.h"],
-#     cmd = """
-#       $(location //test/common/json:gen_excluded_unicodes) | \\
-#       grep -v 'contains invalid UTF-8'
-#     """,
-#     tools = [":gen_excluded_unicodes"],
-# )
-
 envoy_cc_test_library(
     name = "json_sanitizer_test_util_lib",
     srcs = [

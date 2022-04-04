@@ -946,6 +946,26 @@ TEST(IntervalSet, testTest) {
   EXPECT_FALSE(set.test(7));
 }
 
+TEST(IntervalSet, testTestDouble) {
+  IntervalSetImpl<double> set;
+  set.insert(4.0, 6.0);
+  EXPECT_FALSE(set.test(0));
+  EXPECT_FALSE(set.test(3.9999));
+  EXPECT_TRUE(set.test(4.0));
+  EXPECT_TRUE(set.test(4.0001));
+  EXPECT_TRUE(set.test(5.9999));
+  EXPECT_FALSE(set.test(6.0));
+  set.insert(0, 2);
+  EXPECT_TRUE(set.test(0));
+  EXPECT_TRUE(set.test(1));
+  EXPECT_TRUE(set.test(1.999));
+  EXPECT_FALSE(set.test(3));
+  EXPECT_TRUE(set.test(4));
+  EXPECT_TRUE(set.test(5));
+  EXPECT_FALSE(set.test(6));
+  EXPECT_FALSE(set.test(7));
+}
+
 TEST(WelfordStandardDeviation, AllEntriesTheSame) {
   WelfordStandardDeviation wsd;
   wsd.update(10);
