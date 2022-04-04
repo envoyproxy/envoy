@@ -95,14 +95,10 @@ public:
     virtual bool isHttp3Broken() const PURE;
     // Returns true if HTTP/3 is confirmed to be working.
     virtual bool isHttp3Confirmed() const PURE;
-    // Returns true if HTTP/3 has failed recently.
-    virtual bool hasHttp3FailedRecently() const PURE;
     // Marks HTTP/3 broken for a period of time, subject to backoff.
     virtual void markHttp3Broken() PURE;
     // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.
     virtual void markHttp3Confirmed() PURE;
-    // Marks HTTP/3 as failed recently.
-    virtual void markHttp3FailedRecently() PURE;
   };
 
   virtual ~AlternateProtocolsCache() = default;

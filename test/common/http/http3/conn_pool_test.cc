@@ -33,7 +33,6 @@ public:
 class MockPoolConnectResultCallback : public PoolConnectResultCallback {
 public:
   MOCK_METHOD(void, onHandshakeComplete, ());
-  MOCK_METHOD(void, onZeroRttHandshakeFailed, ());
 };
 
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {

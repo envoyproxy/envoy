@@ -1,5 +1,8 @@
 #include "source/common/http/http3_status_tracker_impl.h"
 
+#include <chrono>
+#include <functional>
+
 namespace Envoy {
 namespace Http {
 
@@ -17,10 +20,6 @@ Http3StatusTrackerImpl::Http3StatusTrackerImpl(Event::Dispatcher& dispatcher)
 bool Http3StatusTrackerImpl::isHttp3Broken() const { return state_ == State::Broken; }
 
 bool Http3StatusTrackerImpl::isHttp3Confirmed() const { return state_ == State::Confirmed; }
-
-bool Http3StatusTrackerImpl::hasHttp3FailedRecently() const {
-  return state_ == State::FailedRecently;
-}
 
 void Http3StatusTrackerImpl::markHttp3Broken() {
   state_ = State::Broken;
@@ -43,13 +42,11 @@ void Http3StatusTrackerImpl::markHttp3Confirmed() {
   }
 }
 
-void Http3StatusTrackerImpl::markHttp3FailedRecently() { state_ = State::FailedRecently; }
-
 void Http3StatusTrackerImpl::onExpirationTimeout() {
   if (state_ != State::Broken) {
     return;
   }
-  state_ = State::FailedRecently;
+  state_ = State::Pending;
 }
 
 } // namespace Http
