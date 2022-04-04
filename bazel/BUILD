@@ -608,9 +608,16 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
-    name = "not_x86_or_wasm_disabled",
+    name = "emsdk_not_supported_or_wasm_disabled",
     match_any = [
-        ":not_x86",
+        ":ios_arm64",
+        ":ios_arm64e",
+        ":ios_armv7",
+        ":ios_armv7s",
+        ":ios_i386",
+        ":linux_mips64",
+        ":linux_ppc",
+        ":linux_s390x",
         ":wasm_disabled",
     ],
 )
