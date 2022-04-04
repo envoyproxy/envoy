@@ -43,7 +43,7 @@ def envoy_select_hot_restart(xs, repository = ""):
 # and the ability to build tests using Proxy-Wasm C++ SDK on the current platform.
 def envoy_select_wasm_cpp_tests(xs):
     return select({
-        "@envoy//bazel:emsdk_not_supported_or_wasm_disabled": [],
+        "@envoy//bazel:not_x86_or_wasm_disabled": [],
         "//conditions:default": xs,
     })
 
