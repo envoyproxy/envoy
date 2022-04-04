@@ -99,7 +99,7 @@ public:
 };
 
 /**
- * Implementation of a sublinear domain matcher using a trie.
+ * Implementation of a `sublinear` domain matcher using a trie.
  **/
 template <class DataType> class DomainMatcher : public MatchTree<DataType> {
 public:
