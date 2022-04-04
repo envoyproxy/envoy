@@ -201,7 +201,7 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 
 RouteMatcher::RouteMatcher(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {

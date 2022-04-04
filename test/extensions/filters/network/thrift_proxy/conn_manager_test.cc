@@ -85,7 +85,8 @@ public:
 
   void initializeFilter() { initializeFilter(""); }
 
-  void initializeFilter(const std::string& yaml, const std::vector<std::string>& cluster_names = {}) {
+  void initializeFilter(const std::string& yaml,
+                        const std::vector<std::string>& cluster_names = {}) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
     if (yaml.empty()) {
       config.set_stat_prefix("test");
@@ -1952,8 +1953,7 @@ route_config:
         cluster: cluster2
 )EOF";
 
-  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml), EnvoyException,
-                          "unknown thrift cluster");
+  EXPECT_THROW_WITH_REGEX(initializeFilter(yaml), EnvoyException, "unknown thrift cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster1"}), EnvoyException,
                           "unknown thrift cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster2"}), EnvoyException,
