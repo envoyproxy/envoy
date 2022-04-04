@@ -495,7 +495,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "wasm-cc|win32-front-proxy"
+  run_ci_verify "*" "wasm-cc|win32-front-proxy|shared"
   exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc
