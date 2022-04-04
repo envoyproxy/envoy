@@ -1,56 +1,112 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/matcher/matcher.h"
-#include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/matcher/matcher.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "xds/type/matcher/v3/domain.pb.h"
 #include "xds/type/matcher/v3/domain.pb.validate.h"
-
-#include "absl/strings/match.h"
-#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Matcher {
 
-namespace {
-bool isWildcardServerName(const std::string& name) {
-  return absl::StartsWith(name, "*.") || name == "*";
-}
-
-/**
- * A "compressed" trie node with domain parts as values.
- */
-class DomainNode {
-private:
-  absl::flat_hash_map<std::string, std::unique_ptr<DomainNode>> children_;
-  absl::optional<OnMatch<DataType>> exact_on_match_;
-  absl::optional<OnMatch<DataType>> prefix_on_match_;
-};
-} // namespace
-
-using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
 using ::Envoy::Matcher::evaluateMatch;
 using ::Envoy::Matcher::MatchState;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
-using ::Envoy::Matcher::OnMatchFactory;
-using ::Envoy::Matcher::OnMatchFactoryCb;
+
+namespace {
 
 /**
- * Implementation of a `sublinear` domain matcher.
-template <class DataType>
-class TrieMatcher : public MatchTree<DataType> {
+ * A "compressed" trie node with domain parts as edge values.
+ */
+template <class DataType> struct DomainNode {
+  absl::flat_hash_map<std::string, DomainNode<DataType>> children_;
+  // Matches the exact path from the root.
+  OptRef<OnMatch<DataType>> exact_on_match_;
+  // Matches the prefix for the path from the root.
+  OptRef<OnMatch<DataType>> prefix_on_match_;
+  // Closest parent node with a prefix match.
+  OptRef<DomainNode<DataType>> parent_prefix_;
+
+  // Insert an on-match for the parts of the domain by handling the last optional
+  // wildcard symbol as a special non-part.
+  void insert(absl::Span<const std::string> parts, OnMatch<DataType>& on_match) {
+    if (parts.empty()) {
+      ASSERT(!exact_on_match_);
+      exact_on_match_ = makeOptRef(on_match);
+    } else if (parts[0] == "*") {
+      // Prefix wildcards are unique and wildcard must be the last part.
+      ASSERT(!prefix_on_match_ && parts.size() == 1);
+      prefix_on_match_ = makeOptRef(on_match);
+    } else {
+      DomainNode<DataType>& child = children_[parts[0]];
+      return child.insert(parts.subspan(1), on_match);
+    }
+  }
+
+  // Link parent prefix from child nodes.
+  void link(OptRef<DomainNode<DataType>> parent_prefix) {
+    parent_prefix_ = parent_prefix;
+    if (prefix_on_match_) {
+      parent_prefix = makeOptRef(*this);
+    }
+    for (auto& [_, child] : children_) {
+      child.link(parent_prefix);
+    }
+  }
+
+  // Find the deepest node matching the reversed parts of the domain.
+  // Returns a node and a bool indicating whether the match is exact for this node.
+  std::pair<DomainNode const*, bool> find(absl::Span<const std::string> parts) const {
+    if (parts.empty()) {
+      return std::make_pair(this, true);
+    }
+    auto it = children_.find(parts[0]);
+    if (it != children_.end()) {
+      return it->second.find(parts.subspan(1));
+    }
+    return std::make_pair(this, false);
+  }
+};
+
+template <class DataType> struct DomainTree {
+  DomainNode<DataType> root_;
+  std::vector<OnMatch<DataType>> on_matches_;
+};
+
+} // namespace
+
+/**
+ * General utilities for domain name matching.
+ */
+class DomainMatcherUtility {
 public:
-  TrieMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
-              const std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>>& trie)
-      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), trie_(trie) {}
+  static void validateServerName(const std::string& server_name);
+  static void duplicateServerNameError(const std::string& server_name);
+};
+
+/**
+ * Implementation of a sublinear domain matcher using a trie.
+ **/
+template <class DataType> class DomainMatcher : public MatchTree<DataType> {
+public:
+  DomainMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
+                const std::shared_ptr<DomainTree<DataType>>& domain_tree)
+      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)),
+        domain_tree_(domain_tree) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
@@ -60,34 +116,31 @@ public:
     if (!input.data_) {
       return {MatchState::MatchComplete, on_no_match_};
     }
-    const Network::Address::InstanceConstSharedPtr addr =
-        Network::Utility::parseInternetAddressNoThrow(*input.data_);
-    if (!addr) {
-      return {MatchState::MatchComplete, on_no_match_};
-    }
-    auto values = trie_->getData(addr);
-    // The candidates returned by the LC trie are not in any specific order, so we
-    // sort them by the prefix length first (longest first), and the order of declaration second.
-    std::sort(values.begin(), values.end(), TrieNodeComparator<DataType>());
-    bool first = true;
-    for (const auto node : values) {
-      if (!first && node.exclusive_) {
-        continue;
+    std::vector<std::string> parts = absl::StrSplit(*input.data_, ".");
+    std::reverse(parts.begin(), parts.end());
+    // Traverse from the most specific match to the root and check for prefix matches.
+    auto [node, exact] = domain_tree_->root_.find(parts);
+    while (node) {
+      OptRef<OnMatch<DataType>> on_match;
+      if (exact) {
+        on_match = node->exact_on_match_;
+        exact = false;
+      } else {
+        on_match = node->prefix_on_match_;
       }
-      if (node.on_match_->action_cb_) {
-        return {MatchState::MatchComplete, OnMatch<DataType>{node.on_match_->action_cb_, nullptr}};
+      if (on_match) {
+        if (on_match->action_cb_) {
+          return {MatchState::MatchComplete, OnMatch<DataType>{on_match->action_cb_, nullptr}};
+        }
+        auto matched = evaluateMatch(*on_match->matcher_, data);
+        if (matched.match_state_ == MatchState::UnableToMatch) {
+          return {MatchState::UnableToMatch, absl::nullopt};
+        }
+        if (matched.match_state_ == MatchState::MatchComplete && matched.result_) {
+          return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr}};
+        }
       }
-      // Resume any subtree matching to preserve backtracking progress.
-      auto matched = evaluateMatch(*node.on_match_->matcher_, data);
-      if (matched.match_state_ == MatchState::UnableToMatch) {
-        return {MatchState::UnableToMatch, absl::nullopt};
-      }
-      if (matched.match_state_ == MatchState::MatchComplete && matched.result_) {
-        return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr}};
-      }
-      if (first) {
-        first = false;
-      }
+      node = node->parent_prefix_.ptr();
     }
     return {MatchState::MatchComplete, on_no_match_};
   }
@@ -95,46 +148,49 @@ public:
 private:
   const DataInputPtr<DataType> data_input_;
   const absl::optional<OnMatch<DataType>> on_no_match_;
-  std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>> trie_;
+  const std::shared_ptr<DomainTree<DataType>> domain_tree_;
 };
- */
 
 template <class DataType>
 class DomainMatcherFactoryBase : public ::Envoy::Matcher::CustomMatcherFactory<DataType> {
 public:
-  ::Envoy::Matcher::MatchTreeFactoryCb<DataType>
-  createCustomMatcherFactoryCb(const Protobuf::Message& config,
-                               Server::Configuration::ServerFactoryContext& factory_context,
-                               DataInputFactoryCb<DataType> data_input,
-                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
-                               OnMatchFactory<DataType>& on_match_factory) override {
+  ::Envoy::Matcher::MatchTreeFactoryCb<DataType> createCustomMatcherFactoryCb(
+      const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& factory_context,
+      ::Envoy::Matcher::DataInputFactoryCb<DataType> data_input,
+      absl::optional<::Envoy::Matcher::OnMatchFactoryCb<DataType>> on_no_match,
+      ::Envoy::Matcher::OnMatchFactory<DataType>& on_match_factory) override {
     const auto& typed_config =
-        MessageUtil::downcastAndValidate<const xds::type::matcher::v3::DomainMatcher&>(
+        MessageUtil::downcastAndValidate<const xds::type::matcher::v3::ServerNameMatcher&>(
             config, factory_context.messageValidationVisitor());
-    absl::flat_hash_map<std::string, OnMatch<DataType>> server_names;
+    auto domain_tree = std::make_shared<DomainTree<DataType>>();
+    // Ensures pointer stability when populating the vector.
+    domain_tree->on_matches_.reserve(typed_config.domain_matchers().size());
+    absl::flat_hash_map<std::string, std::reference_wrapper<OnMatch<DataType>>> server_names;
     for (const auto& domain_matcher : typed_config.domain_matchers()) {
-      OnMatch<DataType> on_match = *on_match_factory.createOnMatch(domain_matcher.on_match()).value()();
-      if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
-        throw EnvoyException(fmt::format("invalid domain wildcard: {}", server_name));
-      }
+      auto& on_match = domain_tree->on_matches_.emplace_back(
+          on_match_factory.createOnMatch(domain_matcher.on_match()).value()());
       for (const auto& server_name : domain_matcher.domains()) {
-        // Reject internationalized domains to avoid ambiguity with case sensitivity.
-        if (!absl::ascii_isascii(server_name)) {
-          throw EnvoyException(fmt::format("non-ASCII domains are not supported: {}", server_name));
-        }
-        auto [_, inserted] = server_names.try_emplace(ascii::AsciiStrToLower(server_name), on_match);
+        DomainMatcherUtility::validateServerName(server_name);
+        auto [_, inserted] = server_names.try_emplace(absl::AsciiStrToLower(server_name), on_match);
         if (!inserted) {
-          throw EnvoyException(fmt::format("duplicate domain: {}", server_name));
+          DomainMatcherUtility::duplicateServerNameError(server_name);
         }
       }
     }
-    return [data_input, on_no_match]() {
+    for (const auto& [server_name, on_match] : server_names) {
+      std::vector<std::string> parts = absl::StrSplit(server_name, ".");
+      std::reverse(parts.begin(), parts.end());
+      domain_tree->root_.insert(parts, on_match);
+    }
+    domain_tree->root_.link(OptRef<DomainNode<DataType>>());
+    return [data_input, on_no_match, domain_tree]() {
       return std::make_unique<DomainMatcher<DataType>>(
-          data_input(), on_no_match ? absl::make_optional(on_no_match.value()()) : absl::nullopt);
+          data_input(), on_no_match ? absl::make_optional(on_no_match.value()()) : absl::nullopt,
+          domain_tree);
     };
-  };
+  }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<xds::type::matcher::v3::DomainMatcher>();
+    return std::make_unique<xds::type::matcher::v3::ServerNameMatcher>();
   }
   std::string name() const override { return "envoy.matching.custom_matchers.domain_matcher"; }
 };

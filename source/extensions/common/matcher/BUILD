@@ -26,6 +26,7 @@ envoy_cc_extension(
     srcs = ["trie_matcher.cc"],
     hdrs = ["trie_matcher.h"],
     deps = [
+        "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/registry",
@@ -42,7 +43,9 @@ envoy_cc_extension(
     srcs = ["domain_matcher.cc"],
     hdrs = ["domain_matcher.h"],
     deps = [
+        "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
+        "//envoy/network:filter_interface",
         "//envoy/registry",
         "//source/common/matcher:matcher_lib",
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",

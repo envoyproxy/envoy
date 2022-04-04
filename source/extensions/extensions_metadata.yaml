@@ -818,5 +818,12 @@ envoy.matching.inputs.application_protocol:
 envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.network.custom_matchers
+  - envoy.matching.http.custom_matchers
+  security_posture: unknown
+  status: alpha
+envoy.matching.custom_matchers.domain_matcher:
+  categories:
+  - envoy.matching.network.custom_matchers
+  - envoy.matching.http.custom_matchers
   security_posture: unknown
   status: alpha

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/matcher/matcher.h"
-#include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/matcher/matcher.h"
@@ -152,9 +151,6 @@ public:
   }
   std::string name() const override { return "envoy.matching.custom_matchers.trie_matcher"; }
 };
-
-class NetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::MatchingData> {};
-class UdpNetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::UdpMatchingData> {};
 
 } // namespace Matcher
 } // namespace Common
