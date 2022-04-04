@@ -66,11 +66,12 @@ Custom Matching Algorithms
 **************************
 
 In addition to the built-in exact and prefix matchers, these custom matchers
-are available in some contexts:
+are available in any context:
 
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
-* :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+* :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>`.
+* :ref:`Server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>`.
 
 Filter Integration
 ##################

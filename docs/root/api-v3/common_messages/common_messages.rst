@@ -35,6 +35,7 @@ Common messages
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
   ../../xds/type/v3/range.proto
   ../../xds/type/v3/typed_struct.proto
+  ../../xds/type/matcher/v3/domain.proto
   ../../xds/type/matcher/v3/ip.proto
   ../../xds/type/matcher/v3/matcher.proto
   ../../xds/type/matcher/v3/range.proto
