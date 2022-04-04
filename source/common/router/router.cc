@@ -461,6 +461,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   cluster_ = cluster->info();
 
+  // Set up stat prefixes, etc.
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+                                       !config_.suppress_envoy_headers_);
+  request_vcluster_ = route_entry_->virtualCluster(headers);
+  if (request_vcluster_ != nullptr) {
+    callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
+  }
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
