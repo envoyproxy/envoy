@@ -59,7 +59,8 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
       *this, std::move(socket), false /* do not hand off at internal listener */);
   // Transfer internal passthrough state to the active socket from downstream.
   if (io_handle != nullptr && io_handle->passthroughState()) {
-    io_handle->passthroughState()->mergeInto(active_socket->dynamicMetadata(), active_socket->filterState());
+    io_handle->passthroughState()->mergeInto(active_socket->dynamicMetadata(),
+                                             active_socket->filterState());
   }
 
   onSocketAccepted(std::move(active_socket));

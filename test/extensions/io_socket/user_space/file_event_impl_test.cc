@@ -51,9 +51,7 @@ public:
   MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata*, peerMetadata, (), (const));
-  MOCK_METHOD(void, setMetadata, (const envoy::config::core::v3::Metadata&));
+  MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
 };
 
 class FileEventImplTest : public testing::Test {

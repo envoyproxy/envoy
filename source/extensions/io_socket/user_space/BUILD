@@ -22,16 +22,13 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "io_handle_lib",
     hdrs = ["io_handle.h"],
-    visibility = [
-        "//source/server:__pkg__",
-        "//source/extensions/transport_socket/internal:__pkg__",
-        "//test/extensions/io_socket/user_space:__pkg__",
-    ],
+    # Used by internal upstream transport socket extension and core server internal listener.
+    visibility = ["//visibility:public"],
     deps = [
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:empty_string",
-        "//envoy/stream_info:filter_state_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

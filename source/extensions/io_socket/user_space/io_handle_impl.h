@@ -184,7 +184,28 @@ private:
 
 class PassthroughStateImpl : public PassthroughState {
 public:
-  void mergeInto(envoy::config::core::v3::Metadata&, StreamInfo::FilterState&) const override {}
+  void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                  std::unique_ptr<FilterStateObjects> filter_state_objects) override {
+    std::cout << "INITIALIZING" << std::endl;
+    metadata_ = std::move(metadata);
+    filter_state_objects_ = std::move(filter_state_objects);
+  }
+  void mergeInto(envoy::config::core::v3::Metadata& metadata,
+                 StreamInfo::FilterState& filter_state) const override {
+    if (metadata_) {
+      metadata.MergeFrom(*metadata_);
+    }
+    if (filter_state_objects_) {
+      for (const auto& [name, object] : *filter_state_objects_) {
+        filter_state.setData(name, object, StreamInfo::FilterState::StateType::Mutable,
+                             StreamInfo::FilterState::LifeSpan::Connection);
+      }
+    }
+  }
+
+private:
+  std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
+  std::unique_ptr<FilterStateObjects> filter_state_objects_;
 };
 
 using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;
@@ -192,7 +213,8 @@ class IoHandleFactory {
 public:
   static std::pair<IoHandleImplPtr, IoHandleImplPtr> createIoHandlePair() {
     auto state = std::make_shared<PassthroughStateImpl>();
-    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(state), new IoHandleImpl(state)};
+    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(state),
+                                                         new IoHandleImpl(state)};
     p.first->setPeerHandle(p.second.get());
     p.second->setPeerHandle(p.first.get());
     return p;
@@ -200,7 +222,8 @@ public:
   static std::pair<IoHandleImplPtr, IoHandleImplPtr>
   createBufferLimitedIoHandlePair(uint32_t buffer_size) {
     auto state = std::make_shared<PassthroughStateImpl>();
-    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(state), new IoHandleImpl(state)};
+    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(state),
+                                                         new IoHandleImpl(state)};
     // This buffer watermark setting emulates the OS socket buffer parameter
     // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
     p.first->setWatermarks(buffer_size);

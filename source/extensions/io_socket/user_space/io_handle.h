@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/pure.h"
 #include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -11,15 +11,26 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
+using FilterStateObjects =
+    std::vector<std::pair<std::string, std::shared_ptr<StreamInfo::FilterState::Object>>>;
+
 // Shared state between peering user space IO handles.
 class PassthroughState {
 public:
   virtual ~PassthroughState() = default;
 
   /**
+   * Initialize the passthrough state from the downstream. This should be called once before other
+   * methods.
+   */
+  virtual void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                          std::unique_ptr<FilterStateObjects> filter_state_objects) PURE;
+
+  /**
    * Merge the passthrough state into a receipient stream metadata and filter state.
    */
-  virtual void mergeInto(envoy::config::core::v3::Metadata& metadata, StreamInfo::FilterState& filter_state) const PURE;
+  virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
+                         StreamInfo::FilterState& filter_state) const PURE;
 };
 
 using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
