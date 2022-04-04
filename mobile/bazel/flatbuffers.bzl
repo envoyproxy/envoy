@@ -21,6 +21,7 @@ def envoy_mobile_flatbuffers_library(name, srcs, namespace, types):
         name = "{}_fb_kt_lib".format(name),
         srcs = [":{}_fb_kt_srcs".format(name)],
         deps = ["@maven//:com_google_flatbuffers_flatbuffers_java"],
+        exports = ["@maven//:com_google_flatbuffers_flatbuffers_java"],
     )
 
     swift_intermediate_outputs = ["{}_generated.swift".format(f.replace(".fbs", "")) for f in srcs]
