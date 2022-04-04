@@ -964,7 +964,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithErrorDetails) {
         expected.set_message("this-is-message");
         // The gRPC status error details is from sendLocalReply's `grpc_error_details` arg.
         *expected.mutable_details()->Add() = a;
-        Envoy::Protobuf::util::MessageDifferencer::Equals(got, expected);
+        EXPECT_TRUE(Envoy::Protobuf::util::MessageDifferencer::Equals(got, expected));
       }));
 
   Utility::sendLocalReply(is_reset, callbacks,

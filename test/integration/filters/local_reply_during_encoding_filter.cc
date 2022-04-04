@@ -17,7 +17,7 @@ public:
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
-                                       "");
+                                       nullptr, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 };

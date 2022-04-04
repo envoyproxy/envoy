@@ -39,14 +39,15 @@ UberFilterFuzzer::UberFilterFuzzer()
       .WillByDefault(
           Invoke([&](AccessLog::InstanceSharedPtr handler) -> void { access_logger_ = handler; }));
   // This handles stopping execution after a direct response is sent.
-  ON_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
+  ON_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _, _))
       .WillByDefault(
           Invoke([this](Http::Code code, absl::string_view body,
                         std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) {
             enabled_ = false;
-            decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
+            decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, nullptr,
+                                               details);
           }));
   ON_CALL(encoder_callbacks_, addEncodedTrailers())
       .WillByDefault(testing::ReturnRef(encoded_trailers_));

@@ -24,11 +24,11 @@ public:
     if (!process_object_.isHealthy()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
                                          "ProcessObjectForFilter is unhealthy", nullptr,
-                                         absl::nullopt, "");
+                                         absl::nullopt, nullptr, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "ProcessObjectForFilter is healthy",
-                                       nullptr, absl::nullopt, "");
+                                       nullptr, absl::nullopt, nullptr, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

@@ -595,7 +595,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
     if (response_headers->getGrpcStatusValue().empty()) {
-      auto final_grpc_status_code =
+      const auto final_grpc_status_code =
           enumToInt(local_reply_data.grpc_status_
                         ? local_reply_data.grpc_status_.value()
                         : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
@@ -621,7 +621,8 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       }
     }
     if (local_reply_data.grpc_error_details_) {
-      auto status_detail_str = local_reply_data.grpc_error_details_->SerializeAsString();
+      const std::string status_detail_str =
+          local_reply_data.grpc_error_details_->SerializeAsString();
       response_headers->setGrpcStatusDetailsBin(
           ::Envoy::Base64::encode(status_detail_str.data(), status_detail_str.size(), false));
     }

@@ -67,7 +67,7 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
     // We should remove the first five bytes.
     Envoy::Buffer::OwnedImpl buffer;
     buffer.add("abc", 3);
-    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _));
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _, _));
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
@@ -550,7 +550,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
       sendLocalReply(
           Http::Code::OK,
           "envoy reverse bridge: upstream responded with no content-type header, status code 400",
-          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _));
+          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _,
+          _));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }
@@ -593,13 +594,14 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
 
   Http::TestResponseHeaderMapImpl headers(
       {{":status", "400"}, {"content-type", "application/json"}});
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(
-          Http::Code::OK,
-          "envoy reverse bridge: upstream responded with unsupported "
-          "content-type application/json, status code 400",
-          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(
+                  Http::Code::OK,
+                  "envoy reverse bridge: upstream responded with unsupported "
+                  "content-type application/json, status code 400",
+                  _,
+                  absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)),
+                  _, _));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }
@@ -916,7 +918,8 @@ TEST_F(ReverseBridgeTest, WithholdGrpcStreamResponseNoContentLength) {
       decoder_callbacks_,
       sendLocalReply(
           Http::Code::OK, "envoy reverse bridge: upstream did not set content length", _,
-          absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _));
+          absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _,
+          _));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }

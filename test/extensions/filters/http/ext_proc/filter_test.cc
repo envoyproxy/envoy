@@ -417,8 +417,9 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Bad request", _, Eq(absl::nullopt),
+                             Eq(nullptr), "Got_a_bad_request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -490,7 +491,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+                                                 Eq(absl::nullopt), _, "Got_a_bad_request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,

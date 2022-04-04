@@ -34,7 +34,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     if (absl::StartsWith(headers.Path()->value().getStringView(), config_->prefix_)) {
       decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(config_->code_), config_->body_,
-                                         nullptr, absl::nullopt, "");
+                                         nullptr, absl::nullopt, nullptr, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
