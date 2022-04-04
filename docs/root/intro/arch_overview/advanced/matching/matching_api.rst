@@ -71,6 +71,9 @@ are available in any context:
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>`.
+
+.. _extension_envoy.matching.custom_matchers.domain_matcher:
+
 * :ref:`Server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>`.
 
 Filter Integration
