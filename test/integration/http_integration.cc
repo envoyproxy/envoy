@@ -686,7 +686,7 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
   test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 0);
 
-  auto response2 = 
+  auto response2 =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response2.get());
 
