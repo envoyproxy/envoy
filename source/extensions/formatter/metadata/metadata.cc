@@ -68,8 +68,7 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     }
 
     // Return a pointer to formatter provider.
-    return ::Envoy::Formatter::FormatterProviderPtr{new ::Envoy::Formatter::StreamInfoFormatter(
-        provider->second(filter_namespace, path, max_length))};
+    return provider->second(filter_namespace, path, max_length);
   }
   return nullptr;
 }
