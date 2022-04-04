@@ -678,7 +678,7 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "sni.lyft.com"}
+                                                 {":authority", "sni.lyft.com"},
                                                  {matching_header, "true"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
