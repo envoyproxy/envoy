@@ -1,9 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 cc_library(
     name = "http_parser__permissive",

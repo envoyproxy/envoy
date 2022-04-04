@@ -19,7 +19,6 @@
  * IN THE SOFTWARE.
  */
 #include "http_parser_permissive.h"
-
 #include <assert.h>
 #include <stddef.h>
 #include <ctype.h>
@@ -236,11 +235,18 @@ static const int8_t unhex[256] =
   };
 
 
+#if HTTP_PARSER_STRICT
+# define T(v) 0
+#else
+# define T(v) v
+#endif
+
+
 static const uint8_t normal_url_char[32] = {
 /*   0 nul    1 soh    2 stx    3 etx    4 eot    5 enq    6 ack    7 bel  */
         0    |   0    |   0    |   0    |   0    |   0    |   0    |   0,
 /*   8 bs     9 ht    10 nl    11 vt    12 np    13 cr    14 so    15 si   */
-        0    |   0    |   0    |   0    |   0    |   0    |   0    |   0,
+        0    | T(2)   |   0    |   0    | T(16)  |   0    |   0    |   0,
 /*  16 dle   17 dc1   18 dc2   19 dc3   20 dc4   21 nak   22 syn   23 etb */
         0    |   0    |   0    |   0    |   0    |   0    |   0    |   0,
 /*  24 can   25 em    26 sub   27 esc   28 fs    29 gs    30 rs    31 us  */
@@ -425,10 +431,18 @@ enum http_host_state
   (c) == '$' || (c) == ',')
 
 #define STRICT_TOKEN(c)     ((c == ' ') ? 0 : tokens[(unsigned char)c])
-#define IS_URL_CHAR(c)      (BIT_AT(normal_url_char, (unsigned char)c) || \
-  ((c) & 0x80) || ((c) == '\t') || ((c) == 0x0c))
-#define IS_HOST_CHAR(c)     (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '_')
-#define TOKEN(c) (tokens[(unsigned char)c])
+
+#if HTTP_PARSER_STRICT
+#define TOKEN(c)            STRICT_TOKEN(c)
+#define IS_URL_CHAR(c)      (BIT_AT(normal_url_char, (unsigned char)c))
+#define IS_HOST_CHAR(c)     (IS_ALPHANUM(c) || (c) == '.' || (c) == '-')
+#else
+#define TOKEN(c)            tokens[(unsigned char)c]
+#define IS_URL_CHAR(c)                                                         \
+  (BIT_AT(normal_url_char, (unsigned char)c) || ((c) & 0x80))
+#define IS_HOST_CHAR(c)                                                        \
+  (IS_ALPHANUM(c) || (c) == '.' || (c) == '-' || (c) == '_')
+#endif
 
 /**
  * Verify that a char is a valid visible (printable) US-ASCII
@@ -439,7 +453,21 @@ enum http_host_state
 
 #define start_state (parser->type == HTTP_REQUEST ? s_start_req : s_start_res)
 
-# define NEW_MESSAGE() (start_state)
+
+#if HTTP_PARSER_STRICT
+# define STRICT_CHECK(cond)                                          \
+do {                                                                 \
+  if (cond) {                                                        \
+    SET_ERRNO(HPE_STRICT);                                           \
+    goto error;                                                      \
+  }                                                                  \
+} while (0)
+# define NEW_MESSAGE() (http_should_keep_alive(parser) ? start_state : s_dead)
+#else
+# define STRICT_CHECK(cond)
+# define NEW_MESSAGE() start_state
+#endif
+
 
 /* Map errno values to strings for human-readable output */
 #define HTTP_STRERROR_GEN(n, s) { "HPE_" #n, s },
@@ -470,6 +498,12 @@ parse_url_char(enum state s, const char ch)
   if (ch == ' ' || ch == '\r' || ch == '\n') {
     return s_dead;
   }
+
+#if HTTP_PARSER_STRICT
+  if (ch == '\t' || ch == '\f') {
+    return s_dead;
+  }
+#endif
 
   switch (s) {
     case s_req_spaces_before_url:
@@ -754,18 +788,22 @@ reexecute:
       }
 
       case s_res_H:
+        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_res_HT);
         break;
 
       case s_res_HT:
+        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_res_HTT);
         break;
 
       case s_res_HTT:
+        STRICT_CHECK(ch != 'P');
         UPDATE_STATE(s_res_HTTP);
         break;
 
       case s_res_HTTP:
+        STRICT_CHECK(ch != '/');
         UPDATE_STATE(s_res_http_major);
         break;
 
@@ -884,6 +922,7 @@ reexecute:
         break;
 
       case s_res_line_almost_done:
+        STRICT_CHECK(ch != LF);
         UPDATE_STATE(s_header_field_start);
         break;
 
@@ -1077,26 +1116,32 @@ reexecute:
         break;
 
       case s_req_http_H:
+        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_req_http_HT);
         break;
 
       case s_req_http_HT:
+        STRICT_CHECK(ch != 'T');
         UPDATE_STATE(s_req_http_HTT);
         break;
 
       case s_req_http_HTT:
+        STRICT_CHECK(ch != 'P');
         UPDATE_STATE(s_req_http_HTTP);
         break;
 
       case s_req_http_I:
+        STRICT_CHECK(ch != 'C');
         UPDATE_STATE(s_req_http_IC);
         break;
 
       case s_req_http_IC:
+        STRICT_CHECK(ch != 'E');
         UPDATE_STATE(s_req_http_HTTP);  /* Treat "ICE" as "HTTP". */
         break;
 
       case s_req_http_HTTP:
+        STRICT_CHECK(ch != '/');
         UPDATE_STATE(s_req_http_major);
         break;
 
@@ -1708,6 +1753,7 @@ reexecute:
 
       case s_header_value_discard_ws_almost_done:
       {
+        STRICT_CHECK(ch != LF);
         UPDATE_STATE(s_header_value_discard_lws);
         break;
       }
@@ -1750,6 +1796,8 @@ reexecute:
 
       case s_headers_almost_done:
       {
+        STRICT_CHECK(ch != LF);
+
         if (parser->flags & F_TRAILING) {
           /* End of a chunked request */
           UPDATE_STATE(s_message_done);
@@ -1828,6 +1876,7 @@ reexecute:
       case s_headers_done:
       {
         int hasBody;
+        STRICT_CHECK(ch != LF);
 
         parser->nread = 0;
         nread = 0;
@@ -2013,6 +2062,7 @@ reexecute:
       case s_chunk_size_almost_done:
       {
         assert(parser->flags & F_CHUNKED);
+        STRICT_CHECK(ch != LF);
 
         parser->nread = 0;
         nread = 0;
@@ -2053,12 +2103,14 @@ reexecute:
       case s_chunk_data_almost_done:
         assert(parser->flags & F_CHUNKED);
         assert(parser->content_length == 0);
+        STRICT_CHECK(ch != CR);
         UPDATE_STATE(s_chunk_data_done);
         CALLBACK_DATA(body);
         break;
 
       case s_chunk_data_done:
         assert(parser->flags & F_CHUNKED);
+        STRICT_CHECK(ch != LF);
         parser->nread = 0;
         nread = 0;
         UPDATE_STATE(s_chunk_size_start);
