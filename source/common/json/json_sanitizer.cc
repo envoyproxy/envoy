@@ -55,7 +55,7 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   // conditionals, so we only check the arithmetically ORed condition after the
   // loop. This avoids branches and allows simpler loop unrolling by the
   // compiler.
-  ASSERT(ARRAY_SIZE(needs_slow_sanitizer) == 256);
+  static_assert(ARRAY_SIZE(needs_slow_sanitizer) == 256);
   uint32_t need_slow = 0;
   for (char c : str) {
     // We need to escape control characters, characters >= 127, and double-quote
@@ -78,7 +78,7 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   END_TRY
   catch (std::exception&) {
     // If Nlohmann throws an error, emit an octal escape for any character
-    // requireing it.
+    // requiring it.
     buffer.clear();
     for (char c : str) {
       if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
@@ -98,6 +98,8 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
 absl::string_view stripDoubleQuotes(absl::string_view str) {
   if (str.size() >= 2 && str[0] == '"' && str[str.size() - 1] == '"') {
     str = str.substr(1, str.size() - 2);
+  } else {
+    IS_ENVOY_BUG(absl::StrCat("stripDoubleQuotes called on a str that lacks double-quotes: ", str));
   }
   return str;
 }

@@ -14,19 +14,20 @@ namespace {
 // for differential fuzzing. We need to avoid comparing sanitization results for
 // strings containing utf-8 sequences that protobufs cannot serialize.
 //
-// bazel build -c opt test/common/json:json_sanitizer_test
-//   ./bazel-bin/test/common/json/json_sanitizer_test |&
-//       grep -v 'contains invalid UTF-8'
+// bazel -c opt run test/common/json:gen_excluded_unicodes |& grep -v 'contains invalid UTF-8'
 //
 // The grep pipe is essential as otherwise you will be buried in thousands of
 // messages from the protobuf library that cannot otherwise be trapped. The
-// "-c opt" is essential because JsonSanitizerTest.AllFourByteUtf8 iterates over
-// all 4-byte sequences which takes almost 20 seconds without optimization, so
-// it is conditionally compiled on NDEBUG.
+// "-c opt" is recommended because otherwise it takes almost a minute to run
+// through all 4-byte UTF-8 sequences.
 //
 // Running in this mode causes two tests to fail, but prints two initialization
 // blocks for invalid byte code ranges, which can then be pasted into the
 // InvalidUnicodeSet constructor in json_sanitizer_test_util.cc.
+//
+// The output of this command can then be pasted into the InvalidUnicodeSet
+// constructor for json_sanitizer_test_util.cc. It should only be necessary
+// to re-compute the invalid set if the protobuf library changes.
 class InvalidUnicodeCollector {
 public:
   /**

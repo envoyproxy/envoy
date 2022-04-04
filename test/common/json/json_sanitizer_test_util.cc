@@ -20,8 +20,7 @@ class InvalidUnicodeSet {
 public:
   InvalidUnicodeSet() {
     // The invalid intervals are generated with the command:
-    //   bazel run -c opt/ //test/common/json:gen_excluded_unicodes |
-    //       grep -v 'contains invalid UTF-8'
+    // bazel -c opt run test/common/json:gen_excluded_unicodes |& grep -v 'contains invalid UTF-8'
 
     // Avoid ranges where the protobuf serialization fails, returning an empty
     // string. Nlohmann also fails (throws exceptions) in this range but

@@ -21,16 +21,25 @@ namespace Json {
  * BM_ProtoEncoderWithEscape       1521 ns         1521 ns       462697
  * BM_NlohmannWithEscape            215 ns          215 ns      3264218
  *
+ * The returned string is suitable for including in a double-quoted JSON
+ * context, but does not include the surrounding double-quotes. The primary
+ * reason is performance: most of the time this function can return the
+ * passed-in str without needing to perform memory operations, and the main
+ * expected usage is in a context where unconditionally adding the double-quotes
+ * is fast and easy.
+ *
  * @param buffer a string in which an escaped string can be written, if needed.
  *   It is not necessary for callers to clear the buffer first; it be cleared
  *   by this method if needed.
  * @param str the string to be translated
- * @return the translated string_view.
+ * @return the translated string_view, valid as long as both buffer and str are
+ *   valid.
  */
 absl::string_view sanitize(std::string& buffer, absl::string_view str);
 
 /**
- * Strips double-quotes on first and last characters of str, if both are present.
+ * Strips double-quotes on first and last characters of str. It's an ENVOY_BUG
+ * to call this on a string that is not surrounded by double-quotes.
  *
  * @param str The string to strip double-quotes from.
  * @return The string without its surrounding double-quotes.
