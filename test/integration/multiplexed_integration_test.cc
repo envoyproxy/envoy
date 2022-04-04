@@ -1715,6 +1715,13 @@ struct FrameIntegrationTestParam {
   bool enable_new_codec_wrapper;
 };
 
+std::string
+frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
+  const bool is_ipv4 = params.param.ip_version == Network::Address::IpVersion::v4;
+  const bool new_codec_wrapper = params.param.enable_new_codec_wrapper;
+  return absl::StrCat(is_ipv4 ? "IPv4" : "IPv6", new_codec_wrapper ? "WrappedNghttp2" : "Nghttp2");
+}
+
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
@@ -1877,10 +1884,8 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
-                         testing::ValuesIn(Http2FrameIntegrationTest::testParams())
-                         /*,
-                           TestUtility::ipTestParamsToString*/
-                         );
+                         testing::ValuesIn(Http2FrameIntegrationTest::testParams()),
+                         frameIntegrationTestParamToString);
 
 // Tests sending an empty metadata map from downstream.
 TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
