@@ -1710,10 +1710,28 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
   EXPECT_EQ(served_by.size(), 1);
 }
 
-class Http2FrameIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+struct FrameIntegrationTestParam {
+  Network::Address::IpVersion ip_version;
+  bool enable_new_codec_wrapper;
+};
+
+class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam()) {}
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      GetParam().enable_new_codec_wrapper ? "true" : "false");
+  }
+
+  static std::vector<FrameIntegrationTestParam> testParams() {
+    std::vector<FrameIntegrationTestParam> v;
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      for (bool enable_new_codec_wrapper : {false, true}) {
+        v.push_back({ip_version, enable_new_codec_wrapper});
+      }
+    }
+    return v;
+  }
 };
 
 // Regression test.
@@ -1859,8 +1877,10 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(Http2FrameIntegrationTest::testParams())
+                         /*,
+                           TestUtility::ipTestParamsToString*/
+                         );
 
 // Tests sending an empty metadata map from downstream.
 TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
