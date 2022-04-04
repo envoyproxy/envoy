@@ -165,8 +165,9 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
-  EXPECT_EQ(expected_upstream_connections,
-            test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
+
+  test_server_->waitForCounterEq("tcp.tcp_stats.on_demand_cluster_attempt",
+                                 expected_upstream_connections);
   EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
   EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
   // This upstream is listening on the endpoint of `new_cluster`.
@@ -272,7 +273,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
 
   // TODO: assert there is no more on-demand cds request since the first cluster is in flight.
   IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
-  EXPECT_EQ(2, test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
+  test_server_->waitForCounterEq("tcp.tcp_stats.on_demand_cluster_attempt", 2);
 
   tcp_client_1->waitForHalfClose();
   tcp_client_2->waitForHalfClose();
