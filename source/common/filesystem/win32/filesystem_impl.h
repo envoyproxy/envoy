@@ -27,6 +27,7 @@ protected:
 
 private:
   friend class FileSystemImplTest;
+  bool truncate_{};
 };
 
 template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin32 {

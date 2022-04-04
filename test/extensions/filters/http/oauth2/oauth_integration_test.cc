@@ -96,12 +96,14 @@ typed_config:
       token_secret:
         name: token
         sds_config:
-          path: "{{ test_tmpdir }}/token_secret.yaml"
+          path_config_source:
+            path: "{{ test_tmpdir }}/token_secret.yaml"
           resource_api_version: V3
       hmac_secret:
         name: hmac
         sds_config:
-          path: "{{ test_tmpdir }}/hmac_secret.yaml"
+          path_config_source:
+            path: "{{ test_tmpdir }}/hmac_secret.yaml"
           resource_api_version: V3
     auth_scopes:
     - user

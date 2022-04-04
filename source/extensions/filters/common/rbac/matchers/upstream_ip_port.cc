@@ -33,8 +33,9 @@ UpstreamIpPortMatcher::UpstreamIpPortMatcher(
 bool UpstreamIpPortMatcher::matches(const Network::Connection&,
                                     const Envoy::Http::RequestHeaderMap&,
                                     const StreamInfo::StreamInfo& info) const {
-
-  if (!info.filterState().hasDataWithName(StreamInfo::UpstreamAddress::key())) {
+  auto address_obj = info.filterState().getDataReadOnly<StreamInfo::UpstreamAddress>(
+      StreamInfo::UpstreamAddress::key());
+  if (address_obj == nullptr) {
     ENVOY_LOG_EVERY_POW_2(
         warn,
         "Did not find filter state with key: {}. Do you have a filter in the filter chain "
@@ -44,12 +45,8 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
     return false;
   }
 
-  const StreamInfo::UpstreamAddress& address_obj =
-      info.filterState().getDataReadOnly<StreamInfo::UpstreamAddress>(
-          StreamInfo::UpstreamAddress::key());
-
   if (cidr_) {
-    if (cidr_->isInRange(*address_obj.address_)) {
+    if (cidr_->isInRange(*address_obj->address_)) {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: true",
                 cidr_->asString());
 
@@ -61,7 +58,7 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
   }
 
   if (port_) {
-    const auto port = address_obj.address_->ip()->port();
+    const auto port = address_obj->address_->ip()->port();
     if (port >= port_->start() && port <= port_->end()) {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: true",
                 port_->start(), port_->end());

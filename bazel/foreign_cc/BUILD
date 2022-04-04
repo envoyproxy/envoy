@@ -103,6 +103,18 @@ configure_make(
     tags = ["skip_on_windows"],
 )
 
+configure_make(
+    name = "ragel",
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_ragel//:all",
+    out_binaries = ["ragel"],
+    tags = ["skip_on_windows"],
+)
+
 envoy_cmake(
     name = "libsxg",
     cache_entries = {
@@ -385,7 +397,6 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
-        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
         "WAMR_BUILD_INTERP": "1",
         "WAMR_BUILD_FAST_INTERP": "1",
         "WAMR_BUILD_JIT": "0",
@@ -399,7 +410,6 @@ envoy_cmake(
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],
     tags = ["skip_on_windows"],
-    deps = [":llvm"],
 )
 
 envoy_cmake(

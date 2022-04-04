@@ -67,7 +67,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {

@@ -20,6 +20,7 @@ import envoy_repo
 
 
 class PytestChecker(checker.Checker):
+    _use_uvloop = False
     checks = ("pytests",)
 
     @cached_property

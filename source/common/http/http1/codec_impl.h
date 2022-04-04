@@ -60,7 +60,7 @@ public:
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
-  uint32_t bufferLimit() override;
+  uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
@@ -80,8 +80,6 @@ public:
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
-
-  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
@@ -252,8 +250,6 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
-
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
                  MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
@@ -298,7 +294,6 @@ protected:
   bool deferred_end_stream_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
-  const bool no_chunked_encoding_header_for_304_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
 
 private:
@@ -480,6 +475,7 @@ private:
   Status onUrl(const char* data, size_t length) override;
   Status onStatus(const char*, size_t) override { return okStatus(); }
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (active_request_) {
@@ -534,10 +530,6 @@ private:
   std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
-  // This defaults to 2, which functionally disables pipelining. If any users
-  // of Envoy wish to enable pipelining (which is dangerous and ill supported)
-  // we could make this configurable.
-  uint32_t max_outbound_responses_{};
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
@@ -547,6 +539,8 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  const bool runtime_lazy_read_disable_{};
 };
 
 /**

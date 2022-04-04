@@ -7,7 +7,7 @@ namespace Extensions {
 namespace KeyValue {
 
 FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
-                                               std::chrono::seconds flush_interval,
+                                               std::chrono::milliseconds flush_interval,
                                                Filesystem::Instance& file_system,
                                                const std::string& filename)
     : KeyValueStoreBase(dispatcher, flush_interval), file_system_(file_system),
@@ -48,9 +48,9 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
   const auto file_config = MessageUtil::anyConvertAndValidate<
       envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>(
       typed_config.config().typed_config(), validation_visitor);
-  auto seconds =
-      std::chrono::seconds(DurationUtil::durationToSeconds(file_config.flush_interval()));
-  return std::make_unique<FileBasedKeyValueStore>(dispatcher, seconds, file_system,
+  auto milliseconds =
+      std::chrono::milliseconds(DurationUtil::durationToMilliseconds(file_config.flush_interval()));
+  return std::make_unique<FileBasedKeyValueStore>(dispatcher, milliseconds, file_system,
                                                   file_config.filename());
 }
 

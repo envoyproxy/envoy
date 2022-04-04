@@ -70,10 +70,10 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      bool ignore_global_conn_limit) override {
+                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                      bool bind_to_port, bool ignore_global_conn_limit) override {
     return Network::ListenerPtr{
-        createListener_(std::move(socket), cb, bind_to_port, ignore_global_conn_limit)};
+        createListener_(std::move(socket), cb, runtime, bind_to_port, ignore_global_conn_limit)};
   }
 
   Network::UdpListenerPtr
@@ -142,7 +142,7 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               bool bind_to_port, bool ignore_global_conn_limit));
+               Runtime::Loader& runtime, bool bind_to_port, bool ignore_global_conn_limit));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                const envoy::config::core::v3::UdpSocketConfig& config));

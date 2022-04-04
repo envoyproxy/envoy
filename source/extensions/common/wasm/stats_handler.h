@@ -8,7 +8,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {

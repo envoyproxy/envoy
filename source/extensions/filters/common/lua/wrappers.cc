@@ -111,9 +111,8 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
     }
     return;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case ProtobufWkt::Value::KIND_NOT_SET:
+    PANIC("not implemented");
   }
 }
 

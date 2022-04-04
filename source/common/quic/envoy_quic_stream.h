@@ -77,7 +77,7 @@ public:
   void removeCallbacks(Http::StreamCallbacks& callbacks) override {
     removeCallbacksHelper(callbacks);
   }
-  uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
+  uint32_t bufferLimit() const override { return send_buffer_simulation_.highWatermark(); }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
     return connection()->connectionInfoProvider().localAddress();
   }
@@ -153,6 +153,8 @@ protected:
     }
   }
 
+  StreamInfo::BytesMeterSharedPtr& mutableBytesMeter() { return bytes_meter_; }
+
   // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
@@ -194,6 +196,40 @@ private:
   absl::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
+};
+
+// Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was
+// constructed.
+class IncrementalBytesSentTracker {
+public:
+  IncrementalBytesSentTracker(const quic::QuicStream& stream, StreamInfo::BytesMeter& bytes_meter,
+                              bool update_header_bytes)
+      : stream_(stream), bytes_meter_(bytes_meter), update_header_bytes_(update_header_bytes),
+        initial_bytes_sent_(totalStreamBytesWritten()) {}
+
+  ~IncrementalBytesSentTracker() {
+    if (update_header_bytes_) {
+      bytes_meter_.addHeaderBytesSent(incrementalBytesWritten());
+    }
+    bytes_meter_.addWireBytesSent(incrementalBytesWritten());
+  }
+
+private:
+  // Returns the number of newly sent bytes since the tracker was constructed.
+  uint64_t incrementalBytesWritten() {
+    ASSERT(totalStreamBytesWritten() >= initial_bytes_sent_);
+    return totalStreamBytesWritten() - initial_bytes_sent_;
+  }
+
+  // Returns total number of stream bytes written, including buffered bytes.
+  uint64_t totalStreamBytesWritten() const {
+    return stream_.stream_bytes_written() + stream_.BufferedDataBytes();
+  }
+
+  const quic::QuicStream& stream_;
+  StreamInfo::BytesMeter& bytes_meter_;
+  bool update_header_bytes_;
+  uint64_t initial_bytes_sent_;
 };
 
 } // namespace Quic

@@ -181,13 +181,13 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,
                                        FilterState::LifeSpan::FilterChain);
-    EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
+    EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
 
     stream_info.upstreamInfo()->setUpstreamFilterState(stream_info.filterState());
     EXPECT_EQ(1, stream_info.upstreamInfo()
                      ->upstreamFilterState()
                      ->getDataReadOnly<TestIntAccessor>("test")
-                     .access());
+                     ->access());
 
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());

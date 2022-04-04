@@ -34,6 +34,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cidr_range_interface",
+    hdrs = ["cidr_range.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
@@ -73,6 +82,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_lib",
+    deps = [
+        ":connection_impl",
+        ":default_client_connection_factory",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_impl",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
     external_deps = ["abseil_optional"],
@@ -105,6 +122,25 @@ envoy_cc_library(
     deps = [
         ":connection_base_lib",
         ":connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_client_connection_factory",
+    srcs = [
+        "default_client_connection_factory.cc",
+    ],
+    hdrs = [
+        "default_client_connection_factory.h",
+    ],
+    deps = [
+        ":address_lib",
+        ":connection_base_lib",
+        ":connection_impl",
+        "//envoy/network:client_connection_factory",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/registry",
     ],
 )
 
@@ -234,6 +270,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "listener_filter_buffer_lib",
+    srcs = ["listener_filter_buffer_impl.cc"],
+    hdrs = ["listener_filter_buffer_impl.h"],
+    deps = [
+        "//envoy/network:io_handle_interface",
+        "//envoy/network:listener_filter_buffer_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_lib",
     srcs = [
         "base_listener_impl.cc",
@@ -276,6 +323,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
+        "//source/common/network:transport_socket_options_lib",
     ],
 )
 

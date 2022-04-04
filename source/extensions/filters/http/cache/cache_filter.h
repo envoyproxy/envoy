@@ -49,6 +49,17 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
+  // Set required state in the CacheFilter for handling a cache hit.
+  void handleCacheHit();
+
+  // Set up the required state in the CacheFilter for handling a range
+  // request.
+  void handleCacheHitWithRangeRequest();
+
+  // Set required state in the CacheFilter for handling a cache hit when
+  // validation is required.
+  void handleCacheHitWithValidation(Envoy::Http::RequestHeaderMap& request_headers);
+
   // Precondition: lookup_result_ points to a cache lookup result that requires validation.
   //               filter_state_ is ValidatingCachedResponse.
   // Serves a validated cached response after updating it with a 304 response.

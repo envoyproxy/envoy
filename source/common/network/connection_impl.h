@@ -72,6 +72,9 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
+  ConnectionInfoSetter& connectionInfoSetter() override {
+    return socket_->connectionInfoProvider();
+  }
   const ConnectionInfoProvider& connectionInfoProvider() const override {
     return socket_->connectionInfoProvider();
   }
@@ -81,7 +84,11 @@ public:
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
-  bool connecting() const override { return connecting_; }
+  bool connecting() const override {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
+                         *this, connecting_);
+    return connecting_;
+  }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
@@ -95,6 +102,9 @@ public:
   absl::string_view transportFailureReason() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

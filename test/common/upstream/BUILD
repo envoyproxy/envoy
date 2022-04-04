@@ -15,6 +15,20 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "od_cds_api_impl_test",
+    srcs = ["od_cds_api_impl_test.cc"],
+    deps = [
+        "//envoy/config:subscription_interface",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/upstream:od_cds_api_lib",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cds_api_impl_test",
     srcs = ["cds_api_impl_test.cc"],
     deps = [
@@ -23,12 +37,24 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cds_api_lib",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_discovery_manager_test",
+    srcs = ["cluster_discovery_manager_test.cc"],
+    deps = [
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/upstream:cluster_discovery_manager_lib",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
     ],
 )
 
@@ -51,12 +77,14 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:cluster_real_priority_set_mocks",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:od_cds_api_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -150,6 +178,7 @@ envoy_cc_benchmark_binary(
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/mocks/config:custom_config_validators_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",

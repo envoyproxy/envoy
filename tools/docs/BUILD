@@ -22,7 +22,6 @@ py_binary(
     ],
     args = ["$(location //bazel:all_repository_locations)"],
     data = ["//bazel:all_repository_locations"],
-    deps = ["//tools/dependency:utils"],
 )
 
 py_binary(

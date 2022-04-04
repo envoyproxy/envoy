@@ -43,9 +43,8 @@ using namespace std::chrono_literals;
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
-
 class ExtProcIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTest {
+                               public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
@@ -87,6 +86,11 @@ protected:
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+
+      // Parameterize with defer processing to prevent bit rot as filter made
+      // assumptions of data flow, prior relying on eager processing.
+      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                        deferredProcessing() ? "true" : "false");
     });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -124,7 +128,8 @@ protected:
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers, "POST");
+    HttpTestUtility::addDefaultHeaders(headers);
+    headers.setMethod("POST");
     if (modify_headers) {
       (*modify_headers)(headers);
     }
@@ -311,8 +316,10 @@ protected:
   FakeStreamPtr processor_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
+    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
+    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
@@ -624,6 +631,35 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
   EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
 }
 
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that tries to modify the trailers incorrectly
+// according to the header mutation rules.
+TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_all()->set_value(true);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  handleUpstreamRequestWithTrailer();
+
+  processResponseHeadersMessage(false, absl::nullopt);
+  processResponseTrailersMessage(false, [](const HttpTrailers&, TrailersResponse& resp) {
+    auto* trailer_add = resp.mutable_header_mutation()->add_set_headers();
+    trailer_add->mutable_header()->set_key("x-modified-trailers");
+    trailer_add->mutable_header()->set_value("xxx");
+    return true;
+  });
+
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // We get a reset since we've received some of the response already.
+    ASSERT_TRUE(response->waitForReset());
+  } else {
+    verifyDownstreamResponse(*response, 500);
+  }
+}
+
 // Test the filter configured to only send the response trailers message
 TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
   auto* mode = proto_config_.mutable_processing_mode();
@@ -684,6 +720,30 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   verifyDownstreamResponse(*response, 200);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
   EXPECT_EQ("Hello, World!", response->body());
+}
+
+// Test the filter with a response body callback enabled that uses
+// partial buffering. We should still be able to change headers.
+TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+
+  // Should get just one message with the body
+  processResponseBodyMessage(false, [](const HttpBody&, BodyResponse& body_resp) {
+    auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
+    auto* header_add = header_mut->add_set_headers();
+    header_add->mutable_header()->set_key("x-testing-response-header");
+    header_add->mutable_header()->set_value("Yes");
+    return true;
+  });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
 }
 
 // Test the filter with a response body callback enabled using an
@@ -962,6 +1022,46 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
   // The attempt to set the status code to 100 should have been ignored.
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ("{\"reason\": \"Because\"}", response->body());
+}
+
+// Test the filter with request body buffering enabled using
+// an ext_proc server that responds to the request_body message
+// by modifying a header that should cause an error.
+TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Original body", absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  processRequestBodyMessage(false, [](const HttpBody&, BodyResponse& response) {
+    auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
+    mut->mutable_header()->set_key(":scheme");
+    mut->mutable_header()->set_value("tcp");
+    return true;
+  });
+
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter with request body buffering enabled using
+// an ext_proc server that responds to the request_body message
+// by modifying a header that should cause an error.
+TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBodyPartialBuffer) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Original body", absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  processRequestBodyMessage(false, [](const HttpBody&, BodyResponse& response) {
+    auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
+    mut->mutable_header()->set_key(":scheme");
+    mut->mutable_header()->set_value("tcp");
+    return true;
+  });
+
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the ability of the filter to turn a GET into a POST by adding a body

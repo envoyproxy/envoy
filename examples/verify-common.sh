@@ -99,6 +99,7 @@ responds_without () {
     local expected
     expected="$1"
     shift
+    # shellcheck disable=2266
     _curl "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
         echo "ERROR: curl without (${*}): $expected" >&2
         return 1
@@ -119,6 +120,7 @@ responds_without_header () {
     local expected
     expected="$1"
     shift
+    # shellcheck disable=2266
     _curl --head "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
         echo "ERROR: curl without header (${*}): $expected" >&2
         return 1

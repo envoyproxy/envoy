@@ -45,6 +45,9 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
     config = route_config->statefuleSessionConfig();
   }
   session_state_ = config->createSessionState(headers);
+  if (session_state_ == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
     decoder_callbacks_->setUpstreamOverrideHost(upstream_address.value());

@@ -119,6 +119,7 @@ public:
     bool local_closed_{false};
     bool remote_closed_{false};
     uint32_t read_disable_count_{};
+    bool created_schedulable_callback_{false};
 
     bool isLocalOpen() const { return !local_closed_; }
 
@@ -144,11 +145,26 @@ public:
 
   } request_, response_;
 
+  // Encapsulates configuration, connections information used in the HttpStream.
+  struct ConnectionContext {
+    MockConnectionManagerConfig* conn_manager_config_;
+    NiceMock<Network::MockConnection>& server_connection_;
+    NiceMock<Network::MockConnection>& client_connection_;
+
+    ConnectionContext(MockConnectionManagerConfig* conn_manager_config,
+                      NiceMock<Network::MockConnection>& server_connection,
+                      NiceMock<Network::MockConnection>& client_connection)
+        : conn_manager_config_(conn_manager_config), server_connection_(server_connection),
+          client_connection_(client_connection) {}
+  };
+
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
              bool end_stream, StreamResetCallbackFn stream_reset_callback,
-             MockConnectionManagerConfig* config)
-      : stream_reset_callback_(stream_reset_callback), conn_manager_config_(config) {
+             ConnectionContext& context)
+      : http_protocol_(client.protocol()), stream_reset_callback_(stream_reset_callback),
+        context_(context) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
+
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
           ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
@@ -225,7 +241,8 @@ public:
           auto headers =
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
-                                                          *conn_manager_config_, "");
+                                                          *context_.conn_manager_config_,
+                                                          /*via=*/"", stream_info_, /*node_id=*/"");
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
@@ -323,12 +340,35 @@ public:
         } else {
           --state.read_disable_count_;
         }
+
         StreamEncoder* encoder;
+        Event::MockDispatcher* dispatcher{nullptr};
+
         if (response) {
           encoder = state.response_encoder_;
+          dispatcher = &context_.server_connection_.dispatcher_;
         } else {
           encoder = state.request_encoder_;
+          dispatcher = &context_.client_connection_.dispatcher_;
         }
+
+        // With this feature enabled for http2 we end up creating a schedulable
+        // callback the first time we re-enable reading as it's used to process
+        // the backed up data.
+        if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+          const bool expecting_schedulable_callback_creation =
+              http_protocol_ == Protocol::Http2 && state.read_disable_count_ == 0 && !disable &&
+              !state.created_schedulable_callback_;
+
+          if (expecting_schedulable_callback_creation) {
+            ASSERT(dispatcher != nullptr);
+            state.created_schedulable_callback_ = true;
+            // The unique pointer of this object will be returned in createSchedulableCallback_ of
+            // dispatcher, so there is no risk of object leak.
+            new Event::MockSchedulableCallback(dispatcher);
+          }
+        }
+
         encoder->getStream().readDisable(disable);
       }
       break;
@@ -396,9 +436,11 @@ public:
            response_.stream_state_ != StreamState::Closed;
   }
 
+  Protocol http_protocol_;
   int32_t stream_index_{-1};
   StreamResetCallbackFn stream_reset_callback_;
-  MockConnectionManagerConfig* conn_manager_config_;
+  ConnectionContext context_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -492,6 +534,9 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
+
+  HttpStream::ConnectionContext connection_context(&conn_manager_config, server_connection,
+                                                   client_connection);
 
   Http1::CodecStats::AtomicPtr http1_stats;
   Http2::CodecStats::AtomicPtr http2_stats;
@@ -614,7 +659,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
               should_close_connection = true;
             }
           },
-          &conn_manager_config);
+          connection_context);
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }

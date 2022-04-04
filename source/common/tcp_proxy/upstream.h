@@ -45,11 +45,8 @@ class HttpUpstream;
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
-  using TunnelingConfig =
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
-
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-               Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
+               Upstream::LoadBalancerContext* context, const TunnelingConfigHelper& config,
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type);
   ~HttpConnPool() override;
 
@@ -96,7 +93,7 @@ private:
   void onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
                           const Network::Address::InstanceConstSharedPtr& local_address,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
-  const TunnelingConfig config_;
+  const TunnelingConfigHelper& config_;
   Http::CodecType type_;
   absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
   Http::ConnectionPool::Cancellable* upstream_handle_{};
@@ -151,13 +148,15 @@ public:
   }
 
 protected:
-  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config,
-               const StreamInfo::StreamInfo& downstream_info);
+  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+               const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
+  // The encoder offered by the upstream http client.
   Http::RequestEncoder* request_encoder_{};
-  const TunnelingConfig config_;
-  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  // The config object that is owned by the downstream network filter chain factory.
+  const TunnelingConfigHelper& config_;
+  // The downstream info that is owned by the downstream connection.
   const StreamInfo::StreamInfo& downstream_info_;
 
 private:
@@ -201,8 +200,8 @@ private:
 
 class Http1Upstream : public HttpUpstream {
 public:
-  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config,
-                const StreamInfo::StreamInfo& downstream_info);
+  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
 
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
@@ -211,8 +210,8 @@ public:
 
 class Http2Upstream : public HttpUpstream {
 public:
-  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config,
-                const StreamInfo::StreamInfo& downstream_info);
+  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;

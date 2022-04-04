@@ -13,6 +13,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "absl/strings/string_view.h"
 
@@ -116,6 +117,12 @@ public:
    * @return the cluster the host is a member of.
    */
   virtual const ClusterInfo& cluster() const PURE;
+
+  /**
+   * @return true if the cluster can create a connection for this priority, false otherwise.
+   * @param priority the priority the connection would have.
+   */
+  virtual bool canCreateConnection(Upstream::ResourcePriority priority) const PURE;
 
   /**
    * @return the host's outlier detection monitor.

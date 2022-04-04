@@ -38,8 +38,8 @@ protected:
     // Disable the explicit wildcard resource feature, so OldDeltaSubscriptionState will be picked
     // up.
     {
-      TestScopedRuntime scoped_runtime_;
-      Runtime::LoaderSingleton::getExisting()->mergeValues({
+      TestScopedRuntime scoped_runtime;
+      scoped_runtime.mergeValues({
           {"envoy.restart_features.explicit_wildcard_resource", "false"},
       });
       state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(type_url, callbacks_,
@@ -685,14 +685,6 @@ TEST_F(OldVhdsDeltaSubscriptionStateTest, ResourceTTL) {
   deliverDiscoveryResponse(create_resource_with_ttl(true), {}, "debug1", "nonce1", true, 1);
 
   // Heartbeat update should not be propagated to the subscription callback.
-  EXPECT_CALL(*ttl_timer_, enabled());
-  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 0);
-
-  // When runtime flag is disabled, maintain old behavior where we do propagate
-  // the update to the subscription callback.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.vhds_heartbeats", "false"}});
-
   EXPECT_CALL(*ttl_timer_, enabled());
   deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
 }

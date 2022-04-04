@@ -111,4 +111,74 @@ message ValidationAssert {
   // applicable.
   repeated envoy.config.route.v3.HeaderMatcher request_header_matches = 11;
   repeated envoy.config.route.v3.HeaderMatcher response_header_matches = 12;
+
+  // Match the redirect response code
+  google.protobuf.UInt32Value code_redirect = 13;
+}
+
+// The ValidationResult schema contains test results of the envoy router check tool.
+message ValidationResult {
+  // The results of the validation tests.
+  // If the tool was configured to 'only-show-failures',
+  // then 'test_results' contain only results for failed tests.
+  // Otherwise, 'test_results' will contain all the tests results.
+  repeated ValidationItemResult test_results = 1;
+}
+
+// The ValidationItemResult schema specifies the result after running ValidationItem test.
+message ValidationItemResult {
+  // Name of the test case from ValidationItem.
+  string test_name = 1;
+
+  // A flag indicating whether the test passed.
+  // If false, then 'failure' specifies the reason of the failure.
+  bool test_passed = 2;
+
+  // The reason of the test failure.
+  ValidationFailure failure = 3;
+}
+
+// Schema describes the reason of the test failure.
+message ValidationFailure {
+  // Match the cluster name result.
+  google.protobuf.StringValue expected_cluster_name = 1;
+  google.protobuf.StringValue actual_cluster_name = 2;
+
+  // Match the virtual cluster name result.
+  google.protobuf.StringValue expected_virtual_cluster_name = 3;
+  google.protobuf.StringValue actual_virtual_cluster_name = 4;
+
+  // Match the virtual host name result.
+  google.protobuf.StringValue expected_virtual_host_name = 5;
+  google.protobuf.StringValue actual_virtual_host_name = 6;
+
+  // Match the host rewrite result.
+  google.protobuf.StringValue expected_host_rewrite = 7;
+  google.protobuf.StringValue actual_host_rewrite = 8;
+
+  // Match the path rewrite result.
+  google.protobuf.StringValue expected_path_rewrite = 9;
+  google.protobuf.StringValue actual_path_rewrite = 10;
+
+  // Match the path redirect result.
+  google.protobuf.StringValue expected_path_redirect = 11;
+  google.protobuf.StringValue actual_path_redirect = 12;
+
+  // Match the redirect code result.
+  google.protobuf.UInt32Value expected_code_redirect = 13;
+  google.protobuf.UInt32Value actual_code_redirect = 14;
+
+  // Match the request headers results.
+  repeated HeaderMatchFailure request_header_match_failures = 15;
+  // Match the response headers results.
+  repeated HeaderMatchFailure response_header_match_failures = 16;
+}
+
+// Schema for header match validation failure.
+message HeaderMatchFailure {
+  // The header matcher from the ValidationAssert.
+  envoy.config.route.v3.HeaderMatcher header_matcher = 1;
+
+  // The actual header value from the router response.
+  google.protobuf.StringValue actual_header_value = 2;
 }

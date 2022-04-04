@@ -40,7 +40,7 @@ public:
   }
 
   TestMapPtr makeTestMapWithLimitAtPriority(uint64_t limit, ResourcePriority priority) {
-    host_->cluster_.resetResourceManager(1024, 1024, 1024, 1024, limit);
+    host_->cluster_.resetResourceManager(1024, 1024, 1024, 1024, limit, 100);
     return std::make_unique<TestMap>(dispatcher_, host_, priority);
   }
 

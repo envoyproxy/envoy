@@ -13,7 +13,7 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
 
@@ -132,6 +132,7 @@ class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
+  ~IsolatedStoreImpl() override;
 
   // Stats::Scope
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -140,8 +141,8 @@ public:
     Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;
   }
-  ScopePtr createScope(const std::string& name) override;
-  ScopePtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr createScope(const std::string& name) override;
+  ScopeSharedPtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
@@ -227,12 +228,19 @@ public:
     text_readouts_.forEachStat(f_size, f_stat);
   }
 
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
+  }
+
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
     if (f_size != nullptr) {
-      f_size(1);
+      f_size(scopes_.size() + 1);
     }
-    const Scope& scope = *this;
-    f_stat(scope);
+    f_stat(*default_scope_);
+    for (const ScopeSharedPtr& scope : scopes_) {
+      f_stat(*scope);
+    }
   }
 
   Stats::StatName prefix() const override { return StatName(); }
@@ -260,6 +268,8 @@ private:
   IsolatedStatsCache<TextReadout> text_readouts_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
+  ScopeSharedPtr default_scope_;
+  std::vector<ScopeSharedPtr> scopes_;
 };
 
 } // namespace Stats

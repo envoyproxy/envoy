@@ -70,6 +70,12 @@ public:
   virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
+   * Returns version of computedBuckets() with disjoint buckets. This vector is
+   * guaranteed to be the same length as supportedBuckets().
+   */
+  virtual std::vector<uint64_t> computeDisjointBuckets() const PURE;
+
+  /**
    * Returns number of values during the period. This number may be an approximation
    * of the number of samples in the histogram, it is not guaranteed that this will be
    * 100% the number of samples observed.
@@ -155,12 +161,12 @@ public:
   /**
    * Returns the quantile summary representation.
    */
-  virtual const std::string quantileSummary() const PURE;
+  virtual std::string quantileSummary() const PURE;
 
   /**
    * Returns the bucket summary representation.
    */
-  virtual const std::string bucketSummary() const PURE;
+  virtual std::string bucketSummary() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

@@ -374,9 +374,14 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
     return setEnd(buffer);
   case ProtocolState::MessageEnd:
     return messageEnd(buffer);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case ProtocolState::StopIteration:
+    FALLTHRU;
+  case ProtocolState::WaitForData:
+    FALLTHRU;
+  case ProtocolState::Done:
+    PANIC("unexpected");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ProtocolState DecoderStateMachine::popReturnState() {

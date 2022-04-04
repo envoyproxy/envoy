@@ -1,7 +1,7 @@
 #if defined(__linux__)
 #define DO_NOT_INCLUDE_NETINET_TCP_H 1
 
-#include </usr/include/linux/tcp.h>
+#include <linux/tcp.h>
 
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 

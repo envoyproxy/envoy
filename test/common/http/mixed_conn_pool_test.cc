@@ -70,7 +70,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
   auto* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
   NiceMock<MockResponseDecoder> decoder;
-  conn_pool_->newStream(decoder, callbacks_);
+  conn_pool_->newStream(decoder, callbacks_, {false, true});
 
   std::string next_protocol = "";
   if (protocol.has_value()) {

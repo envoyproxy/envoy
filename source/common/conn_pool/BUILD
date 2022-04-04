@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["conn_pool_base.h"],
     deps = [
         "//envoy/stats:timespan_interface",
+        "//source/common/common:debug_recursion_checker_lib",
         "//source/common/common:linked_object",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",

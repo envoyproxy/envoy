@@ -16,8 +16,8 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
 }
 
 Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks&, bool,
-                                                          bool) {
+                                                          Network::TcpListenerCallbacks&,
+                                                          Runtime::Loader&, bool, bool) {
   return nullptr;
 }
 

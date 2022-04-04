@@ -18,6 +18,7 @@
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
+#include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
 
@@ -372,8 +373,7 @@ public:
                               Runtime::Loader* runtime)
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  const void* onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-                      const void*) override {
+  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
     const Protobuf::Reflection* reflection = message.GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
 
@@ -385,7 +385,7 @@ public:
     // If this field is not in use, continue.
     if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
         (!field.is_repeated() && !reflection->HasField(message, &field))) {
-      return nullptr;
+      return;
     }
 
     const auto& field_status = field.options().GetExtension(xds::annotations::v3::field_status);
@@ -406,10 +406,10 @@ public:
                             absl::StrCat("envoy.deprecated_features:", field.full_name()), warning,
                             message, validation_visitor_);
     }
-    return nullptr;
   }
 
-  void onMessage(const Protobuf::Message& message, const void*) override {
+  void onMessage(const Protobuf::Message& message,
+                 absl::Span<const Protobuf::Message* const> parents, bool) override {
     if (message.GetDescriptor()
             ->options()
             .GetExtension(xds::annotations::v3::message_status)
@@ -433,11 +433,18 @@ public:
     if (!unknown_fields.empty()) {
       std::string error_msg;
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
-        error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+        absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        validation_visitor_.onUnknownField("type " + message.GetTypeName() +
-                                           " with unknown field set {" + error_msg + "}");
+        validation_visitor_.onUnknownField(
+            fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
+                        !parents.empty()
+                            ? absl::StrJoin(parents, "::",
+                                            [](std::string* out, const Protobuf::Message* const m) {
+                                              absl::StrAppend(out, m->GetTypeName());
+                                            })
+                            : "root",
+                        error_msg));
       }
     }
   }
@@ -451,9 +458,37 @@ private:
 
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           Runtime::Loader* runtime) {
+                                           bool recurse_into_any) {
+  Runtime::Loader* runtime = validation_visitor.runtime().has_value()
+                                 ? &validation_visitor.runtime().value().get()
+                                 : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
-  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, nullptr);
+  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+}
+
+namespace {
+
+class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
+                 bool was_any_or_top_level) override {
+    std::string err;
+    // PGV verification is itself recursive up to the point at which it hits an Any message. As
+    // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
+    // at which PGV would have stopped because it does not itself check within Any messages.
+    if (was_any_or_top_level && !pgv::BaseValidator::AbstractCheckMessage(message, &err)) {
+      ProtoExceptionUtil::throwProtoValidationException(err, message);
+    }
+  }
+
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+};
+
+} // namespace
+
+void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
+  PgvCheckVisitor visitor;
+  ProtobufMessage::traverseMessage(visitor, message, true);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,

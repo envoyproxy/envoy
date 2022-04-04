@@ -14,7 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:context_provider_interface",
         "//envoy/network:address_interface",
-        "//envoy/stats:symbol_table_interface",
+        "//envoy/stats:stats_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

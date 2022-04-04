@@ -447,6 +447,34 @@ TEST_F(DnsCacheImplTest, TTL) {
              2 /* added */, 1 /* removed */, 1 /* num hosts */);
 }
 
+// Verify that dns_min_refresh_rate is honored.
+TEST_F(DnsCacheImplTest, TTLWithMinRefreshRate) {
+  *config_.mutable_dns_min_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(45);
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer = new Event::MockTimer(&context_.dispatcher_);
+  Event::MockTimer* timeout_timer = new Event::MockTimer(&context_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(45000), _));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+}
+
 // TTL purge test with different refresh/TTL parameters.
 TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
   *config_.mutable_dns_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(30);
@@ -1182,8 +1210,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 
 TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
@@ -1299,8 +1326,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
 TEST_F(DnsCacheImplTest, CacheLoad) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);

@@ -5,6 +5,7 @@
 
 #include "envoy/network/io_handle.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/network/io_socket_error_impl.h"
 
 namespace Envoy {
@@ -142,6 +143,12 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override {
+    // QUIC should get congestion window from QuicFilterManagerConnectionImpl, which implements the
+    // Envoy::Network::Connection::congestionWindowInBytes interface.
+    IS_ENVOY_BUG("QuicIoHandleWrapper does not implement congestionWindowInBytes.");
+    return {};
+  }
 
 private:
   Network::IoHandle& io_handle_;

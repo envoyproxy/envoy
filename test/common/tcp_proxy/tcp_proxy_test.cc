@@ -116,7 +116,7 @@ public:
             .filterState()
             ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                 Network::UpstreamSocketOptionsFilterState::key())
-            .addOption(
+            ->addOption(
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
@@ -842,6 +842,26 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   idle_timer->invokeCallback();
 }
 
+// Test that Upstream and Downstream Bytes are metered.
+// Checks that %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED%,
+//  %DOWNSTREAM_WIRE_BYTES_SENT%, and %DOWNSTREAM_WIRE_BYTES_RECEIVED% are
+//  correctly logged.
+TEST_F(TcpProxyTest, AccessLogBytesMeterData) {
+  setup(1, accessLogConfig("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+                           "%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED%"));
+  raiseEventUpstreamConnected(0);
+  Buffer::OwnedImpl upData("bye");
+  upstream_callbacks_->onUpstreamData(upData, false);
+  Buffer::OwnedImpl downData("hiya");
+  filter_->onData(downData, false);
+  Buffer::OwnedImpl noneData("");
+  filter_->onData(noneData, false);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "4 3 3 4");
+}
+
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged with the
 // observability name.
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
@@ -1072,7 +1092,7 @@ TEST_F(TcpProxyTest, ShareFilterState) {
                 .upstreamInfo()
                 ->upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
-                .value());
+                ->value());
 }
 
 // Tests that filter callback can access downstream and upstream address and ssl properties.

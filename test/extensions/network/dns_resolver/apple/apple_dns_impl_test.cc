@@ -426,6 +426,7 @@ public:
   void completeWithError(DNSServiceErrorType error_code) {
     const std::string hostname = "foo.com";
     sockaddr_in addr4;
+    memset(&addr4, 0, sizeof(addr4));
     addr4.sin_family = AF_INET;
     EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
     addr4.sin_port = htons(6502);
@@ -462,12 +463,14 @@ public:
                     uint32_t expected_address_size = 1) {
     const std::string hostname = "foo.com";
     sockaddr_in addr4;
+    memset(&addr4, 0, sizeof(addr4));
     addr4.sin_family = AF_INET;
     EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
     addr4.sin_port = htons(6502);
     Network::Address::Ipv4Instance address(&addr4);
 
     sockaddr_in6 addr6;
+    memset(&addr6, 0, sizeof(addr6));
     addr6.sin6_family = AF_INET6;
     EXPECT_EQ(1, inet_pton(AF_INET6, "102:304:506:708:90a:b0c:d0e:f00", &addr6.sin6_addr));
     addr6.sin6_port = 0;
@@ -563,6 +566,7 @@ protected:
 TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -598,6 +602,7 @@ TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
 
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -633,6 +638,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
 
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -687,6 +693,7 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousTimeoutInGetAddrInfo) {
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -738,12 +745,14 @@ TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithTimeout) {
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
   Network::Address::Ipv4Instance address(&addr4);
 
   sockaddr_in addr4_2;
+  memset(&addr4_2, 0, sizeof(addr4_2));
   addr4_2.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "5.6.7.8", &addr4_2.sin_addr));
   addr4_2.sin_port = htons(6502);
@@ -821,6 +830,7 @@ TEST_F(AppleDnsImplFakeApiTest, AllV4IfOnlyV4) {
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -860,6 +870,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
 TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -869,6 +880,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
 
   const std::string hostname2 = "foo2.com";
   sockaddr_in addr4_2;
+  memset(&addr4_2, 0, sizeof(addr4_2));
   addr4_2.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "5.6.7.8", &addr4_2.sin_addr));
   addr4_2.sin_port = htons(6502);
@@ -934,6 +946,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
 TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -1001,6 +1014,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
 TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -1035,6 +1049,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
 TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -1062,12 +1077,14 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
 TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
   Network::Address::Ipv4Instance address(&addr4);
 
   sockaddr_in addr4_2;
+  memset(&addr4_2, 0, sizeof(addr4_2));
   addr4_2.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "5.6.7.8", &addr4_2.sin_addr));
   addr4_2.sin_port = htons(6502);

@@ -10,7 +10,38 @@ import tarfile
 import urllib.parse
 from collections import defaultdict, namedtuple
 
-from tools.dependency import utils as dep_utils
+# Information releated to a GitHub release version.
+GitHubRelease = namedtuple('GitHubRelease', ['organization', 'project', 'version', 'tagged'])
+
+
+# Search through a list of URLs and determine if any contain a GitHub URL. If
+# so, use heuristics to extract the release version and repo details, return
+# this, otherwise return None.
+def get_github_release_from_urls(urls):
+    for url in urls:
+        if not url.startswith('https://github.com/'):
+            continue
+        components = url.split('/')
+        if components[5] == 'archive':
+            # Only support .tar.gz, .zip today. Figure out the release tag from this
+            # filename.
+            if components[-1].endswith('.tar.gz'):
+                github_version = components[-1][:-len('.tar.gz')]
+            else:
+                assert (components[-1].endswith('.zip'))
+                github_version = components[-1][:-len('.zip')]
+        else:
+            # Release tag is a path component.
+            assert (components[5] == 'releases')
+            github_version = components[7]
+        # If it's not a GH hash, it's a tagged release.
+        tagged_release = len(github_version) != 40
+        return GitHubRelease(
+            organization=components[3],
+            project=components[4],
+            version=github_version,
+            tagged=tagged_release)
+    return None
 
 
 # Render a CSV table given a list of table headers, widths and list of rows
@@ -56,7 +87,7 @@ def render_title(title):
 # SHA. Otherwise, return the tarball download.
 def get_version_url(metadata):
     # Figure out if it's a GitHub repo.
-    github_release = dep_utils.get_github_release_from_urls(metadata['urls'])
+    github_release = get_github_release_from_urls(metadata['urls'])
     # If not, direct download link for tarball
     if not github_release:
         return metadata['urls'][0]
