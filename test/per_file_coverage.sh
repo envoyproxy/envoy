@@ -4,8 +4,8 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.0"
-"source/common/api:73.2" # TODO(ravenblack): should be higher after PR#20332
-"source/common/api/posix:71.7" # TODO(ravenblack): should be 75+ after PR#20332
+"source/common/api:72.9" # TODO(ravenblack): should be higher after PR#20332
+"source/common/api/posix:71.5" # TODO(ravenblack): should be 75+ after PR#20332
 "source/common/common:96.2"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
