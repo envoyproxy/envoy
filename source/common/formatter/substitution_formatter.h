@@ -400,7 +400,7 @@ public:
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
-                      absl::optional<size_t> max_length);
+                      absl::optional<size_t> max_length, bool format_as_number = false);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&,
@@ -411,6 +411,8 @@ public:
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
+private:
+  bool format_as_number_;
 };
 
 /**

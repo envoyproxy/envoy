@@ -12,6 +12,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* access_log: add GRPC_STATUS_NUMBER format command operator
 * access_log: log all header values in the grpc access log.
 * build: ``VERSION`` and ``API_VERSION`` have been renamed to ``VERSION.txt`` and ``API_VERSION.txt`` respectively to avoid conflicts with the C++ ``<version>`` header.
 * config: type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
