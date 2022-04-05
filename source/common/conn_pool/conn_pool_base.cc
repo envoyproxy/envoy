@@ -1,7 +1,5 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
-#include <openssl/crypto.h>
-
 #include "source/common/common/assert.h"
 #include "source/common/common/debug_recursion_checker.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -272,6 +270,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
 
   if (can_send_early_data && !early_data_clients_.empty()) {
     ActiveClient& client = *early_data_clients_.front();
+    ENVOY_CONN_LOG(debug, "using existing early data ready connection", client);
     attachStreamToClient(client, context);
     // Even if there's an available client, we may want to preconnect to handle the next
     // incoming stream.
@@ -495,7 +494,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
       onConnectFailed(client);
       if (contributed_to_connecting_stream_capacity) {
-        // Purge pending streams only if this is not a.
+        // Purge pending streams only if this client doesn't contribute to the local connecting
+        // stream capacity. In other words, the rest clients  would be able to handle all the
+        // pending stream once they are connected.
         ConnectionPool::PoolFailureReason reason;
         if (client.timed_out_) {
           reason = ConnectionPool::PoolFailureReason::Timeout;
@@ -677,6 +678,7 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
         }
       }
       if (idle_client != nullptr) {
+        // Close the client after the for loop avoid messing up with iterator.
         transitionActiveClientState(*idle_client, ActiveClient::State::Draining);
         idle_client->close();
       }

@@ -100,7 +100,8 @@ public:
 
   void setState(State state) {
     if (state == State::ReadyForEarlyData && !supportsEarlyData()) {
-      IS_ENVOY_BUG("Non-early-data compliant client gets early data ready");
+      IS_ENVOY_BUG("Unable to set state to ReadyForEarlyData in a client which does not support "
+                   "early data.");
       return;
     }
     // If the client is transitioning to draining, update the remaining
@@ -304,6 +305,7 @@ public:
   // Called when an upstream is ready to serve pending streams.
   void onUpstreamReady();
 
+  // Called when an upstream is ready to serve early data streams.
   void onUpstreamReadyForEarlyData(ActiveClient& client);
 
 protected:
