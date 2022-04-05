@@ -112,3 +112,18 @@ index b5fe925..31aa81e 100644
  template <typename T>
  struct pointer_traits<::gurl_base::CheckedContiguousIterator<T>> {
 
+# TODO(keith): Remove once https://quiche-review.googlesource.com/c/googleurl/+/10980 lands
+
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 3a85453..a329de2 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -382,7 +382,7 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+ #define CONSTINIT
+ #endif
+ 
+-#if defined(__clang__)
++#if defined(__clang__) && HAS_CPP_ATTRIBUTE(gsl::Pointer)
+ #define GSL_OWNER [[gsl::Owner]]
+ #define GSL_POINTER [[gsl::Pointer]]
+ #else
