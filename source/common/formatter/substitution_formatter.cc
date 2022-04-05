@@ -1387,7 +1387,8 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
                                          absl::optional<size_t> max_length, bool format_as_number)
-    : HeaderFormatter(main_header, alternative_header, max_length), format_as_number_(format_as_number) {}
+    : HeaderFormatter(main_header, alternative_header, max_length),
+      format_as_number_(format_as_number) {}
 
 absl::optional<std::string>
 GrpcStatusFormatter::format(const Http::RequestHeaderMap&,

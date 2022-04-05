@@ -2033,7 +2033,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusNumberFormatterTest) {
   for (size_t i = 0; i < grpc_statuses.size(); ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
     EXPECT_EQ(std::to_string(i), formatter.format(request_header, response_header, response_trailer,
-                                                 stream_info, body));
+                                                  stream_info, body));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
         ProtoEq(ValueUtil::numberValue(i)));
