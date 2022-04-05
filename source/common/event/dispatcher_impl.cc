@@ -9,6 +9,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/network/client_connection_factory.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
@@ -16,12 +17,14 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/event/signal_impl.h"
 #include "source/common/event/timer_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -158,8 +161,16 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::TransportSocketPtr&& transport_socket,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
-                                                         std::move(transport_socket), options);
+
+  auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
+      std::string(address->addressType()));
+  // The target address is usually offered by EDS and the EDS api should reject the unsupported
+  // address.
+  // TODO(lambdai): Return a closed connection if the factory is not found. Note that the caller
+  // expects a non-null connection as of today so we cannot gracefully handle unsupported address
+  // type.
+  return factory->createClientConnection(*this, address, source_address,
+                                         std::move(transport_socket), options);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

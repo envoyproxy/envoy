@@ -21,17 +21,17 @@
 namespace Envoy {
 namespace {
 
-class ListenerFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                      public BaseIntegrationTest {
+class TlsInspectorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                    public BaseIntegrationTest {
 public:
-  ListenerFilterIntegrationTest()
+  TlsInspectorIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
       filters:
        -  name: envoy.filters.network.echo
 )EOF") {}
 
-  ~ListenerFilterIntegrationTest() override = default;
+  ~TlsInspectorIntegrationTest() override = default;
   std::string appendMatcher(const std::string& listener_filter, bool disabled) {
     if (disabled) {
       return listener_filter +
@@ -49,9 +49,9 @@ filter_disabled:
     }
   }
 
-  void initializeWithListenerFilter(bool ssl_client, const std::string& log_format,
-                                    absl::optional<bool> listener_filter_disabled = absl::nullopt,
-                                    bool enable_ja3_fingerprinting = false) {
+  void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
+                                  absl::optional<bool> listener_filter_disabled = absl::nullopt,
+                                  bool enable_ja3_fingerprinting = false) {
     config_helper_.renameListener("echo");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
     if (listener_filter_disabled.has_value()) {
@@ -91,8 +91,8 @@ filter_disabled:
                         const Ssl::ClientSslTransportOptions& ssl_options = {},
                         const std::string& curves_list = "",
                         bool enable_ja3_fingerprinting = false) {
-    initializeWithListenerFilter(ssl_client, log_format, listener_filter_disabled,
-                                 enable_ja3_fingerprinting);
+    initializeWithTlsInspector(ssl_client, log_format, listener_filter_disabled,
+                               enable_ja3_fingerprinting);
 
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
@@ -140,7 +140,7 @@ filter_disabled:
 };
 
 // Each listener filter is enabled by default.
-TEST_P(ListenerFilterIntegrationTest, AllListenerFiltersAreEnabledByDefault) {
+TEST_P(TlsInspectorIntegrationTest, AllListenerFiltersAreEnabledByDefault) {
   setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
                    /*ssl_client=*/true);
   client_->close(Network::ConnectionCloseType::NoFlush);
@@ -148,7 +148,7 @@ TEST_P(ListenerFilterIntegrationTest, AllListenerFiltersAreEnabledByDefault) {
 }
 
 // The tls_inspector is disabled. The ALPN won't be sniffed out and no filter chain is matched.
-TEST_P(ListenerFilterIntegrationTest, DisabledTlsInspectorFailsFilterChainFind) {
+TEST_P(TlsInspectorIntegrationTest, DisabledTlsInspectorFailsFilterChainFind) {
   setupConnections(/*listener_filter_disabled=*/true, /*expect_connection_open=*/false,
                    /*ssl_client=*/true);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
@@ -156,7 +156,7 @@ TEST_P(ListenerFilterIntegrationTest, DisabledTlsInspectorFailsFilterChainFind) 
 }
 
 // trigger the tls inspect filter timeout, and continue create new connection after timeout
-TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
+TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
   setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
                    /*ssl_client=*/false);
   // The length of tls hello message is defined as `TLS_MAX_CLIENT_HELLO = 64 * 1024`
@@ -171,7 +171,7 @@ TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
 }
 
 // The `JA3` fingerprint is correct in the access log.
-TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
+TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA3` fingerprint:
   //   `771,49199,23-65281-10-11-35-16-13,23,0`
@@ -189,7 +189,7 @@ TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
               testing::Eq("71d1f47d1125ac53c3c6a4863c087cfe"));
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, TlsInspectorIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 } // namespace

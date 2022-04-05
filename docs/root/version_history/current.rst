@@ -34,6 +34,7 @@ Minor Behavior Changes
 * http: when writing custom filters, ``injectEncodedDataToFilterChain`` and ``injectDecodedDataToFilterChain`` now trigger sending of headers if they were not yet sent due to ``StopIteration``. Previously, calling one of the inject functions in that state would trigger an assertion. See issue #19891 for more details.
 * listener: the :ref:`ipv4_compat <envoy_api_field_core.SocketAddress.ipv4_compat>` flag can only be set on Ipv6 address and Ipv4-mapped Ipv6 address. A runtime guard is added ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and the default is true.
 * network: add a new ConnectionEvent ``ConnectedZeroRtt`` which may be raised by QUIC connections to allow early data to be sent before the handshake finishes. This event is ignored at callsites which is only reachable for TCP connections in the Envoy core code. Any extensions which depend on ConnectionEvent enum value should audit their usage of it to make sure this new event is handled appropriately.
+* oauth2: disable chunked transfer encoding in the token request to be compatible with Azure AD (login.microsoftonline.com).
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 * ratelimit: the :ref:`header_value_match <envoy_v3_api_msg_config.route.v3.ratelimit.action.HeaderValueMatch>` support custom descriptor_key.
 * router: record upstream request timeouts for all the cases and not just for those requests which are awaiting headers. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` to false.
@@ -52,7 +53,9 @@ Bug Fixes
 * data plane: fix crash when internal redirect selects a route configured with direct response or redirect actions.
 * data plane: fixing error handling where writing to a socket failed while under the stack of processing. This should genreally affect HTTP/3. This behavioral change can be reverted by setting ``envoy.reloadable_features.allow_upstream_inline_write`` to false.
 * eds: fix the eds cluster update by allowing update on the locality of the cluster endpoints. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` to false.
+* hot restart: fixed a bug where an incorrect fd was passed to child when a tcp listener and a udp listener listen to the same address because socket type was not used to find the matching listener for a url.
 * http: fixed a bug where %RESPONSE_CODE_DETAILS% was not set correctly in :ref:`request_headers_to_add <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add>`.
+* http: fixed a bug where ``100-continue`` comparison in the ``Expect`` request header field was case sensitive. This RFC compliant behavior can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.http_100_continue_case_insensitive`` to false.
 * jwt_authn: fixed a bug where a JWT with empty "iss" is passed even the field :ref:`issuer <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.issuer>` is specified. If the "issuer" field is specified, "iss" in the JWT should match it.
 * jwt_authn: fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
 * router: fixed mirror policy :ref:`runtime_fraction <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.runtime_fraction>` to
@@ -64,6 +67,7 @@ Bug Fixes
 * tls: fix a bug while matching a certificate SAN with an exact value in ``match_typed_subject_alt_names`` of a listener where wildcard ``*`` character is not the only character of the dns label. Example, ``baz*.example.net`` and ``*baz.example.net`` and ``b*z.example.net`` will match ``baz1.example.net`` and ``foobaz.example.net`` and ``buzz.example.net``, respectively.
 * upstream: cluster slow start config add ``min_weight_percent`` field to avoid too big EDF deadline which cause slow start endpoints receiving no traffic, default 10%. This fix is releted to `issue#19526 <https://github.com/envoyproxy/envoy/issues/19526>`_.
 * upstream: fix stack overflow when a cluster with large number of idle connections is removed.
+* xds: fix a crash that occurs when Envoy receives a discovery response without ``control_plane`` field.
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
 * xray: fix the AWS X-Ray tracer extension to annotate a child span with ``type=subsegment`` to correctly relate subsegments to a parent segment. Previously a subsegment would be treated as an independent segment.
 * xray: fix the AWS X-Ray tracer extension to reuse the trace ID already present in the header ``x-amzn-trace-id`` instead of creating a new one.
@@ -100,6 +104,7 @@ New Features
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * admin: :http:post:`/logging` now accepts ``/logging?paths=name1:level1,name2:level2,...`` to change multiple log levels at once.
 * cluster: added support for per host limits in :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>`. Currently only  :ref:`max_connections <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connections>` is supported.
+* cluster: added support to restore original destination address from any desired header via setting :ref:`http_header_name <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.http_header_name>`.
 * cluster: support :ref:`override host status restriction <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.override_host_status>`.
 * config: added new file based xDS configuration via :ref:`path_config_source <envoy_v3_api_field_config.core.v3.ConfigSource.path_config_source>`.
   :ref:`watched_directory <envoy_v3_api_field_config.core.v3.PathConfigSource.watched_directory>` can
@@ -112,6 +117,7 @@ New Features
   TTL. This was previously hard coded to 5s and defaults to 5s if unset.
 * http: added random_value_specifier in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow random value to be specified from configuration proto.
 * http: added request_mirror_policies to higher levels (i.e., :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies>` in :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` and  :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.VirtualHost.request_mirror_policies>` in :ref:`VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`) which applies to :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` in all routes underneath without configured mirror policies.
+* http: added support for :ref:`cidr_ranges <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.InternalAddressConfig.cidr_ranges>` for configuring list of CIDR ranges that are considered internal.
 * http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring `Proxy-Status <https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08>`_ HTTP response header fields.
 * http: make consistent custom header format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
 * http3: add :ref:`enable_early_data <envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.enable_early_data>` to turn on/off downstream early data support.
@@ -122,6 +128,7 @@ New Features
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
 * redis: support for hostnames returned in ``cluster_slots`` response is now available.
+* router: added a path-separated prefix matcher, to make route creation more efficient. :ref:`path_separated_prefix <envoy_v3_api_field_config.route.v3.RouteMatch.path_separated_prefix>`.
 * schema_validator_tool: added ``bootstrap`` checking to the
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`.
 * schema_validator_tool: added ``--fail-on-deprecated`` and ``--fail-on-wip`` to the
@@ -142,6 +149,7 @@ New Features
   useful in support systems such as CI, CD, etc. The
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>` has been added
   to the tools image.
+* udp_proxy: added :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>` to support matching and routing to different clusters.
 * udp_proxy: added support for :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log>`.
 
 Deprecated
@@ -153,3 +161,4 @@ Deprecated
 * http: removing support for long-deprecated old style filter names, e.g. envoy.router, envoy.lua.
 * re2: removed undocumented histograms ``re2.program_size`` and ``re2.exceeded_warn_level``.
 * thrift: deprecated TTwitter protocol since we believe it's not used and it's causing significant maintenance burden.
+* udp_proxy: deprecated :ref:`cluster <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.cluster>` in favor of :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>`.
