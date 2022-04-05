@@ -380,13 +380,14 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
 
 void PassthroughStateImpl::initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
                                       std::unique_ptr<FilterStateObjects> filter_state_objects) {
-  std::cout << "INITIALIZING" << std::endl;
+  ASSERT(state_ == State::Created);
   metadata_ = std::move(metadata);
   filter_state_objects_ = std::move(filter_state_objects);
+  state_ = State::Initialized;
 }
 void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata,
-                                     StreamInfo::FilterState& filter_state) const {
-  std::cout << "SETTING STATE" << std::endl;
+                                     StreamInfo::FilterState& filter_state) {
+  ASSERT(state_ == State::Initialized);
   if (metadata_) {
     metadata.MergeFrom(*metadata_);
   }
@@ -396,6 +397,9 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
                            StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
+  metadata_.release();
+  filter_state_objects_.release();
+  state_ = State::Done;
 }
 } // namespace UserSpace
 } // namespace IoSocket

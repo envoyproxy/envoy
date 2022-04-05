@@ -20,17 +20,18 @@ public:
   virtual ~PassthroughState() = default;
 
   /**
-   * Initialize the passthrough state from the downstream. This should be called once before other
-   * methods.
+   * Initialize the passthrough state from the downstream. This should be
+   * called exactly once before `mergeInto`.
    */
   virtual void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
                           std::unique_ptr<FilterStateObjects> filter_state_objects) PURE;
 
   /**
-   * Merge the passthrough state into a recipient stream metadata and filter state.
+   * Merge the passthrough state into a recipient stream metadata and its
+   * filter state. This should be called at most once after `initialize`.
    */
   virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
-                         StreamInfo::FilterState& filter_state) const PURE;
+                         StreamInfo::FilterState& filter_state) PURE;
 };
 
 using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
