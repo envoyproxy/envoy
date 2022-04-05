@@ -69,10 +69,13 @@ public:
   bool startSecureTransport() override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() override;
   std::string nextProtocol() const override;
+  // Note, this might change before connect finishes.
+  ConnectionInfoSetter& connectionInfoSetter() override;
   // Note, this might change before connect finishes.
   const ConnectionInfoProvider& connectionInfoProvider() const override;
   // Note, this might change before connect finishes.

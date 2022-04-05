@@ -41,14 +41,6 @@ const Protobuf::MethodDescriptor& mockMethodDescriptor() {
       "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs");
 }
 
-OptRef<const envoy::config::core::v3::RetryPolicy> optionalRetryPolicy(
-    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
-  if (!config.has_grpc_stream_retry_policy()) {
-    return {};
-  }
-  return config.grpc_stream_retry_policy();
-}
-
 // We don't care about the actual log entries, as this logger just adds them to the proto, but we
 // need to use a proto type because the ByteSizeLong() is used to determine the log size, so we use
 // standard Struct and Empty protos.
@@ -59,12 +51,10 @@ public:
   MockGrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-      std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
       const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
-                         dispatcher, scope, access_log_prefix, service_method,
-                         optionalRetryPolicy(config)) {}
+      : GrpcAccessLogger(std::move(client), config, dispatcher, scope, access_log_prefix,
+                         service_method) {}
 
   int numInits() const { return num_inits_; }
 
@@ -125,10 +115,13 @@ public:
   void initLogger(std::chrono::milliseconds buffer_flush_interval_msec, size_t buffer_size_bytes) {
     timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
+    config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
+    config_.mutable_buffer_flush_interval()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(buffer_flush_interval_msec).count());
+
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, config_, buffer_flush_interval_msec,
-        buffer_size_bytes, dispatcher_, stats_store_, "mock_access_log_prefix.",
-        mockMethodDescriptor());
+        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, stats_store_,
+        "mock_access_log_prefix.", mockMethodDescriptor());
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
@@ -354,11 +347,10 @@ private:
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                const Grpc::RawAsyncClientSharedPtr& client,
-               std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher) override {
-    return std::make_shared<MockGrpcAccessLoggerImpl>(
-        std::move(client), config, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
-        scope_, "mock_access_log_prefix.", mockMethodDescriptor());
+    return std::make_shared<MockGrpcAccessLoggerImpl>(std::move(client), config, dispatcher, scope_,
+                                                      "mock_access_log_prefix.",
+                                                      mockMethodDescriptor());
   }
 };
 

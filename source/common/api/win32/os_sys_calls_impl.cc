@@ -403,6 +403,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 
   if (!SOCKET_FAILURE(rc)) {
     tcp_info->tcpi_rtt = std::chrono::microseconds(win_tcpinfo.RttUs);
+    tcp_info->tcpi_snd_cwnd = win_tcpinfo.Cwnd;
   }
   return {!SOCKET_FAILURE(rc), !SOCKET_FAILURE(rc) ? 0 : ::WSAGetLastError()};
 #endif

@@ -290,6 +290,10 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
   if (!SOCKET_FAILURE(result)) {
     tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
+
+    const uint64_t mss = (unix_tcp_info.tcpi_snd_mss > 0) ? unix_tcp_info.tcpi_snd_mss : 1460;
+    // Convert packets to bytes.
+    tcp_info->tcpi_snd_cwnd = unix_tcp_info.tcpi_snd_cwnd * mss;
   }
   return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
 #endif

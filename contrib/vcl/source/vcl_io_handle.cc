@@ -765,6 +765,8 @@ IoHandlePtr VclIoHandle::duplicate() {
 
 absl::optional<std::chrono::milliseconds> VclIoHandle::lastRoundTripTime() { return {}; }
 
+absl::optional<uint64_t> VclIoHandle::congestionWindowInBytes() const { return {}; }
+
 } // namespace Vcl
 } // namespace Network
 } // namespace Extensions

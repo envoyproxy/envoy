@@ -60,6 +60,7 @@ processing, which makes them suitable for RBAC policies.
    request.time, timestamp, Time of the first byte received
    request.id, string, Request ID corresponding to ``x-request-id`` header value
    request.protocol, string, "Request protocol ('"HTTP/1.0'", '"HTTP/1.1'", '"HTTP/2'", or '"HTTP/3'")"
+   request.query, string, The query portion of the URL in the format of "name1=value1&name2=value2".
 
 Header values in ``request.headers`` associative array are comma-concatenated in case of multiple values.
 

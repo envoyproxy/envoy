@@ -88,6 +88,7 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override { return absl::nullopt; }
   absl::optional<std::string> interfaceName() override { return absl::nullopt; }
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
@@ -181,6 +182,17 @@ class IoHandleFactory {
 public:
   static std::pair<IoHandleImplPtr, IoHandleImplPtr> createIoHandlePair() {
     auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(), new IoHandleImpl()};
+    p.first->setPeerHandle(p.second.get());
+    p.second->setPeerHandle(p.first.get());
+    return p;
+  }
+  static std::pair<IoHandleImplPtr, IoHandleImplPtr>
+  createBufferLimitedIoHandlePair(uint32_t buffer_size) {
+    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(), new IoHandleImpl()};
+    // This buffer watermark setting emulates the OS socket buffer parameter
+    // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
+    p.first->setWatermarks(buffer_size);
+    p.second->setWatermarks(buffer_size);
     p.first->setPeerHandle(p.second.get());
     p.second->setPeerHandle(p.first.get());
     return p;

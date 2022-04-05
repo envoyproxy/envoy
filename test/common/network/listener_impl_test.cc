@@ -124,13 +124,12 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   // Required to manipulate runtime values when there is no test server.
   TestScopedRuntime scoped_runtime;
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"overload.global_downstream_max_connections", "2"}});
+  scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", "2"}});
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, *Runtime::LoaderSingleton::getExisting(), true, false);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, scoped_runtime.loader(), true, false);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -161,8 +160,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   EXPECT_EQ(2, server_connections.size());
 
   // Let's increase the allowed connections and try sending more connections.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"overload.global_downstream_max_connections", "3"}});
+  scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", "3"}});
   initiate_connections(5);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(4);
@@ -171,8 +169,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   EXPECT_EQ(3, server_connections.size());
 
   // Clear the limit and verify there's no longer a limit.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"overload.global_downstream_max_connections", ""}});
+  scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", ""}});
   initiate_connections(10);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -185,21 +182,19 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
     conn->close(ConnectionCloseType::NoFlush);
   }
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"overload.global_downstream_max_connections", ""}});
+  scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", ""}});
 }
 
 TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   // Required to manipulate runtime values when there is no test server.
   TestScopedRuntime scoped_runtime;
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"overload.global_downstream_max_connections", "1"}});
+  scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", "1"}});
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, *Runtime::LoaderSingleton::getExisting(), true, true);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, scoped_runtime.loader(), true, true);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;

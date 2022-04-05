@@ -167,6 +167,11 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() {
   return *config_.clusterManager();
 }
 
+const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
+
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
@@ -467,12 +472,6 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
-
-  assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
-      [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
-  envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
-      [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
-
   InstanceImpl::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
@@ -619,10 +618,21 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      component_factory.createRuntime(*this, initial_config));
+  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
+  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.no_runtime_singleton", false)) {
+    runtime_ = std::move(runtime_ptr);
+  } else {
+    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
+  }
   initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
+
+  if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
+    assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
+        [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
+    envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
+        [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+  }
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
@@ -648,10 +658,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
-      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_, quic_stat_names_);
+      *admin_, runtime(), stats_store_, thread_local_, dns_resolver_, *ssl_context_manager_,
+      *dispatcher_, *local_info_, *secret_manager_, messageValidationContext(), *api_,
+      http_context_, grpc_context_, router_context_, access_log_manager_, *singleton_manager_,
+      options_, quic_stat_names_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -675,7 +685,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
-  Runtime::LoaderSingleton::get().initialize(clusterManager());
+  runtime().initialize(clusterManager());
 
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
@@ -706,7 +716,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
   // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+  runtime().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {
@@ -730,8 +740,8 @@ void InstanceImpl::onRuntimeReady() {
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
               ->createUncachedRawAsyncClient(),
-          *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
-          info_factory_, access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *dispatcher_, runtime(), stats_store_, *ssl_context_manager_, info_factory_,
+          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
     }
@@ -931,7 +941,12 @@ void InstanceImpl::terminate() {
   FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
-Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
+Runtime::Loader& InstanceImpl::runtime() {
+  if (runtime_singleton_) {
+    return runtime_singleton_->instance();
+  }
+  return *runtime_;
+}
 
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");

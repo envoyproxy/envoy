@@ -3,8 +3,10 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -40,7 +42,7 @@ enum ApiVersion {
 
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ApiConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ApiConfigSource";
 
@@ -108,6 +110,16 @@ message ApiConfigSource {
 
   // Skip the node identifier in subsequent discovery requests for streaming gRPC config types.
   bool set_node_on_first_message_only = 7;
+
+  // A list of config validators that will be executed when a new update is
+  // received from the ApiConfigSource. Note that each validator handles a
+  // specific xDS service type, and only the validators corresponding to the
+  // type url (in `:ref: DiscoveryResponse` or `:ref: DeltaDiscoveryResponse`)
+  // will be invoked.
+  // If the validator returns false or throws an exception, the config will be rejected by
+  // the client, and a NACK will be sent.
+  // [#extension-category: envoy.config.validators]
+  repeated TypedExtensionConfig config_validators = 9;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
@@ -239,4 +251,33 @@ message ConfigSource {
   // will request for resources and the resource type that the client will in
   // turn expect to be delivered.
   ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Configuration source specifier for a late-bound extension configuration. The
+// parent resource is warmed until all the initial extension configurations are
+// received, unless the flag to apply the default configuration is set.
+// Subsequent extension updates are atomic on a per-worker basis. Once an
+// extension configuration is applied to a request or a connection, it remains
+// constant for the duration of processing. If the initial delivery of the
+// extension configuration fails, due to a timeout for example, the optional
+// default configuration is applied. Without a default configuration, the
+// extension is disabled, until an extension configuration is received. The
+// behavior of a disabled extension depends on the context. For example, a
+// filter chain with a disabled extension filter rejects all incoming streams.
+message ExtensionConfigSource {
+  ConfigSource config_source = 1 [(validate.rules).any = {required: true}];
+
+  // Optional default configuration to use as the initial configuration if
+  // there is a failure to receive the initial extension configuration or if
+  // `apply_default_config_without_warming` flag is set.
+  google.protobuf.Any default_config = 2;
+
+  // Use the default config as the initial configuration without warming and
+  // waiting for the first discovery response. Requires the default configuration
+  // to be supplied.
+  bool apply_default_config_without_warming = 3;
+
+  // A set of permitted extension type URLs. Extension configuration updates are rejected
+  // if they do not match any type URL in the set.
+  repeated string type_urls = 4 [(validate.rules).repeated = {min_items: 1}];
 }

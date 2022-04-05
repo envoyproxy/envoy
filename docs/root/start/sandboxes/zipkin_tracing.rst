@@ -33,7 +33,7 @@ One of the most important benefits of tracing from Envoy is that it will take ca
 propagating the traces to the Zipkin service cluster. However, in order to fully take advantage
 of tracing, the application has to propagate trace headers that Envoy generates, while making
 calls to other services. In the sandbox we have provided, the simple flask app
-(see trace function in :download:`service.py <_include/front-proxy/service.py>`) acting as service1 propagates
+(see trace function in :download:`examples/shared/tracing/service.py <_include/shared/tracing/service.py>`) acting as service1 propagates
 the trace headers while making an outbound call to service2.
 
 Step 3: Build the sandbox

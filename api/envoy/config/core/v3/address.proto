@@ -31,9 +31,9 @@ message Pipe {
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
-// [#not-implemented-hide:] The address represents an envoy internal listener.
-// TODO(lambdai): Make this address available for listener and endpoint.
-// TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.
+// The address represents an envoy internal listener.
+// [#comment: TODO(lambdai): Make this address available for listener and endpoint.
+// TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
 message EnvoyInternalAddress {
   oneof address_name_specifier {
     option (validate.required) = true;

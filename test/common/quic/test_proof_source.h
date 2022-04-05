@@ -15,7 +15,7 @@ namespace Quic {
 // QUICHE and a fake signature.
 class TestProofSource : public EnvoyQuicProofSourceBase {
 public:
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
                const quic::QuicSocketAddress& /*client_address*/, const std::string& /*hostname*/,
                bool* cert_matched_sni) override {
@@ -36,7 +36,7 @@ protected:
   }
 
 private:
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{
       new quic::ProofSource::Chain(
           std::vector<std::string>{std::string(quic::test::kTestCertificate)})};
 

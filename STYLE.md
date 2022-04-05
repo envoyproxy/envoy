@@ -90,7 +90,7 @@
   NiceMock for mocks whose behavior is not the focus of a test.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
-  such as `GUARDED_BY`, should be used for shared state guarded by
+  such as `ABSL_GUARDED_BY`, should be used for shared state guarded by
   locks/mutexes.
 * Functions intended to be local to a cc file should be declared in an anonymous namespace,
   rather than using the 'static' keyword. Note that the

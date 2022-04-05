@@ -2,9 +2,10 @@
 # 2. Fix the include path for //external:zlib.
 # 3. Add support for --define=no_debug_info=1.
 # 4. Disable pointer compression (https://crbug.com/v8/12592).
+# 5. Add M1 CPU support https://chromium-review.googlesource.com/c/v8/v8/+/3502848
 
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 1cc0121e60..dedc78fbb0 100644
+index 13f2a5bebf..2197568c48 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
@@ -16,7 +17,7 @@ index 1cc0121e60..dedc78fbb0 100644
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
-@@ -161,7 +161,7 @@ v8_int(
+@@ -157,7 +157,7 @@ v8_int(
  # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
  v8_string(
      name = "v8_enable_pointer_compression",
@@ -26,7 +27,7 @@ index 1cc0121e60..dedc78fbb0 100644
  
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index 0e9559a65f..fa0c460c48 100644
+index dee5e69cc4..d0b5a3c49a 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
 @@ -151,6 +151,11 @@ def _default_args():
@@ -41,6 +42,14 @@ index 0e9559a65f..fa0c460c48 100644
          }),
          includes = ["include"],
          linkopts = select({
+@@ -383,6 +388,7 @@ def _v8_target_cpu_transition_impl(settings, attr):
+         "k8": "x64",
+         "x86_64": "x64",
+         "darwin": "x64",
++        "darwin_arm64": "arm64",
+         "darwin_x86_64": "x64",
+         "x64_windows": "x64",
+         "x86": "ia32",
 diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
 index 6db6698d7e..b56d31085f 100644
 --- a/src/snapshot/snapshot-utils.cc

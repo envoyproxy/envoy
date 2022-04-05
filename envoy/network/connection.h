@@ -30,6 +30,7 @@ enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
   Connected,
+  ConnectedZeroRtt,
 };
 
 /**
@@ -194,6 +195,7 @@ public:
   /**
    * @return the connection info provider backing this connection.
    */
+  virtual ConnectionInfoSetter& connectionInfoSetter() PURE;
   virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
   virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
@@ -341,6 +343,14 @@ public:
    */
   virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                                 std::chrono::microseconds rtt) PURE;
+
+  /**
+   * @return the current congestion window in bytes, or unset if not available or not
+   * congestion-controlled.
+   * @note some congestion controller's cwnd is measured in number of packets, in that case the
+   * return value is cwnd(in packets) times the connection's MSS.
+   */
+  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

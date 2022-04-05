@@ -1,5 +1,5 @@
-load("@proxy_wasm_cpp_sdk//bazel/wasm:wasm.bzl", "proxy_wasm_cc_binary")
-load("@rules_rust//rust:rust.bzl", "rust_binary")
+load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
 load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
 
 def _wasm_rust_transition_impl(settings, attr):

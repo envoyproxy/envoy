@@ -200,17 +200,10 @@ public:
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
-  Server::Instance& server() { return server_; }
 
   GenHandlerCb createHandlerFunction() {
     return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> HandlerPtr {
       return findHandler(path_and_query, admin_stream);
-    };
-  }
-  AdminFilter::AdminServerCallbackFunction createCallbackFunction() {
-    return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-                  Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
-      return runCallback(path_and_query, response_headers, response, filter);
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
@@ -227,6 +220,8 @@ public:
   static HandlerPtr makeStaticTextHandler(absl::string_view response_text, Http::Code code);
 
 private:
+  friend class AdminTestingPeer;
+
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
@@ -295,8 +290,8 @@ private:
    * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
    */
   struct NullOverloadManager : public OverloadManager {
-    struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
-      NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    struct OverloadState : public ThreadLocalOverloadState {
+      OverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
       bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
       bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
@@ -310,12 +305,12 @@ private:
 
     void start() override {
       tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<NullThreadLocalOverloadState>(dispatcher);
+        return std::make_shared<OverloadState>(dispatcher);
       });
     }
 
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
-      return tls_->getTyped<NullThreadLocalOverloadState>();
+      return tls_->getTyped<OverloadState>();
     }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }

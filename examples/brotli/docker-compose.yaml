@@ -1,15 +1,24 @@
 version: "3.7"
 services:
+
+  flask_service:
+    build:
+      context: ../shared/flask
+    image: flask_service:python-3.10-slim-bullseye
+    restart: "no"
+
   envoy-stats:
     build:
       context: .
       dockerfile: Dockerfile-brotli
     ports:
-      - "9901:9901"
-      - "9902:9902"
-      - "10000:10000"
+    - "9901:9901"
+    - "9902:9902"
+    - "10000:10000"
 
   service:
     build:
       context: .
       dockerfile: Dockerfile-service
+    volumes:
+    - ./service.py:/code/service.py

@@ -387,6 +387,7 @@ public:
     resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
                                                (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
   }
+  bool isCaresDefaultTheOnlyNameserver() { return resolver_->isCaresDefaultTheOnlyNameserver(); }
 
 private:
   DnsResolverImpl* resolver_;
@@ -450,7 +451,26 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
   auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
 
-  // convert the address and options into typed_dns_resolver_config
+  // First, create a resolver with no fallback. Check to see if cares default is
+  // the only nameserver.
+  bool only_has_default = false;
+  {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+    Network::DnsResolverFactory& dns_resolver_factory =
+        createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    auto resolver =
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+    auto peer =
+        std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+    only_has_default = peer->isCaresDefaultTheOnlyNameserver();
+  }
+
+  // Now create a resolver with a failover resolver.
   envoy::config::core::v3::Address dns_resolvers;
   Network::Utility::addressToProtobufAddress(
       Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
@@ -458,10 +478,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.set_use_resolvers_as_fallback(true);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-
   // copy over dns_resolver_options_
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
-
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
@@ -470,14 +488,19 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   auto resolver =
       dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
 
-  // Given that the local machine will have a working conf in resolve.conf the resolver will not
-  // use the fallback given.
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
   EXPECT_EQ(resolvers->family, AF_INET);
-  EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  if (only_has_default) {
+    // If cares default was the only resolver, the fallbacks will be used.
+    EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  } else {
+    // In the common case, where cares default was not the only resolver, the fallback will not be
+    // used.
+    EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  }
   ares_free_data(resolvers);
 }
 
@@ -574,6 +597,8 @@ public:
   }
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
+  absl::string_view addressType() const override { PANIC("not implemented"); }
+
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {
     return SocketInterfaceSingleton::get();
@@ -767,9 +792,7 @@ public:
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
                                                     std::list<DnsResponse>&& results) -> void {
-                                if (!expected_to_execute) {
-                                  FAIL();
-                                }
+                                EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
                               });
@@ -791,7 +814,9 @@ public:
                            const DnsLookupFamily lookup_family,
                            const std::list<std::string>& expected_addresses,
                            const DnsResolver::ResolutionStatus resolution_status =
-                               DnsResolver::ResolutionStatus::Success) {
+                               DnsResolver::ResolutionStatus::Success,
+                           const bool getifaddrs_supported = true,
+                           const bool getiffaddrs_success = true) {
     server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
     server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
@@ -799,15 +824,24 @@ public:
     Api::MockOsSysCalls os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-    EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(true));
-    EXPECT_CALL(os_sys_calls, getifaddrs(_))
-        .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
-          for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-            auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
-            vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
-          }
-          return {0, 0};
-        }));
+    EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(getifaddrs_supported));
+    if (getifaddrs_supported) {
+      if (getiffaddrs_success) {
+        EXPECT_CALL(os_sys_calls, getifaddrs(_))
+            .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+              for (uint32_t i = 0; i < ifaddrs.size(); i++) {
+                auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+                vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
+              }
+              return {0, 0};
+            }));
+      } else {
+        EXPECT_CALL(os_sys_calls, getifaddrs(_))
+            .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
+              return {-1, 1};
+            }));
+      }
+    }
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server
     EXPECT_CALL(os_sys_calls, accept(_, _, _))
@@ -868,6 +902,21 @@ TEST_P(DnsImplTest, DestructPending) {
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
   EXPECT_GT(peer_->events().size(), 0U);
+}
+
+// Validate that All queries (2 concurrent queries) properly cleanup when the channel is destroyed.
+// TODO(mattklein123): This is a brute force way of testing this path, however we have seen
+// evidence that this happens during normal operation via the "channel dirty" path. The sequence
+// must look something like:
+// 1) Issue All query with 2 parallel sub-queries.
+// 2) Issue parallel query which fails with ARES_ECONNREFUSED, mark channel dirty.
+// 3) Issue 3rd query which sees a dirty channel and destroys it, causing the parallel queries
+//    issued in step 1 to fail. It's not clear whether this is possible over a TCP channel or
+//    just via UDP.
+// Either way, we have no tests today that cover parallel queries. We can do this is a follow up.
+TEST_P(DnsImplTest, DestructPendingAllQuery) {
+  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::All, true);
+  ASSERT_NE(nullptr, query);
 }
 
 TEST_P(DnsImplTest, DestructCallback) {
@@ -1317,6 +1366,17 @@ TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterAllV6) {
   testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7"});
 }
 
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfGetiffaddrsIsNotSupported) {
+  testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
+                      DnsResolver::ResolutionStatus::Success, false /* getifaddrs_supported */);
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfThereIsAGetiffaddrsFailure) {
+  testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
+                      DnsResolver::ResolutionStatus::Success, true /* getifaddrs_supported */,
+                      false /* getifaddrs_success */);
+}
+
 class DnsImplFilterUnroutableFamiliesDontFilterTest : public DnsImplTest {
 protected:
   bool filterUnroutableFamilies() const override { return false; }
@@ -1359,12 +1419,12 @@ TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAll) {
                       DnsLookupFamily::All, {"201.134.56.7", "1::2"});
 }
 
-TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterAllV4) {
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV4) {
   testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"}, DnsLookupFamily::All,
                       {"201.134.56.7", "1::2"});
 }
 
-TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterAllV6) {
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV6) {
   testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7", "1::2"});
 }
 

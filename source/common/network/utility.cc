@@ -137,6 +137,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
@@ -421,7 +422,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (absl::StrContains(s, '-')) {
       char dash = 0;
       ss >> min;
       ss >> dash;

@@ -506,7 +506,7 @@ public:
   virtual bool traceSampled() const PURE;
 };
 
-using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
 
 /**
  * All virtual cluster stats. @see stats_macro.h
@@ -727,6 +727,7 @@ enum class PathMatchType {
   Prefix,
   Exact,
   Regex,
+  PathSeparatedPrefix,
 };
 
 /**

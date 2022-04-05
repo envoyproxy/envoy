@@ -246,6 +246,7 @@ public:
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
+  const Upstream::ClusterManager& clusterManager() const override;
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -357,6 +358,7 @@ private:
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
