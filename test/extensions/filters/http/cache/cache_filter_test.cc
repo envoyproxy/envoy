@@ -54,6 +54,8 @@ MATCHER_P(doesNotHaveHeaders, matcher, "") {
   return true;
 }
 
+// Unit test fixture for CacheFilter. Uses a mock cache to allow for explicitly
+// sequencing cache callbacks for e.g. testing flow control.
 class CacheFilterTest : public ::testing::Test {
 protected:
   void SetUp() override {
