@@ -4,17 +4,17 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_mem_slice_impl.h"
-
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
 
+#include "quiche_platform_impl/quiche_mem_slice_impl.h"
+
 namespace quiche {
 
-QuicheMemSliceImpl::QuicheMemSliceImpl(quic::QuicBuffer buffer) {
+QuicheMemSliceImpl::QuicheMemSliceImpl(quiche::QuicheBuffer buffer) {
   size_t length = buffer.size();
-  quic::QuicUniqueBufferPtr buffer_ptr = buffer.Release();
+  quiche::QuicheUniqueBufferPtr buffer_ptr = buffer.Release();
   fragment_ = std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
       buffer_ptr.get(), length,
       // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
@@ -22,7 +22,7 @@ QuicheMemSliceImpl::QuicheMemSliceImpl(quic::QuicBuffer buffer) {
       // here and below to unify and simplify the constructor implementations.
       [allocator = buffer_ptr.get_deleter().allocator()](const void* p, size_t,
                                                          const Envoy::Buffer::BufferFragmentImpl*) {
-        quic::QuicBufferDeleter deleter(allocator);
+        quiche::QuicheBufferDeleter deleter(allocator);
         deleter(const_cast<char*>(static_cast<const char*>(p)));
       });
   buffer_ptr.release();

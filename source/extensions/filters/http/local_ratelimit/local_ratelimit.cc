@@ -114,6 +114,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Store descriptors which is used to generate x-ratelimit-* headers in encoding response headers.
   stored_descriptors_ = descriptors;
 
+  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
+    for (const auto& request_descriptor : descriptors) {
+      for (const Envoy::RateLimit::DescriptorEntry& entry : request_descriptor.entries_) {
+        ENVOY_LOG(debug, "populate descriptors: key={} value={}", entry.key_, entry.value_);
+      }
+    }
+  }
+
   if (requestAllowed(descriptors)) {
     config->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;

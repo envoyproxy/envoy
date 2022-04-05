@@ -72,7 +72,8 @@ public:
    * @param expected_route_json tool config json file.
    * @return bool if all routes match what is expected.
    */
-  bool compareEntries(const std::string& expected_routes);
+  std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
+  compareEntries(const std::string& expected_routes);
 
   /**
    * Set whether to print out match case details.
@@ -116,35 +117,38 @@ private:
    */
   void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry);
 
-  bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
-                      const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
+                      const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                      envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareVirtualCluster(ToolConfig& tool_config,
-                             const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
+                             const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                             envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareVirtualHost(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                          envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRewriteHost(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRewritePath(ToolConfig& tool_config, const std::string& expected);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                          envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRewritePath(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                          envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRedirectPath(ToolConfig& tool_config,
-                           const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRedirectCode(ToolConfig& tool_config, uint32_t expected);
+                           const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                           envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRedirectCode(ToolConfig& tool_config,
-                           const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+                           const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                           envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRequestHeaderFields(ToolConfig& tool_config,
-                                  const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+                                  const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                                  envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareResponseHeaderFields(ToolConfig& tool_config,
-                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                                   envoy::RouterCheckToolSchema::ValidationFailure& failure);
   template <typename HeaderMap>
   bool matchHeaderField(const HeaderMap& header_map,
                         const envoy::config::route::v3::HeaderMatcher& header,
-                        const std::string test_type);
+                        const std::string test_type,
+                        envoy::RouterCheckToolSchema::HeaderMatchFailure& header_match_failure);
 
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
@@ -228,6 +232,11 @@ public:
    */
   bool disableDeprecationCheck() const { return disable_deprecation_check_; }
 
+  /**
+   * @return the path to save tests results.
+   */
+  const std::string& outputPath() const { return output_path_; }
+
 private:
   std::string test_path_;
   std::string config_path_;
@@ -236,5 +245,6 @@ private:
   bool is_detailed_;
   bool only_show_failures_;
   bool disable_deprecation_check_;
+  std::string output_path_;
 };
 } // namespace Envoy

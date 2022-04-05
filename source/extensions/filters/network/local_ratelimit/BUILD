@@ -21,6 +21,7 @@ envoy_cc_library(
         "//envoy/event:timer_interface",
         "//envoy/network:filter_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/singleton:manager_interface",
         "//envoy/stats:stats_macros",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",

@@ -19,9 +19,17 @@ namespace {
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   envoy::config::bootstrap::v3::Bootstrap sanitizedInput(input);
-  // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
-  // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
-  for (auto& cluster : *sanitizedInput.mutable_static_resources()->mutable_clusters()) {
+  for (::envoy::config::cluster::v3::Cluster& cluster :
+       *sanitizedInput.mutable_static_resources()->mutable_clusters()) {
+    if (cluster.load_assignment().endpoints_size() > 10) {
+      ENVOY_LOG_MISC(debug,
+                     "Rejecting input with more the 10 endpoints to keep runtime acceptable. "
+                     "Current #endpoints: {}",
+                     cluster.load_assignment().endpoints_size());
+      return;
+    }
+    // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
+    // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
     for (auto& health_check : *cluster.mutable_health_checks()) {
       if (health_check.http_health_check().codec_client_type() ==
           envoy::type::v3::CodecClientType::HTTP3) {

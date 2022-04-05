@@ -202,6 +202,16 @@ const std::string& ConnectionInfoImplBase::alpn() const {
   return alpn_;
 }
 
+const std::string& ConnectionInfoImplBase::sni() const {
+  if (sni_.empty()) {
+    const char* proto = SSL_get_servername(ssl(), TLSEXT_NAMETYPE_host_name);
+    if (proto != nullptr) {
+      sni_ = std::string(proto);
+    }
+  }
+  return sni_;
+}
+
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   if (!cached_serial_number_peer_certificate_.empty()) {
     return cached_serial_number_peer_certificate_;

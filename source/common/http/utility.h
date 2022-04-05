@@ -630,6 +630,11 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
  */
 bool isSafeRequest(Http::RequestHeaderMap& request_headers);
 
+/**
+ * Return the GatewayTimeout HTTP code to indicate the request is full received.
+ */
+Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

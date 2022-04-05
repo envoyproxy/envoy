@@ -33,13 +33,13 @@ MAINTAINERS = {
     'phlax': 'U017PLM0GNQ',
     'jmarantz': 'U80HPLBPG',
     'antoniovicente': 'UKVNCQ212',
-    'junr03': 'U79K0Q431',
     'wrowe': 'UBQR8NGBS',
     'yanavlasov': 'UJHLR5KFS',
     'rojkov': 'UH5EXLYQK',
     'RyanTheOptimist': 'U01SW3JC8GP',
     'adisuissa': 'UT17EMMTP',
     'KBaichoo': 'U016ZPU8KBK',
+    'wbpcode': 'U017KF5C0Q6',
 }
 
 # First pass reviewers who are not maintainers should get
@@ -49,7 +49,6 @@ FIRST_PASS = {
     'dmitri-d': 'UB1883Q5S',
     'tonya11en': 'U989BG2CW',
     'esmet': 'U01BCGBUUAE',
-    'wbpcode': 'U017KF5C0Q6',
     'mathetake': 'UG9TD2FSB',
 }
 

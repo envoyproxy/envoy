@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {

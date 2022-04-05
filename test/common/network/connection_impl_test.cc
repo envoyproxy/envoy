@@ -334,9 +334,14 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   EXPECT_TRUE(client_connection_->connecting());
 
   StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
-  // Make sure removed connections don't get events.
+  // Make sure removed callbacks don't get events.
   client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
   client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
+
+  // Make sure later callbacks don't receive a connected event if an earlier callback closed
+  // the connection during its callback.
+  StrictMock<MockConnectionCallbacks> later_callbacks;
+  client_connection_->addConnectionCallbacks(later_callbacks);
 
   std::shared_ptr<MockReadFilter> add_and_remove_filter =
       std::make_shared<StrictMock<MockReadFilter>>();
@@ -346,6 +351,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
         client_connection_->close(ConnectionCloseType::NoFlush);
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(later_callbacks, onEvent(ConnectionEvent::LocalClose));
 
   read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
@@ -3033,6 +3039,9 @@ protected:
   StrictMock<MockConnectionCallbacks> client_callbacks_;
 };
 
+// The internal address is passed to Envoy by EDS. If this Envoy instance is configured as internal
+// address disabled, the EDS subscription should reject the config before dispatcher attempt to
+// establish connection to such address.
 TEST_F(InternalClientConnectionImplTest,
        CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
   auto runtime = std::make_unique<TestScopedRuntime>();
@@ -3042,14 +3051,14 @@ TEST_F(InternalClientConnectionImplTest,
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
-  // Not implemented yet.
+
   ASSERT_DEATH(
       {
         ClientConnectionPtr connection =
             dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
       },
-      "panic: not implemented");
+      "");
 }
 
 class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTest {

@@ -4,18 +4,26 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 
+#include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+using TestCertificateValidationContextConfigPtr =
+    std::unique_ptr<TestCertificateValidationContextConfig>;
+using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
+using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
+using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameDNSMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
@@ -185,6 +193,120 @@ TEST(DefaultCertValidatorTest, NoSanInCert) {
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, WithVerifyDepth) {
+
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/test_long_cert_chain.pem"));
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/test_random_cert.pem"));
+  bssl::UniquePtr<X509> ca_cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+
+  // Create the default validator object.
+  // Config includes ca_cert and the verify-depth.
+  // Set verify depth < 3, so verification fails. ( There are 3 intermediate certs )
+
+  std::string ca_cert_str(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+  TestCertificateValidationContextConfigPtr test_config =
+      std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false, san_matchers,
+                                                               ca_cert_str, 2);
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          test_config.get(), stats, Event::GlobalTimeSystem().timeSystem());
+
+  STACK_OF(X509)* intermediates = cert_chain.get();
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+
+  X509_STORE* storep = SSL_CTX_get_cert_store(ssl_ctx.get());
+  X509_STORE_add_cert(storep, ca_cert.get());
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
+
+  default_validator->addClientValidationContext(ssl_ctx.get(), false);
+  X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
+                         SSL_CTX_get0_param(ssl_ctx.get()));
+
+  EXPECT_EQ(X509_verify_cert(store_ctx.get()), 0);
+
+  // Now, create config with no depth configuration, verification should pass.
+  test_config = std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false,
+                                                                         san_matchers, ca_cert_str);
+  default_validator = std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+      test_config.get(), stats, Event::GlobalTimeSystem().timeSystem());
+
+  // Re-initialize context
+  ssl_ctx = SSL_CTX_new(TLS_method());
+  store_ctx = X509_STORE_CTX_new();
+  storep = SSL_CTX_get_cert_store(ssl_ctx.get());
+  X509_STORE_add_cert(storep, ca_cert.get());
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
+
+  default_validator->addClientValidationContext(ssl_ctx.get(), false);
+  X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
+                         SSL_CTX_get0_param(ssl_ctx.get()));
+
+  EXPECT_EQ(X509_verify_cert(store_ctx.get()), 1);
+  EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_OK);
+}
+
+class MockCertificateValidationContextConfig : public Ssl::CertificateValidationContextConfig {
+public:
+  MockCertificateValidationContextConfig() {
+    auto matcher = envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher();
+    matcher.set_san_type(
+        static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType>(
+            123));
+    matchers_.emplace_back(matcher);
+  };
+  const std::string& caCert() const override { return s_; }
+  const std::string& caCertPath() const override { return s_; }
+  const std::string& certificateRevocationList() const override { return s_; }
+  const std::string& certificateRevocationListPath() const override { return s_; }
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return matchers_;
+  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return strs_; }
+  bool allowExpiredCertificate() const override { return false; }
+  MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                  TrustChainVerification,
+              trustChainVerification, (), (const override));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+              customValidatorConfig, (), (const override));
+  MOCK_METHOD(Api::Api&, api, (), (const override));
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
+  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+
+private:
+  std::string s_;
+  std::vector<std::string> strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers_;
+};
+
+TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
+  auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>();
+  EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
+      .WillRepeatedly(testing::Return(envoy::extensions::transport_sockets::tls::v3::
+                                          CertificateValidationContext::ACCEPT_UNTRUSTED));
+  auto matchers =
+      std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
+  Stats::TestUtil::TestStore store;
+  auto ssl_stats = generateSslStats(store);
+  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
+                                                          Event::GlobalTimeSystem().timeSystem());
+  auto ctx = std::vector<SSL_CTX*>();
+  EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
+                          "Failed to create string SAN matcher of type.*");
 }
 
 } // namespace Tls

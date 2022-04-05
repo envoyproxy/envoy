@@ -1,6 +1,12 @@
 version: "3.7"
 services:
 
+  flask_service:
+    build:
+      context: ../shared/flask
+    image: flask_service:python-3.10-slim-bullseye
+    restart: "no"
+
   proxy-frontend:
     build:
       context: .
@@ -17,6 +23,8 @@ services:
     networks:
       edge:
       postgres-frontend:
+    volumes:
+    - ./service.py:/code/service.py
 
   proxy-postgres-frontend:
     build:

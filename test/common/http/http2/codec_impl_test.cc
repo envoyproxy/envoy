@@ -136,12 +136,11 @@ public:
   }
 
   virtual void initialize() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.http2_new_codec_wrapper",
-          enable_new_codec_wrapper_ ? "true" : "false"}});
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{std::string(Runtime::defer_processing_backedup_streams),
-          defer_processing_backedup_streams_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper",
+                                  enable_new_codec_wrapper_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
+                                  defer_processing_backedup_streams_ ? "true" : "false"}});
+
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
@@ -163,6 +162,9 @@ public:
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
           return request_decoder_;
         }));
+
+    ON_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty())
+        .WillByDefault(Return(true));
   }
 
   void setupDefaultConnectionMocks() {
@@ -378,7 +380,8 @@ protected:
     initialize();
 
     TestRequestHeaderMapImpl request_headers;
-    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    request_headers.setMethod("POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
     driveToCompletion();
@@ -433,7 +436,8 @@ protected:
     initialize();
 
     TestRequestHeaderMapImpl request_headers;
-    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    request_headers.setMethod("POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
     driveToCompletion();
@@ -1332,6 +1336,55 @@ TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithout
                 "    ConnectionImpl::StreamImpl"));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("Dumping corresponding downstream request for upstream stream 1:\n"));
+}
+
+TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcessing) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl first_part(std::string(1024, 'a'));
+  request_encoder_->encodeData(first_part, true);
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  EXPECT_CALL(server_connection_.dispatcher_, pushTrackedObject(_))
+      .WillOnce(Invoke([&](const ScopeTrackedObject* tracked_object) {
+        EXPECT_CALL(server_connection_, dumpState(_, _))
+            .WillOnce(Invoke([&](std::ostream& os, int) {
+              os << "Network Connection info would be dumped...\n";
+            }));
+        tracked_object->dumpState(ostream, 1);
+      }));
+  EXPECT_CALL(request_decoder_, decodeData(_, true));
+
+  process_buffered_data_callback->invokeCallback();
+
+  EXPECT_THAT(ostream.contents(), HasSubstr("Http2::ConnectionImpl "));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("Dumping current stream:\n  stream: \n    ConnectionImpl::StreamImpl"));
+  EXPECT_THAT(ostream.contents(), HasSubstr("Network Connection info would be dumped..."));
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
@@ -3599,12 +3652,10 @@ public:
 
 protected:
   void initialize() override {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.http2_new_codec_wrapper",
-          enable_new_codec_wrapper_ ? "true" : "false"}});
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{std::string(Runtime::defer_processing_backedup_streams),
-          defer_processing_backedup_streams_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper",
+                                  enable_new_codec_wrapper_ ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
+                                  defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
