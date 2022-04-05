@@ -2,16 +2,27 @@
 
 #include "envoy/extensions/transport_sockets/internal/v3/internal_upstream.pb.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/stream_info/filter_state.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/extensions/io_socket/user_space/io_handle.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
-#include "source/extensions/transport_sockets/internal/internal.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Internal {
+
+#define ALL_INTERNAL_UPSTREAM_STATS(COUNTER)                                                       \
+  COUNTER(no_metadata)                                                                             \
+  COUNTER(no_filter_state)                                                                         \
+  COUNTER(filter_state_error)
+
+/**
+ * Struct definition for all internal transport socket stats. @see stats_macros.h
+ */
+struct InternalUpstreamStats {
+  ALL_INTERNAL_UPSTREAM_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 class Config {
 public:
@@ -22,6 +33,8 @@ public:
   extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) const;
   std::unique_ptr<IoSocket::UserSpace::FilterStateObjects>
   extractFilterState(const StreamInfo::FilterStateSharedPtr& filter_state) const;
+  void hashKey(std::vector<uint8_t>& key,
+               const StreamInfo::FilterStateSharedPtr& filter_state) const;
 
 private:
   enum class MetadataKind { Host, Cluster };
@@ -30,24 +43,26 @@ private:
     const MetadataKind kind_;
     const std::string name_;
   };
+  InternalUpstreamStats stats_;
   std::vector<MetadataSource> metadata_sources_;
   std::vector<std::string> filter_state_names_;
 };
-
-using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 class InternalSocketFactory : public PassthroughFactory {
 public:
   InternalSocketFactory(
       Server::Configuration::TransportSocketFactoryContext& context,
-      const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport& config,
+      const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
+          config_proto,
       Network::TransportSocketFactoryPtr&& inner_factory);
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
-  ConfigConstSharedPtr config_;
+  const Config config_;
 };
 
 } // namespace Internal

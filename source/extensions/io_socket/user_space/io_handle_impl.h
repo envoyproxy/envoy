@@ -185,23 +185,9 @@ private:
 class PassthroughStateImpl : public PassthroughState {
 public:
   void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                  std::unique_ptr<FilterStateObjects> filter_state_objects) override {
-    std::cout << "INITIALIZING" << std::endl;
-    metadata_ = std::move(metadata);
-    filter_state_objects_ = std::move(filter_state_objects);
-  }
+                  std::unique_ptr<FilterStateObjects> filter_state_objects) override;
   void mergeInto(envoy::config::core::v3::Metadata& metadata,
-                 StreamInfo::FilterState& filter_state) const override {
-    if (metadata_) {
-      metadata.MergeFrom(*metadata_);
-    }
-    if (filter_state_objects_) {
-      for (const auto& [name, object] : *filter_state_objects_) {
-        filter_state.setData(name, object, StreamInfo::FilterState::StateType::Mutable,
-                             StreamInfo::FilterState::LifeSpan::Connection);
-      }
-    }
-  }
+                 StreamInfo::FilterState& filter_state) const override;
 
 private:
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;

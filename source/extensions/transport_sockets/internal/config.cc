@@ -1,9 +1,10 @@
 #include "source/extensions/transport_sockets/internal/config.h"
 
+#include "envoy/common/hashable.h"
 #include "envoy/extensions/transport_sockets/internal/v3/internal_upstream.pb.validate.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/transport_socket_config.h"
 
+#include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/config/utility.h"
 #include "source/extensions/transport_sockets/internal/internal.h"
 
@@ -46,7 +47,8 @@ public:
 
 Config::Config(const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
                    config_proto,
-               Stats::Scope&) {
+               Stats::Scope& scope)
+    : stats_{ALL_INTERNAL_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, "internal_upstream."))} {
   for (const auto& metadata : config_proto.passthrough_metadata()) {
     MetadataKind kind;
     switch (metadata.kind().kind_case()) {
@@ -78,6 +80,8 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
       if (host->metadata()->filter_metadata().contains(source.name_)) {
         (*metadata->mutable_filter_metadata())[source.name_] =
             host->metadata()->filter_metadata().at(source.name_);
+      } else {
+        stats_.no_metadata_.inc();
       }
       break;
     }
@@ -85,6 +89,8 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
       if (host->cluster().metadata().filter_metadata().contains(source.name_)) {
         (*metadata->mutable_filter_metadata())[source.name_] =
             host->cluster().metadata().filter_metadata().at(source.name_);
+      } else {
+        stats_.no_metadata_.inc();
       }
       break;
     }
@@ -104,20 +110,35 @@ Config::extractFilterState(const StreamInfo::FilterStateSharedPtr& filter_state)
   for (const auto& name : filter_state_names_) {
     try {
       auto object = filter_state->getDataSharedMutableGeneric(name);
+      if (object == nullptr) {
+        stats_.no_filter_state_.inc();
+        continue;
+      }
       filter_state_objects->emplace_back(name, object);
     } catch (const EnvoyException& e) {
+      stats_.filter_state_error_.inc();
     }
   }
   return filter_state_objects;
 }
 
+void Config::hashKey(std::vector<uint8_t>& key,
+                     const StreamInfo::FilterStateSharedPtr& filter_state) const {
+  for (const auto& name : filter_state_names_) {
+    if (auto object = filter_state->getDataReadOnly<Hashable>(name); object != nullptr) {
+      if (auto hash = object->hash(); hash) {
+        pushScalarToByteVector(hash.value(), key);
+      }
+    }
+  }
+}
+
 InternalSocketFactory::InternalSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
-    const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport& config,
+    const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
+        config_proto,
     Network::TransportSocketFactoryPtr&& inner_factory)
-    : PassthroughFactory(std::move(inner_factory)) {
-  config_ = std::make_shared<Config>(config, context.scope());
-}
+    : PassthroughFactory(std::move(inner_factory)), config_(config_proto, context.scope()) {}
 
 Network::TransportSocketPtr InternalSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options) const {
@@ -127,14 +148,23 @@ Network::TransportSocketPtr InternalSocketFactory::createTransportSocket(
   }
   std::unique_ptr<envoy::config::core::v3::Metadata> extracted_metadata;
   if (options && options->host()) {
-    extracted_metadata = config_->extractMetadata(options->host());
+    extracted_metadata = config_.extractMetadata(options->host());
   }
   std::unique_ptr<IoSocket::UserSpace::FilterStateObjects> extracted_filter_state;
   if (options && options->filterState()) {
-    extracted_filter_state = config_->extractFilterState(options->filterState());
+    extracted_filter_state = config_.extractFilterState(options->filterState());
   }
   return std::make_unique<InternalSocket>(std::move(inner_socket), std::move(extracted_metadata),
                                           std::move(extracted_filter_state));
+}
+
+void InternalSocketFactory::hashKey(std::vector<uint8_t>& key,
+                                    Network::TransportSocketOptionsConstSharedPtr options) const {
+  PassthroughFactory::hashKey(key, options);
+  // Filter state should be included in the hash since it is imported per an internal connection.
+  if (options && options->filterState()) {
+    config_.hashKey(key, options->filterState());
+  }
 }
 
 REGISTER_FACTORY(InternalUpstreamConfigFactory,

@@ -14,11 +14,6 @@ envoy_cc_library(
     srcs = ["internal.cc"],
     hdrs = ["internal.h"],
     deps = [
-        "//envoy/network:transport_socket_interface",
-        "//envoy/upstream:host_description_interface",
-        "//envoy/upstream:upstream_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/io_socket/user_space:io_handle_lib",
         "//source/extensions/transport_sockets/common:passthrough_lib",
         "@envoy_api//envoy/extensions/transport_sockets/internal/v3:pkg_cc_proto",
@@ -31,10 +26,14 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":internal",
+        "//envoy/common:hashable_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
+        "//envoy/stats:stats_macros",
+        "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/io_socket/user_space:io_handle_lib",
+        "//source/extensions/transport_sockets/common:passthrough_lib",
         "@envoy_api//envoy/extensions/transport_sockets/internal/v3:pkg_cc_proto",
     ],
 )

@@ -377,6 +377,26 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
   }
   return {0, 0};
 }
+
+void PassthroughStateImpl::initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                                      std::unique_ptr<FilterStateObjects> filter_state_objects) {
+  std::cout << "INITIALIZING" << std::endl;
+  metadata_ = std::move(metadata);
+  filter_state_objects_ = std::move(filter_state_objects);
+}
+void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata,
+                                     StreamInfo::FilterState& filter_state) const {
+  std::cout << "SETTING STATE" << std::endl;
+  if (metadata_) {
+    metadata.MergeFrom(*metadata_);
+  }
+  if (filter_state_objects_) {
+    for (const auto& [name, object] : *filter_state_objects_) {
+      filter_state.setData(name, object, StreamInfo::FilterState::StateType::Mutable,
+                           StreamInfo::FilterState::LifeSpan::Connection);
+    }
+  }
+}
 } // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions

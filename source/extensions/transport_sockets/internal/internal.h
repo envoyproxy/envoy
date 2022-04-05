@@ -1,12 +1,6 @@
 #pragma once
 
-#include "envoy/event/timer.h"
 #include "envoy/extensions/transport_sockets/internal/v3/internal_upstream.pb.h"
-#include "envoy/network/connection.h"
-#include "envoy/network/filter.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/host_description.h"
 
 #include "source/extensions/io_socket/user_space/io_handle.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"

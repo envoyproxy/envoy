@@ -1,13 +1,5 @@
 #include "source/extensions/transport_sockets/internal/internal.h"
 
-#include "envoy/buffer/buffer.h"
-#include "envoy/network/connection.h"
-#include "envoy/upstream/upstream.h"
-
-#include "source/common/common/assert.h"
-#include "source/common/protobuf/utility.h"
-#include "source/extensions/io_socket/user_space/io_handle.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
