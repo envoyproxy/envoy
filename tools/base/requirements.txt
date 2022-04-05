@@ -540,9 +540,9 @@ multidict==5.1.0 \
     # via
     #   aiohttp
     #   yarl
-nest-asyncio==1.5.4 \
-    --hash=sha256:3fdd0d6061a2bb16f21fe8a9c6a7945be83521d81a0d15cff52e9edee50101d6 \
-    --hash=sha256:f969f6013a16fadb4adcf09d11a68a4f617c6049d7af7ac2c676110169a63abd
+nest-asyncio==1.5.5 \
+    --hash=sha256:b98e3ec1b246135e4642eceffa5a6c23a3ab12c82ff816a92c612d68205813b2 \
+    --hash=sha256:e442291cd942698be619823a17a86a5759eabe1f8613084790de189fe9e16d65
     # via -r requirements.in
 orjson==3.6.7 \
     --hash=sha256:0a65f3c403f38b0117c6dd8e76e85a7bd51fcd92f06c5598dfeddbc44697d3e5 \
