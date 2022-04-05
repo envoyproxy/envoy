@@ -8,6 +8,12 @@ protocol.
 
 When the files are changed on the filesystem, Envoy will automatically update its configuration.
 
+.. note::
+
+   Envoy only updates when the configuration file is replaced by a file move, and not when the file is edited in place.
+
+   It is implemented this way to ensure configuration consistency.
+
 At a minimum, you will need to start Envoy configured with the following sections:
 
 - :ref:`node <start_quick_start_dynamic_fs_node>` to uniquely identify the proxy node.
@@ -90,3 +96,8 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :linenos:
     :emphasize-lines: 11, 17-18, 22-23
+
+.. seealso::
+
+   :ref:`atomic swaps <config_runtime_symbolic_link_swap>`
+      Details about how runtime configuration is updated.
