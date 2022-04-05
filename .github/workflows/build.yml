@@ -5,6 +5,7 @@ on:
       - master
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
   schedule:                # This trigger is here only to make sure
     - cron: '59 * * * *' # the example itself doesn't become stale
 jobs:
