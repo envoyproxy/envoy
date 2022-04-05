@@ -18,7 +18,7 @@ public:
   virtual ~AccessLogFile() = default;
 
   /**
-   * Write data to the file.
+   * Write data to the file. test
    */
   virtual void write(absl::string_view) PURE;
 
