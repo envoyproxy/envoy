@@ -540,8 +540,9 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ClientNotSupportEarlyDataGetsEarlyDataRea
   ActiveClient& client_ref = *clients_.back();
   // The first stream should be attached a client upon 0-RTT connected.
   EXPECT_CALL(pool_, onPoolReady).Times(0u);
-  EXPECT_ENVOY_BUG(client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt),
-                   "Non-early-data compliant client gets early data ready");
+  EXPECT_ENVOY_BUG(
+      client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt),
+      "Unable to set state to ReadyForEarlyData in a client which does not support early data");
   CHECK_STATE(0 /*active*/, 1 /*pending*/, concurrent_streams_ /*connecting capacity*/);
 
   // Clean up.
