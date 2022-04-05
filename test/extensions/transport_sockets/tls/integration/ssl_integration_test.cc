@@ -339,7 +339,7 @@ protected:
 
     // Drive the connection until we get a response.
     while (response.empty()) {
-      connection->run(Event::Dispatcher::RunType::NonBlock);
+      EXPECT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
     }
     EXPECT_THAT(response, testing::HasSubstr("HTTP/1.1 200 OK\r\n"));
 

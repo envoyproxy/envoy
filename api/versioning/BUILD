@@ -57,6 +57,7 @@ proto_library(
         "//envoy/extensions/access_loggers/open_telemetry/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
+        "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",

@@ -6,6 +6,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/router/config_impl.h"
 
 #include "absl/strings/match.h"
@@ -154,6 +155,31 @@ public:
     return false;
   }
 };
+
+class PathSeparatedPrefixMatcherImpl : public BaseMatcherImpl {
+public:
+  PathSeparatedPrefixMatcherImpl(const RequirementRule& rule)
+      : BaseMatcherImpl(rule), prefix_(rule.match().path_separated_prefix()),
+        path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+
+  bool matches(const Http::RequestHeaderMap& headers) const override {
+    if (!BaseMatcherImpl::matchRoute(headers)) {
+      return false;
+    }
+    absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+    if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
+        (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
+      ENVOY_LOG(debug, "Path-separated prefix requirement '{}' matched.", prefix_);
+      return true;
+    }
+    return false;
+  }
+
+private:
+  // prefix string
+  const std::string prefix_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
 } // namespace
 
 MatcherConstPtr Matcher::create(const RequirementRule& rule) {
@@ -166,6 +192,8 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     return std::make_unique<RegexMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kConnectMatcher:
     return std::make_unique<ConnectMatcherImpl>(rule);
+  case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
+    return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
