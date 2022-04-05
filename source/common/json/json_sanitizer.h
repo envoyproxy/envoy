@@ -38,8 +38,9 @@ namespace Json {
 absl::string_view sanitize(std::string& buffer, absl::string_view str);
 
 /**
- * Strips double-quotes on first and last characters of str. It's an ENVOY_BUG
- * to call this on a string that is not surrounded by double-quotes.
+ * Strips double-quotes on first and last characters of str. It's a
+ * precondition to call this on a string that is not surrounded by
+ * double-quotes.
  *
  * @param str The string to strip double-quotes from.
  * @return The string without its surrounding double-quotes.

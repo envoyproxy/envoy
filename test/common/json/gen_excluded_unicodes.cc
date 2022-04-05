@@ -21,9 +21,9 @@ namespace {
 // "-c opt" is recommended because otherwise it takes almost a minute to run
 // through all 4-byte UTF-8 sequences.
 //
-// Running in this mode causes two tests to fail, but prints two initialization
-// blocks for invalid byte code ranges, which can then be pasted into the
-// InvalidUnicodeSet constructor in json_sanitizer_test_util.cc.
+// Running this prints two initialization blocks for invalid byte code ranges,
+// which can then be pasted into the InvalidUnicodeSet constructor in
+// json_sanitizer_test_util.cc.
 //
 // The output of this command can then be pasted into the InvalidUnicodeSet
 // constructor for json_sanitizer_test_util.cc. It should only be necessary
@@ -57,7 +57,12 @@ private:
 };
 
 bool isInvalidProtobufSerialization(const std::string& str) {
-  return (str.size() == 2 && str[0] == '"' && str[1] == '"') || str.size() > 8;
+  // To work around https://github.com/protocolbuffers/protobuf/issues/9729
+  // we must examine its output for each unicode. The protobuf library's
+  // invalid outputs take two forms:
+  //   ""            (empty quoted string, which happens on 3-byte utf8)
+  //   \u1234\u5678  (two consecutive unicode escapes for a 4-byte utf8)
+  return str == "\"\"" || str.size() > 8;
 }
 
 void allThreeByteUtf8() {

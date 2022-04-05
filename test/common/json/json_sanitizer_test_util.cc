@@ -16,6 +16,9 @@ namespace TestUtil {
 
 namespace {
 
+constexpr uint32_t UnicodeEscapeLength = 6; // "\u1234"
+constexpr absl::string_view UnicodeEscapePrefix = "\\u";
+
 class InvalidUnicodeSet {
 public:
   InvalidUnicodeSet() {
@@ -88,7 +91,7 @@ bool isProtoSerializableUtf8(absl::string_view in) {
 
 // Decodes unicode hex escape \u1234 into 0x1234, returning success.
 bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
-  if (absl::StartsWith(str, "\\u") && str.size() >= 6) {
+  if (absl::StartsWith(str, UnicodeEscapePrefix) && str.size() >= UnicodeEscapeLength) {
     // TODO(jmarantz): Github master,
     // https://github.com/abseil/abseil-cpp/blob/master/absl/strings/numbers.h
     // has absl::SimpleHexAtoi, enabling this impl to be
@@ -111,7 +114,7 @@ bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_vi
     auto [unicode, consumed] = Utf8::decode(utf8);
     if (consumed != 0 && unicode == escaped_unicode) {
       utf8 = utf8.substr(consumed, utf8.size() - consumed);
-      escaped = escaped.substr(6, escaped.size() - 6);
+      escaped = escaped.substr(UnicodeEscapeLength, escaped.size() - UnicodeEscapeLength);
       return true;
     }
   }
