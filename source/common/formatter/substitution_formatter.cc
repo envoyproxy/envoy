@@ -447,6 +447,8 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     return std::make_unique<DownstreamPeerCertVEndFormatter>(token);
   } else if (absl::StartsWith(token, "GRPC_STATUS")) {
     return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
+  } else if (absl::StartsWith(token, "GRPC_STATUS_NUMBER")) {
+    return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(), true);
   } else if (absl::StartsWith(token, "REQUEST_HEADERS_BYTES")) {
     return std::make_unique<HeadersByteSizeFormatter>(
         HeadersByteSizeFormatter::HeaderType::RequestHeaders);
@@ -1384,8 +1386,8 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
-                                         absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+                                         absl::optional<size_t> max_length, bool format_as_number)
+    : HeaderFormatter(main_header, alternative_header, max_length), format_as_number_(format_as_number) {}
 
 absl::optional<std::string>
 GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
@@ -1396,6 +1398,9 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
     return absl::nullopt;
+  }
+  if (format_as_number_) {
+    return absl::StrCat(grpc_status.value());
   }
   const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
   if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
@@ -1413,6 +1418,9 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
     return unspecifiedValue();
+  }
+  if (format_as_number_) {
+    return ValueUtil::numberValue(grpc_status.value());
   }
   const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
   if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
