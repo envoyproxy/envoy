@@ -211,7 +211,6 @@ public:
   // ThriftProxy::ThriftFilters::DecoderFilter
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
-  MOCK_METHOD(void, resetUpstreamConnection, ());
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
   // ThriftProxy::DecoderEventHandler
