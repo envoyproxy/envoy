@@ -181,6 +181,7 @@ public:
 
   void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
              bool has_cluster = true, bool expect_gro = true) {
+
     config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
@@ -248,13 +249,7 @@ public:
                                    int ipv6_expect) {
     setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_original_src_ip: true
     )EOF"));
 
@@ -375,13 +370,7 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 upstream_socket_config:
   prefer_gro: false
   )EOF",
@@ -413,62 +402,13 @@ upstream_socket_config:
   EXPECT_EQ(access_log_data_.value(), "17 3 17 3");
 }
 
-// Route with source IP.
-TEST_F(UdpProxyFilterTest, Router) {
-  InSequence s;
-
-  setup(readConfig(R"EOF(
-stat_prefix: foo
-matcher:
-  matcher_tree:
-    input:
-      name: envoy.matching.inputs.source_ip
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
-    exact_match_map:
-      map:
-        "10.0.0.1":
-          action:
-            name: route
-            typed_config:
-              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-              cluster: fake_cluster
-  )EOF"));
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-
-  test_sessions_[0].idle_timer_->invokeCallback();
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-
-  recvDataFromDownstream("10.0.0.3:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-}
-
 // Idle timeout flow.
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   expectSessionCreate(upstream_address_);
@@ -502,13 +442,7 @@ TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF",
                         access_log_format));
 
@@ -559,13 +493,7 @@ TEST_F(UdpProxyFilterTest, NoUpstreamHost) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
@@ -581,13 +509,7 @@ TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"),
         false);
 
@@ -601,13 +523,7 @@ TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"),
         false);
 
@@ -649,13 +565,7 @@ TEST_F(UdpProxyFilterTest, MaxSessionsCircuitBreaker) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   // Allow only a single session.
@@ -692,13 +602,7 @@ TEST_F(UdpProxyFilterTest, RemoveHostSessions) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   expectSessionCreate(upstream_address_);
@@ -726,13 +630,7 @@ TEST_F(UdpProxyFilterTest, HostUnhealthyPickSameHost) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   expectSessionCreate(upstream_address_);
@@ -754,13 +652,7 @@ TEST_F(UdpProxyFilterTest, HostUnhealthyPickDifferentHost) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   expectSessionCreate(upstream_address_);
@@ -801,13 +693,7 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingBasicFlow) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF"));
 
@@ -851,13 +737,7 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingFirstInvalidHost) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF"));
 
@@ -876,13 +756,7 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingSecondInvalidHost) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF"));
 
@@ -909,13 +783,7 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveHostSessions) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF"));
 
@@ -943,13 +811,7 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveCluster) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF"));
 
@@ -988,13 +850,7 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingCannotCreateConnection) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF"));
 
@@ -1031,13 +887,7 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_original_src_ip: false
   )EOF"));
 
@@ -1055,13 +905,7 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotMentione
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   ensureNoIpTransparentSocketOptions();
@@ -1076,13 +920,7 @@ TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
 
   auto config = R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 use_original_src_ip: true
   )EOF";
 
@@ -1098,13 +936,7 @@ TEST_F(UdpProxyFilterTest, HashPolicyWithSourceIp) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 hash_policies:
 - source_ip: true
   )EOF"));
@@ -1117,13 +949,7 @@ TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithSourceIp) {
   InSequence s;
   auto config = R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 hash_policies:
 - source_ip: false
   )EOF";
@@ -1138,13 +964,7 @@ TEST_F(UdpProxyFilterTest, NoHashPolicy) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   EXPECT_EQ(nullptr, config_->hashPolicy());
@@ -1156,13 +976,7 @@ TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 hash_policies:
 - source_ip: true
   )EOF"));
@@ -1189,13 +1003,7 @@ TEST_F(UdpProxyFilterTest, NullHashWithoutHashPolicy) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
   )EOF"));
 
   auto host = createHost(upstream_address_);
@@ -1218,13 +1026,7 @@ TEST_F(UdpProxyFilterTest, HashPolicyWithKey) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 hash_policies:
 - key: "key"
   )EOF"));
@@ -1237,13 +1039,7 @@ TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithKey) {
   InSequence s;
   auto config = R"EOF(
 stat_prefix: foo
-matcher:
- on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 hash_policies:
 - key: ""
   )EOF";
@@ -1258,13 +1054,7 @@ TEST_F(UdpProxyFilterTest, HashWithKey) {
 
   setup(readConfig(R"EOF(
 stat_prefix: foo
-matcher:
-  on_no_match:
-    action:
-      name: route
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-        cluster: fake_cluster
+cluster: fake_cluster
 hash_policies:
 - key: "key"
   )EOF"));

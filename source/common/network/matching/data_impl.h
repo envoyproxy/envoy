@@ -24,15 +24,15 @@ private:
  */
 class UdpMatchingDataImpl : public UdpMatchingData {
 public:
-  UdpMatchingDataImpl(const Address::Instance& local_address,
-                      const Address::Instance& remote_address)
+  UdpMatchingDataImpl(const Address::InstanceConstSharedPtr& local_address,
+                      const Address::InstanceConstSharedPtr& remote_address)
       : local_address_(local_address), remote_address_(remote_address) {}
-  const Address::Instance& localAddress() const override { return local_address_; }
-  const Address::Instance& remoteAddress() const override { return remote_address_; }
+  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
 
 private:
-  const Address::Instance& local_address_;
-  const Address::Instance& remote_address_;
+  const Address::InstanceConstSharedPtr& local_address_;
+  const Address::InstanceConstSharedPtr& remote_address_;
 };
 
 } // namespace Matching

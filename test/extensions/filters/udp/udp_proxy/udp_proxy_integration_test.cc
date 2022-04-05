@@ -98,13 +98,7 @@ name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
-  matcher:
-    on_no_match:
-      action:
-        name: route
-        typed_config:
-          '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-          cluster: cluster_0
+  cluster: cluster_0
   upstream_socket_config:
     max_rx_datagram_size: {}
 )EOF",
@@ -115,13 +109,7 @@ name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
-  matcher:
-    on_no_match:
-      action:
-        name: route
-        typed_config:
-          '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-          cluster: cluster_0
+  cluster: cluster_0
 )EOF");
     }
 
@@ -138,13 +126,7 @@ name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
-  matcher:
-    on_no_match:
-      action:
-        name: route
-        typed_config:
-          '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-          cluster: cluster_0
+  cluster: cluster_0
 )EOF");
     // Add a reverse filter for reversing payload prior to UDP proxy
     config_helper_.addListenerFilter(R"EOF(

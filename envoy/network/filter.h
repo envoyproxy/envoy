@@ -555,8 +555,8 @@ public:
 
   virtual ~UdpMatchingData() = default;
 
-  virtual const Address::Instance& localAddress() const PURE;
-  virtual const Address::Instance& remoteAddress() const PURE;
+  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 };
 
 } // namespace Network
