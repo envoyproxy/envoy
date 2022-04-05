@@ -61,6 +61,7 @@ The following sandboxes are available:
     jaeger_tracing
     load_reporting_service
     locality_load_balancing
+    local_ratelimit
     lua
     mysql
     postgres

@@ -14,44 +14,46 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-  Upstream::ThreadLocalCluster* cluster =
-      config->clusterManager().getThreadLocalCluster(config->cluster());
-  if (cluster != nullptr) {
-    onClusterAddOrUpdate(*cluster);
+  for (const auto& entry : config_->allClusterNames()) {
+    Upstream::ThreadLocalCluster* cluster = config->clusterManager().getThreadLocalCluster(entry);
+    if (cluster != nullptr) {
+      onClusterAddOrUpdate(*cluster);
+    }
   }
 }
 
 void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != config_->cluster()) {
-    return;
-  }
-
-  ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster.info()->name());
-  ASSERT(cluster_info_ == absl::nullopt || &cluster_info_.value()->cluster_ != &cluster);
+  auto cluster_name = cluster.info()->name();
+  ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
+  ASSERT((!cluster_infos_.contains(cluster_name)) ||
+         &cluster_infos_[cluster_name]->cluster_ != &cluster);
 
   if (config_->usingPerPacketLoadBalancing()) {
-    cluster_info_.emplace(std::make_unique<PerPacketLoadBalancingClusterInfo>(*this, cluster));
+    cluster_infos_.emplace(cluster_name,
+                           std::make_unique<PerPacketLoadBalancingClusterInfo>(*this, cluster));
   } else {
-    cluster_info_.emplace(std::make_unique<StickySessionClusterInfo>(*this, cluster));
+    cluster_infos_.emplace(cluster_name,
+                           std::make_unique<StickySessionClusterInfo>(*this, cluster));
   }
 }
 
 void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
-  if (cluster != config_->cluster()) {
+  if (!cluster_infos_.contains(cluster)) {
     return;
   }
 
   ENVOY_LOG(debug, "udp proxy: detaching from cluster {}", cluster);
-  cluster_info_.reset();
+  cluster_infos_.erase(cluster);
 }
 
 Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
-  if (!cluster_info_.has_value()) {
+  const std::string& route = config_->route(*data.addresses_.local_, *data.addresses_.peer_);
+  if (!cluster_infos_.contains(route)) {
     config_->stats().downstream_sess_no_route_.inc();
     return Network::FilterStatus::StopIteration;
   }
 
-  return cluster_info_.value()->onData(data);
+  return cluster_infos_[route]->onData(data);
 }
 
 Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) {
