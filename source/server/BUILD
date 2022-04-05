@@ -68,6 +68,8 @@ envoy_cc_library(
         ":active_tcp_listener",
         ":active_udp_listener",
         ":connection_handler_impl",
+        "//envoy/network:client_connection_factory",
+        "//source/common/network:address_lib",
     ],
 )
 

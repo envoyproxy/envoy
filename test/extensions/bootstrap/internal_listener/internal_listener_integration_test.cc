@@ -32,6 +32,11 @@ public:
       listener.mutable_address()->mutable_envoy_internal_address()->set_server_listener_name(
           "internal_listener");
     });
+    config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.internal_listener
+typed_config:
+  "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener"
+)EOF");
     BaseIntegrationTest::initialize();
   }
 };
