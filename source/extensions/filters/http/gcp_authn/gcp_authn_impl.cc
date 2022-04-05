@@ -41,10 +41,8 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
-    // TODO(tyxia) Revisit log option, error or debug
-    ENVOY_LOG(error,
-              "Failed to fetch the token [uri = {}]: [cluster = {}] is not found or configured.",
-              uri, cluster);
+    ENVOY_LOG(error, "Failed to fetch the token: [cluster = {}] is not found or configured.",
+              cluster);
     onError();
     return;
   }
@@ -95,7 +93,7 @@ void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
   // Http::AsyncClient::FailureReason only has one value: "Reset".
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  ENVOY_LOG(error, "Request to [uri = {}] failed: stream has been reset", config_.http_uri().uri());
+  ENVOY_LOG(error, "Request failed: stream has been reset");
   active_request_ = nullptr;
   onError();
 }

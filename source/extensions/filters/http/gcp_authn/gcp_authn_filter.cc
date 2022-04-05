@@ -42,11 +42,11 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
   }
 
   if (!audience_str.empty()) {
-    // Audience is URL of receiving service that will performance authentication.
+    // Audience is URL of receiving service that will perform authentication.
     // The URL format is
     // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
-    // So, add the audience from the config to the final url by substituting the `[AUDIENCE]` with
-    // real audience string from the config.
+    // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
+    // with real audience string from the config.
     std::string final_url =
         absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str}});
     client_->fetchToken(*this, buildRequest(final_url));
