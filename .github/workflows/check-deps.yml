@@ -16,7 +16,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@0ebf233433c08fb9061af664d501c3f3ff0e9e20
+        uses: actions/setup-python@9c644ca2ab8e57ea0a487b5ec2f8290740378bfd
         with:
           python-version: ${{ matrix.python-version }}
 
