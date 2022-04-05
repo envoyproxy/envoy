@@ -24,5 +24,10 @@ message GcpAuthnFilterConfig {
   config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
   // Retry policy for fetching tokens.
+  // This field is optional and if it is not configured, it will be fail-closed (i.e., rejects the requests).
   config.core.v3.RetryPolicy retry_policy = 2;
+}
+
+message Audience {
+  map<string, string> audience_map = 1;
 }

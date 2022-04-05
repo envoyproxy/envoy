@@ -14,13 +14,13 @@ namespace GcpAuthn {
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
 
-Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& url) {
+Http::RequestMessagePtr buildRequest(absl::string_view url) {
   absl::string_view host;
   absl::string_view path;
   Envoy::Http::Utility::extractHostPathFromUri(url, host, path);
   Http::RequestHeaderMapPtr headers =
       Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
-          {{Envoy::Http::Headers::get().Method, method},
+          {{Envoy::Http::Headers::get().Method, "GET"},
            {Envoy::Http::Headers::get().Host, std::string(host)},
            {Envoy::Http::Headers::get().Path, std::string(path)},
            {Envoy::Http::LowerCaseString(MetadataFlavorKey), MetadataFlavor}});
@@ -72,9 +72,10 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
 
 void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
                                Http::ResponseMessagePtr&& response) {
-  try {
-    const uint64_t status_code = Envoy::Http::Utility::getResponseStatus(response->headers());
-    active_request_ = nullptr;
+  auto status = Envoy::Http::Utility::getResponseStatusNoThrow(response->headers());
+  active_request_ = nullptr;
+  if (status.has_value()) {
+    uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ASSERT(callbacks_ != nullptr);
       callbacks_->onComplete(response.get());
@@ -83,9 +84,9 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
       ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
       onError();
     }
-  } catch (const Envoy::EnvoyException& e) {
+  } else {
     // This occurs if the response headers are invalid.
-    ENVOY_LOG(error, "Failed to get the response: {}", e.what());
+    ENVOY_LOG(error, "Failed to get the response because response headers are not valid.");
     onError();
   }
 }

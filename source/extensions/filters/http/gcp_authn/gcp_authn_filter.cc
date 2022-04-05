@@ -29,27 +29,32 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
 
   std::string audience_str;
   if (cluster != nullptr) {
-    auto filter_metadata = cluster->info()->metadata().filter_metadata();
+    // The `audience` is passed to filter through cluster metadata.
+    auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
     const auto filter_it = filter_metadata.find(std::string(FilterName));
-
     if (filter_it != filter_metadata.end()) {
-      audience_str =
-          filter_it->second.fields().find(std::string(AudienceKey))->second.string_value();
+      envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+      MessageUtil::unpackTo(filter_it->second, audience);
+      if (audience.audience_map().contains(std::string(AudienceKey))) {
+        audience_str = audience.audience_map().find(std::string(AudienceKey))->second;
+      }
     }
   }
 
   if (!audience_str.empty()) {
-    // Add the audience from the config to the final url.
-    // `[AUDIENCE]` field is substituted with real audience string from the config.
+    // Audience is URL of receiving service that will performance authentication.
+    // The URL format is
+    // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
+    // So, add the audience from the config to the final url by substituting the `[AUDIENCE]` with
+    // real audience string from the config.
     std::string final_url =
         absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str}});
-    client_->fetchToken(*this, buildRequest("GET", final_url));
+    client_->fetchToken(*this, buildRequest(final_url));
     initiating_call_ = false;
   } else {
-    // Audience is URL of receiving service that will performance authentication. So, there is no
-    // need to fetch the token if no audience is specified, because no authentication will be
-    // performed. Just continue the filter chain iteration.
-    ENVOY_LOG(error, "Failed to retrieve the audience from the configuration.");
+    // There is no need to fetch the token if no audience is specified because no
+    // authentication will be performed. So, we just continue the filter chain iteration.
+    ENVOY_LOG(debug, "Failed to retrieve the audience from the configuration.");
     state_ = State::Complete;
   }
 

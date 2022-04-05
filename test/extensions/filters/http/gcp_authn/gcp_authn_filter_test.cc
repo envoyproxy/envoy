@@ -67,11 +67,13 @@ public:
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
     if (valid) {
-      (*(*metadata_
-              .mutable_filter_metadata())[std::string(
-                                              Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
-            .mutable_fields())[std::string(Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey)]
-          .set_string_value("tests");
+      envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+      audience.mutable_audience_map()->insert(
+          {std::string(Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey), "test"});
+
+      (*metadata_.mutable_typed_filter_metadata())
+          [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+              .PackFrom(audience);
     }
     ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
@@ -110,7 +112,7 @@ TEST_F(GcpAuthnFilterTest, Success) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
+  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Host()->value().getStringView(), "testhost");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(), "/path/test");
@@ -126,7 +128,8 @@ TEST_F(GcpAuthnFilterTest, Success) {
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
 
-  EXPECT_CALL(request_callbacks_, onComplete_(response.get()));
+  // EXPECT_CALL(request_callbacks_, onComplete(response.get()));
+  EXPECT_CALL(request_callbacks_, onComplete(response.get()));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -148,19 +151,19 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
 
-  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
   GcpAuthnFilterConfig config;
   TestUtility::loadFromYaml(no_cluster_config, config);
   createClient(config);
-  client_->fetchToken(request_callbacks_, buildRequest("GET", config.http_uri().uri()));
+  client_->fetchToken(request_callbacks_, buildRequest(config.http_uri().uri()));
 }
 
 TEST_F(GcpAuthnFilterTest, Failure) {
   setupMockObjects();
   // Create the client object.
   createClient();
-  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
-  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
+  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
+  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
   client_callback_->onFailure(client_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -169,14 +172,14 @@ TEST_F(GcpAuthnFilterTest, NotOkResponse) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
+  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "504"},
   }));
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
-  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
@@ -185,13 +188,13 @@ TEST_F(GcpAuthnFilterTest, EmptyResponseHeader) {
   // Create the client object.
   createClient();
 
-  client_->fetchToken(request_callbacks_, buildRequest("GET", config_.http_uri().uri()));
+  client_->fetchToken(request_callbacks_, buildRequest(config_.http_uri().uri()));
 
   Envoy::Http::ResponseHeaderMapPtr empty_resp_headers(
       new Envoy::Http::TestResponseHeaderMapImpl({}));
   Envoy::Http::ResponseMessagePtr empty_response(
       new Envoy::Http::ResponseMessageImpl(std::move(empty_resp_headers)));
-  EXPECT_CALL(request_callbacks_, onComplete_(/*response_ptr=*/nullptr));
+  EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
   client_callback_->onSuccess(client_request_, std::move(empty_response));
 }
 

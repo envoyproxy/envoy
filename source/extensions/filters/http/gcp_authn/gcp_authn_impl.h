@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-Http::RequestMessagePtr buildRequest(const std::string& method, const std::string& url);
+Http::RequestMessagePtr buildRequest(absl::string_view url);
 
 /**
  * Async callbacks used during fetchToken() calls.
