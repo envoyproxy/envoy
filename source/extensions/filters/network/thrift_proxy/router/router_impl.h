@@ -95,7 +95,10 @@ private:
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
-    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const Http::LowerCaseString& clusterHeader() const override {
+      // Weighted cluster entries don't have a cluster header.
+      return "";
+    }
     const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
     requestMirrorPolicies() const override {
       return parent_.requestMirrorPolicies();
