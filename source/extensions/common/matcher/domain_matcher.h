@@ -27,8 +27,6 @@ using ::Envoy::Matcher::MatchState;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 
-namespace {
-
 /**
  * A "compressed" trie node with domain parts as edge values.
  */
@@ -86,8 +84,6 @@ template <class DataType> struct DomainTree {
   DomainNode<DataType> root_;
   std::vector<OnMatch<DataType>> on_matches_;
 };
-
-} // namespace
 
 /**
  * General utilities for domain name matching.

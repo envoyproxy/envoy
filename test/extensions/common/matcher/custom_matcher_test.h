@@ -22,6 +22,7 @@ namespace Matcher {
 using ::Envoy::Matcher::ActionFactory;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
+using ::Envoy::Matcher::MatchState;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
