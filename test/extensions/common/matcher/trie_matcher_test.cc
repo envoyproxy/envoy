@@ -577,8 +577,7 @@ matcher_tree:
   auto match_tree = matcher_factory.create(matcher);
 
   Network::MockConnectionSocket socket;
-  Network::Address::InstanceConstSharedPtr address =
-      std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080);
+  const Network::Address::Ipv4Instance address("192.168.0.1", 8080);
   Network::Matching::UdpMatchingDataImpl data(address, address);
 
   const auto result = match_tree()->match(data);
