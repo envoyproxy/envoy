@@ -51,7 +51,8 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/", "./test/integration/load_balancers/")
+    "./test/integration/filters/", "./test/integration/load_balancers/",
+    "./test/extensions/transport_sockets/tls/integration/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
