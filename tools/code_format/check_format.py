@@ -1174,7 +1174,8 @@ if __name__ == "__main__":
         # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
         exclude_list = (
             "':(exclude)source/extensions/filters/http/buffer/BUILD' "
-            "':(exclude)source/extensions/filters/network/common/BUILD' ")
+            "':(exclude)source/extensions/filters/network/common/BUILD' "
+            "':(exclude)source/extensions/io_socket/user_space/BUILD' ")
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
             % exclude_list)
