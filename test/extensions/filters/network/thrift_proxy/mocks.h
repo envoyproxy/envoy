@@ -268,6 +268,71 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
+class MockEncoderFilter : public EncoderFilter {
+public:
+  MockEncoderFilter();
+  ~MockEncoderFilter() override;
+
+  // ThriftProxy::ThriftFilters::EncoderFilter
+  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
+  MOCK_METHOD(bool, passthroughSupported, (), (const));
+
+  // ThriftProxy::DecoderEventHandler
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data));
+  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
+  MOCK_METHOD(FilterStatus, transportEnd, ());
+  MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
+  MOCK_METHOD(FilterStatus, messageEnd, ());
+  MOCK_METHOD(FilterStatus, structBegin, (absl::string_view name));
+  MOCK_METHOD(FilterStatus, structEnd, ());
+  MOCK_METHOD(FilterStatus, fieldBegin,
+              (absl::string_view name, FieldType& msg_type, int16_t& field_id));
+  MOCK_METHOD(FilterStatus, fieldEnd, ());
+  MOCK_METHOD(FilterStatus, boolValue, (bool& value));
+  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value));
+  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value));
+  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value));
+  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, doubleValue, (double& value));
+  MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value));
+  MOCK_METHOD(FilterStatus, mapBegin,
+              (FieldType & key_type, FieldType& value_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, mapEnd, ());
+  MOCK_METHOD(FilterStatus, listBegin, (FieldType & elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, listEnd, ());
+  MOCK_METHOD(FilterStatus, setBegin, (FieldType & elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, setEnd, ());
+};
+
+class MockEncoderFilterCallbacks : public EncoderFilterCallbacks {
+public:
+  MockEncoderFilterCallbacks();
+  ~MockEncoderFilterCallbacks() override;
+
+  // ThriftProxy::ThriftFilters::EncoderFilterCallbacks
+  MOCK_METHOD(uint64_t, streamId, (), (const));
+  MOCK_METHOD(const Network::Connection*, connection, (), (const));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(void, continueEncoding, ());
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
+  MOCK_METHOD(TransportType, downstreamTransportType, (), (const));
+  MOCK_METHOD(ProtocolType, downstreamProtocolType, (), (const));
+  MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
+  MOCK_METHOD(void, startUpstreamResponse, (Transport&, Protocol&));
+  MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
+  MOCK_METHOD(void, resetDownstreamConnection, ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
+  MOCK_METHOD(bool, responseSuccess, ());
+
+  uint64_t stream_id_{1};
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  MessageMetadataSharedPtr metadata_;
+  std::shared_ptr<Router::MockRoute> route_;
+};
+
 class MockFilterConfigFactory : public NamedThriftFilterConfigFactory {
 public:
   MockFilterConfigFactory();

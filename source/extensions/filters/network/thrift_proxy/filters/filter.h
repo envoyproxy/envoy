@@ -224,7 +224,7 @@ public:
 /**
  * Decoder filter interface.
  */
-class DecoderFilter : public FilterBase, public DecoderEventHandler {
+class DecoderFilter : public FilterBase, public virtual DecoderEventHandler {
 public:
   ~DecoderFilter() override = default;
 
@@ -243,7 +243,7 @@ public:
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 
-class EncoderFilter : public FilterBase, public DecoderEventHandler {
+class EncoderFilter : public FilterBase, public virtual DecoderEventHandler {
 public:
   ~EncoderFilter() override = default;
 
@@ -333,8 +333,16 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addDecoderFilter(DecoderFilterSharedPtr filter) PURE;
-  // virtual void addEncoderFilter(EncoderFilterSharedPtr filter) PURE;
-  // virtual void addBidirectionFilter(BidirectionFilterSharedPtr filter) PURE;
+  /**
+   * Add an encoder filter that is used when writing connection data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addEncoderFilter(EncoderFilterSharedPtr filter) PURE;
+  /**
+   * Add a bidirection filter that is used when reading and writing connection data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addBidirectionFilter(BidirectionFilterSharedPtr filter) PURE;
 };
 
 /**

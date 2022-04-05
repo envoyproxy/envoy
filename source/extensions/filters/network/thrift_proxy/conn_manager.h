@@ -82,6 +82,7 @@ private:
     bool onData(Buffer::Instance& data);
 
     // ProtocolConverter
+    // FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
@@ -218,6 +219,15 @@ private:
       ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
       filter->setDecoderFilterCallbacks(*wrapper);
       LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+    }
+
+    void addEncoderFilter([[maybe_unused]] ThriftFilters::EncoderFilterSharedPtr filter) override {
+      // TODO
+    }
+
+    void addBidirectionFilter(
+        [[maybe_unused]] ThriftFilters::BidirectionFilterSharedPtr filter) override {
+      // TODO
     }
 
     bool passthroughSupported() const;

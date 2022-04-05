@@ -217,11 +217,11 @@ public:
 
   bool encodePassthroughSupported() const override { return true; }
 
-  FilterStatus decodeTransportBegin(MessageMetadataSharedPtr ) override {
+  FilterStatus decodeTransportBegin(MessageMetadataSharedPtr) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeTransportBegin(MessageMetadataSharedPtr ) override {
+  FilterStatus encodeTransportBegin(MessageMetadataSharedPtr) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
@@ -229,19 +229,19 @@ public:
 
   FilterStatus encodeTransportEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodePassthroughData(Buffer::Instance& ) override {
+  FilterStatus decodePassthroughData(Buffer::Instance&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodePassthroughData(Buffer::Instance& ) override {
+  FilterStatus encodePassthroughData(Buffer::Instance&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus decodeMessageBegin(MessageMetadataSharedPtr ) override {
+  FilterStatus decodeMessageBegin(MessageMetadataSharedPtr) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeMessageBegin(MessageMetadataSharedPtr ) override {
+  FilterStatus encodeMessageBegin(MessageMetadataSharedPtr) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
@@ -249,11 +249,11 @@ public:
 
   FilterStatus encodeMessageEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodeStructBegin(absl::string_view ) override {
+  FilterStatus decodeStructBegin(absl::string_view) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeStructBegin(absl::string_view ) override {
+  FilterStatus encodeStructBegin(absl::string_view) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
@@ -261,13 +261,11 @@ public:
 
   FilterStatus encodeStructEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodeFieldBegin(absl::string_view , FieldType& ,
-                                int16_t& ) override {
+  FilterStatus decodeFieldBegin(absl::string_view, FieldType&, int16_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeFieldBegin(absl::string_view , FieldType& ,
-                                int16_t& ) override {
+  FilterStatus encodeFieldBegin(absl::string_view, FieldType&, int16_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
@@ -275,63 +273,43 @@ public:
 
   FilterStatus encodeFieldEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodeBoolValue(bool& ) override { return ThriftProxy::FilterStatus::Continue; }
+  FilterStatus decodeBoolValue(bool&) override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus encodeBoolValue(bool& ) override { return ThriftProxy::FilterStatus::Continue; }
+  FilterStatus encodeBoolValue(bool&) override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodeByteValue(uint8_t& ) override {
+  FilterStatus decodeByteValue(uint8_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus encodeByteValue(uint8_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus decodeInt16Value(int16_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus encodeInt16Value(int16_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus decodeInt32Value(int32_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus encodeInt32Value(int32_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus decodeInt64Value(int64_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus encodeInt64Value(int64_t&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus decodeDoubleValue(double&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus encodeDoubleValue(double&) override { return ThriftProxy::FilterStatus::Continue; }
+
+  FilterStatus decodeStringValue(absl::string_view) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeByteValue(uint8_t& ) override {
+  FilterStatus encodeStringValue(absl::string_view) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus decodeInt16Value(int16_t& ) override {
+  FilterStatus decodeMapBegin(FieldType&, FieldType&, uint32_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeInt16Value(int16_t& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus decodeInt32Value(int32_t& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus encodeInt32Value(int32_t& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus decodeInt64Value(int64_t& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus encodeInt64Value(int64_t& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus decodeDoubleValue(double& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus encodeDoubleValue(double& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus decodeStringValue(absl::string_view ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus encodeStringValue(absl::string_view ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus decodeMapBegin(FieldType& , FieldType& , uint32_t& ) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  FilterStatus encodeMapBegin(FieldType& , FieldType& , uint32_t& ) override {
+  FilterStatus encodeMapBegin(FieldType&, FieldType&, uint32_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
@@ -339,11 +317,11 @@ public:
 
   FilterStatus encodeMapEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodeListBegin(FieldType& , uint32_t& ) override {
+  FilterStatus decodeListBegin(FieldType&, uint32_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeListBegin(FieldType& , uint32_t& ) override {
+  FilterStatus encodeListBegin(FieldType&, uint32_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
@@ -351,11 +329,11 @@ public:
 
   FilterStatus encodeListEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
-  FilterStatus decodeSetBegin(FieldType& , uint32_t& ) override {
+  FilterStatus decodeSetBegin(FieldType&, uint32_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 
-  FilterStatus encodeSetBegin(FieldType& , uint32_t& ) override {
+  FilterStatus encodeSetBegin(FieldType&, uint32_t&) override {
     return ThriftProxy::FilterStatus::Continue;
   }
 

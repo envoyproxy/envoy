@@ -92,6 +92,41 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
+MockEncoderFilter::MockEncoderFilter() {
+  ON_CALL(*this, transportBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, transportEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, messageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, messageEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, structBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, structEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, fieldBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, fieldEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, boolValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, byteValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, int16Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, int32Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, int64Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, doubleValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, stringValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, mapBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, mapEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, listBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, listEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setEnd()).WillByDefault(Return(FilterStatus::Continue));
+}
+MockEncoderFilter::~MockEncoderFilter() = default;
+
+MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
+  route_ = std::make_shared<NiceMock<Router::MockRoute>>();
+
+  ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
+  ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(*this, route()).WillByDefault(Return(route_));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() = default;
+
 MockFilterConfigFactory::MockFilterConfigFactory() : name_("envoy.filters.thrift.mock_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();
 }

@@ -41,9 +41,10 @@ public:
   TestConfigImpl(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config,
                  Server::Configuration::MockFactoryContext& context,
                  Router::RouteConfigProviderManager& route_config_provider_manager,
-                 ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
+                 ThriftFilters::DecoderFilterSharedPtr decoder_filter,
+                 ThriftFilters::EncoderFilterSharedPtr encoder_filter, ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context, route_config_provider_manager),
-        decoder_filter_(decoder_filter), stats_(stats) {}
+        decoder_filter_(decoder_filter), encoder_filter_(encoder_filter), stats_(stats) {}
 
   // ConfigImpl
   ThriftFilterStats& stats() override { return stats_; }
@@ -52,6 +53,7 @@ public:
       callbacks.addDecoderFilter(custom_filter_);
     }
     callbacks.addDecoderFilter(decoder_filter_);
+    callbacks.addEncoderFilter(encoder_filter_);
   }
   TransportPtr createTransport() override {
     if (transport_) {
@@ -68,6 +70,7 @@ public:
 
   ThriftFilters::DecoderFilterSharedPtr custom_filter_;
   ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
+  ThriftFilters::EncoderFilterSharedPtr encoder_filter_;
   ThriftFilterStats& stats_;
   MockTransport* transport_{};
   MockProtocol* protocol_{};
@@ -113,9 +116,12 @@ public:
     context_.server_factory_context_.cluster_manager_.initializeClusters(cluster_names, {});
 
     proto_config_ = config;
+    decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
+    encoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockEncoderFilter>>();
 
-    config_ = std::make_unique<TestConfigImpl>(
-        proto_config_, context_, *route_config_provider_manager_, decoder_filter_, stats_);
+    config_ =
+        std::make_unique<TestConfigImpl>(proto_config_, context_, *route_config_provider_manager_,
+                                         decoder_filter_, encoder_filter_, stats_);
     if (custom_transport_) {
       config_->transport_ = custom_transport_;
     }
@@ -373,6 +379,7 @@ public:
         .WillOnce(
             Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
+    EXPECT_CALL(*decoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
@@ -382,6 +389,7 @@ public:
     BinaryProtocolImpl proto;
     callbacks->startUpstreamResponse(transport, proto);
 
+    EXPECT_CALL(*encoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
@@ -414,6 +422,7 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
+  std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
   Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
