@@ -3,6 +3,8 @@
 #include <string>
 #include <thread>
 
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
+
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
@@ -15,7 +17,6 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
-#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,7 +25,6 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
-using ::testing::AnyNumber;
 using ::testing::StrictMock;
 
 class AsyncFileManagerFactoryTest : public ::testing::Test {
@@ -33,7 +33,6 @@ public:
     singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
-        .Times(AnyNumber())
         .WillRepeatedly(Return(true));
   }
 
@@ -55,7 +54,7 @@ TEST_F(AsyncFileManagerFactoryDeathTest, DiesIfThreadPoolSelectedAndUnsupported)
   envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
   config.mutable_thread_pool()->set_thread_count(1);
   EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
-      .WillOnce(Return(false));
+      .WillRepeatedly(Return(false));
   EXPECT_DEATH({ factory_->getAsyncFileManager(config, &mock_posix_file_operations_); },
                "AsyncFileManagerThreadPool not supported");
 }

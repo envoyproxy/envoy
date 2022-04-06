@@ -20,7 +20,6 @@ envoy_cc_library(
         "async_file_handle.h",
         "async_file_manager.h",
     ],
-    visibility = ["//visibility:private"],
     deps = [
         ":status_after_file_error",
         "//source/common/buffer:buffer_lib",
@@ -40,7 +39,6 @@ envoy_cc_library(
         "async_file_context_thread_pool.h",
         "async_file_manager_thread_pool.h",
     ],
-    visibility = ["//visibility:private"],
     deps = [
         ":async_files_base",
         ":status_after_file_error",
@@ -48,6 +46,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/status:statusor",
+        "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
 )
 
@@ -60,7 +59,6 @@ envoy_cc_library(
     hdrs = [
         "async_file_manager_factory.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         ":async_files_thread_pool",
         "//source/common/api:os_sys_calls_lib",
@@ -75,8 +73,8 @@ envoy_cc_library(
     name = "status_after_file_error",
     srcs = ["status_after_file_error.cc"],
     hdrs = ["status_after_file_error.h"],
-    visibility = ["//visibility:public"],
     deps = [
+        "//envoy/api:os_sys_calls_interface",
         "//source/common/common:utility_lib",
         "@com_google_absl//absl/status",
     ],

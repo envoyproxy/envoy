@@ -17,16 +17,15 @@ TEST(StatusAfterFileError, AllErrnosReturnErrors) {
       ENAMETOOLONG, EFBIG,  EOVERFLOW, EINTR,  ENODEV, ENOENT, ENXIO,  EOPNOTSUPP, 784324,
   };
   for (const int error : errors) {
-    errno = error;
-    auto status = statusAfterFileError();
+    auto status = statusAfterFileError(error);
     EXPECT_NE(absl::StatusCode::kOk, status.code());
     EXPECT_NE("", status.message());
   }
 } // namespace async_files
 
 TEST(StatusAfterFileError, ErrnoZeroReturnsOK) {
-  errno = 0;
-  auto status = statusAfterFileError();
+  Api::SysCallSizeResult result{0, 0};
+  auto status = statusAfterFileError(result);
   EXPECT_EQ(absl::StatusCode::kOk, status.code());
 }
 

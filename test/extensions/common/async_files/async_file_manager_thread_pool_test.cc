@@ -2,19 +2,21 @@
 #include <string>
 #include <thread>
 
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
+
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 
+#include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
+
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
-#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/mocks/server/mocks.h"
-#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -123,7 +125,7 @@ protected:
   const char* test_tmpdir = std::getenv("TEST_TMPDIR");
   std::string tmpdir_ = test_tmpdir ? test_tmpdir : "/tmp";
   absl::Mutex control_mutex_;
-  AsyncFileManager* manager_;
+  std::shared_ptr<AsyncFileManager> manager_;
 
   AsyncFileActionBlockedUntilReleased* blocker_[3];
   std::atomic<BlockerState> blocker_last_state_[3];
@@ -284,8 +286,9 @@ TEST_F(AsyncFileManagerSingleThreadTest, CreateAnonymousFileWorks) {
 TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileAndUnlinkWork) {
   char filename[1024];
   snprintf(filename, sizeof(filename), "%s/async_file.XXXXXX", tmpdir_.c_str());
-  int fd = Api::OsSysCallsSingleton().mkstemp(filename);
-  Api::OsSysCallsSingleton().close(fd);
+  Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
+  auto fd = posix.mkstemp(filename);
+  posix.close(fd.return_value_);
   WaitForResult<absl::StatusOr<AsyncFileHandle>> handle_blocker;
   manager_->openExistingFile(filename, AsyncFileManager::Mode::ReadWrite,
                              handle_blocker.callback());

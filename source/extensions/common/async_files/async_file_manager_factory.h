@@ -3,6 +3,7 @@
 #include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/singleton/manager.h"
+
 #include "source/extensions/common/async_files/async_file_manager.h"
 
 namespace Envoy {

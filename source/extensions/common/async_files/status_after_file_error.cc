@@ -12,8 +12,7 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
-absl::Status statusAfterFileError() {
-  int code = errno;
+absl::Status statusAfterFileError(int code) {
   const std::string str = Envoy::errorDetails(code);
   switch (code) {
   case EACCES:

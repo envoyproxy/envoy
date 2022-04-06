@@ -3,6 +3,8 @@
 #include <string>
 #include <thread>
 
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
+
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
@@ -15,7 +17,6 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
-#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -25,7 +26,6 @@ namespace Common {
 namespace AsyncFiles {
 
 using ::testing::_;
-using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Return;
@@ -35,7 +35,6 @@ class AsyncFileManagerWithMockFilesTest : public ::testing::Test {
 public:
   void SetUp() override {
     EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
-        .Times(AnyNumber())
         .WillRepeatedly(Return(true));
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);
@@ -48,7 +47,7 @@ protected:
   std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
   StrictMock<Api::MockOsSysCalls> mock_posix_file_operations_;
   std::shared_ptr<AsyncFileManagerFactory> factory_;
-  AsyncFileManager* manager_;
+  std::shared_ptr<AsyncFileManager> manager_;
   static constexpr absl::string_view tmpdir_{"/mocktmp"};
 };
 
@@ -56,11 +55,11 @@ TEST_F(AsyncFileManagerWithMockFilesTest, ChainedOperationsWorkAndSkipQueue) {
   int fd = 1;
   absl::Barrier write_blocker{2};
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce(Return(fd));
+      .WillOnce(Return(Api::SysCallIntResult{fd, 0}));
   EXPECT_CALL(mock_posix_file_operations_, pwrite(fd, _, 5, 0))
       .WillOnce([&write_blocker](int, const void*, size_t, off_t) {
         write_blocker.Block();
-        return 5;
+        return Api::SysCallSizeResult{5, 0};
       });
   // Chain open/write/close. Write will block because of the mock expectation.
   manager_->createAnonymousFile(tmpdir_, [](absl::StatusOr<AsyncFileHandle> result) {
@@ -84,7 +83,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest, ChainedOperationsWorkAndSkipQueue) {
     absl::MutexLock lock(&mu);
     EXPECT_FALSE(did_second_action);
   }
-  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(0));
+  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   // Unblock the write.
   write_blocker.Block();
   // Ensure that the second action does get a turn after the file operations completed.
@@ -124,7 +123,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
       .WillOnce([&open_blocker, &open_blocker_finish, &fd](const char*, int, int) {
         open_blocker.Block();
         open_blocker_finish.Block();
-        return fd;
+        return Api::SysCallIntResult{fd, 0};
       });
   std::atomic<bool> callback_was_called{false};
   // Queue opening the file, record if the callback was called (it shouldn't be).
@@ -143,7 +142,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
   // Cancel the open request (but too late to actually stop it!)
   cancelOpen();
   // Expect the automatic close operation to occur.
-  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(0));
+  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   // Allow the open operation to complete.
   open_blocker_finish.Block();
   // Ensure that the second action does get a turn after the file operation relinquishes the thread.
@@ -167,7 +166,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
       .WillOnce([&open_blocker, &open_blocker_finish, &fd]() {
         open_blocker.Block();
         open_blocker_finish.Block();
-        return fd;
+        return Api::SysCallIntResult{fd, 0};
       });
   std::atomic<bool> callback_was_called{false};
   // Queue opening the file, record if the callback was called (it shouldn't be).
@@ -186,7 +185,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
   // Cancel the open request (but too late to actually stop it!)
   cancelOpen();
   // Expect the automatic close operation to occur.
-  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(0));
+  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   // Allow the open operation to complete.
   open_blocker_finish.Block();
   // Ensure that the second action does get a turn after the file operation relinquishes the thread.
@@ -205,8 +204,8 @@ TEST_F(AsyncFileManagerWithMockFilesTest, OpenFailureInCreateAnonymousReturnsAnE
   // First do a successful open and close, to establish that we can use the O_TMPFILE path
   // (otherwise a failure will retry using 'mkstemp').
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce(Return(fd));
-  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(0));
+      .WillOnce(Return(Api::SysCallIntResult{fd, 0}));
+  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   absl::Barrier first_open_blocker{2};
   manager_->createAnonymousFile(tmpdir_,
                                 [&first_open_blocker](absl::StatusOr<AsyncFileHandle> result) {
@@ -217,10 +216,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest, OpenFailureInCreateAnonymousReturnsAnE
   // first 'open'.
   first_open_blocker.Block();
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce([](const char*, int, int) {
-        errno = EMFILE;
-        return -1;
-      });
+      .WillOnce(Return(Api::SysCallIntResult{-1, EMFILE}));
   // Capture the result of the second open call, to verify that the error code came through.
   absl::Status captured_result;
   absl::Barrier callback_blocker{2};
@@ -235,12 +231,9 @@ TEST_F(AsyncFileManagerWithMockFilesTest, OpenFailureInCreateAnonymousReturnsAnE
 
 TEST_F(AsyncFileManagerWithMockFilesTest, CreateAnonymousFallbackMkstempReturnsAnErrorOnFailure) {
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce(Return(-1));
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
   EXPECT_CALL(mock_posix_file_operations_, mkstemp(Eq(std::string(tmpdir_) + "/buffer.XXXXXX")))
-      .WillOnce([]() {
-        errno = EMFILE;
-        return -1;
-      });
+      .WillOnce(Return(Api::SysCallIntResult{-1, EMFILE}));
   // Capture the result of the open call, to verify that the error code came through.
   absl::Status captured_result;
   absl::Barrier callback_blocker{2};
@@ -260,7 +253,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest, CreateAnonymousFallbackReturnsAnErrorI
   }
   EXPECT_CALL(mock_posix_file_operations_,
               open(Eq(too_long_tmpdir), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce(Return(-1));
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
   // Capture the result of the open call, to verify that the error code came through.
   absl::Status captured_result;
   absl::Barrier callback_blocker{2};
@@ -277,20 +270,21 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
        CreateAnonymousFallbackClosesAndReturnsAnErrorIfUnlinkWhileOpenFails) {
   int fd = 1;
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce(Return(-1));
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
   EXPECT_CALL(mock_posix_file_operations_, mkstemp(Eq(absl::StrCat(tmpdir_, "/buffer.XXXXXX"))))
       .WillOnce([&fd](char* tmplate) {
         memcpy(tmplate + strlen(tmplate) - 6, "ABCDEF", 6);
-        return fd;
+        return Api::SysCallIntResult{fd, 0};
       });
   // First unlink fails while the file is open, second unlink after close succeeds.
   {
     InSequence s;
     EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(absl::StrCat(tmpdir_, "/buffer.ABCDEF"))))
-        .WillOnce(Return(-1));
-    EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(0));
+        .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
+    EXPECT_CALL(mock_posix_file_operations_, close(fd))
+        .WillOnce(Return(Api::SysCallIntResult{0, 0}));
     EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(absl::StrCat(tmpdir_, "/buffer.ABCDEF"))))
-        .WillOnce(Return(0));
+        .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   }
   absl::Status captured_result;
   absl::Barrier callback_blocker{2};
@@ -310,15 +304,16 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
     InSequence s;
     EXPECT_CALL(mock_posix_file_operations_,
                 open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-        .WillOnce(Return(-1));
+        .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
     EXPECT_CALL(mock_posix_file_operations_, mkstemp(Eq(absl::StrCat(tmpdir_, "/buffer.XXXXXX"))))
         .WillOnce([&fd](char* tmplate) {
           memcpy(tmplate + strlen(tmplate) - 6, "ABCDEF", 6);
-          return fd;
+          return Api::SysCallIntResult{fd, 0};
         });
     EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(absl::StrCat(tmpdir_, "/buffer.ABCDEF"))))
-        .WillOnce(Return(0));
-    EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(0));
+        .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    EXPECT_CALL(mock_posix_file_operations_, close(fd))
+        .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   }
   absl::Barrier callback_blocker{2};
   manager_->createAnonymousFile(tmpdir_,

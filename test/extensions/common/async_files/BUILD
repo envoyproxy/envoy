@@ -14,7 +14,10 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/extensions/common/async_files:async_files_mocks",
+        "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
 )
 
@@ -27,18 +30,24 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/extensions/common/async_files:async_files_mocks",
+        "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_test(
     name = "async_file_manager_factory_test",
     srcs = [
-        "async_file_manager_Factory_test.cc",
+        "async_file_manager_factory_test.cc",
     ],
     deps = [
         "//source/extensions/common/async_files",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/extensions/common/async_files:async_files_mocks",
+        "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
 )
 

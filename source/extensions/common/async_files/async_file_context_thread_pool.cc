@@ -30,7 +30,7 @@ protected:
     return static_cast<AsyncFileContextThreadPool*>(handle_.get());
   }
 
-  const Api::OsSysCalls& posix() const {
+  Api::OsSysCalls& posix() const {
     return static_cast<AsyncFileManagerThreadPool&>(context()->manager()).posix();
   }
 
@@ -46,10 +46,10 @@ public:
   absl::Status executeImpl() override {
     ASSERT(fileDescriptor() != -1);
     std::string procfile = absl::StrCat("/proc/self/fd/", fileDescriptor());
-    int result = posix().linkat(fileDescriptor(), procfile.c_str(), AT_FDCWD, filename_.c_str(),
-                                AT_SYMLINK_FOLLOW);
-    if (result == -1) {
-      return statusAfterFileError();
+    auto result = posix().linkat(fileDescriptor(), procfile.c_str(), AT_FDCWD, filename_.c_str(),
+                                 AT_SYMLINK_FOLLOW);
+    if (result.return_value_ == -1) {
+      return statusAfterFileError(result);
     }
     return absl::OkStatus();
   }
@@ -71,8 +71,9 @@ public:
 
   absl::Status executeImpl() override {
     ASSERT(fileDescriptor() != -1);
-    if (posix().close(fileDescriptor()) == -1) {
-      return statusAfterFileError();
+    auto result = posix().close(fileDescriptor());
+    if (result.return_value_ == -1) {
+      return statusAfterFileError(result);
     }
     fileDescriptor() = -1;
     return absl::OkStatus();
@@ -93,14 +94,15 @@ public:
     ASSERT(fileDescriptor() != -1);
     auto result = std::make_unique<Envoy::Buffer::OwnedImpl>();
     auto reservation = result->reserveSingleSlice(length_);
-    int bytes_read = posix().pread(fileDescriptor(), reservation.slice().mem_, length_, offset_);
-    if (bytes_read == -1) {
-      return statusAfterFileError();
+    auto bytes_read = posix().pread(fileDescriptor(), reservation.slice().mem_, length_, offset_);
+    if (bytes_read.return_value_ == -1) {
+      return statusAfterFileError(bytes_read);
     }
-    if (static_cast<unsigned int>(bytes_read) != length_) {
-      result = std::make_unique<Envoy::Buffer::OwnedImpl>(reservation.slice().mem_, bytes_read);
+    if (static_cast<unsigned int>(bytes_read.return_value_) != length_) {
+      result = std::make_unique<Envoy::Buffer::OwnedImpl>(reservation.slice().mem_,
+                                                          bytes_read.return_value_);
     } else {
-      reservation.commit(bytes_read);
+      reservation.commit(bytes_read.return_value_);
     }
     return result;
   }
@@ -125,14 +127,14 @@ public:
     for (const auto& slice : slices) {
       size_t slice_bytes_written = 0;
       while (slice_bytes_written < slice.len_) {
-        ssize_t bytes_just_written =
+        auto bytes_just_written =
             posix().pwrite(fileDescriptor(), static_cast<char*>(slice.mem_) + slice_bytes_written,
                            slice.len_ - slice_bytes_written, offset_ + total_bytes_written);
-        if (bytes_just_written == -1) {
-          return statusAfterFileError();
+        if (bytes_just_written.return_value_ == -1) {
+          return statusAfterFileError(bytes_just_written);
         }
-        slice_bytes_written += bytes_just_written;
-        total_bytes_written += bytes_just_written;
+        slice_bytes_written += bytes_just_written.return_value_;
+        total_bytes_written += bytes_just_written.return_value_;
       }
     }
     return total_bytes_written;
@@ -151,11 +153,11 @@ public:
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
     ASSERT(fileDescriptor() != -1);
-    int newfd = posix().dup(fileDescriptor());
-    if (newfd == -1) {
-      return statusAfterFileError();
+    auto newfd = posix().duplicate(fileDescriptor());
+    if (newfd.return_value_ == -1) {
+      return statusAfterFileError(newfd);
     }
-    return std::make_shared<AsyncFileContextThreadPool>(context()->manager(), newfd);
+    return std::make_shared<AsyncFileContextThreadPool>(context()->manager(), newfd.return_value_);
   }
 
   void onCancelledBeforeCallback(absl::StatusOr<AsyncFileHandle> result) override {

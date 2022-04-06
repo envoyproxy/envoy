@@ -30,9 +30,11 @@ AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(
     const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
     Api::OsSysCalls& posix)
     : posix_(posix) {
+  std::cout << "XXXXX wut" << std::endl;
   if (!posix.supportsAllPosixFileOperations()) {
     PANIC("AsyncFileManagerThreadPool not supported");
   }
+  std::cout << "XXXXX wut2" << std::endl;
   unsigned int thread_pool_size = config.thread_pool().thread_count();
   if (thread_pool_size == 0) {
     thread_pool_size = std::thread::hardware_concurrency();
@@ -115,7 +117,7 @@ protected:
     }
   }
   AsyncFileManagerThreadPool& manager_;
-  const Api::OsSysCalls& posix() { return manager_.posix(); }
+  Api::OsSysCalls& posix() { return manager_.posix(); }
 };
 
 class ActionCreateAnonymousFile : public ActionWithFileResult {
@@ -126,23 +128,23 @@ public:
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
     bool was_successful_first_call = false;
-    int fd;
-    std::call_once(manager_.once_flag_, [this, &was_successful_first_call, &fd]() {
-      fd = posix().open(path_.c_str(), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
-      was_successful_first_call = manager_.supports_o_tmpfile_ = (fd != -1);
+    Api::SysCallIntResult open_result;
+    std::call_once(manager_.once_flag_, [this, &was_successful_first_call, &open_result]() {
+      open_result = posix().open(path_.c_str(), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
+      was_successful_first_call = manager_.supports_o_tmpfile_ = (open_result.return_value_ != -1);
     });
     if (manager_.supports_o_tmpfile_) {
       if (was_successful_first_call) {
         // This was the thread doing the very first open(O_TMPFILE), and it worked, so no need to do
         // anything else.
-        return std::make_shared<AsyncFileContextThreadPool>(manager_, fd);
+        return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_);
       }
       // This was any other thread, but O_TMPFILE proved it worked, so we can do it again.
-      fd = posix().open(path_.c_str(), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
-      if (fd == -1) {
-        return statusAfterFileError();
+      open_result = posix().open(path_.c_str(), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
+      if (open_result.return_value_ == -1) {
+        return statusAfterFileError(open_result);
       }
-      return std::make_shared<AsyncFileContextThreadPool>(manager_, fd);
+      return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_);
     }
     // If O_TMPFILE didn't work, fall back to creating a named file and unlinking it.
     // Use a fixed-size buffer because we're going to be using C file functions anyway, and it saves
@@ -156,22 +158,22 @@ public:
     // Using C-style functions here because `mkstemp` requires a writable
     // char buffer, and we can't give it that with C++ strings.
     snprintf(filename, sizeof(filename), "%s%s", path_.c_str(), file_suffix);
-    fd = posix().mkstemp(filename);
-    if (fd == -1) {
-      return statusAfterFileError();
+    open_result = posix().mkstemp(filename);
+    if (open_result.return_value_ == -1) {
+      return statusAfterFileError(open_result);
     }
-    if (posix().unlink(filename) != 0) {
+    if (posix().unlink(filename).return_value_ != 0) {
       // Most likely the problem here is we can't unlink a file while it's open - since that's a
       // prerequisite of the desired behavior of this function, and we don't want to accidentally
       // fill a disk with named tmp files, if this happens we close the file, unlink it, and report
       // an error.
-      posix().close(fd);
+      posix().close(open_result.return_value_);
       posix().unlink(filename);
       return absl::UnimplementedError(
           "AsyncFileManagerThreadPool::createAnonymousFile: not supported for "
           "target filesystem (failed to unlink an open file)");
     }
-    return std::make_shared<AsyncFileContextThreadPool>(manager_, fd);
+    return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_);
   }
 
 private:
@@ -186,11 +188,11 @@ public:
       : ActionWithFileResult(manager, on_complete), filename_(filename), mode_(mode) {}
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
-    int fd = posix().open(filename_.c_str(), openFlags());
-    if (fd == -1) {
-      return statusAfterFileError();
+    auto open_result = posix().open(filename_.c_str(), openFlags());
+    if (open_result.return_value_ == -1) {
+      return statusAfterFileError(open_result);
     }
-    return std::make_shared<AsyncFileContextThreadPool>(manager_, fd);
+    return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_);
   }
 
 private:
@@ -211,20 +213,20 @@ private:
 
 class ActionUnlink : public AsyncFileActionWithResult<absl::Status> {
 public:
-  ActionUnlink(const Api::OsSysCalls& posix, absl::string_view filename,
+  ActionUnlink(Api::OsSysCalls& posix, absl::string_view filename,
                std::function<void(absl::Status)> on_complete)
       : AsyncFileActionWithResult(on_complete), posix_(posix), filename_(filename) {}
 
   absl::Status executeImpl() override {
-    int result = posix_.unlink(filename_.c_str());
-    if (result == -1) {
-      return statusAfterFileError();
+    Api::SysCallIntResult unlink_result = posix_.unlink(filename_.c_str());
+    if (unlink_result.return_value_ == -1) {
+      return statusAfterFileError(unlink_result);
     }
     return absl::OkStatus();
   }
 
 private:
-  const Api::OsSysCalls& posix_;
+  Api::OsSysCalls& posix_;
   const std::string filename_;
 };
 

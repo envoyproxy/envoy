@@ -4,18 +4,20 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/common/async_files/async_file_action.h"
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 
+#include "test/mocks/server/mocks.h"
+
 #include "absl/status/statusor.h"
 #include "absl/synchronization/barrier.h"
-#include "envoy/extensions/common/async_files/v3/async_file_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/mocks/server/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +25,6 @@ namespace Common {
 namespace AsyncFiles {
 
 using ::testing::_;
-using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::Return;
 using ::testing::StrictMock;
@@ -65,7 +66,7 @@ public:
 
   std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
   std::shared_ptr<AsyncFileManagerFactory> factory_;
-  AsyncFileManager* manager_;
+  std::shared_ptr<AsyncFileManager> manager_;
 };
 
 class AsyncFileHandleTest : public testing::Test, public AsyncFileHandleHelpers {
@@ -82,21 +83,19 @@ public:
 class AsyncFileHandleWithMockPosixTest : public testing::Test, public AsyncFileHandleHelpers {
 public:
   void SetUp() override {
+    EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
+        .WillRepeatedly(Return(true));
     singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);
     manager_ = factory_->getAsyncFileManager(config, &mock_posix_file_operations_);
     EXPECT_CALL(mock_posix_file_operations_, open(_, _, _))
-        .Times(AnyNumber())
-        .WillRepeatedly(Return(1));
+        .WillRepeatedly(Return(Api::SysCallIntResult{1, 0}));
     EXPECT_CALL(mock_posix_file_operations_, open(_, _))
-        .Times(AnyNumber())
-        .WillRepeatedly(Return(1));
-    EXPECT_CALL(mock_posix_file_operations_, close(_)).Times(AnyNumber()).WillRepeatedly(Return(0));
-    EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
-        .Times(AnyNumber())
-        .WillRepeatedly(Return(true));
+        .WillRepeatedly(Return(Api::SysCallIntResult{1, 0}));
+    EXPECT_CALL(mock_posix_file_operations_, close(_))
+        .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
   }
   StrictMock<Api::MockOsSysCalls> mock_posix_file_operations_;
 };
@@ -358,7 +357,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialReadReturnsPartialResult) {
   EXPECT_CALL(mock_posix_file_operations_, pread(_, _, _, _))
       .WillOnce([](int, void* buf, size_t, off_t) {
         memcpy(buf, "hel", 3);
-        return 3;
+        return Api::SysCallSizeResult{3, 0};
       });
   handle->read(0, 5, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
     read_status = std::move(status.value());
@@ -383,9 +382,9 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialWriteRetries) {
   absl::Barrier write_barrier{2};
   Envoy::Buffer::OwnedImpl write_value{"hello"};
   EXPECT_CALL(mock_posix_file_operations_, pwrite(_, IsMemoryMatching("hello"), 5, 0))
-      .WillOnce(Return(3));
+      .WillOnce(Return(Api::SysCallSizeResult{3, 0}));
   EXPECT_CALL(mock_posix_file_operations_, pwrite(_, IsMemoryMatching("lo"), 2, 3))
-      .WillOnce(Return(2));
+      .WillOnce(Return(Api::SysCallSizeResult{2, 0}));
   handle->write(write_value, 0, [&](absl::StatusOr<size_t> status) {
     write_status = std::move(status.value());
     write_barrier.Block();
@@ -399,10 +398,10 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialWriteRetries) {
 TEST_F(AsyncFileHandleWithMockPosixTest, CancellingDuplicateInProgressClosesTheFile) {
   auto handle = createAnonymousFile();
   absl::Barrier entering_dup{2}, finishing_dup{2};
-  EXPECT_CALL(mock_posix_file_operations_, dup(_)).WillOnce([&]() {
+  EXPECT_CALL(mock_posix_file_operations_, duplicate(_)).WillOnce([&]() {
     entering_dup.Block();
     finishing_dup.Block();
-    return 4242;
+    return Api::SysCallSocketResult{4242, 0};
   });
   auto cancel_dup = handle->duplicate([](absl::StatusOr<AsyncFileHandle>) {
     // Callback is not called if we cancel (already validated in manager tests)
@@ -413,7 +412,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingDuplicateInProgressClosesTheF
   absl::Barrier closing{2};
   EXPECT_CALL(mock_posix_file_operations_, close(4242)).WillOnce([&]() {
     closing.Block();
-    return 0;
+    return Api::SysCallIntResult{0, 0};
   });
   finishing_dup.Block();
   closing.Block();
@@ -427,7 +426,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingCreateHardLinkInProgressRemov
   EXPECT_CALL(mock_posix_file_operations_, linkat(_, _, _, Eq(filename), _)).WillOnce([&]() {
     entering_hardlink.Block();
     finishing_hardlink.Block();
-    return 0;
+    return Api::SysCallIntResult{0, 0};
   });
   auto cancel_hardlink = handle->createHardLink(filename, [](absl::Status) {
     // Callback is not called if we cancel, so this is unimportant.
@@ -437,7 +436,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingCreateHardLinkInProgressRemov
   absl::Barrier unlinking{2};
   EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(filename))).WillOnce([&]() {
     unlinking.Block();
-    return 0;
+    return Api::SysCallIntResult{0, 0};
   });
   finishing_hardlink.Block();
   unlinking.Block();
@@ -451,8 +450,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingFailedCreateHardLinkInProgres
   EXPECT_CALL(mock_posix_file_operations_, linkat(_, _, _, Eq(filename), _)).WillOnce([&]() {
     entering_hardlink.Block();
     finishing_hardlink.Block();
-    errno = EBADF;
-    return -1;
+    return Api::SysCallIntResult{-1, EBADF};
   });
   auto cancel_hardlink = handle->createHardLink(filename, [](absl::Status) {
     // Callback is not called if we cancel, so this is unimportant.
@@ -469,11 +467,8 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CloseFailureReportsError) {
   absl::Status close_status;
   absl::Barrier close_barrier{2};
   EXPECT_CALL(mock_posix_file_operations_, close(1))
-      .WillOnce([]() {
-        errno = EBADF;
-        return -1;
-      })
-      .WillOnce(Return(0));
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   handle->close([&](absl::Status status) {
     close_status = status;
     close_barrier.Block();
@@ -487,10 +482,8 @@ TEST_F(AsyncFileHandleWithMockPosixTest, DuplicateFailureReportsError) {
   auto handle = createAnonymousFile();
   absl::StatusOr<AsyncFileHandle> dup_status;
   absl::Barrier dup_barrier{2};
-  EXPECT_CALL(mock_posix_file_operations_, dup(_)).WillOnce([]() {
-    errno = EBADF;
-    return -1;
-  });
+  EXPECT_CALL(mock_posix_file_operations_, duplicate(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
   handle->duplicate([&](absl::StatusOr<AsyncFileHandle> status) {
     dup_status = status;
     dup_barrier.Block();

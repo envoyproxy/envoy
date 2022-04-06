@@ -3,10 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "absl/base/thread_annotations.h"
-#include "absl/container/flat_hash_map.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/extensions/common/async_files/async_file_manager_thread_pool.h"
+
+#include "absl/base/thread_annotations.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +35,7 @@ std::shared_ptr<AsyncFileManagerFactory>
 AsyncFileManagerFactory::singleton(Envoy::Singleton::Manager* singleton_manager) {
   return singleton_manager->getTyped<AsyncFileManagerFactory>(
       SINGLETON_MANAGER_REGISTERED_NAME(async_file_manager_factory_singleton),
-      [] { return std::make_shared<AsyncFileManagerFactory>(); });
+      [] { return std::make_shared<AsyncFileManagerFactoryImpl>(); });
 }
 
 std::shared_ptr<AsyncFileManager> AsyncFileManagerFactoryImpl::getAsyncFileManager(
