@@ -70,11 +70,12 @@ are available in any context:
 
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
-* :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>`.
+* :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` for matching IP addresses.
 
 .. _extension_envoy.matching.custom_matchers.domain_matcher:
 
-* :ref:`Server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>`.
+* :ref:`Server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` for matching domain names (e.g.
+  `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`).
 
 Filter Integration
 ##################

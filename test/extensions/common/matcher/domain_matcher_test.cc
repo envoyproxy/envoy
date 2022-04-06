@@ -23,7 +23,7 @@ matcher_tree:
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   custom_match:
-    name: ip_matcher
+    name: matcher
     typed_config:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
@@ -72,7 +72,7 @@ matcher_tree:
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   custom_match:
-    name: ip_matcher
+    name: matcher
     typed_config:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
@@ -98,7 +98,7 @@ matcher_tree:
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   custom_match:
-    name: ip_matcher
+    name: matcher
     typed_config:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
@@ -125,7 +125,7 @@ matcher_tree:
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   custom_match:
-    name: ip_matcher
+    name: matcher
     typed_config:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
@@ -159,7 +159,7 @@ matcher_tree:
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   custom_match:
-    name: ip_matcher
+    name: matcher
     typed_config:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
@@ -212,7 +212,7 @@ matcher_tree:
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   custom_match:
-    name: ip_matcher
+    name: matcher
     typed_config:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
@@ -268,7 +268,7 @@ matcher_tree:
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
               custom_match:
-                name: ip_matcher
+                name: matcher
                 typed_config:
                   "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
                   domain_matchers:

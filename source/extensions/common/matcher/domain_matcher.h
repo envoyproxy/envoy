@@ -28,7 +28,18 @@ using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 
 /**
- * A "compressed" trie node with domain parts as edge values.
+ * A "compressed" trie node with individual domain parts as edge values. Example:
+ *
+ *            ()
+ *     `com`     `org`
+ *   (`*.com`)    ()
+ *              `envoy`
+ *            (`envoy.org`)
+ *
+ * represents the following patterns:
+ * - `*` that matches any domain;
+ * - `*.com` that matches any domain ending with `.com`;
+ * - `envoy.org` that matches domain `envoy.org` exactly.
  */
 template <class DataType> struct DomainNode {
   absl::flat_hash_map<std::string, DomainNode<DataType>> children_;
