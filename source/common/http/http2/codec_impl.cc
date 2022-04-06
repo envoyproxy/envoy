@@ -2180,6 +2180,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
     if (use_oghttp2_library_) {
+      visitor_ = std::move(visitor);
       adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
     } else {
       auto adapter =

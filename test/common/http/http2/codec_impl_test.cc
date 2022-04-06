@@ -527,7 +527,7 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   EXPECT_TRUE(client_wrapper_->status_.ok());
   EXPECT_TRUE(server_wrapper_->status_.ok());
 
-  if (enable_new_codec_wrapper_) {
+  if (http2_implementation_ == Http2Impl::WrappedNghttp2) {
     // Regression test for issue #19761.
     EXPECT_EQ(0, getClientDataSourcesSize());
     EXPECT_EQ(0, getServerDataSourcesSize());
