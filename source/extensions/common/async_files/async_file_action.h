@@ -44,7 +44,7 @@ protected:
 // to each specific action.
 //
 // on_complete callbacks run in the AsyncFileManager's thread pool, and therefore:
-// 1. Should avoid using variables that may be out of scope by the time the thread is called.
+// 1. Should avoid using variables that may be out of scope by the time the callback is called.
 // 2. May need to lock-guard variables that can be changed in other threads.
 // 3. Must not block significantly or do significant work - if anything time-consuming is required
 // the result should be passed to another thread for handling.
