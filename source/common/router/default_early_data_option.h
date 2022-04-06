@@ -26,13 +26,14 @@ public:
 
   EarlyDataOptionPtr createEarlyDataOption(const Protobuf::Message& config) override {
     auto& early_data_config =
-        dynamic_cast<const envoy::extensions::early_data_option::v3::DefaultEarlyDataOption&>(config);
+        dynamic_cast<const envoy::extensions::early_data_option::v3::DefaultEarlyDataOption&>(
+            config);
     return std::make_unique<DefaultEarlyDataOption>(
         early_data_config.early_data_allows_safe_requests());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::route::v3::DefaultEarlyDataOption>();
+    return std::make_unique<envoy::extensions::early_data_option::v3::DefaultEarlyDataOption>();
   }
 };
 

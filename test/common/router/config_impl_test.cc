@@ -6334,7 +6334,7 @@ virtual_hosts:
       early_data_option:
         name: envoy.route.early_data_option.default
         typed_config:
-          "@type": type.googleapis.com/envoy.config.route.v3.DefaultEarlyDataOption
+          "@type": type.googleapis.com/envoy.extensions.early_data_option.v3.DefaultEarlyDataOption
   - match:
       prefix: "/baz"
     route:
@@ -6342,7 +6342,7 @@ virtual_hosts:
       early_data_option:
         name: envoy.route.early_data_option.default
         typed_config:
-          "@type": type.googleapis.com/envoy.config.route.v3.DefaultEarlyDataOption
+          "@type": type.googleapis.com/envoy.extensions.early_data_option.v3.DefaultEarlyDataOption
           early_data_allows_safe_requests: false
   - match:
       prefix: "/eep"
@@ -6351,7 +6351,7 @@ virtual_hosts:
       early_data_option:
         name: envoy.route.early_data_option.default
         typed_config:
-          "@type": type.googleapis.com/envoy.config.route.v3.DefaultEarlyDataOption
+          "@type": type.googleapis.com/envoy.extensions.early_data_option.v3.DefaultEarlyDataOption
           early_data_allows_safe_requests: true
 
  )EOF";
