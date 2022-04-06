@@ -88,6 +88,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION):
         importpath = "github.com/spf13/afero",
         sum = "h1:8q6vk3hthlpb2SouZcnBVKboxWQWMDNF38bwholZrJc=",
         version = "v1.3.4",
+        build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/spf13/afero",
         # last_update = "2021-03-20"
         # use_category = ["api"],
@@ -98,6 +99,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION):
         importpath = "github.com/lyft/protoc-gen-star",
         sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
         version = "v0.6.0",
+        build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
         # last_update = "2022-03-04"
         # use_category = ["api"],
