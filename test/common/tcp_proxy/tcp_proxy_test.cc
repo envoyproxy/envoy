@@ -1138,7 +1138,7 @@ TEST_F(TcpProxyTest, PickClusterOnUpstreamFailure) {
                     .value());
 }
 
-// Verify that odcds callback does not repick cluster. Upstream connect failure does.
+// Verify that odcds callback does not re-pick cluster. Upstream connect failure does.
 TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
   auto config = onDemandConfig();
   set2Cluster(config);
@@ -1166,7 +1166,7 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
   setup(1, config);
 
   // When the on-demand look up callback is invoked, the target cluster should not change.
-  // The behavior is verified by checking the random() which is used during cluster repick.
+  // The behavior is verified by checking the random() which is used during cluster re-pick.
   EXPECT_CALL(factory_context_.api_.random_, random()).Times(0);
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
 
