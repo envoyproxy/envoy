@@ -112,7 +112,6 @@ public:
 private:
   enum class Status { NotStarted, Calling, Complete };
   ConfigSharedPtr config_;
-  // std::vector<RateLimit::Descriptor> filter_descriptors_;
   Filters::Common::RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};

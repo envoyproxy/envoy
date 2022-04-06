@@ -126,9 +126,7 @@ New Features
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
 * ratelimit: network rate limiter supports runtime value substitution using stream info and substitution formatting via :ref:` Network Rate Limiter <config_network_filters_rate_limit>`.
 * redis: support for hostnames returned in ``cluster_slots`` response is now available.
-* redis: support for hostnames returned in ``cluster slots`` response is now available.
 * router: added a path-separated prefix matcher, to make route creation more efficient. :ref:`path_separated_prefix <envoy_v3_api_field_config.route.v3.RouteMatch.path_separated_prefix>`.
-  See :ref:` Network Rate Limiter <config_network_filters_rate_limit_substitution_formatter>`.
 * schema_validator_tool: added ``bootstrap`` checking to the
   :ref:`schema validator check tool <install_tools_schema_validator_check_tool>`.
 * schema_validator_tool: added ``--fail-on-deprecated`` and ``--fail-on-wip`` to the
