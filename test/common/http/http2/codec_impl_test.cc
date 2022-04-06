@@ -323,6 +323,20 @@ public:
     }
   }
 
+  // Only safe to call when using the wrapped nghttp2 codec implementation.
+  size_t getClientDataSourcesSize() {
+    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(
+               *client_wrapper_->connection_->adapter_)
+        .sources_size();
+  }
+
+  // Only safe to call when using the wrapped nghttp2 codec implementation.
+  size_t getServerDataSourcesSize() {
+    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(
+               *server_wrapper_->connection_->adapter_)
+        .sources_size();
+  }
+
   TestScopedRuntime scoped_runtime_;
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
@@ -452,6 +466,50 @@ protected:
     }
   }
 };
+
+TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+
+  // Encode request headers.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Queue request body.
+  Buffer::OwnedImpl request_body(std::string(1024, 'a'));
+  request_encoder_->encodeData(request_body, true);
+
+  // Flush request body.
+  EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Encode response headers.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // Queue response body.
+  Buffer::OwnedImpl response_body(std::string(1024, 'b'));
+  response_encoder_->encodeData(response_body, true);
+
+  // Flush response body.
+  EXPECT_CALL(response_decoder_, decodeData(_, true)).Times(AtLeast(1));
+  driveToCompletion();
+
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+
+  if (enable_new_codec_wrapper_) {
+    // Regression test for issue #19761.
+    EXPECT_EQ(0, getClientDataSourcesSize());
+    EXPECT_EQ(0, getServerDataSourcesSize());
+  }
+}
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
