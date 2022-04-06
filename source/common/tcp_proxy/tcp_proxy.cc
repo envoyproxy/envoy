@@ -432,6 +432,9 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
   case Upstream::ClusterDiscoveryStatus::Available:
     // cluster_discovery_handle_ would have been cancelled if the downstream were closed.
     ASSERT(!downstream_closed_);
+    ENVOY_CONN_LOG(debug, "On demand cluster {} is found. Establishing connection.",
+                   read_callbacks_->connection(), cluster_name);
+    config_->onDemandStats().on_demand_cluster_success_.inc();
     establishUpstreamConnection();
     return;
   }

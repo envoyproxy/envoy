@@ -91,6 +91,30 @@ public:
   }
   void setUpShortTimeout() { odcds_timeout_ = std::chrono::milliseconds(1000); }
 
+  ::testing::AssertionResult assertOnDemandCounters(uint64_t success, uint64_t missing,
+                                                    uint64_t timeout) {
+    auto success_counter = test_server_->counter("tcp.tcp_stats.on_demand_cluster_success");
+    auto missing_counter = test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing");
+    auto timeout_counter = test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout");
+    if (success_counter && success_counter->value() == success && missing_counter &&
+        missing_counter->value() == missing && timeout_counter &&
+        timeout_counter->value() == timeout) {
+      return ::testing::AssertionSuccess();
+    } else {
+      auto to_string = [](Stats::CounterSharedPtr& counter) {
+        if (counter == nullptr) {
+          return absl::StrCat("not exist");
+        } else {
+          return absl::StrCat(counter->value());
+        }
+      };
+      return ::testing::AssertionFailure()
+             << fmt::format("success {} vs {}, missing {} vs {}, timeout {} vs {}", success,
+                            to_string(success_counter), missing, to_string(missing_counter),
+                            timeout, to_string(timeout_counter));
+    }
+  }
+
   // The on demand CDS stream. The requested cluster config is delivered to Envoy in this stream.
   FakeStreamPtr odcds_stream_;
   std::chrono::milliseconds odcds_timeout_{60000};
@@ -303,8 +327,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownTcpClientBeforeOdcdsResponse) {
   EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
   // Client disconnect when the tcp proxy is waiting for the on demand response.
   tcp_client->close();
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
+  assertOnDemandCounters(0, 0, 0);
 }
 
 } // namespace
