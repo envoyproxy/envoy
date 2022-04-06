@@ -8,6 +8,7 @@ import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -58,7 +59,7 @@ enum ProtocolType {
   COMPACT = 3;
 
   // The Thrift proxy will use the Thrift "Twitter" protocol implemented by the finagle library.
-  TWITTER = 4;
+  TWITTER = 4 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
 }
 
 message Trds {

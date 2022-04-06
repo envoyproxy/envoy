@@ -23,7 +23,7 @@ inline constexpr absl::string_view AudienceKey = "audience_key";
 #define ALL_GCP_AUTHN_FILTER_STATS(COUNTER) COUNTER(retrieve_audience_failed)
 
 /**
- * Wrapper struct for connection manager stats. @see stats_macros.h
+ * Wrapper struct for stats. @see stats_macros.h
  */
 struct GcpAuthnFilterStats {
   ALL_GCP_AUTHN_FILTER_STATS(GENERATE_COUNTER_STRUCT)
