@@ -220,7 +220,7 @@ public:
    */
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status,
                               absl::string_view details) PURE;
 
   /**

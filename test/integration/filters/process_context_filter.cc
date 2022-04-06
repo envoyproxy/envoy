@@ -28,7 +28,7 @@ public:
       return Http::FilterHeadersStatus::StopIteration;
     }
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "ProcessObjectForFilter is healthy",
-                                       nullptr, absl::nullopt, "");
+                                       nullptr, nullptr, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

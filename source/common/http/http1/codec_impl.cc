@@ -1217,7 +1217,7 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   active_request_->response_encoder_.setDetails(details);
   if (!active_request_->response_encoder_.startedResponse()) {
     active_request_->request_decoder_->sendLocalReply(
-        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
+        error_code_, CodeUtility::toString(error_code_), nullptr, nullptr, details);
   }
   return okStatus();
 }

@@ -515,7 +515,7 @@ void OAuth2Filter::finishFlow() {
 void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
-                                     absl::nullopt, EMPTY_STRING);
+                                     nullptr, EMPTY_STRING);
 }
 
 } // namespace Oauth2

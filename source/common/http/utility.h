@@ -373,8 +373,8 @@ struct LocalReplyData {
   Code response_code_;
   // Supplies the optional body text which is returned.
   absl::string_view body_text_;
-  // gRPC status code to override the httpToGrpcStatus mapping with.
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+
+  Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status_;
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
 };

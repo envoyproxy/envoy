@@ -462,7 +462,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
     error_ = true;
     decoder_callbacks_->sendLocalReply(
-        static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
+        static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, nullptr,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                      StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                      "}"));
@@ -482,7 +482,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           "Transcoding of query arguments of HttpBody request is not done (unexpected state)");
       error_ = true;
       decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
+          Http::Code::BadRequest, "Bad request", nullptr, nullptr,
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }

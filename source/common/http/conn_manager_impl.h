@@ -193,9 +193,9 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status,
                         absl::string_view details) override {
-      return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+      return filter_manager_.sendLocalReply(code, body, modify_headers, std::move(grpc_status), details);
     }
 
     // Tracing::TracingConfig

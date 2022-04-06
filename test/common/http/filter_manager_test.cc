@@ -114,7 +114,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         encoder_filter->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
-                                                           absl::nullopt, "");
+                                                           nullptr, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -479,7 +479,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_CALL(*encoder_filter, onLocalReply(_));
   EXPECT_CALL(filter_manager_callbacks_, resetStream());
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                             absl::nullopt, "details");
+                                             nullptr, "details");
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.
@@ -528,7 +528,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*encoder_filter, encodeHeaders(_, _))
         .WillOnce(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
           decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body2", nullptr,
-                                                     absl::nullopt, "details2");
+                                                     nullptr, "details2");
           return FilterHeadersStatus::StopIteration;
         }));
 
@@ -541,7 +541,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                               absl::nullopt, "details");
+                                               nullptr, "details");
   }
 
   // The final details should be details2.

@@ -436,7 +436,7 @@ public:
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status,
                               absl::string_view details) PURE;
 
   /**
@@ -872,7 +872,7 @@ public:
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status,
                               absl::string_view details) PURE;
   /**
    * Adds new metadata to be encoded.

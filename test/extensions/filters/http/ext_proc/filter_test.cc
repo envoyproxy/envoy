@@ -418,7 +418,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+                                                 Eq(nullptr), "Got_a_bad_request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -490,7 +490,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+                                                 Eq(nullptr), "Got_a_bad_request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -1547,7 +1547,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(nullptr), "ext_proc_error_gRPC_error_13"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -1604,7 +1604,7 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+                                                 Eq(nullptr), "ext_proc_error_gRPC_error_13"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,

@@ -21,6 +21,8 @@ namespace Http {
 namespace {
 REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<Matching::HttpFilterActionContext>);
 
+using Envoy::Http::StreamFilterCallbacks;
+
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 
 // Shared helper for recording the latest filter used.
@@ -397,8 +399,8 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
 void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+    Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status, absl::string_view details) {
+  parent_.sendLocalReply(code, body, modify_headers, std::move(grpc_status), details);
 }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
@@ -455,7 +457,7 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
   } else {
     parent_.filter_manager_callbacks_.onRequestDataTooLarge();
     sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+                   nullptr, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
   }
 }
 
@@ -758,7 +760,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     IS_ENVOY_BUG("Invalid request data");
-    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr,nullptr,
                    StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
@@ -898,7 +900,7 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
 void FilterManager::sendLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status, absl::string_view details) {
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   const bool is_grpc_request = state_.is_grpc_request_;
@@ -927,7 +929,7 @@ void FilterManager::sendLocalReply(
   if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
-                                 grpc_status, details);
+                                 std::move(grpc_status), details);
   } else if (!state_.non_100_response_headers_encoded_) {
     ENVOY_STREAM_LOG(debug, "Sending local reply with details {} directly to the encoder", *this,
                      details);
@@ -937,7 +939,7 @@ void FilterManager::sendLocalReply(
     // state machine screwed up, bypass the filter chain and send the local
     // reply directly to the codec.
     //
-    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, grpc_status);
+    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, std::move(grpc_status));
   } else {
     // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
@@ -952,7 +954,7 @@ void FilterManager::sendLocalReply(
 void FilterManager::sendLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
   // For early error handling, do a best-effort attempt to create a filter chain
@@ -990,13 +992,13 @@ void FilterManager::sendLocalReplyViaFilterChain(
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
-      Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
+      Utility::LocalReplyData{is_grpc_request, code, body, std::move(grpc_status), is_head_request});
 }
 
 void FilterManager::sendDirectLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap&)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status) {
   // Make sure we won't end up with nested watermark calls from the body buffer.
   state_.encoder_filters_streaming_ = true;
   Http::Utility::sendLocalReply(
@@ -1035,7 +1037,7 @@ void FilterManager::sendDirectLocalReply(
             }
             maybeEndEncode(end_stream);
           }},
-      Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
+      Utility::LocalReplyData{state_.is_grpc_request_, code, body, std::move(grpc_status), is_head_request});
 }
 
 void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
@@ -1157,7 +1159,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   if (!status.ok()) {
     // If the check failed, then we reply with BadGateway, and stop the further processing.
     sendLocalReply(
-        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+        Http::Code::BadGateway, status.message(), nullptr, nullptr,
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
                      "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
     return;
@@ -1238,7 +1240,7 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
     encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     IS_ENVOY_BUG("Invalid response data");
-    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, nullptr,
                    StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidResponseData);
   }
 }
@@ -1642,8 +1644,8 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
 void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+    Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status, absl::string_view details) {
+  parent_.sendLocalReply(code, body, modify_headers, std::move(grpc_status), details);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
@@ -1663,7 +1665,7 @@ void ActiveStreamEncoderFilter::responseDataTooLarge() {
     // reset the stream.
     parent_.sendLocalReply(
         Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
-        nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+        nullptr, nullptr, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
 }
 

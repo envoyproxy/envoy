@@ -89,7 +89,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          config_->statusOnError(), EMPTY_STRING, nullptr, nullptr,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -406,7 +406,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          config_->statusOnError(), EMPTY_STRING, nullptr, nullptr,
           Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;

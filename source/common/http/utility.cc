@@ -594,10 +594,12 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
     if (response_headers->getGrpcStatusValue().empty()) {
-      response_headers->setGrpcStatus(std::to_string(
-          enumToInt(local_reply_data.grpc_status_
-                        ? local_reply_data.grpc_status_.value()
-                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+      if (local_reply_data.grpc_status_ && local_reply_data.grpc_status_->status_code_) {
+        response_headers->setGrpcStatus(local_reply_data.grpc_status_->status_code_.value());
+      } else {
+         response_headers->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
+      }
+
     }
 
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
