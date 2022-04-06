@@ -64,9 +64,9 @@ message RateLimitQuotaBucketSettings {
       // to the assignment. No individual request/response matching needed.
       //
       // .. note::
-      // To avoid memory exhaust, queue configuration allows to
-      // to impose constraints on the maximum number of pending requests
-      // in the queue, and choose what to do with the request over the limit.
+      //   To avoid memory exhaust, queue configuration allows to
+      //   to impose constraints on the maximum number of pending requests
+      //   in the queue, and choose what to do with the request over the limit.
       type.v3.RateLimitStrategyQueue queue_requests = 2;
     }
   }

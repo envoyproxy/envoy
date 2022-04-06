@@ -5,8 +5,6 @@ package envoy.service.rate_limit_quota.v3;
 import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
