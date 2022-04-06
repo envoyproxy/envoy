@@ -720,35 +720,6 @@ public:
 using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
 
 /**
- * Type of path matching that a route entry uses.
- */
-enum class PathMatchType {
-  None,
-  Prefix,
-  Exact,
-  Regex,
-  PathSeparatedPrefix,
-};
-
-/**
- * Criterion that a route entry uses for matching a particular path.
- */
-class PathMatchCriterion {
-public:
-  virtual ~PathMatchCriterion() = default;
-
-  /**
-   * @return PathMatchType type of path match.
-   */
-  virtual PathMatchType matchType() const PURE;
-
-  /**
-   * @return const std::string& the string with which to compare paths.
-   */
-  virtual const std::string& matcher() const PURE;
-};
-
-/**
  * Base class for all route typed metadata factories.
  */
 class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
@@ -982,11 +953,6 @@ public:
    * tls context match criteria, nullptr is returned.
    */
   virtual const TlsContextMatchCriteria* tlsContextMatchCriteria() const PURE;
-
-  /**
-   * @return const PathMatchCriterion& the match criterion for this route.
-   */
-  virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 
   /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt

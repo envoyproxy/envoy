@@ -85,7 +85,6 @@ public:
   // SipProxy::SipFilters::DecoderFilter
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
-  MOCK_METHOD(void, resetUpstreamConnection, ());
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
   // SipProxy::DecoderEventHandler

@@ -87,7 +87,8 @@ STD_REGEX_ALLOWLIST = (
     "./contrib/squash/filters/http/source/squash_filter.h",
     "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
-    "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/stats_handler.cc", "./source/server/admin/stats_request.cc",
+    "./source/server/admin/stats_request.h", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
 
@@ -204,53 +205,6 @@ CODE_CONVENTION_REPLACEMENTS = {
     # Times(1) noise.
     ".Times(1).WillOnce": ".WillOnce",
     ".Times(1).WillRepeatedly": ".WillOnce",
-}
-
-UNOWNED_EXTENSIONS = {
-    "extensions/filters/http/buffer",
-    "extensions/filters/http/rbac",
-    "extensions/filters/http/ip_tagging",
-    "extensions/filters/http/tap",
-    "extensions/filters/http/health_check",
-    "extensions/filters/http/cors",
-    "extensions/filters/http/dynamo",
-    "extensions/filters/http/lua",
-    "extensions/filters/http/common",
-    "extensions/filters/common",
-    "extensions/filters/common/rbac",
-    "extensions/filters/common/lua",
-    "extensions/filters/listener/original_dst",
-    "extensions/filters/listener/proxy_protocol",
-    "extensions/stat_sinks/statsd",
-    "extensions/stat_sinks/common",
-    "extensions/stat_sinks/common/statsd",
-    "extensions/health_checkers/redis",
-    "extensions/access_loggers/grpc",
-    "extensions/access_loggers/file",
-    "extensions/common/tap",
-    "extensions/transport_sockets/raw_buffer",
-    "extensions/transport_sockets/tap",
-    "extensions/tracers/zipkin",
-    "extensions/tracers/dynamic_ot",
-    "extensions/tracers/opencensus",
-    "extensions/tracers/lightstep",
-    "extensions/tracers/common",
-    "extensions/tracers/common/ot",
-    "extensions/retry/host/previous_hosts",
-    "extensions/filters/network/client_ssl_auth",
-    "extensions/filters/network/rbac",
-    "extensions/filters/network/tcp_proxy",
-    "extensions/filters/network/echo",
-    "extensions/filters/network/redis_proxy",
-    "extensions/filters/network/kafka",
-    "extensions/filters/network/kafka/broker",
-    "extensions/filters/network/kafka/mesh",
-    "extensions/filters/network/kafka/mesh/command_handlers",
-    "extensions/filters/network/kafka/protocol",
-    "extensions/filters/network/kafka/serialization",
-    "extensions/filters/network/mongo_proxy",
-    "extensions/filters/network/common",
-    "extensions/filters/network/common/redis",
 }
 
 UNSORTED_FLAGS = {
@@ -1033,7 +987,7 @@ class FormatChecker:
         for owned in owned_directories:
             if owned.startswith(dir_name) or dir_name.startswith(owned):
                 found = True
-        if not found and dir_name not in UNOWNED_EXTENSIONS:
+        if not found:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
@@ -1196,32 +1150,24 @@ if __name__ == "__main__":
             if (e.returncode != 0 and e.returncode != 1):
                 error_messages.append("Failed to check visibility with command %s" % command)
 
+    def get_owners():
+        with open('./OWNERS.md') as f:
+            EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*github.com.(.*)\)\)')
+            maintainers = ["@UNOWNED"]
+            for line in f:
+                if "Senior extension maintainers" in line:
+                    return maintainers
+                m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+                if m is not None:
+                    maintainers.append("@" + m.group(1).lower())
+
     # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
     # error_messages.
     def owned_directories(error_messages):
         owned = []
-        maintainers = [
-            '@mattklein123',
-            '@htuch',
-            '@alyssawilk',
-            '@zuercher',
-            '@lizan',
-            '@snowp',
-            '@yanavlasov',
-            '@junr03',
-            '@dio',
-            '@jmarantz',
-            '@antoniovicente',
-            '@ggreenway',
-            '@phlax',
-            '@wrowe',
-            '@rojkov',
-            '@RyanTheOptimist',
-            '@adisuissa',
-            '@KBaichoo',
-        ]
-
         try:
+            maintainers = get_owners()
+
             with open('./CODEOWNERS') as f:
                 for line in f:
                     # If this line is of the form "extensions/... @owner1 @owner2" capture the directory

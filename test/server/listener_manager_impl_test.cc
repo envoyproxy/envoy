@@ -48,6 +48,9 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
 
+// For internal listener test only.
+SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
+
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
   ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }
@@ -55,6 +58,13 @@ protected:
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
+  void SetUp() override {
+    ListenerManagerImplTest::SetUp();
+    ASSERT_NE(nullptr, server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+                           "internal_listener_registry_singleton",
+                           [registry = internal_registry_]() { return registry; }));
+  }
+
   /**
    * Create an IPv4 listener with a given name.
    */
