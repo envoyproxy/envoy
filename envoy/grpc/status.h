@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include "absl/types/optional.h"
+#include "google/rpc/status.pb.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -59,9 +60,14 @@ public:
    * The gRPC status option for gRPC local reply.
    */
   struct LocalReplyGrpcStatusOption {
-    // gRPC status code to override the httpToGrpcStatus mapping with.
+
+    // Supplies gRPC status code to override the httpToGrpcStatus mapping with.
     const absl::optional<GrpcStatus> status_code_;
-    LocalReplyGrpcStatusOption(GrpcStatus status_code) : status_code_(status_code) {}
+
+    // Supplies gRPC status error details.
+    std::unique_ptr<::google::rpc::Status> error_details_;
+
+    LocalReplyGrpcStatusOption(GrpcStatus status_code, std::unique_ptr<::google::rpc::Status> error_details) : status_code_(status_code), error_details_(std::move(error_details)) {}
   };
 
   using LocalReplyGrpcStatusOptionPtr = std::unique_ptr<LocalReplyGrpcStatusOption>;

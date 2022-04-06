@@ -58,4 +58,5 @@ envoy_cc_library(
 envoy_cc_library(
     name = "status",
     hdrs = ["status.h"],
+    deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
 )

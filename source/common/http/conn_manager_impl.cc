@@ -810,7 +810,7 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "downstream duration timeout", nullptr,
                  std::make_unique<Envoy::Grpc::Status::LocalReplyGrpcStatusOption>(
-                     Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded),
+                     Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded, nullptr),
                  StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
 }
 
