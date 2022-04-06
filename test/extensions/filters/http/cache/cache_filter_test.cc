@@ -185,7 +185,7 @@ protected:
     auto insert_context = std::make_unique<StrictMock<MockInsertContext>>();
     EXPECT_CALL(*insert_context, insertHeaders(isSupersetOfCacheableResponseHeaders(), _, true));
     EXPECT_CALL(*insert_context, onDestroy());
-    return std::move(insert_context);
+    return insert_context;
   }
 
   // Returns a unique_ptr to a MockInsertContext for an insert with body.
@@ -211,7 +211,7 @@ protected:
     }
     EXPECT_CALL(*insert_context, onDestroy());
 
-    return std::move(insert_context);
+    return insert_context;
   }
 
   // Passes request_headers_ into the filter's decodeHeaders(), and runs any
