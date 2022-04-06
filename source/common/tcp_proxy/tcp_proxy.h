@@ -138,15 +138,10 @@ public:
       : odcds_(context.clusterManager().allocateOdCdsApi(on_demand_message.odcds_config(),
                                                          OptRef<xds::core::v3::ResourceLocator>(),
                                                          context.messageValidationVisitor())),
-        stats_(generateStats(scope)) {
-    lookup_timeout_ =
-        std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000));
-    // TODO(#20633): ASSERT non-negative when implement odcds timeout API.
-    if (lookup_timeout_ < std::chrono::milliseconds(0)) {
-      lookup_timeout_ = std::chrono::milliseconds(0);
-    }
-  }
-  Upstream::OdCdsApiHandle& odcds() const { return *odcds_; }
+        lookup_timeout_(std::chrono::milliseconds(
+            PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
+        stats_(generateStats(scope)) {}
+  Upstream::OdCdsApiHandle& onDemandCds() const { return *odcds_; }
   std::chrono::milliseconds timeout() const { return lookup_timeout_; }
   const OnDemandStats& stats() const { return stats_; }
 
@@ -244,9 +239,9 @@ public:
     return cluster_metadata_match_criteria_.get();
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
-  OptRef<Upstream::OdCdsApiHandle> odcds() const {
+  OptRef<Upstream::OdCdsApiHandle> onDemandCds() const {
     auto on_demand_config = shared_config_->onDemandConfig();
-    return on_demand_config.has_value() ? makeOptRef(on_demand_config->odcds())
+    return on_demand_config.has_value() ? makeOptRef(on_demand_config->onDemandCds())
                                         : OptRef<Upstream::OdCdsApiHandle>();
   }
   // This function must not be called if on demand is disabled.

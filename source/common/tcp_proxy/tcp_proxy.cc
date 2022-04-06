@@ -336,7 +336,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
       cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (!thread_local_cluster) {
-    auto odcds = config_->odcds();
+    auto odcds = config_->onDemandCds();
     if (!odcds.has_value()) {
       // No ODCDS? It means that on-demand discovery is disabled.
       ENVOY_CONN_LOG(debug, "Cluster not found {} and no on demand cluster set.",
