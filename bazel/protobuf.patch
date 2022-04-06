@@ -1,24 +1,24 @@
 diff --git a/BUILD b/BUILD
-index 1690d4219..8a7f1bf14 100644
+index 887e5e384..40e33c1b0 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -19,7 +19,7 @@ exports_files(["LICENSE"])
+@@ -21,4 +21,4 @@ exports_files(["LICENSE"])
  # ZLIB configuration
  ################################################################################
- 
+
 -ZLIB_DEPS = ["@zlib//:zlib"]
 +ZLIB_DEPS = ["//external:zlib"]
- 
+
  ################################################################################
  # Protobuf Runtime Library
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 9319c67f1..d85d53d4a 100644
+index cd0daeaea..197bf25b6 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
-@@ -31,3 +31,9 @@
+@@ -31,1 +31,1 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
- 
- __version__ = '3.19.4'
+
+ __version__ = '3.20.0'
 +
 +if __name__ != '__main__':
 +  try:
