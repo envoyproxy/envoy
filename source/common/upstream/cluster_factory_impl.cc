@@ -17,7 +17,7 @@ namespace Upstream {
 namespace {
 
 Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                                   Stats::Store& stats) {
+                                         Stats::Store& stats) {
   return stats.createScope(fmt::format(
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
