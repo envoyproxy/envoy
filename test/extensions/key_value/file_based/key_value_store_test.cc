@@ -27,9 +27,8 @@ protected:
 
   void createStore(uint32_t max_entries = 0) {
     flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    store_ = std::make_unique<FileBasedKeyValueStore>(dispatcher_, flush_interval_,
-                                                      Filesystem::fileSystemForTest(), filename_,
-                                                      max_entries);
+    store_ = std::make_unique<FileBasedKeyValueStore>(
+        dispatcher_, flush_interval_, Filesystem::fileSystemForTest(), filename_, max_entries);
   }
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::string filename_;
@@ -62,7 +61,6 @@ TEST_F(KeyValueStoreTest, MaxEntries) {
   EXPECT_EQ("b", store_->get("2").value());
   EXPECT_EQ(absl::nullopt, store_->get("1"));
 }
-
 
 TEST_F(KeyValueStoreTest, Persist) {
   store_->addOrUpdate("foo", "bar");
@@ -131,8 +129,7 @@ TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
     return KeyValueStore::Iterate::Continue;
   };
 
-  EXPECT_DEATH(store_->iterate(update_value_callback),
-               "addOrUpdate under the stack of iterate");
+  EXPECT_DEATH(store_->iterate(update_value_callback), "addOrUpdate under the stack of iterate");
 
   KeyValueStore::ConstIterateCb add_key_callback = [this](const std::string& key,
                                                           const std::string&) {
@@ -142,8 +139,7 @@ TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
     }
     return KeyValueStore::Iterate::Continue;
   };
-  EXPECT_DEATH(store_->iterate(add_key_callback),
-               "addOrUpdate under the stack of iterate");
+  EXPECT_DEATH(store_->iterate(add_key_callback), "addOrUpdate under the stack of iterate");
 }
 #endif
 

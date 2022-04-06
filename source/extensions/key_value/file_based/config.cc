@@ -9,8 +9,7 @@ namespace KeyValue {
 FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
                                                std::chrono::milliseconds flush_interval,
                                                Filesystem::Instance& file_system,
-                                               const std::string& filename,
-                                               uint32_t max_entries)
+                                               const std::string& filename, uint32_t max_entries)
     : KeyValueStoreBase(dispatcher, flush_interval, max_entries), file_system_(file_system),
       filename_(filename) {
   if (!file_system_.fileExists(filename_)) {

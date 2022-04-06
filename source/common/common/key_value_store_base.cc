@@ -32,8 +32,7 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 
 KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
                                      std::chrono::milliseconds flush_interval, uint32_t max_entries)
-    : max_entries_(max_entries),
-    flush_timer_(dispatcher.createTimer([this, flush_interval]() {
+    : max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval]() {
         flush();
         flush_timer_->enableTimer(flush_interval);
       })) {
@@ -47,8 +46,9 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
 // parses contents into the provided store.
 // This is best effort, and will return false on failure without clearing
 // partially parsed data.
-bool KeyValueStoreBase::parseContents(absl::string_view contents,
-                                      quiche::QuicheLinkedHashMap<std::string, std::string>& store) const {
+bool KeyValueStoreBase::parseContents(
+    absl::string_view contents,
+    quiche::QuicheLinkedHashMap<std::string, std::string>& store) const {
   std::string error;
   while (!contents.empty()) {
     absl::optional<absl::string_view> key = getToken(contents, error);
@@ -73,7 +73,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
     store_.erase(key);
     store_.emplace(key, value);
   }
-  if (max_entries_  && store_.size() > max_entries_) {
+  if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
   }
   if (!flush_timer_->enabled()) {
