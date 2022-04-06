@@ -47,7 +47,7 @@ public:
     EXPECT_TRUE(result.on_match_.has_value());
     EXPECT_NE(result.on_match_->action_cb_, nullptr);
     auto action = result.on_match_->action_cb_();
-    const auto value = action->getTyped<StringAction>();
+    const auto value = action->template getTyped<StringAction>();
     EXPECT_EQ(value.string_, output);
   }
   void validateNoMatch() {
