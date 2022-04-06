@@ -164,6 +164,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, SingleTcpClient) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
+  assertOnDemandCounters(1, 0, 0);
 }
 
 // Verify only one delta xds response is needed for multiple tcp_proxy requests.
@@ -192,8 +193,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
 
   test_server_->waitForCounterEq("tcp.tcp_stats.on_demand_cluster_attempt",
                                  expected_upstream_connections);
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
+
   // This upstream is listening on the endpoint of `new_cluster`.
   for (auto n = expected_upstream_connections; n != 0; n--) {
     fake_upstream_connections_.push_back(nullptr);
@@ -218,6 +218,10 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
     tcp_client->close();
   }
 
+  auto success_value = test_server_->counter("tcp.tcp_stats.on_demand_cluster_success")->value();
+  // The cluster look up occurs at least once and at most `expected_upstream_connections` times.
+  EXPECT_GE(expected_upstream_connections, success_value);
+  EXPECT_LE(1, success_value);
   EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
   EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
 }
@@ -243,8 +247,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnTimeout) {
 
   tcp_client->waitForHalfClose();
   tcp_client->close();
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
-  EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
+  assertOnDemandCounters(0, 0, 1);
 }
 
 TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnClusterMissing) {
@@ -271,8 +274,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnClusterMissing) {
 
   tcp_client->waitForHalfClose();
   tcp_client->close();
-  EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
+  assertOnDemandCounters(0, 1, 0);
 }
 
 TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeout) {
@@ -301,8 +303,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
 
   tcp_client_1->waitForHalfClose();
   tcp_client_2->waitForHalfClose();
-  EXPECT_EQ(2, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
+  assertOnDemandCounters(0, 0, 2);
   tcp_client_1->close();
   tcp_client_2->close();
 }
