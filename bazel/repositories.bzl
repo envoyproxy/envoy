@@ -949,6 +949,11 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
+        name = "upb_reflection",
+        actual = "@upb//:reflection",
+    )
+
+    native.bind(
         name = "upb_textformat_lib",
         actual = "@upb//:textformat",
     )
