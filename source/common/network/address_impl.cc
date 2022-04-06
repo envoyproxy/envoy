@@ -407,7 +407,7 @@ EnvoyInternalInstance::EnvoyInternalInstance(const std::string& address_id,
                                              const SocketInterface* sock_interface)
     : InstanceBase(Type::EnvoyInternal, sockInterfaceOrDefault(sock_interface)),
       internal_address_(address_id) {
-  friendly_name_ = absl::StrCat("envoy://", address_id);
+  friendly_name_ = absl::StrCat("envoy:", address_id);
 }
 
 bool EnvoyInternalInstance::operator==(const Instance& rhs) const {

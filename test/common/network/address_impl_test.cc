@@ -333,7 +333,7 @@ TEST(PipeInstanceTest, Basic) {
 
 TEST(InteralInstanceTest, Basic) {
   EnvoyInternalInstance address("listener_foo");
-  EXPECT_EQ("envoy://listener_foo", address.asString());
+  EXPECT_EQ("envoy:listener_foo", address.asString());
   EXPECT_EQ(Type::EnvoyInternal, address.type());
   EXPECT_EQ(nullptr, address.ip());
   EXPECT_EQ(nullptr, address.pipe());
