@@ -118,6 +118,7 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -138,6 +139,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -192,6 +194,7 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   while (!got_continue) {
     // trigger the event to copy the client hello message into buffer
     file_event_callback_(Event::FileReadyType::Read);
@@ -214,6 +217,7 @@ TEST_P(TlsInspectorTest, NoExtensions) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -263,6 +267,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
             return Api::SysCallSizeResult{ssize_t(length), 0};
           }));
 #endif
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -283,6 +288,7 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -310,6 +316,7 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   // EXPECT_CALL(cb_, continueFilterChain(true));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
@@ -382,6 +389,7 @@ TEST_P(TlsInspectorTest, NotSsl) {
   // Use 100 bytes of zeroes. This is not valid as a ClientHello.
   data.resize(100);
   mockSysCallForPeek(data);
+  EXPECT_CALL(socket_, detectedTransportProtocol());
   // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
