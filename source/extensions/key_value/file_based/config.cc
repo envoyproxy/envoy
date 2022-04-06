@@ -9,8 +9,9 @@ namespace KeyValue {
 FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
                                                std::chrono::milliseconds flush_interval,
                                                Filesystem::Instance& file_system,
-                                               const std::string& filename)
-    : KeyValueStoreBase(dispatcher, flush_interval), file_system_(file_system),
+                                               const std::string& filename,
+                                               uint32_t max_entries)
+    : KeyValueStoreBase(dispatcher, flush_interval, max_entries), file_system_(file_system),
       filename_(filename) {
   if (!file_system_.fileExists(filename_)) {
     ENVOY_LOG(info, "File for key value store does not yet exist: {}", filename);
@@ -50,8 +51,9 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
       typed_config.config().typed_config(), validation_visitor);
   auto milliseconds =
       std::chrono::milliseconds(DurationUtil::durationToMilliseconds(file_config.flush_interval()));
+  uint32_t max_entries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(file_config, max_entries, 1000);
   return std::make_unique<FileBasedKeyValueStore>(dispatcher, milliseconds, file_system,
-                                                  file_config.filename());
+                                                  file_config.filename(), max_entries);
 }
 
 REGISTER_FACTORY(FileBasedKeyValueStoreFactory, KeyValueStoreFactory);

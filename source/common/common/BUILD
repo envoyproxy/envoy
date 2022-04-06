@@ -155,8 +155,10 @@ envoy_cc_library(
     hdrs = ["key_value_store_base.h"],
     external_deps = [
         "abseil_cleanup",
+        "quiche_quic_platform"
     ],
     deps = [
+        "@com_github_google_quiche//:quiche_common_lib",
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
