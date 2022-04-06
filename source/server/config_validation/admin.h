@@ -25,7 +25,7 @@ public:
                         : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
                   const ParamDescriptorVec& = {}) override;
-  bool addChunkedHandler(const std::string&, const std::string&, GenHandlerCb, bool, bool,
+  bool addStreamingHandler(const std::string&, const std::string&, GenHandlerCb, bool, bool,
                          const ParamDescriptorVec& = {}) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;

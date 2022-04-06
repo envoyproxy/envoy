@@ -9,8 +9,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -69,17 +69,10 @@ public:
   Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
                                              Http::ResponseHeaderMap& response_headers,
                                              Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
-  static Http::Code handlerStats(Stats::Store& stats, bool used_only, bool json,
-                                 const absl::optional<std::regex>& filter,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response);
-
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
+  Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response);
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
@@ -115,6 +108,10 @@ private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
+  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, bool used_only, bool json,
+                                       Utility::HistogramBucketsMode histogram_buckets_mode,
+                                       const absl::optional<std::regex>& regex);
 };
 
 } // namespace Server

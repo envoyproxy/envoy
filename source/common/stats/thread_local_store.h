@@ -104,8 +104,8 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
-  const std::string quantileSummary() const override;
-  const std::string bucketSummary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -528,7 +528,6 @@ private:
   std::atomic<bool> threading_ever_initialized_{};
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
-  AllocatorImpl heap_allocator_;
   OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;

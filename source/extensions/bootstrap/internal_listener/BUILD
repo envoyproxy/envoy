@@ -1,0 +1,68 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
+
+envoy_cc_extension(
+    name = "config",
+    # for integration tests
+    visibility = ["//visibility:public"],
+    deps = [
+        ":client_connection_factory",
+        ":internal_listener_registry",
+    ],
+)
+
+envoy_cc_library(
+    name = "internal_listener_registry",
+    srcs = [
+        "internal_listener_registry.cc",
+    ],
+    hdrs = [
+        "internal_listener_registry.h",
+    ],
+    deps = [
+        ":thread_local_registry",
+        "//envoy/server:bootstrap_extension_config_interface",
+        "//source/server:listener_manager_lib",
+        "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "client_connection_factory",
+    srcs = [
+        "client_connection_factory.cc",
+    ],
+    hdrs = [
+        "client_connection_factory.h",
+    ],
+    deps = [
+        ":thread_local_registry",
+        "//envoy/network:client_connection_factory",
+        "//envoy/network:connection_interface",
+        "//envoy/registry",
+        "//source/common/network:connection_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/extensions/io_socket/user_space:io_handle_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "thread_local_registry",
+    hdrs = [
+        "client_connection_factory.h",
+        "thread_local_registry.h",
+    ],
+    deps = [
+        "//envoy/network:client_connection_factory",
+        "//envoy/network:listener_interface",
+        "//envoy/thread_local:thread_local_interface",
+    ],
+)

@@ -24,7 +24,7 @@ def generate_header_file(input_path):
     correct value.
 
     Args:
-        input_path: the file containing the API version (API_VERSION).
+        input_path: the file containing the API version (API_VERSION.txt).
 
     Returns:
         the header file contents.

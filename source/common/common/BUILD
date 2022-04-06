@@ -153,6 +153,9 @@ envoy_cc_library(
     name = "key_value_store_lib",
     srcs = ["key_value_store_base.cc"],
     hdrs = ["key_value_store_base.h"],
+    external_deps = [
+        "abseil_cleanup",
+    ],
     deps = [
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",

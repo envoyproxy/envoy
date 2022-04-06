@@ -80,6 +80,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
+  ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -101,7 +102,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         i == filters.size() - 1);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
-    ret.push_back(callback);
+    ret.push_back(std::move(callback));
   }
   return ret;
 }

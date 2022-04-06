@@ -112,8 +112,9 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
   int port = fake_upstreams_[1]->localAddress()->ip()->port();
   std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
@@ -150,7 +151,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
-      {":authority", "host"},
+      {":authority", "sni.lyft.com"},
       {"x-lyft-user-id", "123"},
       {"x-forwarded-for", "10.0.0.1"},
       {"x-envoy-retry-on", "http3-post-connect-failure"}};
@@ -168,7 +169,6 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
   fake_upstream_connection_.reset();
-
   // Second request should go out over HTTP/3 because of the Alt-Svc information.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(1);
@@ -199,22 +199,14 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
-  void initialize() override {
-    // TODO(alyssawilk) there's no config guarantee that SNI and hostname
-    // match, but alt-svc rtt caching doesn't work unless they do. Fix.
-    config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(0);
-          auto endpoint = locality_lb->mutable_lb_endpoints(0)->mutable_endpoint();
-          endpoint->set_hostname("foo.lyft.com");
-        });
-    FilterIntegrationTest::initialize();
+  MixedUpstreamIntegrationTest() {
+    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
+    default_request_headers_.setHost("sni.lyft.com");
   }
 
   void writeFile() {
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
-    std::string key = absl::StrCat("https://foo.lyft.com:", port);
+    std::string key = absl::StrCat("https://sni.lyft.com:", port);
 
     size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
                          timeSystem().monotonicTime().time_since_epoch())
@@ -245,13 +237,17 @@ protected:
 };
 
 int getSrtt(std::string alt_svc, TimeSource& time_source) {
-  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source);
+  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source,
+                                                                      /*from_cache=*/false);
   return data.has_value() ? data.value().srtt.count() : 0;
 }
+
 // Test auto-config with a pre-populated HTTP/3 alt-svc entry. The upstream request will
 // occur over HTTP/3.
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
-  testRouterRequestAndResponseWithBody(0, 0, false);
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
   cleanupUpstreamAndDownstream();
   std::string alt_svc;
 
@@ -286,7 +282,9 @@ TEST_P(MixedUpstreamIntegrationTest, SimultaneousLargeRequestsAutoWithHttp3) {
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp2) {
   // Only create an HTTP/2 upstream.
   use_http2_ = true;
-  testRouterRequestAndResponseWithBody(0, 0, false);
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
 }
 
 // Same as above, only multiple requests.

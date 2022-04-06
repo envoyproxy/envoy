@@ -46,6 +46,18 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
 
 } // namespace
 
+void ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6, struct sockaddr_in* sin) {
+#if defined(__APPLE__)
+  *sin = {{}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
+#elif defined(WIN32)
+  struct in_addr in_v4 = {};
+  in_v4.S_un.S_addr = reinterpret_cast<const uint32_t*>(sin6->sin6_addr.u.Byte)[3];
+  *sin = {AF_INET, sin6->sin6_port, in_v4, {}};
+#else
+  *sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
+#endif
+}
+
 StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
                                                               socklen_t ss_len, bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >= sizeof(sa_family_t), "");
@@ -61,16 +73,8 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
     if (!v6only && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-#if defined(__APPLE__)
-      struct sockaddr_in sin = {
-          {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
-#elif defined(WIN32)
-      struct in_addr in_v4 = {};
-      in_v4.S_un.S_addr = reinterpret_cast<const uint32_t*>(sin6->sin6_addr.u.Byte)[3];
-      struct sockaddr_in sin = {AF_INET, sin6->sin6_port, in_v4, {}};
-#else
-      struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
-#endif
+      struct sockaddr_in sin;
+      ipv6ToIpv4CompatibleAddress(sin6, &sin);
       return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
     } else {
       return Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sin6, v6only);
@@ -234,6 +238,16 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
   return ptr;
 }
 
+InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
+  if (!v6only_ && IN6_IS_ADDR_V4MAPPED(&address_.sin6_addr)) {
+    struct sockaddr_in sin;
+    ipv6ToIpv4CompatibleAddress(&address_, &sin);
+    auto addr = Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
+    return addr.ok() ? addr.value() : nullptr;
+  }
+  return nullptr;
+}
+
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
@@ -245,21 +259,21 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
     : Ipv6Instance(address, 0, sockInterfaceOrDefault(sock_interface)) {}
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
-                           const SocketInterface* sock_interface)
+                           const SocketInterface* sock_interface, bool v6only)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
-  ip_.ipv6_.address_.sin6_family = AF_INET6;
-  ip_.ipv6_.address_.sin6_port = htons(port);
+  sockaddr_in6 addr_in;
+  memset(&addr_in, 0, sizeof(addr_in));
+  addr_in.sin6_family = AF_INET6;
+  addr_in.sin6_port = htons(port);
   if (!address.empty()) {
-    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
+    if (1 != inet_pton(AF_INET6, address.c_str(), &addr_in.sin6_addr)) {
       throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
     }
   } else {
-    ip_.ipv6_.address_.sin6_addr = in6addr_any;
+    addr_in.sin6_addr = in6addr_any;
   }
-  // Just in case address is in a non-canonical format, format from network address.
-  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
-  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+  initHelper(addr_in, v6only);
 }
 
 Ipv6Instance::Ipv6Instance(uint32_t port, const SocketInterface* sock_interface)

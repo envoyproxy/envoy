@@ -160,13 +160,13 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
       }
 
       ++it;
-      /* In single thread, this condition should be cover in line 160
-       * And Envoy should be single thread
-      if (it->second->deleted()) {
-        transaction_info_map_.erase(it++);
-      } else {
-        ++it;
-      }*/
+      // In single thread, this condition should be cover in line 160
+      // And Envoy should be single thread
+      // if (it->second->deleted()) {
+      //   transaction_info_map_.erase(it++);
+      // } else {
+      //   ++it;
+      // }
     }
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
@@ -271,7 +271,7 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (!metadata_->destination().empty()) {
+    if (metadata_->destination().empty()) {
       return false;
     }
     return host.address()->ip()->addressAsString() != metadata_->destination();
@@ -333,7 +333,6 @@ public:
     UNREFERENCED_PARAMETER(metadata);
     return *this;
   }
-  absl::string_view getLocalIp() override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -348,7 +347,7 @@ class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public std::enable_shared_from_this<UpstreamRequest>,
                         public Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamRequest(Upstream::TcpPoolData& pool_data,
+  UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool_data,
                   std::shared_ptr<TransactionInfo> transaction_info);
   ~UpstreamRequest() override;
   FilterStatus start();
@@ -374,19 +373,12 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
   void write(Buffer::Instance& data, bool end_stream) {
     return conn_data_->connection().write(data, end_stream);
-  }
-
-  absl::string_view localAddress() {
-    return conn_data_->connection()
-        .connectionInfoProvider()
-        .localAddress()
-        ->ip()
-        ->addressAsString();
   }
 
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
@@ -396,7 +388,7 @@ public:
   std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
 
 private:
-  Upstream::TcpPoolData& conn_pool_;
+  std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;

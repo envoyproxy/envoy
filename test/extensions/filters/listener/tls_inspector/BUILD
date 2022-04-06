@@ -22,6 +22,8 @@ envoy_cc_test(
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
@@ -62,6 +64,7 @@ envoy_extension_cc_benchmark_binary(
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
@@ -83,5 +86,36 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tls_inspector_integration_test",
+    srcs = [
+        "tls_inspector_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        "//source/common/config:api_version_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//source/extensions/filters/network/echo:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/integration:integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )

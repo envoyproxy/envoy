@@ -6,4 +6,4 @@ COPY ./certs/postgres-frontend.example.com.crt /certs/clientcert.pem
 COPY ./certs/example.com.key /certs/clientkey.pem
 
 RUN chmod go+r /etc/envoy.yaml /certs/cacert.pem /certs/clientkey.pem /certs/clientcert.pem
-CMD ["/usr/local/bin/envoy", "-c /etc/envoy.yaml", "-l", "debug"]
+CMD ["/usr/local/bin/envoy", "-c /etc/envoy.yaml"]

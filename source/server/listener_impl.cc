@@ -8,6 +8,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/access_log/access_log_impl.h"
@@ -345,8 +346,24 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.clusterManager(), parent_.server_.localInfo(),
               parent_.server_.dispatcher(), parent_.server_.stats(),
               parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-              validation_visitor_, parent_.server_.api(), parent_.server_.options())),
+              validation_visitor_, parent_.server_.api(), parent_.server_.options(),
+              parent_.server_.accessLogManager())),
       quic_stat_names_(parent_.quicStatNames()) {
+
+  if ((address_->type() == Network::Address::Type::Ip &&
+       config.address().socket_address().ipv4_compat()) &&
+      (address_->ip()->version() != Network::Address::IpVersion::v6 ||
+       (!address_->ip()->isAnyAddress() &&
+        address_->ip()->ipv6()->v4CompatibleAddress() == nullptr))) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
+      throw EnvoyException(fmt::format(
+          "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
+          address_->asStringView()));
+    } else {
+      ENVOY_LOG(warn, "An invalid IPv4-mapped IPv6 address is used when ipv4_compat is set: {}",
+                address_->asStringView());
+    }
+  }
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -468,7 +485,6 @@ void ListenerImpl::buildAccessLog() {
 
 void ListenerImpl::buildInternalListener() {
   if (config_.address().has_envoy_internal_address()) {
-    internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
     if (config_.has_api_listener()) {
       throw EnvoyException(
           fmt::format("error adding listener '{}': internal address cannot be used in api listener",
@@ -489,6 +505,16 @@ void ListenerImpl::buildInternalListener() {
       throw EnvoyException(fmt::format("error adding listener '{}': does not support socket option",
                                        address_->asString()));
     }
+    std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
+        parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+            "internal_listener_registry_singleton");
+    if (internal_listener_registry == nullptr) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': internal listener registry is not initialized.",
+                      address_->asString()));
+    }
+    internal_listener_config_ =
+        std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
   } else {
     if (config_.has_internal_listener()) {
       throw EnvoyException(fmt::format("error adding listener '{}': address is not an internal "

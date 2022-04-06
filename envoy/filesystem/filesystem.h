@@ -32,7 +32,7 @@ public:
     Write,
     // Create the file if it does not already exist
     Create,
-    // If writing, append to the file rather than writing to the begining and
+    // If writing, append to the file rather than writing to the beginning and
     // truncating after write.
     Append,
   };

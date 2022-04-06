@@ -1,0 +1,90 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: UDP
+        address: 0.0.0.0
+        port_value: 1234
+    listener_filters:
+    - name: envoy.filters.udp_listener.udp_proxy
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+        stat_prefix: service
+        matcher:
+          # The outer matcher list matches source IP.
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: envoy.matching.inputs.source_ip
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+                  value_match:
+                    exact: 127.0.0.1
+              on_match:
+                matcher:
+                  # The inner matcher tree matches source port.
+                  matcher_tree:
+                    input:
+                      name: envoy.matching.inputs.source_port
+                      typed_config:
+                        '@type': type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourcePortInput
+                    exact_match_map:
+                      map:
+                        "80":
+                          action:
+                            name: route
+                            typed_config:
+                              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                              cluster: udp_service
+                        "443":
+                          action:
+                            name: route
+                            typed_config:
+                              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                              cluster: udp_service2
+                  on_no_match:
+                    action:
+                      name: route
+                      typed_config:
+                        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                        cluster: udp_service3
+  clusters:
+  - name: service_udp
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_udp
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 1235
+  - name: service_udp2
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_udp
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 1236
+  - name: service_udp3
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_udp
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 1237

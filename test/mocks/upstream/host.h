@@ -91,6 +91,7 @@ public:
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
+  MOCK_METHOD(bool, canCreateConnection, (Upstream::ResourcePriority), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
@@ -171,6 +172,7 @@ public:
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
+  MOCK_METHOD(bool, canCreateConnection, (Upstream::ResourcePriority), (const));
   MOCK_METHOD((std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>),
               counters, (), (const));
   MOCK_METHOD(MockCreateConnectionData, createConnection_,

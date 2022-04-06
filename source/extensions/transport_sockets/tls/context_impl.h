@@ -60,7 +60,8 @@ struct TlsContext {
   void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
-class ContextImpl : public virtual Envoy::Ssl::Context {
+class ContextImpl : public virtual Envoy::Ssl::Context,
+                    protected Logger::Loggable<Logger::Id::config> {
 public:
   virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
 
@@ -78,6 +79,7 @@ public:
    */
   static int sslExtendedSocketInfoIndex();
 
+  static int sslSocketIndex();
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -87,6 +89,8 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+
+  static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -130,6 +134,9 @@ protected:
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
   const Ssl::HandshakerCapabilities capabilities_;
+  const Network::Address::IpList tls_keylog_local_;
+  const Network::Address::IpList tls_keylog_remote_;
+  AccessLog::AccessLogFileSharedPtr tls_keylog_file_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;

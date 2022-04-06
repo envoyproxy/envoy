@@ -151,6 +151,7 @@ public:
 
 private:
   const std::string descriptor_value_;
+  const std::string descriptor_key_;
   const bool expect_match_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
 };
