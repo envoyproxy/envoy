@@ -932,7 +932,7 @@ void FilterManager::sendLocalReply(
     ENVOY_STREAM_LOG(debug, "Sending local reply with details {} directly to the encoder", *this,
                      details);
     // In this case, at least the header and possibly the body has started
-    // processing through the filter chain, but no non-informational headers
+    // processing through the filter chain, but no informational headers
     // have been sent downstream. To ensure that filters don't get their
     // state machine screwed up, bypass the filter chain and send the local
     // reply directly to the codec.
