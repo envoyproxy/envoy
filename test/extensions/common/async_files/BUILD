@@ -15,7 +15,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/extensions/common/async_files:async_files_mocks",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
@@ -31,7 +30,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/extensions/common/async_files:async_files_mocks",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
@@ -45,7 +43,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/extensions/common/async_files:async_files_mocks",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],

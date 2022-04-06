@@ -80,8 +80,6 @@ protected:
   // Implementation of the actual action.
   virtual T executeImpl() PURE;
 
-  T result_;
-
 private:
   std::function<void(T)> on_complete_;
 };
