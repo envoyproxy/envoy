@@ -30,7 +30,7 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
 };
 
-DECLARE_FACTORY(DefaultClientConnectioFactory);
+DECLARE_FACTORY(DefaultClientConnectionFactory);
 
 } // namespace Network
 } // namespace Envoy
