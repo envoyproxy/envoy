@@ -37,6 +37,7 @@
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Router {
@@ -221,6 +222,20 @@ const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEnt
 
 const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
+}
+
+void UpstreamRequest::copyDynamicMetaDataFromDownstream(StreamInfo::StreamInfo& l4_stream_info) {
+  if (parent_.callbacks()->connection() != nullptr) {
+    const StreamInfo::StreamInfo& downstream_streamInfo =
+        parent_.callbacks()->connection()->streamInfo();
+    const auto& dynamic_metadata = downstream_streamInfo.dynamicMetadata();
+    auto name = Envoy::Extensions::NetworkFilters::NetworkFilterNames::get().DownToUp;
+    auto filter_it = dynamic_metadata.filter_metadata().find(name);
+    if (filter_it != dynamic_metadata.filter_metadata().end()) {
+      ProtobufWkt::Struct metadata(filter_it->second);
+      l4_stream_info.setDynamicMetadata(name, metadata);
+    }
+  }
 }
 
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
@@ -526,6 +541,7 @@ void UpstreamRequest::onPoolReady(
         [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
+  copyDynamicMetaDataFromDownstream(info);
 
   const Http::Status status =
       upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
