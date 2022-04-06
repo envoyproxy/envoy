@@ -72,7 +72,6 @@ class StatFlushIntegrationTest {
 
     engine!!.flushStats()
 
-    statsdServer.awaitNextStat()
-    assertThat(statsdServer.mostRecentlyReceivedStat()).contains("envoy.pulse.foo.bar:1|c")
+    statsdServer.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
   }
 }

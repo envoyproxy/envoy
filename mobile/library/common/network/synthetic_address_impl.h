@@ -20,35 +20,39 @@ class SyntheticAddressImpl : public Instance {
 public:
   SyntheticAddressImpl() {}
 
-  bool operator==(const Instance&) const {
+  bool operator==(const Instance&) const override {
     // Every synthetic address is different from one another and other address types. In reality,
     // whatever object owns a synthetic address can't rely on address equality for any logic as the
     // address is just a stub.
     return false;
   }
 
-  const std::string& asString() const { return address_; }
+  const std::string& asString() const override { return address_; }
 
-  absl::string_view asStringView() const { return address_; }
+  absl::string_view asStringView() const override { return address_; }
 
-  const std::string& logicalName() const { return address_; }
+  const std::string& logicalName() const override { return address_; }
 
-  const Ip* ip() const { return nullptr; }
+  const Ip* ip() const override { return nullptr; }
 
-  const Pipe* pipe() const { return nullptr; }
+  const Pipe* pipe() const override { return nullptr; }
 
-  const EnvoyInternalAddress* envoyInternalAddress() const { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
 
-  const sockaddr* sockAddr() const { return nullptr; }
+  const sockaddr* sockAddr() const override { return nullptr; }
 
-  socklen_t sockAddrLen() const { return 0; }
+  socklen_t sockAddrLen() const override { return 0; }
 
-  Type type() const {
+  Type type() const override {
     // TODO(junr03): consider adding another type of address.
     return Type::Ip;
   }
 
-  const SocketInterface& socketInterface() const { return SocketInterfaceSingleton::get(); }
+  absl::string_view addressType() const override { return "default"; }
+
+  const SocketInterface& socketInterface() const override {
+    return SocketInterfaceSingleton::get();
+  }
 
 private:
   const std::string address_{"synthetic"};

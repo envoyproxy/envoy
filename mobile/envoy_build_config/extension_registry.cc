@@ -1,5 +1,6 @@
 #include "extension_registry.h"
 
+#include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -64,8 +65,9 @@ void ExtensionRegistry::registerFactories() {
   // https://github.com/envoyproxy/envoy/pull/11380/files#diff-8a5c90e5a39b2ea975170edc4434345bR138.
   // For now force the compilation unit to run by creating an instance of the class declared in
   // socket_interface_impl.h and immediately destroy.
-  auto ptr = std::make_unique<Network::SocketInterfaceImpl>();
-  ptr.reset(nullptr);
+  { auto ptr = std::make_unique<Network::SocketInterfaceImpl>(); }
+
+  { auto ptr = std::make_unique<Network::DefaultClientConnectionFactory>(); }
 }
 
 } // namespace Envoy

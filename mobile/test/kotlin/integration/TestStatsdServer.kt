@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicReference
 class TestStatsdServer {
   private val shutdownLatch: CountDownLatch = CountDownLatch(1)
   private val awaitNextStat: AtomicReference<CountDownLatch> = AtomicReference(CountDownLatch(0))
-  private var latestStats: AtomicReference<String> = AtomicReference()
+  private val matchCriteria: AtomicReference<(String) -> Boolean> = AtomicReference()
 
   private var thread: Thread? = null
 
@@ -37,21 +37,21 @@ class TestStatsdServer {
           // TODO(snowp): Parse (or use a parser) so we can extract out individual metric names
           // better.
           val received = String(packet.getData(), packet.getOffset(), packet.getLength())
-          latestStats.set(received)
-          awaitNextStat.get().countDown()
+          val maybeMatch = matchCriteria.get()
+          if (maybeMatch != null && maybeMatch.invoke(received)) {
+            matchCriteria.set(null)
+            awaitNextStat.get().countDown()
+          }
         }
       }
     )
     thread!!.start()
   }
 
-  fun mostRecentlyReceivedStat(): String {
-    return latestStats.get()
-  }
-
-  fun awaitNextStat() {
+  fun awaitStatMatching(predicate: (String) -> Boolean) {
     val latch = CountDownLatch(1)
     awaitNextStat.set(latch)
+    matchCriteria.set(predicate)
     latch.await()
   }
 
