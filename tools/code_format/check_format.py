@@ -1126,6 +1126,7 @@ if __name__ == "__main__":
         # https://github.com/envoyproxy/envoy/issues/9953
         # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
         exclude_list = (
+            "':(exclude)source/extensions/common/wasm/BUILD' "
             "':(exclude)source/extensions/filters/http/buffer/BUILD' "
             "':(exclude)source/extensions/filters/network/common/BUILD' ")
         command = (

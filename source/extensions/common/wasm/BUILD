@@ -66,11 +66,8 @@ envoy_cc_library(
             "-DWASM_USE_CEL_PARSER",
         ],
     }),
-    visibility = [
-        "//source/extensions:__subpackages__",
-        "//test/extensions:__subpackages__",
-        "//test/test_common:__subpackages__",
-    ],
+    # Export an implementation of "null-VM" interfaces in proxy-wasm.
+    visibility = ["//visibility:public"],
     deps = [
         ":wasm_hdr",
         ":wasm_runtime_factory_interface",
