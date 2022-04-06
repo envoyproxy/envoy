@@ -37,6 +37,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/default_early_data_option.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -282,9 +283,7 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
-    bool allowsEarlyDataForRequest(Http::RequestHeaderMap& /*request_headers*/) const override {
-      return false;
-    }
+    const Router::EarlyDataOption& earlyDataOption() const override { return *early_data_option_; }
 
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     std::unique_ptr<Router::RetryPolicy> retry_policy_;
@@ -302,6 +301,9 @@ private:
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
+    // Pass early data option config through StreamOptions.
+    std::unique_ptr<Router::EarlyDataOption> early_data_option_{
+        new Router::DefaultEarlyDataOption(true)};
   };
 
   struct RouteImpl : public Router::Route {

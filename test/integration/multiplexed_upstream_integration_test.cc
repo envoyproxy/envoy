@@ -737,11 +737,15 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        hcm.mutable_route_config()
-            ->mutable_virtual_hosts(0)
-            ->mutable_routes(0)
-            ->mutable_route()
-            ->set_early_data_allows_safe_requests(false);
+        auto* early_data_option = hcm.mutable_route_config()
+                                      ->mutable_virtual_hosts(0)
+                                      ->mutable_routes(0)
+                                      ->mutable_route()
+                                      ->mutable_early_data_option();
+        envoy::config::route::v3::DefaultEarlyDataOption config;
+        config.set_early_data_allows_safe_requests(false);
+        early_data_option->set_name("envoy.route.early_data_options.default");
+        early_data_option->mutable_typed_config()->PackFrom(config);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -770,7 +774,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   ASSERT_TRUE(response2->waitForEndStream());
 }
 
-// Tests that if configured, POST request can be sent over early data and retried if the upstream
+// Tests that Envoy will automatically retry a GET request sent over early data if the upstream
 // rejects it with TooEarly response.
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
 #ifdef WIN32
@@ -782,20 +786,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
     return;
   }
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        auto* route_action = hcm.mutable_route_config()
-                                 ->mutable_virtual_hosts(0)
-                                 ->mutable_routes(0)
-                                 ->mutable_route();
-        route_action->mutable_early_data_options()->add_allowed_methods("POST");
-        // Also config retry upon 425 response because the POST request will not be automatically
-        // retried.
-        auto* retry_policy = route_action->mutable_retry_policy();
-        retry_policy->set_retry_on("retriable-status-codes");
-        retry_policy->add_retriable_status_codes(425);
-      });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -814,7 +804,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
 
   default_request_headers_.addCopy("second_request", "1");
   auto response2 = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "sni.lyft.com"},

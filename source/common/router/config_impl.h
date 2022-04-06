@@ -596,7 +596,7 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-  bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const override;
+  const EarlyDataOption& earlyDataOption() const override { return *early_data_option_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -764,9 +764,7 @@ private:
       return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
-    bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const override {
-      return parent_->allowsEarlyDataForRequest(request_headers);
-    }
+    const EarlyDataOption& earlyDataOption() const override { return parent_->earlyDataOption(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -993,8 +991,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   const std::string random_value_header_name_;
-  // If absent, only allows only safe requests.
-  absl::optional<uint32_t> allowed_early_data_requests_;
+  EarlyDataOptionPtr early_data_option_;
 };
 
 /**

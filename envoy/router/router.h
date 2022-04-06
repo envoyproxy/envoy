@@ -754,6 +754,38 @@ public:
 class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 /**
+ * Base class for all early data option extensions.
+ */
+class EarlyDataOption {
+public:
+  virtual ~EarlyDataOption() = default;
+
+  /**
+   * @return bool whether the given request should be allowed to be sent over early data.
+   */
+  virtual bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const PURE;
+};
+
+using EarlyDataOptionPtr = std::unique_ptr<EarlyDataOption>;
+
+/**
+ * Base class for all early data option factories.
+ */
+class EarlyDataOptionFactory : public Envoy::Config::TypedFactory {
+public:
+  virtual ~EarlyDataOptionFactory() = default;
+
+  /**
+   * @param config the typed config for early data option.
+   * @return EarlyDataIOptionPtr an instance of EarlyDataOption.
+   */
+  virtual EarlyDataOptionPtr createEarlyDataOption(const Protobuf::Message& config) PURE;
+
+  // Config::UntypedFactory
+  std::string category() const override { return "envoy.route.early_data_option"; }
+};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry : public ResponseEntry {
@@ -988,9 +1020,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return bool whether the given request should be allowed to be sent over early data.
+   * @return EarlyDataOption& the configured early data option.
    */
-  virtual bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const PURE;
+  virtual const EarlyDataOption& earlyDataOption() const PURE;
 };
 
 /**

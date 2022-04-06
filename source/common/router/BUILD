@@ -34,6 +34,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
+        ":default_early_data_option_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
@@ -415,5 +416,16 @@ envoy_cc_library(
     hdrs = ["delegating_route_impl.h"],
     deps = [
         "//envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_early_data_option_lib",
+    srcs = ["default_early_data_option.cc"],
+    hdrs = ["default_early_data_option.h"],
+    deps = [
+        "//envoy/router:router_interface",
+        "//source/common/http:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

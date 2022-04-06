@@ -342,6 +342,11 @@ public:
   std::string matcher_;
 };
 
+class MockEarlyDataOption : public EarlyDataOption {
+public:
+  MOCK_METHOD(bool, allowsEarlyDataForRequest, (Http::RequestHeaderMap & request_headers), (const));
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -394,7 +399,7 @@ public:
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
-  MOCK_METHOD(bool, allowsEarlyDataForRequest, (Http::RequestHeaderMap & request_headers), (const));
+  MOCK_METHOD(const EarlyDataOption&, earlyDataOption, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};
@@ -413,6 +418,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
+  testing::NiceMock<MockEarlyDataOption> early_data_option_;
 };
 
 class MockDecorator : public Decorator {

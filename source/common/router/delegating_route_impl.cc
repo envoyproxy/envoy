@@ -176,9 +176,8 @@ const std::string& DelegatingRouteEntry::routeName() const {
   return base_route_->routeEntry()->routeName();
 }
 
-bool DelegatingRouteEntry::allowsEarlyDataForRequest(
-    Http::RequestHeaderMap& request_headers) const {
-  return base_route_->routeEntry()->allowsEarlyDataForRequest(request_headers);
+const EarlyDataOption& DelegatingRouteEntry::earlyDataOption() const {
+  return base_route_->routeEntry()->earlyDataOption();
 }
 
 } // namespace Router

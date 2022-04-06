@@ -6317,7 +6317,7 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, AllowsEarlyData) {
+TEST_F(RouteMatcherTest, ConfigEarlyData) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -6332,61 +6332,74 @@ virtual_hosts:
       prefix: "/bar"
     route:
       cluster: www2
-      early_data_options:
-        allowed_methods: ["GET", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"]
+      early_data_option:
+        name: envoy.route.early_data_option.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.route.v3.DefaultEarlyDataOption
   - match:
       prefix: "/baz"
     route:
       cluster: www2
-      early_data_allows_safe_requests: false
+      early_data_option:
+        name: envoy.route.early_data_option.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.route.v3.DefaultEarlyDataOption
+          early_data_allows_safe_requests: false
   - match:
-      prefix: "/"
+      prefix: "/eep"
     route:
       cluster: www2
-      early_data_allows_safe_requests: true
-  )EOF";
+      early_data_option:
+        name: envoy.route.early_data_option.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.route.v3.DefaultEarlyDataOption
+          early_data_allows_safe_requests: true
+
+ )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   // Default allows safe requests using early data.
   Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
-  EXPECT_TRUE(config.route(foo_request1, 0)->routeEntry()->allowsEarlyDataForRequest(foo_request1));
+  EXPECT_TRUE(config.route(foo_request1, 0)
+                  ->routeEntry()
+                  ->earlyDataOption()
+                  .allowsEarlyDataForRequest(foo_request1));
   Http::TestRequestHeaderMapImpl foo_request2 = genHeaders("www.lyft.com", "/foo", "POST");
-  EXPECT_FALSE(
-      config.route(foo_request2, 0)->routeEntry()->allowsEarlyDataForRequest(foo_request2));
+  EXPECT_FALSE(config.route(foo_request2, 0)
+                   ->routeEntry()
+                   ->earlyDataOption()
+                   .allowsEarlyDataForRequest(foo_request2));
 
-  // If specified, only allows requests with specified methods using early data.
+  // Disable early data.
   Http::TestRequestHeaderMapImpl bar_request1 = genHeaders("www.lyft.com", "/bar", "GET");
-  EXPECT_TRUE(config.route(bar_request1, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request1));
+  EXPECT_FALSE(config.route(bar_request1, 0)
+                   ->routeEntry()
+                   ->earlyDataOption()
+                   .allowsEarlyDataForRequest(bar_request1));
   Http::TestRequestHeaderMapImpl bar_request2 = genHeaders("www.lyft.com", "/bar", "POST");
-  EXPECT_TRUE(config.route(bar_request2, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request2));
-  Http::TestRequestHeaderMapImpl bar_request3 = genHeaders("www.lyft.com", "/bar", "HEAD");
-  EXPECT_FALSE(
-      config.route(bar_request3, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request3));
-  Http::TestRequestHeaderMapImpl bar_request4 = genHeaders("www.lyft.com", "/bar", "PUT");
-  EXPECT_TRUE(config.route(bar_request4, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request4));
-  Http::TestRequestHeaderMapImpl bar_request5 = genHeaders("www.lyft.com", "/bar", "DELETE");
-  EXPECT_TRUE(config.route(bar_request5, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request5));
-  Http::TestRequestHeaderMapImpl bar_request6 = genHeaders("www.lyft.com", "/bar", "OPTIONS");
-  EXPECT_TRUE(config.route(bar_request6, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request6));
-  Http::TestRequestHeaderMapImpl bar_request7 = genHeaders("www.lyft.com", "/bar", "CONNECT");
-  EXPECT_TRUE(config.route(bar_request7, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request7));
-  Http::TestRequestHeaderMapImpl bar_request8 = genHeaders("www.lyft.com", "/bar", "TRACE");
-  EXPECT_TRUE(config.route(bar_request8, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request8));
-  Http::TestRequestHeaderMapImpl bar_request9 = genHeaders("www.lyft.com", "/bar", "PATCH");
-  EXPECT_TRUE(config.route(bar_request9, 0)->routeEntry()->allowsEarlyDataForRequest(bar_request9));
-
-  // If turned off, allows no request using early data.
+  EXPECT_FALSE(config.route(bar_request2, 0)
+                   ->routeEntry()
+                   ->earlyDataOption()
+                   .allowsEarlyDataForRequest(bar_request2));
   Http::TestRequestHeaderMapImpl baz_request = genHeaders("www.lyft.com", "/baz", "GET");
-  EXPECT_FALSE(config.route(baz_request, 0)->routeEntry()->allowsEarlyDataForRequest(baz_request));
+  EXPECT_FALSE(config.route(baz_request, 0)
+                   ->routeEntry()
+                   ->earlyDataOption()
+                   .allowsEarlyDataForRequest(baz_request));
 
   // If explicitly turned on, allows safe requests using early data.
   Http::TestRequestHeaderMapImpl eep_request1 = genHeaders("www.lyft.com", "/eep", "HEAD");
-  EXPECT_TRUE(config.route(eep_request1, 0)->routeEntry()->allowsEarlyDataForRequest(eep_request1));
+  EXPECT_TRUE(config.route(eep_request1, 0)
+                  ->routeEntry()
+                  ->earlyDataOption()
+                  .allowsEarlyDataForRequest(eep_request1));
   Http::TestRequestHeaderMapImpl eep_request2 = genHeaders("www.lyft.com", "/eep", "POST");
-  EXPECT_FALSE(
-      config.route(eep_request2, 0)->routeEntry()->allowsEarlyDataForRequest(eep_request2));
+  EXPECT_FALSE(config.route(eep_request2, 0)
+                   ->routeEntry()
+                   ->earlyDataOption()
+                   .allowsEarlyDataForRequest(eep_request2));
 }
 
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};
