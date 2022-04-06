@@ -142,6 +142,15 @@ public:
     }
   }
 
+  void set2Cluster(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
+    auto* new_cluster = config.mutable_weighted_clusters()->add_clusters();
+    *new_cluster->mutable_name() = "fake_cluster_0";
+    new_cluster->set_weight(1);
+    new_cluster = config.mutable_weighted_clusters()->add_clusters();
+    *new_cluster->mutable_name() = "fake_cluster_1";
+    new_cluster->set_weight(1);
+  }
+
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy onDemandConfig() {
     auto config = defaultConfig();
     config.mutable_on_demand()->mutable_odcds_config();
@@ -1103,6 +1112,86 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
       upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress().get());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamInfo()->upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
+}
+
+TEST_F(TcpProxyTest, PickClusterOnUpstreamFailure) {
+  auto config = defaultConfig();
+  set2Cluster(config);
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  // The random number lead into picking the first one in the weighted clusters.
+  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_0"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
+
+  setup(1, config);
+
+  // The random number lead into picking the second cluster.
+  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(1));
+
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_1"))
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+}
+
+// Verify that odcds callback does not repick cluster. Upstream connect failure does.
+TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
+  auto config = onDemandConfig();
+  set2Cluster(config);
+  config.mutable_max_connect_attempts()->set_value(2);
+  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
+
+  // The random number lead to select the first one in the weighted clusters.
+  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
+
+  // The first cluster is requested 2 times.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_0"))
+      // Invoked on new connection. Null is returned which would trigger on demand.
+      .WillOnce(Return(nullptr))
+      // Invoked in the callback of on demand look up. The cluster is ready upon callback.
+      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+
+  Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_0", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+        cluster_discovery_callback = std::move(cb);
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+
+  setup(1, config);
+
+  // When the on-demand look up callback is invoked, the target cluster should not change.
+  // The behavior is verified by checking the random() which is used during cluster repick.
+  EXPECT_CALL(factory_context_.api_.random_, random()).Times(0);
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
+
+  // Start to raise connect failure.
+
+  // random() is raised in the cluster pick. `fake_cluster_1` will be picked.
+  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(1));
+
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_1"))
+      // Invoked on connect attempt. Null is returned which would trigger on demand.
+      .WillOnce(Return(nullptr))
+      .RetiresOnSaturation();
+
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_1", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 
 // Verify the on demand api is not invoked when the target thread local cluster is present.

@@ -59,6 +59,10 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
+OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
+  return {ON_DEMAND_TCP_PROXY_STATS(POOL_COUNTER(scope))};
+}
+
 Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
@@ -80,6 +84,11 @@ Config::SharedConfig::SharedConfig(
     const uint64_t connection_duration =
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
+  }
+
+  if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
+    on_demand_config_ =
+        std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
   }
 }
 
@@ -128,22 +137,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
 
   if (!config.hash_policy().empty()) {
     hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
-  }
-
-  if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
-    odcds_ = context.clusterManager().allocateOdCdsApi(config.on_demand().odcds_config(),
-                                                       OptRef<xds::core::v3::ResourceLocator>(),
-                                                       context.messageValidationVisitor());
-    if (config.on_demand().has_timeout()) {
-      const uint64_t timeout = DurationUtil::durationToMilliseconds(config.on_demand().timeout());
-      if (timeout > 0) {
-        odcds_timeout_ = std::chrono::milliseconds(timeout);
-      } else {
-        odcds_timeout_ = std::chrono::milliseconds::max();
-      }
-    } else {
-      odcds_timeout_ = std::chrono::seconds(60);
-    }
   }
 }
 
@@ -343,8 +336,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
       cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (!thread_local_cluster) {
-    auto* odcds = config_->odcds();
-    if (odcds == nullptr) {
+    auto odcds = config_->odcds();
+    if (!odcds.has_value()) {
       // No ODCDS? It means that on-demand discovery is disabled.
       ENVOY_CONN_LOG(debug, "Cluster not found {} and no on demand cluster set.",
                      read_callbacks_->connection(), cluster_name);
@@ -357,9 +350,9 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
           [this](Upstream::ClusterDiscoveryStatus cluster_status) {
             onClusterDiscoveryCompletion(cluster_status);
           });
-      config_->stats().on_demand_cluster_attempt_.inc();
+      config_->onDemandStats().on_demand_cluster_attempt_.inc();
       cluster_discovery_handle_ = odcds->requestOnDemandClusterDiscovery(
-          cluster_name, std::move(callback), config_->odcdsTimeout().value());
+          cluster_name, std::move(callback), config_->odcdsTimeout());
     }
     return Network::FilterStatus::StopIteration;
   }
@@ -429,12 +422,12 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
   case Upstream::ClusterDiscoveryStatus::Missing:
     ENVOY_CONN_LOG(debug, "On demand cluster {} is missing", read_callbacks_->connection(),
                    cluster_name);
-    config_->stats().on_demand_cluster_missing_.inc();
+    config_->onDemandStats().on_demand_cluster_missing_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Timeout:
     ENVOY_CONN_LOG(debug, "On demand cluster {} was not found before timeout.",
                    read_callbacks_->connection(), cluster_name);
-    config_->stats().on_demand_cluster_timeout_.inc();
+    config_->onDemandStats().on_demand_cluster_timeout_.inc();
     break;
   case Upstream::ClusterDiscoveryStatus::Available:
     // cluster_discovery_handle_ would have been cancelled if the downstream were closed.
