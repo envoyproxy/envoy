@@ -597,9 +597,8 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       if (local_reply_data.grpc_status_ && local_reply_data.grpc_status_->status_code_) {
         response_headers->setGrpcStatus(local_reply_data.grpc_status_->status_code_.value());
       } else {
-         response_headers->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
+        response_headers->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
       }
-
     }
 
     if (!body_text.empty() && !local_reply_data.is_head_request_) {

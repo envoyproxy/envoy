@@ -23,7 +23,7 @@ public:
     Stats::GaugeOptConstRef gauge = root_scope_.findGauge(stat_name_.statName());
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
-                                         "Couldn't find stat", nullptr, nullptr. "");
+                                         "Couldn't find stat", nullptr, nullptr."");
       return Http::FilterHeadersStatus::StopIteration;
     }
     if (gauge->get().value() == 0) {
@@ -31,8 +31,7 @@ public:
                                          nullptr, nullptr, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr,
-                                       nullptr, "");
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr, nullptr, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

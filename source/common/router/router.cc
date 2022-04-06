@@ -429,7 +429,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
-        nullptr,StreamInfo::ResponseCodeDetails::get().DirectResponse);
+        nullptr, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -455,8 +455,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
     callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", modify_headers,
-                               nullptr,
-                               StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
+                               nullptr, StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -481,7 +480,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         const std::string details =
             absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
                          StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");
-        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, nullptr,details);
+        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, nullptr, details);
         return Http::FilterHeadersStatus::StopIteration;
       }
     }
@@ -508,7 +507,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           // Note: append_cluster_info does not respect suppress_envoy_headers.
           modify_headers(headers);
         },
-        nullptr,StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
+        nullptr, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -606,7 +605,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           debug_config->not_forwarded_header_.value_or(Http::Headers::get().EnvoyNotForwarded),
           "true");
     };
-    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, nullptr,"");
+    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, nullptr, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -728,8 +727,7 @@ void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
-                             nullptr,
-                             StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
+                             nullptr, StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -1114,7 +1112,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
         }
         modify_headers_(headers);
       },
-      nullptr,details);
+      nullptr, details);
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,

@@ -195,7 +195,8 @@ private:
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         Grpc::Status::LocalReplyGrpcStatusOptionPtr grpc_status,
                         absl::string_view details) override {
-      return filter_manager_.sendLocalReply(code, body, modify_headers, std::move(grpc_status), details);
+      return filter_manager_.sendLocalReply(code, body, modify_headers, std::move(grpc_status),
+                                            details);
     }
 
     // Tracing::TracingConfig

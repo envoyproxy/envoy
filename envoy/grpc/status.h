@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <memory>
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -55,14 +55,13 @@ public:
     InvalidCode = -1,
   };
 
-
   /**
    * The gRPC status option for gRPC local reply.
    */
   struct LocalReplyGrpcStatusOption {
     // gRPC status code to override the httpToGrpcStatus mapping with.
-    const std::optional<GrpcStatus> status_code_;
-    LocalReplyGrpcStatusOption(GrpcStatus status_code): status_code_(status_code){}
+    const absl::optional<GrpcStatus> status_code_;
+    LocalReplyGrpcStatusOption(GrpcStatus status_code) : status_code_(status_code) {}
   };
 
   using LocalReplyGrpcStatusOptionPtr = std::unique_ptr<LocalReplyGrpcStatusOption>;

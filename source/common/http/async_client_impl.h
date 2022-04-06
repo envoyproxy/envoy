@@ -378,7 +378,8 @@ private:
                                  [this](Buffer::Instance& data, bool end_stream) -> void {
                                    encodeData(data, end_stream);
                                  }},
-        Utility::LocalReplyData{is_grpc_request_, code, body, std::move(grpc_status), is_head_request_});
+        Utility::LocalReplyData{is_grpc_request_, code, body, std::move(grpc_status),
+                                is_head_request_});
   }
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}

@@ -809,7 +809,8 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "downstream duration timeout", nullptr,
-std::make_unique<Envoy::Grpc::Status::LocalReplyGrpcStatusOption>(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded),
+                 std::make_unique<Envoy::Grpc::Status::LocalReplyGrpcStatusOption>(
+                     Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded),
                  StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
 }
 
@@ -1031,8 +1032,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       const auto& reject_request_params = mutate_result.reject_request.value();
       connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
       sendLocalReply(reject_request_params.response_code, reject_request_params.body, nullptr,
-                     nullptr,
-                     StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
+                     nullptr, StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
       return;
     }
 

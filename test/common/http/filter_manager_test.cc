@@ -478,8 +478,8 @@ TEST_F(FilterManagerTest, OnLocalReply) {
       .WillOnce(Return(LocalErrorStatus::ContinueAndResetStream));
   EXPECT_CALL(*encoder_filter, onLocalReply(_));
   EXPECT_CALL(filter_manager_callbacks_, resetStream());
-  decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                             nullptr, "details");
+  decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr, nullptr,
+                                             "details");
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.
@@ -540,8 +540,8 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     // iteration.
     EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
-    decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                               nullptr, "details");
+    decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr, nullptr,
+                                               "details");
   }
 
   // The final details should be details2.

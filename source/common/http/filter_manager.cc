@@ -760,7 +760,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     IS_ENVOY_BUG("Invalid request data");
-    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr,nullptr,
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, nullptr,
                    StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
@@ -939,7 +939,8 @@ void FilterManager::sendLocalReply(
     // state machine screwed up, bypass the filter chain and send the local
     // reply directly to the codec.
     //
-    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, std::move(grpc_status));
+    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_,
+                         std::move(grpc_status));
   } else {
     // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
@@ -992,7 +993,8 @@ void FilterManager::sendLocalReplyViaFilterChain(
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
-      Utility::LocalReplyData{is_grpc_request, code, body, std::move(grpc_status), is_head_request});
+      Utility::LocalReplyData{is_grpc_request, code, body, std::move(grpc_status),
+                              is_head_request});
 }
 
 void FilterManager::sendDirectLocalReply(
@@ -1037,7 +1039,8 @@ void FilterManager::sendDirectLocalReply(
             }
             maybeEndEncode(end_stream);
           }},
-      Utility::LocalReplyData{state_.is_grpc_request_, code, body, std::move(grpc_status), is_head_request});
+      Utility::LocalReplyData{state_.is_grpc_request_, code, body, std::move(grpc_status),
+                              is_head_request});
 }
 
 void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
@@ -1663,9 +1666,9 @@ void ActiveStreamEncoderFilter::responseDataTooLarge() {
 
     // In this case, sendLocalReply will either send a response directly to the encoder, or
     // reset the stream.
-    parent_.sendLocalReply(
-        Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
-        nullptr, nullptr, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+    parent_.sendLocalReply(Http::Code::InternalServerError,
+                           CodeUtility::toString(Http::Code::InternalServerError), nullptr, nullptr,
+                           StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
 }
 
