@@ -1,16 +1,17 @@
 syntax = "proto3";
 
-package envoy.config.route.v3;
+package envoy.extensions.early_data_option.v3;
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.config.route.v3";
+option java_package = "io.envoyproxy.envoy.extensions.early_data_option.v3";
 option java_outer_classname = "DefaultEarlyDataOptionProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/route/v3;routev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/early_data_option/v3;early_data_optionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP request early data option]
+// [#comment:#extension: envoy.route.early_data_option.default]
 
 // The default rule to allow/disallow a request to be sent as early data.
 message DefaultEarlyDataOption {

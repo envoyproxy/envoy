@@ -742,9 +742,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
                                       ->mutable_routes(0)
                                       ->mutable_route()
                                       ->mutable_early_data_option();
-        envoy::config::route::v3::DefaultEarlyDataOption config;
+        envoy::extensions::early_data_option::v3::DefaultEarlyDataOption config;
         config.set_early_data_allows_safe_requests(false);
-        early_data_option->set_name("envoy.route.early_data_options.default");
+        early_data_option->set_name("envoy.route.early_data_option.default");
         early_data_option->mutable_typed_config()->PackFrom(config);
       });
   initialize();

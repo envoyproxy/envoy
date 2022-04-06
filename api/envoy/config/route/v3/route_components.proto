@@ -1112,6 +1112,7 @@ message RouteAction {
 
   // Specifies how to send request over TLS early data.
   // If absent, allows `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data.
+  // [#extension-category: envoy.route.early_data_option]
   core.v3.TypedExtensionConfig early_data_option = 40;
 
   // Indicates that the route has a retry policy. Note that if this is set,
