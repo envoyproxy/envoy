@@ -25,13 +25,12 @@ enum class ResponseStatus {
   Complete = 1, // The upstream response is complete.
   Reset = 2,    // The upstream response is invalid and its connection must be reset.
 };
-
 /**
- * Decoder filter callbacks add additional callbacks.
+ * Common interface for FilterDecoderCallbacks and FilterEncoderCallbacks.
  */
-class DecoderFilterCallbacks {
+class FilterCallbacks {
 public:
-  virtual ~DecoderFilterCallbacks() = default;
+  virtual ~FilterCallbacks() = default;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -47,15 +46,6 @@ public:
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * Continue iterating through the filter chain with buffered data. This routine can only be
-   * called if the filter has previously returned StopIteration from one of the DecoderFilter
-   * methods. The connection manager will callbacks to the next filter in the chain. Further note
-   * that if the request is not complete, the calling filter may receive further callbacks and must
-   * return an appropriate status code depending on what the filter needs to do.
-   */
-  virtual void continueDecoding() PURE;
 
   /**
    * @return RouteConstSharedPtr the route for the current request.
@@ -115,28 +105,29 @@ public:
    */
   virtual bool responseSuccess() PURE;
 };
+/**
+ * Decoder filter callbacks add additional callbacks.
+ */
+class DecoderFilterCallbacks : public virtual FilterCallbacks {
+public:
+  virtual ~DecoderFilterCallbacks() = default;
+
+  /**
+   * Continue iterating through the filter chain with buffered data. This routine can only be
+   * called if the filter has previously returned StopIteration from one of the DecoderFilter
+   * methods. The connection manager will callbacks to the next filter in the chain. Further note
+   * that if the request is not complete, the calling filter may receive further callbacks and must
+   * return an appropriate status code depending on what the filter needs to do.
+   */
+  virtual void continueDecoding() PURE;
+};
 
 /**
  * Encoder filter callbacks add additional callbacks.
  */
-class EncoderFilterCallbacks {
+class EncoderFilterCallbacks : public virtual FilterCallbacks {
 public:
   virtual ~EncoderFilterCallbacks() = default;
-
-  /**
-   * @return uint64_t the ID of the originating stream for logging purposes.
-   */
-  virtual uint64_t streamId() const PURE;
-
-  /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
-   */
-  virtual const Network::Connection* connection() const PURE;
-
-  /**
-   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
@@ -146,66 +137,11 @@ public:
    * return an appropriate status code depending on what the filter needs to do.
    */
   virtual void continueEncoding() PURE;
-
-  /**
-   * @return RouteConstSharedPtr the route for the current request.
-   */
-  virtual Router::RouteConstSharedPtr route() PURE;
-
-  /**
-   * @return TransportType the originating transport.
-   */
-  virtual TransportType downstreamTransportType() const PURE;
-
-  /**
-   * @return ProtocolType the originating protocol.
-   */
-  virtual ProtocolType downstreamProtocolType() const PURE;
-
-  /**
-   * Create a locally generated response using the provided response object.
-   * @param response DirectResponse the response to send to the downstream client
-   * @param end_stream if true, the downstream connection should be closed after this response
-   */
-  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
-
-  /**
-   * Indicates the start of an upstream response. May only be called once.
-   * @param transport the transport used by the upstream response
-   * @param protocol the protocol used by the upstream response
-   */
-  virtual void startUpstreamResponse(Transport& transport, Protocol& protocol) PURE;
-
-  /**
-   * Called with upstream response data.
-   * @param data supplies the upstream's data
-   * @return ResponseStatus indicating if the upstream response requires more data, is complete,
-   *         or if an error occurred requiring the upstream connection to be reset.
-   */
-  virtual ResponseStatus upstreamData(Buffer::Instance& data) PURE;
-
-  /**
-   * Reset the downstream connection.
-   */
-  virtual void resetDownstreamConnection() PURE;
-
-  /**
-   * @return StreamInfo for logging purposes.
-   */
-  virtual StreamInfo::StreamInfo& streamInfo() PURE;
-
-  /**
-   * @return Response encoder metadata created by the connection manager.
-   */
-  virtual MessageMetadataSharedPtr responseMetadata() PURE;
-
-  /**
-   * @return Signal indicating whether or not the response encoder encountered a successful/void
-   * reply.
-   */
-  virtual bool responseSuccess() PURE;
 };
 
+/**
+ * Common interface for Thrift filters.
+ */
 class FilterBase {
 public:
   virtual ~FilterBase() = default;
@@ -220,6 +156,8 @@ public:
    */
   virtual void onDestroy() PURE;
 };
+
+using FilterBaseSharedPtr = std::shared_ptr<FilterBase>;
 
 /**
  * Decoder filter interface.

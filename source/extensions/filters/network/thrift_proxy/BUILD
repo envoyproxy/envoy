@@ -70,7 +70,7 @@ envoy_cc_library(
     deps = [
         ":app_exception_lib",
         ":decoder_lib",
-        ":filter_utility_lib",
+        ":filter_utils_lib",
         ":protocol_converter_lib",
         ":protocol_interface",
         ":stats_lib",
@@ -117,9 +117,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_utility_lib",
-    srcs = ["filter_utility.cc"],
-    hdrs = ["filter_utility.h"],
+    name = "filter_utils_lib",
+    srcs = ["filter_utils.cc"],
+    hdrs = ["filter_utils.h"],
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],

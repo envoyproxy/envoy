@@ -129,7 +129,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   }
 }
 
-void ConnectionManager::continueDecoding() {
+void ConnectionManager::continueDispatch() {
   ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
@@ -141,6 +141,10 @@ void ConnectionManager::continueDecoding() {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
+
+void ConnectionManager::continueEncoding() { continueDispatch(); }
+
+void ConnectionManager::continueDecoding() { continueDispatch(); }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
@@ -326,6 +330,19 @@ void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
   }
 }
 
+void ConnectionManager::ActiveRpcEncoderFilter::continueEncoding() {
+  const FilterStatus status = parent_.applyEncoderFilters(this);
+  if (status == FilterStatus::Continue) {
+    // All filters have been executed for the current decoder state.
+    if (parent_.pending_transport_end_) {
+      // If the filter stack was paused during transportEnd, handle end-of-request details.
+      parent_.finalizeRequest();
+    }
+
+    parent_.continueEncoding();
+  }
+}
+
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderFilter* filter) {
   ASSERT(filter_action_ != nullptr);
 
@@ -345,7 +362,60 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
   std::list<ActiveRpcDecoderFilterPtr>::iterator entry =
       !filter ? decoder_filters_.begin() : std::next(filter->entry());
   for (; entry != decoder_filters_.end(); entry++) {
-    const FilterStatus status = filter_action_((*entry)->handle_.get());
+    const FilterStatus status = filter_action_((*entry)->decoder_handle_.get());
+    if (local_response_sent_) {
+      // The filter called sendLocalReply but _did not_ close the connection.
+      // We return FilterStatus::Continue irrespective of the current result,
+      // which is fine because subsequent calls to this method will skip
+      // filters anyway.
+      //
+      // Note: we need to return FilterStatus::Continue here, in order for decoding
+      // to proceed. This is important because as noted above, the connection remains
+      // open so we need to consume the remaining bytes.
+      break;
+    }
+
+    if (status != FilterStatus::Continue) {
+      // If we got FilterStatus::StopIteration and a local reply happened but
+      // local_response_sent_ was not set, the connection was closed.
+      //
+      // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
+      // dispatch() stops the processing.
+      //
+      // In other words, after a local reply closes the connection and StopIteration
+      // is returned we are done.
+      return status;
+    }
+  }
+
+  filter_action_ = nullptr;
+  filter_context_.reset();
+
+  return FilterStatus::Continue;
+}
+
+// TODO
+FilterStatus
+ConnectionManager::ActiveRpc::applyEncoderFilters([[maybe_unused]] ActiveRpcEncoderFilter* filter) {
+  ASSERT(filter_action_ != nullptr);
+
+  if (local_response_sent_) {
+    filter_action_ = nullptr;
+    filter_context_.reset();
+    return FilterStatus::Continue;
+  }
+
+  if (upgrade_handler_) {
+    // Divert events to the current protocol upgrade handler.
+    const FilterStatus status = filter_action_(upgrade_handler_.get());
+    filter_context_.reset();
+    return status;
+  }
+
+  std::list<ActiveRpcEncoderFilterPtr>::iterator entry =
+      !filter ? encoder_filters_.begin() : std::next(filter->entry());
+  for (; entry != encoder_filters_.end(); entry++) {
+    const FilterStatus status = filter_action_((*entry)->encoder_handle_.get());
     if (local_response_sent_) {
       // The filter called sendLocalReply but _did not_ close the connection.
       // We return FilterStatus::Continue irrespective of the current result,
@@ -464,7 +534,12 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
 
 bool ConnectionManager::ActiveRpc::passthroughSupported() const {
   for (auto& entry : decoder_filters_) {
-    if (!entry->handle_->passthroughSupported()) {
+    if (!entry->decoder_handle_->passthroughSupported()) {
+      return false;
+    }
+  }
+  for (auto& entry : encoder_filters_) {
+    if (!entry->encoder_handle_->passthroughSupported()) {
       return false;
     }
   }

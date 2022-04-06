@@ -1684,6 +1684,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -1708,6 +1709,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1734,6 +1736,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -1777,6 +1780,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -1820,6 +1824,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -1872,6 +1877,7 @@ route_config:
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -1916,6 +1922,7 @@ route_config:
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
   EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};

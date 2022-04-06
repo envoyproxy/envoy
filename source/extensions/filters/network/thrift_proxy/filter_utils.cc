@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/thrift_proxy/filter_utility.h"
+#include "source/extensions/filters/network/thrift_proxy/filter_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -199,8 +199,8 @@ private:
 using DelegateEncoderFilterSharedPtr = std::shared_ptr<DelegateEncoderFilter>;
 
 BidirectionFilterWrapper::BidirectionFilterWrapper(BidirectionFilterSharedPtr filter)
-    : parent_(filter), decode_filter_(std::make_shared<DelegateDecoderFilter>(parent_)),
-      encode_filter_(std::make_shared<DelegateEncoderFilter>(parent_)) {}
+    : decoder_filter_(std::make_shared<DelegateDecoderFilter>(parent_)),
+      encoder_filter_(std::make_shared<DelegateEncoderFilter>(parent_)), parent_(filter) {}
 
 } // namespace ThriftFilters
 } // namespace ThriftProxy

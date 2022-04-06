@@ -17,10 +17,11 @@ public:
   // ThriftBaseFilter
   void onDestroy() override { parent_->onDestroy(); }
 
+  DecoderFilterSharedPtr decoder_filter_;
+  EncoderFilterSharedPtr encoder_filter_;
+
 private:
   BidirectionFilterSharedPtr parent_;
-  DecoderFilterSharedPtr decode_filter_;
-  EncoderFilterSharedPtr encode_filter_;
 };
 
 using BidirectionFilterWrapperSharedPtr = std::shared_ptr<BidirectionFilterWrapper>;
