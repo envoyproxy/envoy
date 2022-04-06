@@ -194,12 +194,12 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
 
   if (response_proto.has_control_plane()) {
     control_plane_stats.identifier_.set(response_proto.control_plane().identifier());
-  }
 
-  if (response_proto.control_plane().identifier() != sub->second->controlPlaneIdentifier()) {
-    sub->second->setControlPlaneIdentifier(response_proto.control_plane().identifier());
-    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", response_proto.type_url(),
-              sub->second->controlPlaneIdentifier());
+    if (response_proto.control_plane().identifier() != sub->second->controlPlaneIdentifier()) {
+      sub->second->setControlPlaneIdentifier(response_proto.control_plane().identifier());
+      ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", response_proto.type_url(),
+                sub->second->controlPlaneIdentifier());
+    }
   }
 
   pausable_ack_queue_.push(sub->second->handleResponse(response_proto));

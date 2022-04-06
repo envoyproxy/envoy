@@ -849,3 +849,7 @@ The following command operators are supported:
 
 %FILTER_CHAIN_NAME%
   The network filter chain name of the downstream connection.
+
+%ENVIRONMENT(X):Z%
+  Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
+  Z is an optional parameter denoting string truncation up to Z characters long.
