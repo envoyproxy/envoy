@@ -144,7 +144,6 @@ TEST_F(QuicPlatformTest, QuicExportedStats) {
 
 TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("!!"));
-  EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
   EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));
