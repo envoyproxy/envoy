@@ -59,6 +59,10 @@ public:
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
   // WebAssembly filter
   const std::string Wasm = "envoy.filters.network.wasm";
+  // PacketTrace filter
+  const std::string PacketTrace = "envoy.filters.network.packet_trace";
+  // Copy dynamic metadata from downstream to upstream
+  const std::string DownToUp = "envoy.filters.network.down_up";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

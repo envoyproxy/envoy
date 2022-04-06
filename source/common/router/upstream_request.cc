@@ -37,6 +37,7 @@
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Router {
@@ -221,6 +222,18 @@ const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEnt
 
 const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
+}
+
+void UpstreamRequest::copyDynamicMetaDataFromDownstream(StreamInfo::StreamInfo& l4_stream_info) {
+  const StreamInfo::StreamInfo& downstream_streamInfo =
+      parent_.callbacks()->connection()->streamInfo();
+  const auto& dynamic_metadata = downstream_streamInfo.dynamicMetadata();
+  auto name = Envoy::Extensions::NetworkFilters::NetworkFilterNames::get().DownToUp;
+  auto filter_it = dynamic_metadata.filter_metadata().find(name);
+  if (filter_it != dynamic_metadata.filter_metadata().end()) {
+    ProtobufWkt::Struct metadata(filter_it->second);
+    l4_stream_info.setDynamicMetadata(name, metadata);
+  }
 }
 
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
@@ -414,7 +427,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void UpstreamRequest::onPoolReady(
     std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -440,16 +453,16 @@ void UpstreamRequest::onPoolReady(
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
-  if (info.upstreamInfo().has_value()) {
-    auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
+  if (info.upstreamInfo()) {
+    auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
     upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
-    upstream_info.setUpstreamNumStreams(info.upstreamInfo().value().get().upstreamNumStreams());
+    upstream_info.setUpstreamNumStreams(info.upstreamInfo()->upstreamNumStreams());
   }
 
   upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
-      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+      info.filterState()->parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   upstream_info.setUpstreamLocalAddress(upstream_local_address);
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
 
@@ -515,6 +528,7 @@ void UpstreamRequest::onPoolReady(
         [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
+  copyDynamicMetaDataFromDownstream(info);
 
   const Http::Status status =
       upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());

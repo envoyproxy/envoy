@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.packet_trace.v3;
+
+import "envoy/config/core/v3/address.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.packet_trace.v3";
+option java_outer_classname = "PacketTraceProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/packet_trace/v3;packet_tracev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: PacketTrace]
+// PacketTrace :ref:`configuration overview <config_network_filters_packet_trace>`.
+// [#extension: envoy.filters.network.packet_trace]
+
+message PacketTrace {
+  repeated config.core.v3.CidrRange local_address_range = 1;
+
+  repeated config.core.v3.CidrRange remote_address_range = 2;
+}

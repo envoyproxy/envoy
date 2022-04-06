@@ -197,6 +197,7 @@ proto_library(
         "//envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3:pkg",
         "//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",
+        "//envoy/extensions/filters/network/packet_trace/v3:pkg",
         "//envoy/extensions/filters/network/ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/rbac/v3:pkg",
         "//envoy/extensions/filters/network/redis_proxy/v3:pkg",

@@ -141,6 +141,7 @@ EXTENSIONS = {
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",
+    "envoy.filters.network.packet_trace":                                 "//source/extensions/filters/network/packet_trace:config",
     "envoy.filters.network.ratelimit":                            "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                                 "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                          "//source/extensions/filters/network/redis_proxy:config",
