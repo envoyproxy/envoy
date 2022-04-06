@@ -141,8 +141,11 @@ ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
                                   ConnectionImpl* connection, const nghttp2_option* options) {
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
       http2::adapter::Perspective::kClient, *callbacks, connection);
-  std::unique_ptr<http2::adapter::Http2Adapter> adapter =
-      http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor, options);
+  auto adapter = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor, options);
+  auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+    p->RemoveStream(stream_id);
+  };
+  visitor->set_stream_close_listener(std::move(stream_close_listener));
   connection->setVisitor(std::move(visitor));
   return adapter;
 }
@@ -2174,13 +2177,19 @@ ServerConnectionImpl::ServerConnectionImpl(
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   if (use_new_codec_wrapper_) {
-    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
+    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
     if (use_oghttp2_library_) {
       adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
     } else {
-      adapter_ =
-          http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor_, h2_options.options());
+      auto adapter =
+          http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
+      auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+        p->RemoveStream(stream_id);
+      };
+      visitor->set_stream_close_listener(std::move(stream_close_listener));
+      visitor_ = std::move(visitor);
+      adapter_ = std::move(adapter);
     }
   } else {
     nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
