@@ -3,7 +3,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/client_connection_factory.h"
 #include "envoy/network/connection.h"
-
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
