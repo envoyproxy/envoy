@@ -55,7 +55,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
   } else {
     // There is no need to fetch the token if no audience is specified because no
     // authentication will be performed. So, we just continue the filter chain iteration.
-    ENVOY_LOG(debug, "Failed to retrieve the audience from the configuration.");
+    stats_.retrieve_audience_failed_.inc();
     state_ = State::Complete;
   }
 

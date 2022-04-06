@@ -19,7 +19,7 @@ public:
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace GcpAuthn

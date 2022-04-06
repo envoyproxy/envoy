@@ -58,7 +58,7 @@ public:
   }
 
   void setupFilterAndCallback() {
-    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_);
+    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_, "Test");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -213,10 +213,10 @@ TEST_F(GcpAuthnFilterTest, NoFilterMetadata) {
   setupFilterAndCallback();
   // Set up mock filter metadata.
   setupMockFilterMetadata(/*is_valid=*/false);
-
   // decodeHeaders() is expected to return `Continue` because no filter metadata is specified
   // in configuration.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->stats().retrieve_audience_failed_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {

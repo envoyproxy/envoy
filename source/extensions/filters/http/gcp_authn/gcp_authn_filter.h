@@ -17,6 +17,17 @@ namespace GcpAuthn {
 
 inline constexpr absl::string_view FilterName = "envoy.filters.http.gcp_authn";
 inline constexpr absl::string_view AudienceKey = "audience_key";
+/**
+ * All stats for the gcp authentication filter. @see stats_macros.h
+ */
+#define ALL_GCP_AUTHN_FILTER_STATS(COUNTER) COUNTER(retrieve_audience_failed)
+
+/**
+ * Wrapper struct for connection manager stats. @see stats_macros.h
+ */
+struct GcpAuthnFilterStats {
+  ALL_GCP_AUTHN_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 using FilterConfigProtoSharedPtr =
     std::shared_ptr<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
@@ -32,11 +43,12 @@ public:
 
   GcpAuthnFilter(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      Server::Configuration::FactoryContext& context)
+      Server::Configuration::FactoryContext& context, const std::string& stats_prefix)
       : filter_config_(
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
                 config)),
-        context_(context), client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)) {}
+        context_(context), client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)),
+        stats_(generateStats(stats_prefix, context.scope())) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -45,10 +57,16 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   State state() { return state_; }
+  GcpAuthnFilterStats& stats() { return stats_; }
 
   ~GcpAuthnFilter() override = default;
 
 private:
+  GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
+    // const std::string final_prefix = absl::StrCat(stats_prefix, "gcp_authn.");
+    return {ALL_GCP_AUTHN_FILTER_STATS(
+        POOL_COUNTER_PREFIX(scope, absl::StrCat(stats_prefix, "gcp_authn.")))};
+  }
   FilterConfigProtoSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
@@ -56,6 +74,8 @@ private:
 
   bool initiating_call_{};
   State state_{State::NotStarted};
+
+  GcpAuthnFilterStats stats_;
 };
 
 } // namespace GcpAuthn
