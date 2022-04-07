@@ -1,4 +1,6 @@
 #include <cerrno>
+#include <chrono>
+#include <future>
 #include <memory>
 #include <string>
 #include <thread>
@@ -16,7 +18,6 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
-#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -53,12 +54,12 @@ protected:
 
 TEST_F(AsyncFileManagerWithMockFilesTest, ChainedOperationsWorkAndSkipQueue) {
   int fd = 1;
-  absl::Barrier write_blocker{2};
+  std::promise<void> write_blocker;
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
       .WillOnce(Return(Api::SysCallIntResult{fd, 0}));
   EXPECT_CALL(mock_posix_file_operations_, pwrite(fd, _, 5, 0))
       .WillOnce([&write_blocker](int, const void*, size_t, off_t) {
-        write_blocker.Block();
+        write_blocker.get_future().wait();
         return Api::SysCallSizeResult{5, 0};
       });
   // Chain open/write/close. Write will block because of the mock expectation.
@@ -71,45 +72,39 @@ TEST_F(AsyncFileManagerWithMockFilesTest, ChainedOperationsWorkAndSkipQueue) {
     });
   });
   // Separately queue another action.
-  absl::Mutex mu;
-  bool did_second_action = false;
-  manager_->whenReady([&did_second_action, &mu](absl::Status) {
-    absl::MutexLock lock(&mu);
-    did_second_action = true;
-  });
-  std::this_thread::yield();
-  // Ensure that the second action doesn't get a turn while the file operations are still blocking.
-  {
-    absl::MutexLock lock(&mu);
-    EXPECT_FALSE(did_second_action);
-  }
+  std::promise<void> did_second_action;
+  manager_->whenReady([&](absl::Status) { did_second_action.set_value(); });
+  auto second_action_future = did_second_action.get_future();
+  // Ensure that the second action didn't get a turn while the file operations are still blocking.
+  EXPECT_EQ(std::future_status::timeout,
+            second_action_future.wait_for(std::chrono::milliseconds(1)));
   EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   // Unblock the write.
-  write_blocker.Block();
+  write_blocker.set_value();
   // Ensure that the second action does get a turn after the file operations completed.
-  {
-    auto cond = [&did_second_action]() { return did_second_action; };
-    absl::MutexLock lock(&mu);
-    EXPECT_TRUE(mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1)));
-  }
+  EXPECT_EQ(std::future_status::ready, second_action_future.wait_for(std::chrono::seconds(1)));
 }
 
 TEST_F(AsyncFileManagerWithMockFilesTest, CancellingAQueuedActionPreventsItFromExecuting) {
-  absl::Barrier ready_blocker{2};
-  manager_->whenReady([&](absl::Status) { ready_blocker.Block(); });
+  std::promise<void> ready;
+  // Add a blocking action so we can guarantee cancel is called before unlink begins.
+  manager_->whenReady([&](absl::Status) { ready.get_future().wait(); });
+  // Ensure that unlink doesn't get called.
   EXPECT_CALL(mock_posix_file_operations_, unlink(_)).Times(0);
   auto cancel_unlink = manager_->unlink("irrelevant", [](absl::Status) {});
   cancel_unlink();
-  absl::Barrier done_blocker{2};
-  manager_->whenReady([&](absl::Status) { done_blocker.Block(); });
-  ready_blocker.Block();
-  done_blocker.Block();
+  std::promise<void> done;
+  // Add a notifying action so we can ensure that the unlink action was passed by the time
+  // the test ends.
+  manager_->whenReady([&](absl::Status) { done.set_value(); });
+  ready.set_value();
+  done.get_future().wait();
 }
 
 TEST_F(AsyncFileManagerWithMockFilesTest, CancellingACompletedActionDoesNothingImportant) {
-  absl::Barrier ready_blocker{2};
-  auto cancel = manager_->whenReady([&](absl::Status) { ready_blocker.Block(); });
-  ready_blocker.Block();
+  std::promise<void> ready;
+  auto cancel = manager_->whenReady([&](absl::Status) { ready.set_value(); });
+  ready.get_future().wait();
   std::this_thread::yield();
   cancel();
 }
@@ -117,12 +112,12 @@ TEST_F(AsyncFileManagerWithMockFilesTest, CancellingACompletedActionDoesNothingI
 TEST_F(AsyncFileManagerWithMockFilesTest,
        CancellingDuringCreateAnonymousFileClosesFileAndPreventsCallback) {
   int fd = 1;
-  absl::Barrier open_blocker{2};
-  absl::Barrier open_blocker_finish{2};
+  std::promise<void> wait_for_open_to_be_executing;
+  std::promise<void> allow_open_to_finish;
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
-      .WillOnce([&open_blocker, &open_blocker_finish, &fd](const char*, int, int) {
-        open_blocker.Block();
-        open_blocker_finish.Block();
+      .WillOnce([&](const char*, int, int) {
+        wait_for_open_to_be_executing.set_value();
+        allow_open_to_finish.get_future().wait();
         return Api::SysCallIntResult{fd, 0};
       });
   std::atomic<bool> callback_was_called{false};
@@ -131,27 +126,20 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
       tmpdir_,
       [&callback_was_called](absl::StatusOr<AsyncFileHandle>) { callback_was_called.store(true); });
   // Separately queue another action.
-  absl::Mutex mu;
-  bool did_second_action = false;
-  manager_->whenReady([&did_second_action, &mu](absl::Status) {
-    absl::MutexLock lock(&mu);
-    did_second_action = true;
-  });
+  std::promise<bool> did_second_action;
+  manager_->whenReady([&](absl::Status) { did_second_action.set_value(true); });
   // Wait for the open operation to be entered.
-  open_blocker.Block();
+  wait_for_open_to_be_executing.get_future().wait();
   // Cancel the open request (but too late to actually stop it!)
   cancelOpen();
   // Expect the automatic close operation to occur.
   EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   // Allow the open operation to complete.
-  open_blocker_finish.Block();
+  allow_open_to_finish.set_value();
   // Ensure that the second action does get a turn after the file operation relinquishes the thread.
   // (This also ensures that the file operation reached the end, so the file should be closed now.)
-  {
-    auto cond = [&did_second_action]() { return did_second_action; };
-    absl::MutexLock lock(&mu);
-    EXPECT_TRUE(mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1)));
-  }
+  ASSERT_EQ(std::future_status::ready,
+            did_second_action.get_future().wait_for(std::chrono::milliseconds(100)));
   // Ensure the callback for the open operation was *not* called, because it was cancelled.
   EXPECT_FALSE(callback_was_called.load());
 }
@@ -160,41 +148,33 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
        CancellingDuringOpenExistingFileClosesFileAndPreventsCallback) {
   int fd = 1;
   std::string filename = absl::StrCat(tmpdir_, "/fake_file");
-  absl::Barrier open_blocker{2};
-  absl::Barrier open_blocker_finish{2};
-  EXPECT_CALL(mock_posix_file_operations_, open(Eq(filename), O_RDWR))
-      .WillOnce([&open_blocker, &open_blocker_finish, &fd]() {
-        open_blocker.Block();
-        open_blocker_finish.Block();
-        return Api::SysCallIntResult{fd, 0};
-      });
+  std::promise<void> wait_for_open_to_be_executing;
+  std::promise<void> allow_open_to_finish;
+  EXPECT_CALL(mock_posix_file_operations_, open(Eq(filename), O_RDWR)).WillOnce([&]() {
+    wait_for_open_to_be_executing.set_value();
+    allow_open_to_finish.get_future().wait();
+    return Api::SysCallIntResult{fd, 0};
+  });
   std::atomic<bool> callback_was_called{false};
   // Queue opening the file, record if the callback was called (it shouldn't be).
   auto cancelOpen = manager_->openExistingFile(
       filename, AsyncFileManager::Mode::ReadWrite,
       [&callback_was_called](absl::StatusOr<AsyncFileHandle>) { callback_was_called.store(true); });
   // Separately queue another action.
-  absl::Mutex mu;
-  bool did_second_action = false;
-  manager_->whenReady([&did_second_action, &mu](absl::Status) {
-    absl::MutexLock lock(&mu);
-    did_second_action = true;
-  });
+  std::promise<bool> did_second_action;
+  manager_->whenReady([&](absl::Status) { did_second_action.set_value(true); });
   // Wait for the open operation to be entered.
-  open_blocker.Block();
+  wait_for_open_to_be_executing.get_future().wait();
   // Cancel the open request (but too late to actually stop it!)
   cancelOpen();
   // Expect the automatic close operation to occur.
   EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   // Allow the open operation to complete.
-  open_blocker_finish.Block();
+  allow_open_to_finish.set_value();
   // Ensure that the second action does get a turn after the file operation relinquishes the thread.
   // (This also ensures that the file operation reached the end, so the file should be closed now.)
-  {
-    auto cond = [&did_second_action]() { return did_second_action; };
-    absl::MutexLock lock(&mu);
-    EXPECT_TRUE(mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1)));
-  }
+  ASSERT_EQ(std::future_status::ready,
+            did_second_action.get_future().wait_for(std::chrono::milliseconds(100)));
   // Ensure the callback for the open operation was *not* called, because it was cancelled.
   EXPECT_FALSE(callback_was_called.load());
 }
@@ -206,27 +186,22 @@ TEST_F(AsyncFileManagerWithMockFilesTest, OpenFailureInCreateAnonymousReturnsAnE
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
       .WillOnce(Return(Api::SysCallIntResult{fd, 0}));
   EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  absl::Barrier first_open_blocker{2};
-  manager_->createAnonymousFile(tmpdir_,
-                                [&first_open_blocker](absl::StatusOr<AsyncFileHandle> result) {
-                                  result.value()->close([](absl::Status) {});
-                                  first_open_blocker.Block();
-                                });
+  std::promise<void> first_open_was_called;
+  manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
+    result.value()->close([](absl::Status) {});
+    first_open_was_called.set_value();
+  });
   // We have to synchronize on this to avoid racily adding a different matching expectation for the
   // first 'open'.
-  first_open_blocker.Block();
+  first_open_was_called.get_future().wait();
   EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
       .WillOnce(Return(Api::SysCallIntResult{-1, EMFILE}));
   // Capture the result of the second open call, to verify that the error code came through.
-  absl::Status captured_result;
-  absl::Barrier callback_blocker{2};
-  manager_->createAnonymousFile(
-      tmpdir_, [&callback_blocker, &captured_result](absl::StatusOr<AsyncFileHandle> result) {
-        captured_result = result.status();
-        callback_blocker.Block();
-      });
-  callback_blocker.Block();
-  EXPECT_EQ(absl::StatusCode::kResourceExhausted, captured_result.code());
+  std::promise<absl::Status> captured_result;
+  manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
+    captured_result.set_value(result.status());
+  });
+  EXPECT_EQ(absl::StatusCode::kResourceExhausted, captured_result.get_future().get().code());
 }
 
 TEST_F(AsyncFileManagerWithMockFilesTest, CreateAnonymousFallbackMkstempReturnsAnErrorOnFailure) {
@@ -235,15 +210,11 @@ TEST_F(AsyncFileManagerWithMockFilesTest, CreateAnonymousFallbackMkstempReturnsA
   EXPECT_CALL(mock_posix_file_operations_, mkstemp(Eq(std::string(tmpdir_) + "/buffer.XXXXXX")))
       .WillOnce(Return(Api::SysCallIntResult{-1, EMFILE}));
   // Capture the result of the open call, to verify that the error code came through.
-  absl::Status captured_result;
-  absl::Barrier callback_blocker{2};
-  manager_->createAnonymousFile(
-      tmpdir_, [&callback_blocker, &captured_result](absl::StatusOr<AsyncFileHandle> result) {
-        captured_result = result.status();
-        callback_blocker.Block();
-      });
-  callback_blocker.Block();
-  EXPECT_EQ(absl::StatusCode::kResourceExhausted, captured_result.code());
+  std::promise<absl::Status> captured_result;
+  manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
+    captured_result.set_value(result.status());
+  });
+  EXPECT_EQ(absl::StatusCode::kResourceExhausted, captured_result.get_future().get().code());
 }
 
 TEST_F(AsyncFileManagerWithMockFilesTest, CreateAnonymousFallbackReturnsAnErrorIfPathTooLong) {
@@ -255,15 +226,11 @@ TEST_F(AsyncFileManagerWithMockFilesTest, CreateAnonymousFallbackReturnsAnErrorI
               open(Eq(too_long_tmpdir), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
       .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
   // Capture the result of the open call, to verify that the error code came through.
-  absl::Status captured_result;
-  absl::Barrier callback_blocker{2};
-  manager_->createAnonymousFile(too_long_tmpdir, [&callback_blocker, &captured_result](
-                                                     absl::StatusOr<AsyncFileHandle> result) {
-    captured_result = result.status();
-    callback_blocker.Block();
+  std::promise<absl::Status> captured_result;
+  manager_->createAnonymousFile(too_long_tmpdir, [&](absl::StatusOr<AsyncFileHandle> result) {
+    captured_result.set_value(result.status());
   });
-  callback_blocker.Block();
-  EXPECT_EQ(absl::StatusCode::kInvalidArgument, captured_result.code());
+  EXPECT_EQ(absl::StatusCode::kInvalidArgument, captured_result.get_future().get().code());
 }
 
 TEST_F(AsyncFileManagerWithMockFilesTest,
@@ -286,15 +253,11 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
     EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(absl::StrCat(tmpdir_, "/buffer.ABCDEF"))))
         .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   }
-  absl::Status captured_result;
-  absl::Barrier callback_blocker{2};
-  manager_->createAnonymousFile(
-      tmpdir_, [&callback_blocker, &captured_result](absl::StatusOr<AsyncFileHandle> result) {
-        captured_result = result.status();
-        callback_blocker.Block();
-      });
-  callback_blocker.Block();
-  EXPECT_EQ(absl::StatusCode::kUnimplemented, captured_result.code());
+  std::promise<absl::Status> captured_result;
+  manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
+    captured_result.set_value(result.status());
+  });
+  EXPECT_EQ(absl::StatusCode::kUnimplemented, captured_result.get_future().get().code());
 }
 
 TEST_F(AsyncFileManagerWithMockFilesTest,
@@ -315,16 +278,15 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
     EXPECT_CALL(mock_posix_file_operations_, close(fd))
         .WillOnce(Return(Api::SysCallIntResult{0, 0}));
   }
-  absl::Barrier callback_blocker{2};
-  manager_->createAnonymousFile(tmpdir_,
-                                [&callback_blocker](absl::StatusOr<AsyncFileHandle> result) {
-                                  ASSERT(result.ok());
-                                  result.value()->close([&callback_blocker](absl::Status result) {
-                                    ASSERT(result.ok());
-                                    callback_blocker.Block();
-                                  });
-                                });
-  callback_blocker.Block();
+  std::promise<void> callback_complete;
+  manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
+    ASSERT(result.ok());
+    result.value()->close([&](absl::Status result) {
+      ASSERT(result.ok());
+      callback_complete.set_value();
+    });
+  });
+  callback_complete.get_future().wait();
 }
 
 } // namespace AsyncFiles

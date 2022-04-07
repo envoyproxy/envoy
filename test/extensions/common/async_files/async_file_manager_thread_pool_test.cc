@@ -1,3 +1,4 @@
+#include <future>
 #include <memory>
 #include <string>
 #include <thread>
@@ -14,7 +15,6 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
-#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -250,18 +250,11 @@ public:
   std::function<void(T)> callback() {
     return [this](T result) { saveResult(result); };
   }
-  void saveResult(T result) {
-    result_ = result;
-    barrier_.Block();
-  }
-  T getResult() {
-    barrier_.Block();
-    return result_;
-  }
+  void saveResult(T result) { result_.set_value(std::move(result)); }
+  T getResult() { return result_.get_future().get(); }
 
 private:
-  absl::Barrier barrier_{2};
-  T result_;
+  std::promise<T> result_;
 };
 
 TEST_F(AsyncFileManagerSingleThreadTest, CreateAnonymousFileWorks) {
