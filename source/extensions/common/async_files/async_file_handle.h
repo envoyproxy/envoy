@@ -58,14 +58,9 @@ public:
                                       std::function<void(absl::StatusOr<size_t>)> on_complete) PURE;
 
   // Creates a new AsyncFileHandle referencing the same file.
-  // This is not asynchronous like the other file operations, as it is never a time-consuming
-  // operation. Note that a file handle duplicated in this way shares positioning and permissions
+  // Note that a file handle duplicated in this way shares positioning and permissions
   // with the original. Since AsyncFileContext functions are all position-explicit, this should not
   // matter.
-  //
-  // The user should avoid using duplicate while a close, open or create operation is in flight on
-  // the source handle, to avoid provoking a race (the underlying file operation will provide an
-  // appropriate error in the event that a race goes the wrong way).
   virtual std::function<void()> duplicate(
       std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete) PURE;
 
