@@ -21,11 +21,13 @@ namespace ExternalProcessing {
 
 using ProcessingResponsePtr = std::unique_ptr<ProcessingResponse>;
 
-class ExternalProcessorClientImpl : public ExternalProcessorClient {
+class ExternalProcessorClientImpl : public ExternalProcessorClient,
+                                    public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager,
                               const envoy::config::core::v3::GrpcService& grpc_service,
                               Stats::Scope& scope);
+  ~ExternalProcessorClientImpl() override;
 
   ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
                                    const StreamInfo::StreamInfo& stream_info) override;
@@ -43,6 +45,8 @@ public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
                               ExternalProcessorCallbacks& callbacks,
                               const StreamInfo::StreamInfo& stream_info);
+  ~ExternalProcessorStreamImpl() override;
+
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
   // actually closed it.

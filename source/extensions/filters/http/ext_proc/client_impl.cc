@@ -12,6 +12,10 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(
     const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope)
     : client_manager_(client_manager), grpc_service_(grpc_service), scope_(scope) {}
 
+ExternalProcessorClientImpl::~ExternalProcessorClientImpl() {
+  ENVOY_LOG(trace, "~ExternalProcessorClientImpl");
+}
+
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
                                    const StreamInfo::StreamInfo& stream_info) {
@@ -34,6 +38,10 @@ ExternalProcessorStreamImpl::ExternalProcessorStreamImpl(
   stream_ = client_.start(*descriptor, *this, options);
 }
 
+ExternalProcessorStreamImpl::~ExternalProcessorStreamImpl() {
+  ENVOY_LOG(trace, "~ExternalProcessorStreamImpl");
+}
+
 void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
                                        bool end_stream) {
   stream_.sendMessage(std::move(request), end_stream);
@@ -51,6 +59,7 @@ bool ExternalProcessorStreamImpl::close() {
 }
 
 void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& response) {
+  ENVOY_LOG(trace, "Received message");
   callbacks_.onReceiveMessage(std::move(response));
 }
 

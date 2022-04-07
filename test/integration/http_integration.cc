@@ -86,9 +86,11 @@ IntegrationCodecClient::IntegrationCodecClient(
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type, bool wait_till_connected)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
-      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this) {
+      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
+      codec_client_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
+  setCodecClientCallbacks(codec_client_callbacks_);
   if (wait_till_connected) {
     dispatcher.run(Event::Dispatcher::RunType::Block);
   }
@@ -130,21 +132,27 @@ IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& header
 
 void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, absl::string_view data,
                                       bool end_stream) {
-  Buffer::OwnedImpl buffer_data(data.data(), data.size());
-  encoder.encodeData(buffer_data, end_stream);
-  flushWrite();
+  if (!stream_gone_) {
+    Buffer::OwnedImpl buffer_data(data.data(), data.size());
+    encoder.encodeData(buffer_data, end_stream);
+    flushWrite();
+  }
 }
 
 void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, Buffer::Instance& data,
                                       bool end_stream) {
-  encoder.encodeData(data, end_stream);
-  flushWrite();
+  if (!stream_gone_) {
+    encoder.encodeData(data, end_stream);
+    flushWrite();
+  }
 }
 
 void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, uint64_t size,
                                       bool end_stream) {
-  Buffer::OwnedImpl data(std::string(size, 'a'));
-  sendData(encoder, data, end_stream);
+  if (!stream_gone_) {
+    Buffer::OwnedImpl data(std::string(size, 'a'));
+    sendData(encoder, data, end_stream);
+  }
 }
 
 void IntegrationCodecClient::sendTrailers(Http::RequestEncoder& encoder,

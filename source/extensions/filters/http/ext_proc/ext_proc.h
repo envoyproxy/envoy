@@ -116,6 +116,7 @@ public:
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         decoding_state_(*this, config->processingMode()),
         encoding_state_(*this, config->processingMode()) {}
+  ~Filter() override;
 
   const FilterConfig& config() const { return *config_; }
 

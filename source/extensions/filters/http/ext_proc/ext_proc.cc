@@ -68,6 +68,8 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   processing_mode_ = src.processing_mode_;
 }
 
+Filter::~Filter() { ENVOY_LOG(trace, "~Filter"); }
+
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
