@@ -55,7 +55,7 @@ message Zstd {
   // A dictionary for compression. zstd offers dictionary compression, which greatly improves
   // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
   // that can be used to search the same dictionary during decompression.
-  // Please refer to ztsd manual to train a specific dictionary for compression:
+  // Please refer to zstd manual to train a specific dictionary for compression:
   // https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder
   config.core.v3.DataSource dictionary = 4;
 
