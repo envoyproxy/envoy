@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <string>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 
 #include "absl/status/status.h"
@@ -53,6 +54,7 @@ absl::Status statusAfterFileError(int code) {
   case 0:
     return absl::OkStatus();
   default:
+    ENVOY_BUG(false, absl::StrCat("Unrecognized error code ", code));
     return absl::UnknownError(str);
   }
 }

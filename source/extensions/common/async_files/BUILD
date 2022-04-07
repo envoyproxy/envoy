@@ -75,6 +75,7 @@ envoy_cc_library(
     hdrs = ["status_after_file_error.h"],
     deps = [
         "//envoy/api:os_sys_calls_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "@com_google_absl//absl/status",
     ],
