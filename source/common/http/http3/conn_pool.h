@@ -37,7 +37,6 @@ public:
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
-    stream_attached_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
@@ -79,8 +78,6 @@ public:
     }
   }
 
-  bool hasCreatedStream() const { return stream_attached_; }
-
 private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
   // streams, QUIC has a fixed number of streams available which is updated via
@@ -107,8 +104,6 @@ private:
   // do 0-RTT during connect(), deferring it to avoid handling network events during CodecClient
   // construction.
   Event::SchedulableCallbackPtr async_connect_callback_;
-  // True if newStream() is ever called.
-  bool stream_attached_{false};
 };
 
 // An interface to propagate H3 handshake result.

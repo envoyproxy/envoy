@@ -5,7 +5,6 @@
 #include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
 
-#include "header_map_impl.h"
 #include "quiche/quic/core/http/spdy_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 
@@ -383,10 +382,7 @@ AlternateProtocolsCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTra
 
 bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Broken() {
-  host_->cluster().stats().upstream_http3_broken_.inc();
-  getHttp3StatusTracker().markHttp3Broken();
-}
+void ConnectivityGrid::markHttp3Broken() { getHttp3StatusTracker().markHttp3Broken(); }
 
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }
 
