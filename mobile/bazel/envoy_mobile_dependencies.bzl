@@ -42,14 +42,14 @@ _default_extra_jni_deps = repository_rule(
     implementation = _default_extra_jni_deps_impl,
 )
 
-def envoy_mobile_dependencies():
+def envoy_mobile_dependencies(extra_maven_dependencies = []):
     if not native.existing_rule("envoy_mobile_extra_swift_sources"):
         _default_extra_swift_sources(name = "envoy_mobile_extra_swift_sources")
     if not native.existing_rule("envoy_mobile_extra_jni_deps"):
         _default_extra_jni_deps(name = "envoy_mobile_extra_jni_deps")
 
     swift_dependencies()
-    kotlin_dependencies()
+    kotlin_dependencies(extra_maven_dependencies)
     python_dependencies()
 
 def swift_dependencies():
@@ -57,7 +57,7 @@ def swift_dependencies():
     apple_rules_dependencies(ignore_version_differences = True)
     swift_rules_dependencies()
 
-def kotlin_dependencies():
+def kotlin_dependencies(extra_maven_dependencies = []):
     maven_install(
         artifacts = [
             "com.google.code.findbugs:jsr305:3.0.2",
@@ -87,7 +87,7 @@ def kotlin_dependencies():
             "org.robolectric:robolectric:4.4",
             "org.hamcrest:hamcrest:2.2",
             "com.google.truth:truth:1.1",
-        ],
+        ] + extra_maven_dependencies,
         repositories = [
             "https://repo1.maven.org/maven2",
             "https://jcenter.bintray.com/",
