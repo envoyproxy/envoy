@@ -21,6 +21,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::StartsWith;
+
 namespace Envoy {
 namespace {
 
