@@ -331,7 +331,8 @@ public:
 
 class MockEarlyDataOption : public EarlyDataOption {
 public:
-  MOCK_METHOD(bool, allowsEarlyDataForRequest, (Http::RequestHeaderMap & request_headers), (const));
+  MOCK_METHOD(bool, allowsEarlyDataForRequest, (const Http::RequestHeaderMap& request_headers),
+              (const));
 };
 
 class MockRouteEntry : public RouteEntry {

@@ -732,9 +732,9 @@ public:
   virtual ~EarlyDataOption() = default;
 
   /**
-   * @return bool whether the given request should be allowed to be sent over early data.
+   * @return bool whether the given request may be sent over early data.
    */
-  virtual bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const PURE;
+  virtual bool allowsEarlyDataForRequest(const Http::RequestHeaderMap& request_headers) const PURE;
 };
 
 using EarlyDataOptionPtr = std::unique_ptr<EarlyDataOption>;

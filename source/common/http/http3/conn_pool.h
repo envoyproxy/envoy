@@ -37,7 +37,7 @@ public:
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
-    stream_attached_ = true;
+    has_created_stream_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
@@ -84,7 +84,7 @@ public:
     }
   }
 
-  bool hasCreatedStream() const { return stream_attached_; }
+  bool hasCreatedStream() const { return has_created_stream_; }
 
 protected:
   bool supportsEarlyData() const override { return true; }
@@ -116,7 +116,7 @@ private:
   // construction.
   Event::SchedulableCallbackPtr async_connect_callback_;
   // True if newStream() is ever called.
-  bool stream_attached_{false};
+  bool has_created_stream_{false};
 };
 
 // An interface to propagate H3 handshake result.

@@ -668,19 +668,15 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
       transitionActiveClientState(client, ActiveClient::State::Draining);
       client.close();
     } else if (!early_data_clients_.empty()) {
-      ActiveClient* idle_client{nullptr};
       for (ActiveClientPtr& client : early_data_clients_) {
         if (client->numActiveStreams() == 0) {
           if (connectingConnectionIsExcess(*client)) {
-            idle_client = client.get();
+            // Close the client after the for loop avoid messing up with iterator.
+            transitionActiveClientState(*client, ActiveClient::State::Draining);
+            client->close();
           }
           break;
         }
-      }
-      if (idle_client != nullptr) {
-        // Close the client after the for loop avoid messing up with iterator.
-        transitionActiveClientState(*idle_client, ActiveClient::State::Draining);
-        idle_client->close();
       }
     }
   }

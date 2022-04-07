@@ -14,7 +14,7 @@ public:
   explicit DefaultEarlyDataOption(bool allow_safe_request)
       : allow_safe_request_(allow_safe_request) {}
 
-  bool allowsEarlyDataForRequest(Http::RequestHeaderMap& request_headers) const override;
+  bool allowsEarlyDataForRequest(const Http::RequestHeaderMap& request_headers) const override;
 
 private:
   bool allow_safe_request_;
