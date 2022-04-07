@@ -44,7 +44,7 @@ message Zstd {
   // ones will 'stick'.
   google.protobuf.UInt32Value compression_level = 1;
 
-  // A 32-bits checksum of content is written at end of frame, If not set, defaults to false.
+  // A 32-bits checksum of content is written at end of frame. If not set, defaults to false.
   bool enable_checksum = 2;
 
   // The higher the value of selected strategy, the more complex it is,
@@ -52,7 +52,7 @@ message Zstd {
   // Special: value 0 means "use default strategy".
   Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
 
-  // A dictionary for compression. zstd offers dictionary compression, which greatly improves
+  // A dictionary for compression. Zstd offers dictionary compression, which greatly improves
   // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
   // that can be used to search the same dictionary during decompression.
   // Please refer to zstd manual to train a specific dictionary for compression:

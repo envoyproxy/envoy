@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.compression.zstd.decompressor]
 
 message Zstd {
-  // Dictionaries for decompression. zstd offers dictionary compression, which greatly improves
+  // Dictionaries for decompression. Zstd offers dictionary compression, which greatly improves
   // efficiency on small files and messages. It is necessary to ensure that the dictionary used for
   // decompression is the same as the compression dictionary. Multiple dictionaries can be set, and the
   // dictionary will be automatically selected for decompression according to the dictionary ID in the
