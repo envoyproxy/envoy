@@ -528,10 +528,8 @@ TEST_P(ListenerIntegrationTest, RemoveInplaceUpdatingListener) {
 
   // Trigger a listener in-place updating.
   listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
-  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)},
-                  "2");
-  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"),
-                  "2");
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
@@ -543,7 +541,7 @@ TEST_P(ListenerIntegrationTest, RemoveInplaceUpdatingListener) {
   const uint32_t response_size = 800;
   const uint32_t request_size = 10;
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                    {"server_id", "cluster_0, backend_0"}};
+                                                   {"server_id", "cluster_0, backend_0"}};
   auto response = sendRequestAndWaitForResponse(
       Http::TestResponseHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
@@ -559,9 +557,9 @@ TEST_P(ListenerIntegrationTest, RemoveInplaceUpdatingListener) {
   // Expect all the sockets are closed include the sockets in the active listener and
   // the sockets in the filter chain draining listener.
   auto reset_response = sendRequestAndWaitForResponse(
-     Http::TestResponseHeaderMapImpl{
-         {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
-     request_size, response_headers, response_size, /*cluster_0*/ 0);
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
   ASSERT_TRUE(reset_response->waitForReset());
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
