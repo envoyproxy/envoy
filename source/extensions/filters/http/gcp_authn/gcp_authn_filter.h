@@ -48,7 +48,7 @@ public:
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
                 config)),
         context_(context), client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)),
-        stats_(generateStats(stats_prefix, context.scope())) {}
+        stats_(generateStats(stats_prefix, context_.scope())) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -63,9 +63,9 @@ public:
 
 private:
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
-    // const std::string final_prefix = absl::StrCat(stats_prefix, "gcp_authn.");
+    //const std::string prefix = absl::StrCat(stats_prefix, "gcp_authn.");
     return {ALL_GCP_AUTHN_FILTER_STATS(
-        POOL_COUNTER_PREFIX(scope, absl::StrCat(stats_prefix, "gcp_authn.")))};
+        POOL_COUNTER_PREFIX(scope, stats_prefix))};
   }
   FilterConfigProtoSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
