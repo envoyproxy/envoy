@@ -12,9 +12,6 @@ namespace Envoy {
 
 // This is the base implementation of the KeyValueStore. It handles the various
 // functions other than flush(), which will be implemented by subclasses.
-//
-// Note this implementation HAS UNBOUNDED SIZE.
-// It is assumed the callers manage the number of entries. Use with care.
 class KeyValueStoreBase : public KeyValueStore,
                           public Logger::Loggable<Logger::Id::key_value_store> {
 public:
