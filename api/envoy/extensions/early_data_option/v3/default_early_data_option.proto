@@ -11,8 +11,8 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/ear
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP request early data option]
-// [#extension: envoy.route.early_data_option.default]
 
+// [#extension: envoy.route.early_data_option.default]
 // The default rule to allow/disallow a request to be sent as early data.
 message DefaultEarlyDataOption {
   // If true, allow `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data. Otherwise, do not use early data.

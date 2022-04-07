@@ -851,19 +851,6 @@ private:
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
-  class RequestMethod {
-  public:
-    static constexpr uint32_t GET = 0x1;
-    static constexpr uint32_t HEAD = 0x2;
-    static constexpr uint32_t POST = 0x4;
-    static constexpr uint32_t PUT = 0x8;
-    static constexpr uint32_t DELETE = 0x10;
-    static constexpr uint32_t CONNECT = 0x20;
-    static constexpr uint32_t OPTIONS = 0x40;
-    static constexpr uint32_t TRACE = 0x80;
-    static constexpr uint32_t PATCH = 0x100;
-  };
-
   /**
    * Returns a vector of request header parsers which applied or will apply header transformations
    * to the request in this route.

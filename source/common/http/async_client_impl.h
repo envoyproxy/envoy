@@ -37,11 +37,11 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/config_impl.h"
-#include "source/common/router/default_early_data_option.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
+#include "source/extensions/early_data_option/default_early_data_option.h"
 
 namespace Envoy {
 namespace Http {

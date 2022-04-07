@@ -1,4 +1,4 @@
-#include "source/common/router/default_early_data_option.h"
+#include "source/extensions/early_data_option/default_early_data_option.h"
 
 #include "source/common/http/utility.h"
 
