@@ -134,7 +134,7 @@ public:
    * Add an admin handler.
    * Lambda to generate a Handler.
    */
-  using GenHandlerCb = std::function<HandlerPtr(absl::string_view path, AdminStream&)>;
+  using GenRequestCb = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
 
   /**
    * Individual admin handler including prefix, help text, and callback.
@@ -142,7 +142,7 @@ public:
   struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
-    const GenHandlerCb handler_;
+    const GenRequestCb handler_;
     const bool removable_;
     const bool mutates_server_state_;
     const ParamDescriptorVec params_{};

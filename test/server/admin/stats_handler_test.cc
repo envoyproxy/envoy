@@ -127,46 +127,6 @@ public:
   Configuration::MockStatsConfig stats_config_;
 };
 
-TEST(StatsHandlerTest, TypeToString) {
-  EXPECT_EQ("TextReadouts", StatsHandler::typeToString(StatsHandler::Type::TextReadouts));
-  EXPECT_EQ("Gauges", StatsHandler::typeToString(StatsHandler::Type::Gauges));
-  EXPECT_EQ("Counters", StatsHandler::typeToString(StatsHandler::Type::Counters));
-  EXPECT_EQ("Histograms", StatsHandler::typeToString(StatsHandler::Type::Histograms));
-  EXPECT_EQ("All", StatsHandler::typeToString(StatsHandler::Type::All));
-}
-
-TEST(StatsHandlerTest, ParseParamsType) {
-  Buffer::OwnedImpl response;
-  StatsHandler::Params params;
-
-  ASSERT_EQ(Http::Code::OK, params.parse("?type=TextReadouts", response));
-  EXPECT_EQ(StatsHandler::Type::TextReadouts, params.type_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?type=Gauges", response));
-  EXPECT_EQ(StatsHandler::Type::Gauges, params.type_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?type=Counters", response));
-  EXPECT_EQ(StatsHandler::Type::Counters, params.type_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?type=Histograms", response));
-  EXPECT_EQ(StatsHandler::Type::Histograms, params.type_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?type=All", response));
-  EXPECT_EQ(StatsHandler::Type::All, params.type_);
-  EXPECT_EQ(Http::Code::BadRequest, params.parse("?type=bogus", response));
-}
-
-TEST(StatsHandlerTest, ParseParamsFormat) {
-  Buffer::OwnedImpl response;
-  StatsHandler::Params params;
-
-  ASSERT_EQ(Http::Code::OK, params.parse("?format=text", response));
-  EXPECT_EQ(StatsHandler::Format::Text, params.format_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?format=html", response));
-  EXPECT_EQ(StatsHandler::Format::Html, params.format_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?format=json", response));
-  EXPECT_EQ(StatsHandler::Format::Json, params.format_);
-  ASSERT_EQ(Http::Code::OK, params.parse("?format=prometheus", response));
-  EXPECT_EQ(StatsHandler::Format::Prometheus, params.format_);
-  EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=bogus", response));
-}
-
 class AdminStatsTest : public StatsHandlerTest,
                        public testing::TestWithParam<Network::Address::IpVersion> {};
 

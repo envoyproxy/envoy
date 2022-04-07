@@ -10,6 +10,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/stats_request.h"
 #include "source/server/admin/utils.h"
 
 #include "absl/strings/string_view.h"
@@ -20,38 +21,6 @@ namespace Server {
 class StatsHandler : public HandlerContextBase {
 
 public:
-  enum class Format {
-    Html,
-    Json,
-    Prometheus,
-    Text,
-  };
-
-  // The order is used to linearize the ordering of stats of all types.
-  enum class Type {
-    TextReadouts,
-    Counters,
-    Gauges,
-    Histograms,
-    All,
-  };
-
-  struct Params {
-    Http::Code parse(absl::string_view url, Buffer::Instance& response);
-    bool shouldShowMetric(const Stats::Metric& metric) const;
-
-    bool used_only_{false};
-    bool prometheus_text_readouts_{false};
-    bool pretty_{false};
-    Format format_{
-        Format::Text}; // If no `format=` param we use Text, but the `UI` defaults to HTML.
-    Type type_{Type::All};
-    Type start_type_{Type::TextReadouts};
-    std::string filter_string_;
-    absl::optional<std::regex> filter_;
-    Http::Utility::QueryParams query_;
-  };
-
   StatsHandler(Server::Instance& server);
 
   Http::Code handlerResetCounters(absl::string_view path_and_query,
@@ -88,11 +57,9 @@ public:
    */
   Admin::UrlHandler statsHandler();
 
-  /**
-   * @return a string representation for a type.
-   */
-  static absl::string_view typeToString(Type type);
-
+  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+                                       StatsRequest::UrlHandlerFn url_handler_fn);
 private:
   class Context;
   class HtmlRender;
@@ -102,16 +69,9 @@ private:
 
   friend class StatsHandlerTest;
 
-  Http::Code stats(const Params& parmams, Stats::Store& store,
-                   Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
-
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
-  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
-  static Admin::RequestPtr makeRequest(Stats::Store& stats, bool used_only, bool json,
-                                       Utility::HistogramBucketsMode histogram_buckets_mode,
-                                       const absl::optional<std::regex>& regex);
 };
 
 } // namespace Server

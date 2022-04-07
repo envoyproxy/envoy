@@ -86,7 +86,7 @@ public:
                   bool removable, bool mutates_server_state,
                   const ParamDescriptorVec& params = {}) override;
   bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
-                         GenHandlerCb callback, bool removable, bool mutates_server_state,
+                         GenRequestCb callback, bool removable, bool mutates_server_state,
                          const ParamDescriptorVec& params = {}) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
@@ -219,18 +219,19 @@ private:
   /**
    * Creates a Handler instance given a request.
    */
-  HandlerPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
+  //RequestPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
 
   /*
    * Individual admin handler including prefix, help text, and callback.
    */
-  struct UrlHandler {
+  /*  struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
     const GenRequestFn handler_;
     const bool removable_;
     const bool mutates_server_state_;
   };
+  */
 
   /**
    * Creates a Request from a url.
@@ -241,7 +242,8 @@ private:
    * Creates a UrlHandler structure from a non-chunked callback.
    */
   UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
-                         HandlerCb callback, bool removable, bool mutates_state);
+                         HandlerCb callback, bool removable, bool mutates_state,
+                         const ParamDescriptorVec& params = {});
 
   /**
    * Creates a URL prefix bound to chunked handler. Handler is expected to

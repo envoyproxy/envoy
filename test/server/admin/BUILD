@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -101,6 +102,15 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_params_test",
+    srcs = ["stats_params_test.cc"],
+    deps = [
+        "//source/server/admin:stats_params_lib",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 

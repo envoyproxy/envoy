@@ -3,18 +3,25 @@
 namespace Envoy {
 namespace Server {
 
-StatsRequest::StatsRequest(Stats::Store& stats, bool used_only, bool json,
-                           Utility::HistogramBucketsMode histogram_buckets_mode,
-                           absl::optional<std::regex> regex)
-    : used_only_(used_only), json_(json), histogram_buckets_mode_(histogram_buckets_mode),
-      regex_(regex), stats_(stats) {}
+StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
+                           UrlHandlerFn url_handler_fn)
+    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {}
 
 Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
-  if (json_) {
-    render_ =
-        std::make_unique<StatsJsonRender>(response_headers, response_, histogram_buckets_mode_);
-  } else {
-    render_ = std::make_unique<StatsTextRender>(histogram_buckets_mode_);
+  switch (params_.format_) {
+    case StatsFormat::Json:
+      render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
+      break;
+    case StatsFormat::Text:
+      render_ = std::make_unique<StatsTextRender>(params_);
+      break;
+    case StatsFormat::Html:
+      render_ = std::make_unique<StatsHtmlRender>(response_headers, response_, url_handler_fn_(),
+                                                  params_);
+      break;
+    case StatsFormat::Prometheus:
+      ASSERT(false);
+      return Http::Code::BadRequest;
   }
 
   // Populate the top-level scopes and the stats underneath any scopes with an empty name.
@@ -123,11 +130,11 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
     Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-      if (used_only_ && !stat->used()) {
+      if (params_.used_only_ && !stat->used()) {
         return true;
       }
       std::string name = stat->name();
-      if (regex_.has_value() && !std::regex_search(name, regex_.value())) {
+      if (params_.filter_.has_value() && !std::regex_search(name, params_.filter_.value())) {
         return true;
       }
       stat_map_[name] = stat;

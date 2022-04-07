@@ -14,6 +14,9 @@ using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
 
 namespace Server {
 
+StatsTextRender::StatsTextRender(const StatsParams& params)
+    : histogram_buckets_mode_(params.histogram_buckets_mode_) {}
+
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
   response.addFragments({name, ": ", absl::StrCat(value), "\n"});
@@ -80,8 +83,8 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response,
-                                 Utility::HistogramBucketsMode histogram_buckets_mode)
-    : histogram_buckets_mode_(histogram_buckets_mode) {
+                                 const StatsParams& params)
+    : histogram_buckets_mode_(params.histogram_buckets_mode_) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the entire stats output, as that
   // makes streaming difficult. Instead we emit the preamble in the
@@ -314,6 +317,30 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   }
   *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
 }
+
+StatsHtmlRender::StatsHtmlRender(
+    Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+    const Admin::UrlHandler& url_handler, const StatsParams& params)
+    : StatsTextRender(params), html_(response) {
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+  html_.setSubmitOnChange(true);
+  html_.renderHead();
+  response.add("<body>\n");
+  html_.renderTableBegin();
+  html_.renderUrlHandler(url_handler, params.query_);
+  html_.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+  html_.renderTableEnd();
+  response.add("<pre>\n");
+}
+
+void StatsHtmlRender::finalize(Buffer::Instance& response) {
+  response.add("</pre></body>\n");
+}
+
+/*void StatsHtmlRender::noStats(Type type) {
+  response_.add(
+      absl::StrCat("</pre>\n<br/><i>No ", typeToString(type), " found</i><br/>\n<pre>\n"));
+      }*/
 
 } // namespace Server
 } // namespace Envoy

@@ -1,7 +1,13 @@
+#pragma once
+
 #include "envoy/stats/stats.h"
 
+#include "envoy/server/admin.h"
+
 #include "source/common/buffer/buffer_impl.h"
+#include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
+#include "source/server/admin/admin_html_generator.h"
 
 namespace Envoy {
 namespace Server {
@@ -33,8 +39,7 @@ public:
 // Implements the Render interface for simple textual representation of stats.
 class StatsTextRender : public StatsRender {
 public:
-  explicit StatsTextRender(Utility::HistogramBucketsMode histogram_buckets_mode)
-      : histogram_buckets_mode_(histogram_buckets_mode) {}
+  explicit StatsTextRender(const StatsParams& params);
 
   // StatsRender
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override;
@@ -56,7 +61,7 @@ private:
 class StatsJsonRender : public StatsRender {
 public:
   StatsJsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                  Utility::HistogramBucketsMode histogram_buckets_mode);
+                  const StatsParams& params);
 
   // StatsRender
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override;
@@ -103,6 +108,18 @@ private:
   bool found_used_histogram_{false};
   bool first_{true};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
+};
+
+class StatsHtmlRender : public StatsTextRender {
+public:
+  StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                  const Admin::UrlHandler& url_handler, const StatsParams& params);
+
+  //void noStats(Type type) override;
+  void finalize(Buffer::Instance&) override;
+
+private:
+  AdminHtmlGenerator html_;
 };
 
 } // namespace Server

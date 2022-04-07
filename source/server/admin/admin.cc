@@ -279,6 +279,10 @@ private:
 
 } // namespace
 
+Admin::RequestPtr Admin::makeStaticTextRequest(absl::string_view response, Http::Code code) {
+  return std::make_unique<StaticTextRequest>(response, code);
+}
+
 Admin::RequestPtr Admin::makeStaticTextRequest(Buffer::Instance& response, Http::Code code) {
   return std::make_unique<StaticTextRequest>(response, code);
 }
@@ -379,9 +383,10 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
                                              const std::string& help_text, HandlerCb callback,
                                              bool removable, bool mutates_state,
-                                     const ParamDescriptorVec& params) {
-
-  return UrlHandler{prefix, help_text, RequestGasket::makeGen(callback), removable, mutates_state};
+                                             const ParamDescriptorVec& params) {
+  return UrlHandler{
+    prefix, help_text, RequestGasket::makeGen(callback), removable, mutates_state, params
+  };
 }
 
 bool AdminImpl::addStreamingHandler(const std::string& prefix, const std::string& help_text,
@@ -412,7 +417,7 @@ bool AdminImpl::addStreamingHandler(const std::string& prefix, const std::string
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable, bool mutates_state,
                            const ParamDescriptorVec& params) {
-  return addStreamingHandler(prefix, help_text, HandlerGasket::makeGen(callback), removable,
+  return addStreamingHandler(prefix, help_text, RequestGasket::makeGen(callback), removable,
                            mutates_state, params);
 }
 
