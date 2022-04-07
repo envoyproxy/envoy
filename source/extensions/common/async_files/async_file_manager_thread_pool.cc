@@ -30,11 +30,9 @@ AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(
     const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
     Api::OsSysCalls& posix)
     : posix_(posix) {
-  std::cout << "XXXXX wut" << std::endl;
   if (!posix.supportsAllPosixFileOperations()) {
     PANIC("AsyncFileManagerThreadPool not supported");
   }
-  std::cout << "XXXXX wut2" << std::endl;
   unsigned int thread_pool_size = config.thread_pool().thread_count();
   if (thread_pool_size == 0) {
     thread_pool_size = std::thread::hardware_concurrency();

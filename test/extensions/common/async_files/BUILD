@@ -40,6 +40,7 @@ envoy_cc_test(
     srcs = [
         "async_file_manager_factory_test.cc",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
