@@ -239,7 +239,7 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
   # and the packages signed with it, for the purpose of testing only.
   if ! gpg --list-secret-keys "*"; then
       export PACKAGES_MAINTAINER_NAME="Envoy CI"
-      export PACKAGES_MAINTAINER_EMAIL="envoy@snake.oil"
+      export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
       BAZEL_BUILD_OPTIONS+=(
           "--action_env=PACKAGES_GEN_KEY=1"
           "--action_env=PACKAGES_MAINTAINER_NAME"
