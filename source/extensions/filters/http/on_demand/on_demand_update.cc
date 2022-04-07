@@ -15,42 +15,84 @@ namespace OnDemand {
 
 namespace {
 
+class RDSDecodeHeadersBehavior : public DecodeHeadersBehavior
+{
+public:
+  virtual void decodeHeaders(OnDemandRouteUpdate& filter) override {
+    filter.handleMissingRoute();
+  }
+};
+
+class RDSCDSDecodeHeadersBehavior : public DecodeHeadersBehavior
+{
+public:
+  RDSCDSDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout)
+    : odcds_(std::move(odcds)), timeout_(timeout) {}
+
+  virtual void decodeHeaders(OnDemandRouteUpdate& filter) override {
+    auto route = filter.handleMissingRoute();
+    if (!route.has_value()) {
+      return;
+    }
+    filter.handleOnDemandCDS(route.value(), *odcds_, timeout_);
+  }
+
+private:
+  Upstream::OdCdsApiHandlePtr odcds_;
+  std::chrono::milliseconds timeout_;
+};
+
+DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(OptRef<const envoy::config::core::v3::ConfigSource> odcds_config,
+                                                     const std::string& resources_locator,
+                                                     std::chrono::milliseconds timeout,
+                                                     Upstream::ClusterManager& cm,
+                                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  if (!odcds_config.has_value()) {
+    return std::make_unique<RDSDecodeHeadersBehavior>();
+  }
+  Upstream::OdCdsApiHandlePtr odcds;
+  if (resources_locator.empty()) {
+    odcds = cm.allocateOdCdsApi(odcds_config.value(), absl::nullopt, validation_visitor);
+  } else {
+    auto locator = Config::XdsResourceIdentifier::decodeUrl(resources_locator);
+    odcds = cm.allocateOdCdsApi(odcds_config.value(), locator, validation_visitor);
+  }
+  return std::make_unique<RDSCDSDecodeHeadersBehavior>(std::move(odcds), timeout);
+}
+
 template <typename ProtoConfig>
-Upstream::OdCdsApiHandlePtr createOdCdsApi(const ProtoConfig& proto_config,
-                                           Upstream::ClusterManager& cm,
-                                           ProtobufMessage::ValidationVisitor& validation_visitor) {
-  if (!proto_config.has_odcds_config() && proto_config.resources_locator().empty()) {
-    return nullptr;
+OptRef<const envoy::config::core::v3::ConfigSource&> getODCDSConfig(const ProtoConfig& proto_config) {
+  if (!proto_config.has_odcds_config()) {
+    return absl::nullopt;
   }
-  if (proto_config.resources_locator().empty()) {
-    // TODO: Would be nice if OptRef accepted absl::null_opt.
-    OptRef<xds::core::v3::ResourceLocator> null_opt_ref;
-    return cm.allocateOdCdsApi(proto_config.odcds_config(), null_opt_ref, validation_visitor);
-  }
-  auto locator = Config::XdsResourceIdentifier::decodeUrl(proto_config.resources_locator());
-  return cm.allocateOdCdsApi(proto_config.odcds_config(), locator, validation_visitor);
+  return proto_config.odcds_config();
+}
+
+template <typename ProtoConfig>
+std::chrono::milliseconds getTimeout(const ProtoConfig& proto_config) {
+  // If changing the default timeout, please update the documentation in on_demand.proto too.
+  return PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 5000);
 }
 
 } // namespace
 
-OnDemandFilterConfig::OnDemandFilterConfig(Upstream::OdCdsApiHandlePtr odcds)
-    : odcds_(std::move(odcds)) {}
+OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
+  : behavior_(std::move(behavior)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(createOdCdsApi(proto_config, cm, validation_visitor)) {}
+  : OnDemandFilterConfig(createDecodeHeadersBehavior(getODCDSConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config), cm, validation_visitor)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(createOdCdsApi(proto_config, cm, validation_visitor)) {}
+  : OnDemandFilterConfig(createDecodeHeadersBehavior(getODCDSConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config), cm, validation_visitor)) {}
 
-Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
-
+OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   if (auto route = callbacks_->route(); route != nullptr) {
-    handleOnDemandCDS(route);
-    return filter_iteration_state_;
+    filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
+    return *route;
   }
   // decodeHeaders() is interrupted.
   decode_headers_active_ = true;
@@ -61,22 +103,18 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
   callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
+  return makeOptRefFromPtr(callbacks_->route().get());
+}
+
+Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
+  auto config = getConfig(callbacks_->route());
+
+  config->decodeHeadersBehavior().decodeHeaders(*this);
   return filter_iteration_state_;
 }
 
 // Passed route pointer here is not null.
-void OnDemandRouteUpdate::handleOnDemandCDS(const Router::RouteConstSharedPtr& route) {
-  auto config = getConfig(route);
-  if (config == nullptr) {
-    filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
-    return;
-  }
-  auto odcds = config->odcds();
-  if (odcds == nullptr) {
-    // No ODCDS? It means that on-demand discovery is disabled.
-    filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
-    return;
-  }
+void OnDemandRouteUpdate::handleOnDemandCDS(const Router::Route& route, Upstream::OdCdsApiHandle& odcds, std::chrono::milliseconds timeout) {
   if (callbacks_->clusterInfo() != nullptr) {
     // Cluster already exists, so nothing to do here.
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
@@ -101,10 +139,9 @@ void OnDemandRouteUpdate::handleOnDemandCDS(const Router::RouteConstSharedPtr& r
         onClusterDiscoveryCompletion(cluster_status);
       });
   cluster_discovery_handle_ = odcds->requestOnDemandClusterDiscovery(
-      cluster_name, std::move(callback), std::chrono::milliseconds(5000));
+      cluster_name, std::move(callback), timeout);
 }
 
-// Passed route pointer here is not null.
 const OnDemandFilterConfig*
 OnDemandRouteUpdate::getConfig(const Router::RouteConstSharedPtr& route) {
   auto config = Http::Utility::resolveMostSpecificPerFilterConfig<OnDemandFilterConfig>(

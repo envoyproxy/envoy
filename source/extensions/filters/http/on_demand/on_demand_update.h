@@ -10,11 +10,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
+class OnDemandRouteUpdate;
+
+// DecodeHeadersBehavior implementations are used by OnDemandRouteUpdate in its decodeHeaders
+// method.
+class DecodeHeadersBehavior
+{
+public:
+  virtual ~DecodeHeadersBehavior() = default;
+
+  virtual void decodeHeaders(OnDemandRouteUpdate& filter) PURE;
+};
+
+using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
+
 // OnDemandFilterConfig contains information from either the extension's
 // proto config or the extension's per-route proto config.
 class OnDemandFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit OnDemandFilterConfig(Upstream::OdCdsApiHandlePtr odcds);
+  explicit OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior);
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
@@ -24,12 +38,10 @@ public:
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  // Get the handle to on-demand cluster discovery service. It may be
-  // null if it was not enabled.
-  Upstream::OdCdsApiHandle* odcds() const { return odcds_.get(); }
+  DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
 
 private:
-  Upstream::OdCdsApiHandlePtr odcds_;
+  DecodeHeadersBehaviorPtr behavior_;
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
@@ -42,9 +54,11 @@ public:
   void onRouteConfigUpdateCompletion(bool route_exists);
   // Callback invoked when on-demand cluster discovery is finished.
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
+  // Do on-demand route discovery if the route is missing.
+  OptRef<const Router::Route> handleMissingRoute();
   // Do on-demand cluster discovery if the cluster used by the route
   // is missing.
-  void handleOnDemandCDS(const Router::RouteConstSharedPtr& route);
+  void handleOnDemandCDS(const Router::Route& route, Upstream::OdCdsApiHandle& odcds, std::chrono::milliseconds timeout);
   // Get the per-route config if it's available, otherwise the
   // extension's config.
   const OnDemandFilterConfig* getConfig(const Router::RouteConstSharedPtr& route);

@@ -33,6 +33,10 @@ message OnDemand {
   // xdstp:// resource locator for on-demand cluster collection.
   // [#not-implemented-hide:]
   string resources_locator = 2;
+
+  // The timeout for on demand cluster lookup. If not set, defaults to 5 seconds.
+  // [#not-implemented-hide:]
+  google.protobuf.Duration timeout = 3;
 }
 
 // Per-route configuration for On Demand Discovery.
@@ -48,4 +52,8 @@ message PerRouteConfig {
   // xdstp:// resource locator for on-demand cluster collection.
   // [#not-implemented-hide:]
   string resources_locator = 2;
+
+  // The timeout for on demand cluster lookup. If not set, defaults to 5 seconds.
+  // [#not-implemented-hide:]
+  google.protobuf.Duration timeout = 3;
 }
