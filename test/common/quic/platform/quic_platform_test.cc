@@ -144,6 +144,8 @@ TEST_F(QuicPlatformTest, QuicExportedStats) {
 
 TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("!!"));
+  // SNI without dot is valid as per RFC 2396.
+  EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
   EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));

@@ -4343,7 +4343,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_hostname_utils_impl_lib",
+        ":quiche_common_platform_logging",
+        "@com_googlesource_googleurl//url",
     ],
 )
 
