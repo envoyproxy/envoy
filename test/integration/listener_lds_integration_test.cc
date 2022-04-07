@@ -491,7 +491,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 // Create a listener, then do an in-place update for the listener.
 // Remove the listener before the filter chain draining is done,
 // then expect the connection will be reset.
-TEST_P(ListenerIntegrationTest, RemoveInplaceUpdatingListener) {
+TEST_P(ListenerIntegrationTest, CloseFilterChainDrainingSocketsWhenNewListenerRemoved) {
   on_server_init_function_ = [&]() {
     createLdsStream();
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
@@ -559,7 +559,7 @@ TEST_P(ListenerIntegrationTest, RemoveInplaceUpdatingListener) {
   auto codec =
       makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
   EXPECT_FALSE(codec->connected());
-  EXPECT_EQ("delayed connect error: 111", codec->connection()->transportFailureReason());
+  EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
