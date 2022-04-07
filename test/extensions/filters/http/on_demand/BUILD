@@ -45,3 +45,24 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "odcds_integration_test",
+    srcs = ["odcds_integration_test.cc"],
+    extension_names = ["envoy.filters.http.on_demand"],
+#    data = [
+#        "//test/config/integration/certs",
+#    ],
+    deps = [
+        "//source/common/common:macros",
+        "//source/extensions/filters/http/on_demand:config",
+        "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/ads_integration_lib",
+        "//test/integration/fake_upstream_lib",
+        "//test/integration/http_integration_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
