@@ -132,27 +132,21 @@ IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& header
 
 void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, absl::string_view data,
                                       bool end_stream) {
-  if (!stream_gone_) {
-    Buffer::OwnedImpl buffer_data(data.data(), data.size());
-    encoder.encodeData(buffer_data, end_stream);
-    flushWrite();
-  }
+  Buffer::OwnedImpl buffer_data(data.data(), data.size());
+  encoder.encodeData(buffer_data, end_stream);
+  flushWrite();
 }
 
 void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, Buffer::Instance& data,
                                       bool end_stream) {
-  if (!stream_gone_) {
-    encoder.encodeData(data, end_stream);
-    flushWrite();
-  }
+  encoder.encodeData(data, end_stream);
+  flushWrite();
 }
 
 void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, uint64_t size,
                                       bool end_stream) {
-  if (!stream_gone_) {
-    Buffer::OwnedImpl data(std::string(size, 'a'));
-    sendData(encoder, data, end_stream);
-  }
+  Buffer::OwnedImpl data(std::string(size, 'a'));
+  sendData(encoder, data, end_stream);
 }
 
 void IntegrationCodecClient::sendTrailers(Http::RequestEncoder& encoder,
