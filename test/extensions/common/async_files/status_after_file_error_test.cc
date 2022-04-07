@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "source/extensions/common/async_files/status_after_file_error.h"
+
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
