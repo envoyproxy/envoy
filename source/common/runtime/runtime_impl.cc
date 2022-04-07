@@ -28,7 +28,7 @@
 #include "absl/strings/numbers.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/platform/quiche_flags_impl.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {
@@ -378,6 +378,11 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
+      IS_ENVOY_BUG(absl::StrCat(
+          "Using a removed guard ", prefix,
+          ". In future version of Enovy this will be treated as invalid configuration"));
+    }
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kStructValue: {

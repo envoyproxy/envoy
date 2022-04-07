@@ -29,6 +29,7 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_replies);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
@@ -45,6 +46,7 @@ RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding)
 RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
 RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
+RUNTIME_GUARD(envoy_reloadable_features_http_100_continue_case_insensitive);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
@@ -60,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_dispatching_frames_for_closed_conne
 RUNTIME_GUARD(envoy_reloadable_features_strict_check_on_ipv4_compat);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
@@ -131,6 +134,14 @@ RuntimeFeatures::RuntimeFeatures() {
     std::string envoy_name = swapPrefix(std::string(name));
     all_features_.emplace(envoy_name, it.second);
   }
+}
+
+bool hasRuntimePrefix(absl::string_view feature) {
+  // Track Envoy reloadable and restart features, excluding synthetic QUIC flags
+  // which are not tracked in the list below.
+  return (absl::StartsWith(feature, "envoy.reloadable_features.") &&
+          !absl::StartsWith(feature, "envoy.reloadable_features.FLAGS_quic")) ||
+         absl::StartsWith(feature, "envoy.restart_features.");
 }
 
 bool isRuntimeFeature(absl::string_view feature) {

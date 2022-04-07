@@ -3,6 +3,7 @@
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
@@ -308,28 +309,37 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else if (end_stream || state.queueOverHighLimit()) {
-      switch (openStream()) {
-      case StreamOpenState::Error:
-        return FilterDataStatus::StopIterationNoBuffer;
-      case StreamOpenState::IgnoreError:
-        return FilterDataStatus::Continue;
-      case StreamOpenState::Ok:
-        // Fall through
-        break;
+      bool terminate;
+      std::tie(terminate, result) = sendStreamChunk(state, data, end_stream);
+
+      if (terminate) {
+        return result;
       }
-      state.enqueueStreamingChunk(data, false, false);
-      // Put all buffered data so far into one big buffer
-      const auto& all_data = state.consolidateStreamedChunks(true);
-      ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-                all_data.data.length(), end_stream);
-      sendBodyChunk(state, all_data.data,
-                    ProcessorState::CallbackState::BufferedPartialBodyCallback, end_stream);
-      result = FilterDataStatus::StopIterationNoBuffer;
-      state.setPaused(true);
     } else {
       // Keep on running and buffering
       state.enqueueStreamingChunk(data, false, false);
-      result = FilterDataStatus::Continue;
+
+      if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
+          state.queueOverHighLimit()) {
+        // When we transition to queue over high limit, we read disable the
+        // stream. With deferred processing, this means new data will buffer in
+        // the receiving codec buffer (not reaching this filter) and data
+        // already queued in this filter hasn't yet been sent externally.
+        //
+        // The filter would send the queued data if it was invoked again, or if
+        // we explicitly kick it off. The former wouldn't happen with deferred
+        // processing since we would be buffering in the receiving codec buffer,
+        // so we opt for the latter, explicitly kicking it off.
+        bool terminate;
+        Buffer::OwnedImpl empty_buffer{};
+        std::tie(terminate, result) = sendStreamChunk(state, empty_buffer, false);
+
+        if (terminate) {
+          return result;
+        }
+      } else {
+        result = FilterDataStatus::Continue;
+      }
     }
     break;
   case ProcessingMode::NONE:
@@ -353,6 +363,28 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     return FilterDataStatus::StopIterationAndBuffer;
   }
   return result;
+}
+
+std::pair<bool, Http::FilterDataStatus>
+Filter::sendStreamChunk(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return {true, FilterDataStatus::StopIterationNoBuffer};
+  case StreamOpenState::IgnoreError:
+    return {true, FilterDataStatus::Continue};
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+  state.enqueueStreamingChunk(data, false, false);
+  // Put all buffered data so far into one big buffer
+  const auto& all_data = state.consolidateStreamedChunks(true);
+  ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
+            all_data.data.length(), end_stream);
+  sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
+                end_stream);
+  state.setPaused(true);
+  return {false, FilterDataStatus::StopIterationNoBuffer};
 }
 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
