@@ -63,6 +63,7 @@ envoy_cc_library(
         ":async_files_thread_pool",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/protobuf:utility_lib",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/status:statusor",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",

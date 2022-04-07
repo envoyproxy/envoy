@@ -16,7 +16,6 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
-#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -57,6 +56,16 @@ TEST_F(AsyncFileManagerFactoryDeathTest, DiesIfThreadPoolSelectedAndUnsupported)
       .WillRepeatedly(Return(false));
   EXPECT_DEATH({ factory_->getAsyncFileManager(config, &mock_posix_file_operations_); },
                "AsyncFileManagerThreadPool not supported");
+}
+
+TEST_F(AsyncFileManagerFactoryDeathTest, DiesIfGivenInconsistentConfigForSameManagerId) {
+  envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+  config.mutable_thread_pool()->set_thread_count(1);
+  auto manager1 = factory_->getAsyncFileManager(config, &mock_posix_file_operations_);
+  config.mutable_thread_pool()->set_thread_count(2);
+  EXPECT_DEATH(
+      { auto manager2 = factory_->getAsyncFileManager(config, &mock_posix_file_operations_); },
+      "AsyncFileManager mismatched config");
 }
 
 TEST_F(AsyncFileManagerFactoryTest, ManagersAreCombinedById) {

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/common/async_files/async_file_manager_thread_pool.h"
 
 #include "absl/base/thread_annotations.h"
@@ -28,6 +29,9 @@ private:
   absl::Mutex mu_;
   absl::flat_hash_map<std::string, std::shared_ptr<AsyncFileManager>>
       managers_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<std::string,
+                      envoy::extensions::common::async_files::v3::AsyncFileManagerConfig>
+      configs_ ABSL_GUARDED_BY(mu_);
 };
 
 std::shared_ptr<AsyncFileManagerFactory>
@@ -51,10 +55,13 @@ std::shared_ptr<AsyncFileManager> AsyncFileManagerFactoryImpl::getAsyncFileManag
       it = managers_
                .insert({config.id(), std::make_shared<AsyncFileManagerThreadPool>(config, posix)})
                .first;
+      configs_.insert({config.id(), config});
       break;
     default:
       PANIC("unrecognized AsyncFileManagerConfig::ManagerType");
     };
+  } else if (!Protobuf::util::MessageDifferencer::Equivalent(configs_[config.id()], config)) {
+    PANIC("AsyncFileManager mismatched config");
   }
   return it->second;
 }
