@@ -5,9 +5,11 @@ package envoy.extensions.filters.http.rate_limit_quota.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 import "google/rpc/status.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -91,21 +93,29 @@ message RateLimitQuotaBucketSettings {
     }
   }
 
+  // Customize the deny response to the requests over the rate limit.
   message DenyResponseSettings {
-    // Status code to use to fail requests when quota is exceeded.
-    // [#comment:TODO: figure out the right defaults for these fields!]
-    int32 http_status_code = 1;
-    // For HTTP requests.
+    // HTTP response code for denying non-gRPC HTTP requests.
+    // Defaults to 429 (:ref:`StatusCode.TooManyRequests<envoy_v3_api_enum_value_type.v3.StatusCode.TooManyRequests>`).
+    type.v3.HttpStatus http_status = 1;
 
-    google.rpc.Status deny_grpc_status = 2;
-    // For gRPC requests.
+    // HTTP response body used for denying non-gRPC HTTP requests.
+    // If not set, an empty body is returned.
+    google.protobuf.BytesValue http_body = 2;
 
-    // A response body to send to the downstream client when the response code
-    // is not OK.
-    bytes http_raw_body = 3;
+    // Specifies the `RPC code
+    // <https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#google.rpc.Code>`_
+    // and the message used when denying over-the-limit gRPC requests.
+    // Defaults to the Status with the RPC Code ``UNAVAILABLE`` and empty message.
+    //
+    // .. note::
+    //   The HTTP code for a gRPC response is always 200.
+    google.rpc.Status grpc_status = 3;
 
-    // A list of headers to add to the response when the request is throttled.
-    repeated config.core.v3.HeaderValue response_headers_to_add = 4;
+    // Specifies a list of HTTP headers that should be added to each response for requests that
+    // have been rate limited. Applies both to plain HTTP, and gRPC requests.
+    repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
+        [(validate.rules).repeated = {max_items: 10}];
   }
 
   message BucketIdBuilder {
@@ -136,7 +146,10 @@ message RateLimitQuotaBucketSettings {
     gt {nanos: 1000000}
   }];
 
-  // [#comment:TODO(sergiitk): behavior on unset]
+  // Customize the deny response to the requests over the rate limit.
+  // If not set, the filter will be configured as if an empty message is set,
+  // and will behave according to the defaults specified in :ref:`DenyResponseSettings
+  // <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings>`.
   DenyResponseSettings deny_response_settings = 3;
 
   // How the data plane should treat requests matched into this bucket
