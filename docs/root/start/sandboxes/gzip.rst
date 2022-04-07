@@ -65,7 +65,7 @@ As only files with a content-type of ``application/json`` are configured to be g
     $ curl -si -H "Accept-Encoding: gzip" localhost:10000/file.txt | grep "content-encoding"
 
 Step 3: Test Envoy’s decompression of downstream files
-**************************************************
+******************************************************
 
 The sandbox is configured with one endpoint on port ``10000`` for uploading downstream files:
 
