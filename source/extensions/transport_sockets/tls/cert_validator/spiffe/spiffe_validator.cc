@@ -263,16 +263,16 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
+absl::optional<size_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
     return 0;
   }
-  size_t ret = SIZE_MAX;
+  absl::optional<size_t> ret = SIZE_MAX;
   for (auto& cert : ca_certs_) {
-    int32_t tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
-    if (tmp == -1) {
-      return tmp;
-    } else if (tmp < static_cast<int>(ret)) {
+    absl::optional<size_t> tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    } else if (tmp.value() < ret.value()) {
       ret = tmp;
     }
   }

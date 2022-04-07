@@ -46,7 +46,7 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details->set_days_until_expiration(
-      Utility::getDaysUntilExpiration(cert, time_source));
+      Utility::getDaysUntilExpiration(cert, time_source).value());
 
   ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
@@ -253,16 +253,16 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
-int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
+absl::optional<size_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
-    return days < 0 ? -1 : days;
+    return days > 0 ? absl::optional<size_t>(days) : absl::nullopt;
   }
-  return 0;
+  return absl::nullopt;
 }
 
 absl::string_view Utility::getCertificateExtensionValue(X509& cert,

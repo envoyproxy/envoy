@@ -469,7 +469,7 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), time_source_);
 }
 
-size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
+absl::optional<size_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
 }
 
