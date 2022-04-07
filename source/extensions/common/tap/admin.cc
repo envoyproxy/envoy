@@ -114,6 +114,8 @@ AdminHandler::createPerTapSinkHandle(uint64_t trace_id,
                                      envoy::config::tap::v3::OutputSink::OutputSinkTypeCase type) {
   UNREFERENCED_PARAMETER(trace_id);
   using ProtoOutputSinkType = envoy::config::tap::v3::OutputSink::OutputSinkTypeCase;
+  ASSERT(type == ProtoOutputSinkType::kStreamingAdmin ||
+         type == ProtoOutputSinkType::kBufferedAdmin);
 
   /**
    * Switching on the sink type here again after doing so in TapConfigBaseImpl constructor
@@ -122,22 +124,14 @@ AdminHandler::createPerTapSinkHandle(uint64_t trace_id,
    */
 
   // Select the sink implementation to use based on type specified in YAML request body
-  switch (type) {
-  case ProtoOutputSinkType::kStreamingAdmin:
+  if (type == ProtoOutputSinkType::kStreamingAdmin) {
     return std::make_unique<AdminPerTapSinkHandle>(*this);
-  case ProtoOutputSinkType::kBufferedAdmin:
-    return std::make_unique<BufferedPerTapSinkHandle>(*this);
-  case ProtoOutputSinkType::kFilePerTap:
-  case ProtoOutputSinkType::kStreamingGrpc:
-    PANIC("not implemented");
-  case ProtoOutputSinkType::OUTPUT_SINK_TYPE_NOT_SET:
-    PANIC_DUE_TO_CORRUPT_ENUM;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM; // Required so that all paths return values
+  return std::make_unique<BufferedPerTapSinkHandle>(*this);
 }
 
 void AdminHandler::TraceBuffer::bufferTrace(
-    std::shared_ptr<envoy::data::tap::v3::TraceWrapper> trace) {
+    const std::shared_ptr<envoy::data::tap::v3::TraceWrapper> &trace) {
   // Ignore traces once the buffer is full or flushed
   if (flushed() || full()) {
     return;
@@ -191,6 +185,7 @@ void AdminHandler::BufferedPerTapSinkHandle::submitTrace(
     TraceBuffer* trace_buffer = attached_request->traceBuffer();
 
     // Check if we already responded to the client
+    // Hit when posts to buffer traces are on the dispatcher queue and the buffer is flushed
     if (trace_buffer->flushed()) {
       return;
     }
@@ -254,7 +249,8 @@ void AdminHandler::AttachedRequestBuffered::onTimeout(
     }
     TraceBuffer* trace_buffer = attached_request->traceBuffer();
 
-    // if the trace buffer has already been flushed short circuit
+    // if the trace buffer has already been flushed short circuit.
+    // Hit when this timeout callback is on the dispatcher queue and the buffer is flushed
     if (trace_buffer->flushed()) {
       return;
     }

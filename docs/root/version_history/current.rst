@@ -151,6 +151,7 @@ New Features
   to the tools image.
 * udp_proxy: added :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>` to support matching and routing to different clusters.
 * udp_proxy: added support for :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log>`.
+* tap: added support for buffering an arbitrary number of tapped traces before returning to the client via a new :ref:`buffered admin sink <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`
 
 Deprecated
 ----------

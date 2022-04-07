@@ -279,6 +279,8 @@ message BufferedAdminSink {
 
   // Acts as a fallback to prevent the client from waiting for long periods of time.
   // After timeout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
+  // This may result in returning fewer traces than were requested, and in the case that no traces are
+  // buffered during this time, no traces will be returned.
   // Specifying 0 for the timeout value (or not specifying a value at all) indicates an infinite timeout.
   google.protobuf.Duration timeout = 2;
 }
