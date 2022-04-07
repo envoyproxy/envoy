@@ -611,8 +611,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
              hcm) { hcm.set_via("via_value"); });
   config_helper_.prependFilter(R"EOF(
   name: pause-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 

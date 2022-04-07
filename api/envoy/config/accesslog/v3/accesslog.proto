@@ -30,9 +30,7 @@ message AccessLog {
 
   reserved "config";
 
-  // The name of the access log extension to instantiate.
-  // The name must match one of the compiled in loggers.
-  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.access_loggers>` for the default list of available loggers.
+  // The name of the access log extension configuration.
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.

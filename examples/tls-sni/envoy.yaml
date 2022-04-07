@@ -6,6 +6,8 @@ static_resources:
         port_value: 10000
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     filter_chains:
     - filter_chain_match:
         server_names:
@@ -29,6 +31,8 @@ static_resources:
                   cluster: proxy-domain1
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
       transport_socket:
         name: envoy.transport_sockets.tls
         typed_config:
@@ -62,6 +66,8 @@ static_resources:
                   cluster: proxy-domain2
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
       transport_socket:
         name: envoy.transport_sockets.tls
         typed_config:
