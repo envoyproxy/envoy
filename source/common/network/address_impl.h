@@ -123,6 +123,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+  absl::string_view addressType() const override { return "default"; }
 
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
@@ -213,6 +214,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+  absl::string_view addressType() const override { return "default"; }
 
   // Validate that IPv6 is supported on this platform
   static absl::Status validateProtocolSupported();
@@ -300,6 +302,7 @@ public:
     }
     return sizeof(pipe_.address_);
   }
+  absl::string_view addressType() const override { return "default"; }
 
 private:
   /**
@@ -345,6 +348,7 @@ public:
   // TODO(lambdai): Verify all callers accepts nullptr.
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
+  absl::string_view addressType() const override { return "envoy_internal"; }
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
