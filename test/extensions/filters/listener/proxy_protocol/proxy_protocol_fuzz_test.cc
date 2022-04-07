@@ -22,7 +22,7 @@ DEFINE_PROTO_FUZZER(
   ConfigSharedPtr cfg = std::make_shared<Config>(store, input.config());
   auto filter = std::make_unique<Filter>(std::move(cfg));
 
-  ListenerFilterWithDataFuzzer fuzzer;
+  ListenerFilterFuzzer fuzzer;
   fuzzer.fuzz(std::move(filter), input.fuzzed());
 }
 
