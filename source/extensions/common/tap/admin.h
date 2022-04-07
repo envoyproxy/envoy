@@ -89,7 +89,7 @@ private:
     // This function takes exclusive ownership of trace and may destroy the content of trace.
     // A unique_ptr is semantically more correct here, but a shared pointer is
     // needed for traces to be captured in lambda function (submitTrace).
-    void bufferTrace(const std::shared_ptr<envoy::data::tap::v3::TraceWrapper> &trace);
+    void bufferTrace(const std::shared_ptr<envoy::data::tap::v3::TraceWrapper>& trace);
 
     // Returns true if the trace buffer is full (reached max_buf_size_) false otherwise
     bool full() const {

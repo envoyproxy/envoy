@@ -131,7 +131,7 @@ AdminHandler::createPerTapSinkHandle(uint64_t trace_id,
 }
 
 void AdminHandler::TraceBuffer::bufferTrace(
-    const std::shared_ptr<envoy::data::tap::v3::TraceWrapper> &trace) {
+    const std::shared_ptr<envoy::data::tap::v3::TraceWrapper>& trace) {
   // Ignore traces once the buffer is full or flushed
   if (flushed() || full()) {
     return;
