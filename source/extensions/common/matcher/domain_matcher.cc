@@ -9,15 +9,15 @@ namespace Extensions {
 namespace Common {
 namespace Matcher {
 
-namespace {
-bool isWildcardServerName(const std::string& name) {
-  return absl::StartsWith(name, "*.") || name == "*";
-}
-} // namespace
-
 void DomainMatcherUtility::validateServerName(const std::string& server_name) {
-  if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
-    throw EnvoyException(fmt::format("invalid domain wildcard: {}", server_name));
+  auto pos = server_name.rfind('*');
+  if (pos != std::string::npos) {
+    if (pos != 0) {
+      throw EnvoyException(fmt::format("wildcard only allowed in the prefix: {}", server_name));
+    }
+    if (server_name != "*" && !absl::StartsWith(server_name, "*.")) {
+      throw EnvoyException(fmt::format("wildcard must be the first domain part: {}", server_name));
+    }
   }
   // Reject internationalized domains to avoid ambiguity with case sensitivity.
   for (char c : server_name) {

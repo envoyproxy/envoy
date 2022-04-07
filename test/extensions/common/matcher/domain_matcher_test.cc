@@ -77,7 +77,7 @@ matcher_tree:
       "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
       domain_matchers:
       - domains:
-        - "com.*"
+        - "*.com.*"
         on_match:
           action:
             name: test_action
@@ -87,7 +87,35 @@ matcher_tree:
   )EOF";
   loadConfig(yaml);
   auto input = TestDataInputFactory("input", "example.com");
-  EXPECT_THROW_WITH_MESSAGE(validateMatch("foo"), EnvoyException, "invalid domain wildcard: com.*");
+  EXPECT_THROW_WITH_MESSAGE(validateMatch("foo"), EnvoyException,
+                            "wildcard only allowed in the prefix: *.com.*");
+}
+
+TEST_F(DomainMatcherTest, TestMatcherPartialWildcard) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
+      domain_matchers:
+      - domains:
+        - "*nvoy.org"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+  )EOF";
+  loadConfig(yaml);
+  auto input = TestDataInputFactory("input", "example.com");
+  EXPECT_THROW_WITH_MESSAGE(validateMatch("foo"), EnvoyException,
+                            "wildcard must be the first domain part: *nvoy.org");
 }
 
 TEST_F(DomainMatcherTest, TestMatcherUnicodeDomain) {
