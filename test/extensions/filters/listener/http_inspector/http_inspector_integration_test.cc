@@ -68,7 +68,8 @@ TEST_P(HttpInspectorTcpIntegrationTest, DetectHttp) {
   test_server_->waitForCounterGe("http_inspector.http11_found", 1);
 }
 
-// Tests the the inspector makes a decision when CRLF is read.
+// Tests that the inspector makes a decision when CRLF is read.
+// Without CRLF, the inspector blocks until either the max bytes are read or a timeout is hit.
 TEST_P(HttpInspectorTcpIntegrationTest, DetectCRLF) {
   initialize();
 
