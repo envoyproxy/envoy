@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.on_demand.v3;
 
 import "envoy/config/core/v3/config_source.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
