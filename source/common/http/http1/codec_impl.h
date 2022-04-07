@@ -81,8 +81,6 @@ public:
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
-  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
-
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
 protected:
@@ -477,6 +475,7 @@ private:
   Status onUrl(const char* data, size_t length) override;
   Status onStatus(const char*, size_t) override { return okStatus(); }
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (active_request_) {
@@ -540,6 +539,8 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  const bool runtime_lazy_read_disable_{};
 };
 
 /**

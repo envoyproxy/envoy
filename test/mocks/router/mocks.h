@@ -232,24 +232,6 @@ public:
   std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
-class TestShadowPolicy : public ShadowPolicy {
-public:
-  TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3::FractionalPercent default_value = {}, bool trace_sampled = true)
-      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value),
-        trace_sampled_(trace_sampled) {}
-  // Router::ShadowPolicy
-  const std::string& cluster() const override { return cluster_; }
-  const std::string& runtimeKey() const override { return runtime_key_; }
-  const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  bool traceSampled() const override { return trace_sampled_; }
-
-  std::string cluster_;
-  std::string runtime_key_;
-  envoy::type::v3::FractionalPercent default_value_;
-  bool trace_sampled_;
-};
-
 class MockShadowWriter : public ShadowWriter {
 public:
   MockShadowWriter();
@@ -347,19 +329,6 @@ public:
   MOCK_METHOD(const absl::optional<bool>&, validated, (), (const));
 };
 
-class MockPathMatchCriterion : public PathMatchCriterion {
-public:
-  MockPathMatchCriterion();
-  ~MockPathMatchCriterion() override;
-
-  // Router::PathMatchCriterion
-  MOCK_METHOD(PathMatchType, matchType, (), (const));
-  MOCK_METHOD(const std::string&, matcher, (), (const));
-
-  PathMatchType type_;
-  std::string matcher_;
-};
-
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -406,7 +375,6 @@ public:
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
               (const Http::RequestHeaderMap&), (const));
-  MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
@@ -427,7 +395,6 @@ public:
   MockMetadataMatchCriteria metadata_matches_criteria_;
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
   TestCorsPolicy cors_policy_;
-  testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
 };

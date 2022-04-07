@@ -111,7 +111,7 @@ public:
 
 private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
-  quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
+  quiche::QuicheReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 
 class EnvoyQuicTestCryptoServerStreamFactory : public EnvoyQuicCryptoServerStreamFactoryInterface {

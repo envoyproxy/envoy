@@ -30,13 +30,9 @@ JSON_TEST_DEPS = [
 envoy_cc_test(
     name = "json_loader_test",
     srcs = ["json_loader_test.cc"],
-    args = ["--runtime-feature-override-for-tests=envoy.reloadable_features.remove_legacy_json"],
-    deps = JSON_TEST_DEPS,
-)
-
-envoy_cc_test(
-    name = "json_loader_legacy_test",
-    srcs = ["json_loader_test.cc"],
-    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_legacy_json"],
-    deps = JSON_TEST_DEPS,
+    deps = [
+        "//source/common/json:json_loader_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/test_common:utility_lib",
+    ],
 )

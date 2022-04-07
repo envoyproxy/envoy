@@ -128,8 +128,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, *Runtime::LoaderSingleton::getExisting(), true, false);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, scoped_runtime.loader(), true, false);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -193,8 +193,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener = dispatcher_->createListener(
-      socket, listener_callbacks, *Runtime::LoaderSingleton::getExisting(), true, true);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, scoped_runtime.loader(), true, true);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;

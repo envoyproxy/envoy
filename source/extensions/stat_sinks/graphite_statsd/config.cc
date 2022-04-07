@@ -38,9 +38,9 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
   }
   case envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink::StatsdSpecifierCase::
       STATSD_SPECIFIER_NOT_SET:
-    break; // Fall through to PANIC.
+    break;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException("unexpected statsd specifier enum");
 }
 
 ProtobufTypes::MessagePtr GraphiteStatsdSinkFactory::createEmptyConfigProto() {

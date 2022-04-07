@@ -52,6 +52,18 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
+StatusOr<Socket::Type> Utility::socketTypeFromUrl(const std::string& url) {
+  if (urlIsTcpScheme(url)) {
+    return Socket::Type::Stream;
+  } else if (urlIsUdpScheme(url)) {
+    return Socket::Type::Datagram;
+  } else if (urlIsUnixScheme(url)) {
+    return Socket::Type::Stream;
+  } else {
+    return absl::InvalidArgumentError(absl::StrCat("unknown protocol scheme: ", url));
+  }
+}
+
 bool Utility::urlIsTcpScheme(absl::string_view url) { return absl::StartsWith(url, TCP_SCHEME); }
 
 bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(url, UDP_SCHEME); }
@@ -422,7 +434,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (absl::StrContains(s, '-')) {
       char dash = 0;
       ss >> min;
       ss >> dash;

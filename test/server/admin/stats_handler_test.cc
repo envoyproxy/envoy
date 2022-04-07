@@ -85,9 +85,12 @@ public:
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
-    Buffer::OwnedImpl data;
+    Admin::RequestPtr request = handler.makeRequest(url, admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream_);
+    Http::Code code = request->start(response_headers);
+    Buffer::OwnedImpl data;
+    while (request->nextChunk(data)) {
+    }
     return std::make_pair(code, data.toString());
   }
 
@@ -133,8 +136,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
-  const CodeResponse code_response(handlerStats(url));
-  EXPECT_EQ(Http::Code::NotFound, code_response.first);
+  CodeResponse code_response(handlerStats(url));
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
   EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
 }
 
@@ -163,16 +166,15 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  constexpr char expected[] =
-      "t: \"hello world\"\n"
-      "c1: 10\n"
-      "c2: 20\n"
-      "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
-      "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
-      "P99.9(209.99,209.99) P100(210.0,210.0)\n"
-      "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
-      "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
-      "P99.9(109.99,109.99) P100(110.0,110.0)\n";
+  constexpr char expected[] = "t: \"hello world\"\n"
+                              "c1: 10\n"
+                              "c2: 20\n"
+                              "h1: P0(200,200) P25(202.5,202.5) P50(205,205) P75(207.5,207.5) "
+                              "P90(209,209) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
+                              "P99.9(209.99,209.99) P100(210,210)\n"
+                              "h2: P0(100,100) P25(102.5,102.5) P50(105,105) P75(107.5,107.5) "
+                              "P90(109,109) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
+                              "P99.9(109.99,109.99) P100(110,110)\n";
   EXPECT_EQ(expected, code_response.second);
 
   code_response = handlerStats(url + "?usedonly");
@@ -1020,10 +1022,28 @@ TEST_P(AdminStatsTest, SortedCountersAndGauges) {
   store_->counterFromString("s3");
   store_->counterFromString("s1");
   store_->gaugeFromString("s2", Stats::Gauge::ImportMode::Accumulate);
-  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+  for (absl::string_view url : {"/stats", "/stats?format=json"}) {
     const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"s1", "s2", "s3", "s4"});
+  }
+}
+
+TEST_P(AdminStatsTest, SortedScopes) {
+  // Check counters and gauges are co-mingled in sorted order in the admin output.
+  store_->counterFromString("a");
+  store_->counterFromString("z");
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
+  scope->counterFromString("r");
+  scope->counterFromString("s");
+  scope->counterFromString("t");
+  Stats::ScopeSharedPtr subscope = scope->createScope("subscope");
+  subscope->counterFromString("x");
+  for (absl::string_view url : {"/stats", "/stats?format=json"}) {
+    CodeResponse code_response = handlerStats(url);
+    ASSERT_EQ(Http::Code::OK, code_response.first);
+    checkOrder(code_response.second,
+               {"a", "scope.r", "scope.s", "scope.subscope.x", "scope.t", "z"});
   }
 }
 
@@ -1033,7 +1053,7 @@ TEST_P(AdminStatsTest, SortedTextReadouts) {
   store_->textReadoutFromString("t3");
   store_->textReadoutFromString("t1");
   store_->textReadoutFromString("t2");
-  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+  for (absl::string_view url : {"/stats", "/stats?format=json"}) {
     const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"t1", "t2", "t3", "t4"});
@@ -1045,7 +1065,7 @@ TEST_P(AdminStatsTest, SortedHistograms) {
   store_->histogramFromString("h3", Stats::Histogram::Unit::Unspecified);
   store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
-  for (const std::string& url : {"/stats", "/stats?format=json"}) {
+  for (absl::string_view url : {"/stats", "/stats?format=json"}) {
     const CodeResponse code_response = handlerStats(url);
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});

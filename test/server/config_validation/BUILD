@@ -27,6 +27,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",

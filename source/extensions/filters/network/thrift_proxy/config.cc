@@ -16,6 +16,7 @@
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter_config.h"
 #include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/rds_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/stats.h"
 #include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
@@ -96,15 +97,27 @@ ProtocolType ProtocolOptionsConfigImpl::protocol(ProtocolType downstream_protoco
   return (protocol_ == ProtocolType::Auto) ? downstream_protocol : protocol_;
 }
 
+SINGLETON_MANAGER_REGISTRATION(thrift_route_config_provider_manager);
+
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
+  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(thrift_route_config_provider_manager), [&context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+          });
 
-  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.mainThreadDispatcher().timeSource()));
+  std::shared_ptr<Config> filter_config(
+      new ConfigImpl(proto_config, context, *route_config_provider_manager));
+
+  // We capture route_config_provider_manager here only to copy the shared_ptr and keep the
+  // reference passed to ConfigImpl valid even after the local variable goes out of scope.
+  return [route_config_provider_manager, filter_config,
+          &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.api().randomGenerator(),
+        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
   };
 }
 
@@ -116,11 +129,11 @@ REGISTER_FACTORY(ThriftProxyFilterConfigFactory,
 
 ConfigImpl::ConfigImpl(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::FactoryContext& context,
+    Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
-      route_matcher_(new Router::RouteMatcher(config.route_config())),
       payload_passthrough_(config.payload_passthrough()),
       max_requests_per_connection_(config.max_requests_per_connection().value()) {
 
@@ -134,6 +147,25 @@ ConfigImpl::ConfigImpl(
     for (const auto& filter : config.thrift_filters()) {
       processFilter(filter);
     }
+  }
+
+  if (config.has_trds()) {
+    if (config.has_route_config()) {
+      throw EnvoyException("both trds and route_config is present in ThriftProxy");
+    }
+    if (config.trds().config_source().config_source_specifier_case() ==
+        envoy::config::core::v3::ConfigSource::kApiConfigSource) {
+      const auto api_type = config.trds().config_source().api_config_source().api_type();
+      if (api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
+          api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+        throw EnvoyException("trds supports only aggregated api_type in api_config_source");
+      }
+    }
+    route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
+        config.trds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
+  } else {
+    route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
+        config.route_config(), context_.getServerFactoryContext());
   }
 }
 

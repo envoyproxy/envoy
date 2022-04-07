@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.http_connection_manager.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -202,6 +203,10 @@ message HttpConnectionManager {
 
     // Whether unix socket addresses should be considered internal.
     bool unix_sockets = 1;
+
+    // List of CIDR ranges that are treated as internal. If unset, then RFC1918 / RFC4193
+    // IP addresses will be considered internal.
+    repeated config.core.v3.CidrRange cidr_ranges = 2;
   }
 
   // [#next-free-field: 7]
