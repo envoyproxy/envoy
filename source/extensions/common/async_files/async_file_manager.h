@@ -14,8 +14,6 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
-class AsyncFileManager;
-
 // An AsyncFileManager should be a singleton or singleton-like.
 // Possible subclasses currently are:
 //   * AsyncFileManagerThreadPool

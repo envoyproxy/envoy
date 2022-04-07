@@ -26,9 +26,8 @@ public:
   std::function<void()> close(std::function<void(absl::Status)> on_complete) override;
   std::function<void()>
   read(off_t offset, size_t length,
-       std::function<void(absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>)> on_complete)
-      override;
-  std::function<void()> write(Envoy::Buffer::Instance& contents, off_t offset,
+       std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) override;
+  std::function<void()> write(Buffer::Instance& contents, off_t offset,
                               std::function<void(absl::StatusOr<size_t>)> on_complete) override;
   std::function<void()>
   duplicate(std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;

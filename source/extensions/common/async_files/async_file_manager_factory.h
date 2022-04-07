@@ -15,7 +15,7 @@ namespace AsyncFiles {
 //
 // This ensures that each distinct id from an AsyncFileManagerConfig represents
 // only one AsyncFileManager.
-class AsyncFileManagerFactory : public Envoy::Singleton::Instance {
+class AsyncFileManagerFactory : public Singleton::Instance {
 public:
   // Returns an AsyncFileManagerFactory.
   //
@@ -25,8 +25,7 @@ public:
   //
   // Specifically, the singleton manager *does not* keep a reference to the returned singleton
   // - the factory persists only as long as there is a live reference to it.
-  static std::shared_ptr<AsyncFileManagerFactory>
-  singleton(Envoy::Singleton::Manager* singleton_manager);
+  static std::shared_ptr<AsyncFileManagerFactory> singleton(Singleton::Manager* singleton_manager);
   virtual std::shared_ptr<AsyncFileManager> getAsyncFileManager(
       const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
       Api::OsSysCalls* substitute_posix_file_operations = nullptr) PURE;

@@ -80,27 +80,24 @@ public:
   }
 };
 
-class ActionReadFile
-    : public AsyncFileActionThreadPool<absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>> {
+class ActionReadFile : public AsyncFileActionThreadPool<absl::StatusOr<Buffer::InstancePtr>> {
 public:
-  ActionReadFile(
-      AsyncFileHandle handle, off_t offset, size_t length,
-      std::function<void(absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>)> on_complete)
-      : AsyncFileActionThreadPool<absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>>(
-            handle, on_complete),
+  ActionReadFile(AsyncFileHandle handle, off_t offset, size_t length,
+                 std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete)
+      : AsyncFileActionThreadPool<absl::StatusOr<Buffer::InstancePtr>>(handle, on_complete),
         offset_(offset), length_(length) {}
 
-  absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> executeImpl() override {
+  absl::StatusOr<Buffer::InstancePtr> executeImpl() override {
     ASSERT(fileDescriptor() != -1);
-    auto result = std::make_unique<Envoy::Buffer::OwnedImpl>();
+    auto result = std::make_unique<Buffer::OwnedImpl>();
     auto reservation = result->reserveSingleSlice(length_);
     auto bytes_read = posix().pread(fileDescriptor(), reservation.slice().mem_, length_, offset_);
     if (bytes_read.return_value_ == -1) {
       return statusAfterFileError(bytes_read);
     }
-    if (static_cast<unsigned int>(bytes_read.return_value_) != length_) {
-      result = std::make_unique<Envoy::Buffer::OwnedImpl>(reservation.slice().mem_,
-                                                          bytes_read.return_value_);
+    if (static_cast<size_t>(bytes_read.return_value_) != length_) {
+      result =
+          std::make_unique<Buffer::OwnedImpl>(reservation.slice().mem_, bytes_read.return_value_);
     } else {
       reservation.commit(bytes_read.return_value_);
     }
@@ -114,7 +111,7 @@ private:
 
 class ActionWriteFile : public AsyncFileActionThreadPool<absl::StatusOr<size_t>> {
 public:
-  ActionWriteFile(AsyncFileHandle handle, Envoy::Buffer::Instance& contents, off_t offset,
+  ActionWriteFile(AsyncFileHandle handle, Buffer::Instance& contents, off_t offset,
                   std::function<void(absl::StatusOr<size_t>)> on_complete)
       : AsyncFileActionThreadPool<absl::StatusOr<size_t>>(handle, on_complete), offset_(offset) {
     contents_.move(contents);
@@ -141,7 +138,7 @@ public:
   }
 
 private:
-  Envoy::Buffer::OwnedImpl contents_;
+  Buffer::OwnedImpl contents_;
   const off_t offset_;
 };
 
@@ -183,13 +180,13 @@ AsyncFileContextThreadPool::close(std::function<void(absl::Status)> on_complete)
 
 std::function<void()> AsyncFileContextThreadPool::read(
     off_t offset, size_t length,
-    std::function<void(absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>)> on_complete) {
+    std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) {
   return enqueue(
       std::make_shared<ActionReadFile>(handle(), offset, length, std::move(on_complete)));
 }
 
 std::function<void()>
-AsyncFileContextThreadPool::write(Envoy::Buffer::Instance& contents, off_t offset,
+AsyncFileContextThreadPool::write(Buffer::Instance& contents, off_t offset,
                                   std::function<void(absl::StatusOr<size_t>)> on_complete) {
   return enqueue(
       std::make_shared<ActionWriteFile>(handle(), contents, offset, std::move(on_complete)));

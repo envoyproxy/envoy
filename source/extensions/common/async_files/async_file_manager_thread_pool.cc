@@ -19,11 +19,11 @@ namespace {
 // ThreadNextAction is per worker thread; if enqueue is called from a callback
 // the action goes directly into ThreadNextAction, otherwise it goes into the
 // queue and is eventually pulled out into ThreadNextAction by a worker thread.
-static thread_local std::shared_ptr<AsyncFileAction> ThreadNextAction;
+thread_local std::shared_ptr<AsyncFileAction> ThreadNextAction;
 
 // ThreadIsWorker is set to true for worker threads, and will be false
 // for all other threads.
-static thread_local bool ThreadIsWorker = false;
+thread_local bool ThreadIsWorker = false;
 } // namespace
 
 AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(

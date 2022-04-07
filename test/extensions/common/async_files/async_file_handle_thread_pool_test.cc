@@ -103,20 +103,20 @@ public:
 TEST_F(AsyncFileHandleTest, WriteReadClose) {
   auto handle = createAnonymousFile();
   absl::StatusOr<size_t> write_status, second_write_status;
-  absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> read_status, second_read_status;
+  absl::StatusOr<Buffer::InstancePtr> read_status, second_read_status;
   absl::Status close_status;
-  Envoy::Buffer::OwnedImpl hello("hello");
+  Buffer::OwnedImpl hello("hello");
   absl::Barrier done_barrier{2};
   handle->write(hello, 0, [&](absl::StatusOr<size_t> status) {
     write_status = std::move(status);
     // Make sure writing at an offset works
-    Envoy::Buffer::OwnedImpl two_chars("p!");
+    Buffer::OwnedImpl two_chars("p!");
     handle->write(two_chars, 3, [&](absl::StatusOr<size_t> status) {
       second_write_status = std::move(status);
-      handle->read(0, 5, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
+      handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
         read_status = std::move(status);
         // Verify reading at an offset.
-        handle->read(2, 3, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
+        handle->read(2, 3, [&](absl::StatusOr<Buffer::InstancePtr> status) {
           second_read_status = std::move(status);
           handle->close([&](absl::Status status) {
             close_status = std::move(status);
@@ -150,7 +150,7 @@ TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
   auto handle = createAnonymousFile();
   absl::StatusOr<size_t> write_status;
   // Write "hello" to the anonymous file.
-  Envoy::Buffer::OwnedImpl data("hello");
+  Buffer::OwnedImpl data("hello");
   absl::Barrier write_barrier{2};
   handle->write(data, 0, [&write_status, &write_barrier](absl::StatusOr<size_t> status) {
     write_status = status;
@@ -233,9 +233,9 @@ TEST_F(AsyncFileHandleTest, OpenExistingWriteOnlyFailsOnRead) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::WriteOnly);
-  absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> read_status;
+  absl::StatusOr<Buffer::InstancePtr> read_status;
   absl::Barrier read_barrier{2};
-  handle->read(0, 5, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
+  handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
     read_status = std::move(status);
     read_barrier.Block();
   });
@@ -252,7 +252,7 @@ TEST_F(AsyncFileHandleTest, OpenExistingWriteOnlyCanWrite) {
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::WriteOnly);
   absl::StatusOr<size_t> write_status;
   absl::Barrier write_barrier{2};
-  Envoy::Buffer::OwnedImpl buf("nine char");
+  Buffer::OwnedImpl buf("nine char");
   handle->write(buf, 0, [&](absl::StatusOr<size_t> status) {
     write_status = std::move(status);
     write_barrier.Block();
@@ -269,7 +269,7 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadOnlyFailsOnWrite) {
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::ReadOnly);
   absl::StatusOr<size_t> write_status;
   absl::Barrier write_barrier{2};
-  Envoy::Buffer::OwnedImpl buf("hello");
+  Buffer::OwnedImpl buf("hello");
   handle->write(buf, 0, [&](absl::StatusOr<size_t> status) {
     write_status = std::move(status);
     write_barrier.Block();
@@ -285,9 +285,9 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadOnlyCanRead) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::ReadOnly);
-  absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> read_status;
+  absl::StatusOr<Buffer::InstancePtr> read_status;
   absl::Barrier read_barrier{2};
-  handle->read(0, 5, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
+  handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
     read_status = std::move(status);
     read_barrier.Block();
   });
@@ -303,7 +303,7 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::ReadWrite);
   absl::StatusOr<size_t> write_status;
   absl::Barrier write_barrier{2};
-  Envoy::Buffer::OwnedImpl buf("p me!");
+  Buffer::OwnedImpl buf("p me!");
   handle->write(buf, 3, [&](absl::StatusOr<size_t> status) {
     write_status = std::move(status);
     write_barrier.Block();
@@ -311,9 +311,9 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
   write_barrier.Block();
   ASSERT_EQ(absl::OkStatus(), write_status.status());
   ASSERT_EQ(5, write_status.value());
-  absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> read_status;
+  absl::StatusOr<Buffer::InstancePtr> read_status;
   absl::Barrier read_barrier{2};
-  handle->read(0, 8, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
+  handle->read(0, 8, [&](absl::StatusOr<Buffer::InstancePtr> status) {
     read_status = std::move(status);
     read_barrier.Block();
   });
@@ -338,7 +338,7 @@ TEST_F(AsyncFileHandleTest, DuplicateCreatesIndependentHandle) {
   close(handle);
   absl::StatusOr<size_t> write_status;
   absl::Barrier write_barrier{2};
-  Envoy::Buffer::OwnedImpl buf("hello");
+  Buffer::OwnedImpl buf("hello");
   dup_file->write(buf, 0, [&](absl::StatusOr<size_t> result) {
     write_status = result;
     write_barrier.Block();
@@ -352,14 +352,14 @@ TEST_F(AsyncFileHandleTest, DuplicateCreatesIndependentHandle) {
 
 TEST_F(AsyncFileHandleWithMockPosixTest, PartialReadReturnsPartialResult) {
   auto handle = createAnonymousFile();
-  absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> read_status;
+  absl::StatusOr<Buffer::InstancePtr> read_status;
   absl::Barrier read_barrier{2};
   EXPECT_CALL(mock_posix_file_operations_, pread(_, _, _, _))
       .WillOnce([](int, void* buf, size_t, off_t) {
         memcpy(buf, "hel", 3);
         return Api::SysCallSizeResult{3, 0};
       });
-  handle->read(0, 5, [&](absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>> status) {
+  handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
     read_status = std::move(status.value());
     read_barrier.Block();
   });
@@ -380,7 +380,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialWriteRetries) {
   auto handle = createAnonymousFile();
   absl::StatusOr<size_t> write_status;
   absl::Barrier write_barrier{2};
-  Envoy::Buffer::OwnedImpl write_value{"hello"};
+  Buffer::OwnedImpl write_value{"hello"};
   EXPECT_CALL(mock_posix_file_operations_, pwrite(_, IsMemoryMatching("hello"), 5, 0))
       .WillOnce(Return(Api::SysCallSizeResult{3, 0}));
   EXPECT_CALL(mock_posix_file_operations_, pwrite(_, IsMemoryMatching("lo"), 2, 3))

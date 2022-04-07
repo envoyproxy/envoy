@@ -64,7 +64,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest, ChainedOperationsWorkAndSkipQueue) {
   // Chain open/write/close. Write will block because of the mock expectation.
   manager_->createAnonymousFile(tmpdir_, [](absl::StatusOr<AsyncFileHandle> result) {
     AsyncFileHandle handle = result.value();
-    Envoy::Buffer::OwnedImpl buf("hello");
+    Buffer::OwnedImpl buf("hello");
     handle->write(buf, 0, [handle](absl::StatusOr<size_t> result) {
       ASSERT(result.value() == 5);
       handle->close([](absl::Status result) { ASSERT(result.ok()); });

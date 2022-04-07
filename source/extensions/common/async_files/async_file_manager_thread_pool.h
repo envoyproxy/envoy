@@ -24,7 +24,7 @@ namespace AsyncFiles {
 // performed the previous action in the chain immediately performs the newly chained
 // action.
 class AsyncFileManagerThreadPool : public AsyncFileManager,
-                                   protected Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   explicit AsyncFileManagerThreadPool(
       const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,

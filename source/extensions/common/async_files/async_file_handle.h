@@ -43,8 +43,7 @@ public:
   // have a file open. There must not already be an action queued for this handle.
   virtual std::function<void()>
   read(off_t offset, size_t length,
-       std::function<void(absl::StatusOr<std::unique_ptr<Envoy::Buffer::Instance>>)> on_complete)
-      PURE;
+       std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) PURE;
 
   // Enqueues an action to write to the currently open file, at position offset, the bytes contained
   // by contents. It is an error to call write on an AsyncFileContext that does not have a file
@@ -55,7 +54,7 @@ public:
   //
   // on_complete is called with the number of bytes written on success.
   // There must not already be an action queued for this handle.
-  virtual std::function<void()> write(Envoy::Buffer::Instance& contents, off_t offset,
+  virtual std::function<void()> write(Buffer::Instance& contents, off_t offset,
                                       std::function<void(absl::StatusOr<size_t>)> on_complete) PURE;
 
   // Creates a new AsyncFileHandle referencing the same file.

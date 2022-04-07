@@ -18,8 +18,7 @@ SINGLETON_MANAGER_REGISTRATION(async_file_manager_factory_singleton);
 
 class AsyncFileManagerFactoryImpl : public AsyncFileManagerFactory {
 public:
-  static std::shared_ptr<AsyncFileManagerFactory>
-  singleton(Envoy::Singleton::Manager* singleton_manager);
+  static std::shared_ptr<AsyncFileManagerFactory> singleton(Singleton::Manager* singleton_manager);
   std::shared_ptr<AsyncFileManager> getAsyncFileManager(
       const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
       Api::OsSysCalls* substitute_posix_file_operations = nullptr)
@@ -32,7 +31,7 @@ private:
 };
 
 std::shared_ptr<AsyncFileManagerFactory>
-AsyncFileManagerFactory::singleton(Envoy::Singleton::Manager* singleton_manager) {
+AsyncFileManagerFactory::singleton(Singleton::Manager* singleton_manager) {
   return singleton_manager->getTyped<AsyncFileManagerFactory>(
       SINGLETON_MANAGER_REGISTERED_NAME(async_file_manager_factory_singleton),
       [] { return std::make_shared<AsyncFileManagerFactoryImpl>(); });

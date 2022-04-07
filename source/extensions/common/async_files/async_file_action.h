@@ -53,7 +53,6 @@ public:
   explicit AsyncFileActionWithResult(std::function<void(T)> on_complete)
       : on_complete_(on_complete) {}
 
-protected:
   void execute() final {
     State expected = State::Queued;
     if (!state_.compare_exchange_strong(expected, State::Executing)) {
@@ -71,6 +70,7 @@ protected:
     state_.store(State::Done);
   }
 
+protected:
   // Performs any action to undo side-effects of the execution if the callback
   // has not yet been called (e.g. closing a file that was just opened).
   // Not necessary for things that don't make persistent resources,
