@@ -32,7 +32,7 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
       substitution_formatters_.push_back(
-          std::make_shared<Formatter::FormatterImpl>(entry.value(), false));
+          std::make_unique<Formatter::FormatterImpl>(entry.value(), false));
     }
     descriptors_.push_back(new_descriptor);
   }
@@ -42,17 +42,17 @@ void Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> origi
                                         StreamInfo::StreamInfo& stream_info) {
 
   std::vector<RateLimit::Descriptor> dynamic_descriptors = std::vector<RateLimit::Descriptor>();
-  std::vector<std::shared_ptr<Formatter::FormatterImpl>>::iterator formatter_it =
+  std::vector<std::unique_ptr<Formatter::FormatterImpl>>::iterator formatter_it =
       substitution_formatters_.begin();
   for (const RateLimit::Descriptor& descriptor : original_descriptors) {
     RateLimit::Descriptor new_descriptor;
     for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
 
       std::string value = descriptorEntry.value_;
-      std::shared_ptr<Formatter::FormatterImpl> formatter_ptr = *formatter_it;
-      value =
-          formatter_ptr->format(*Config::request_headers_.get(), *Config::response_headers_.get(),
-                                *Config::response_trailers_.get(), stream_info, value);
+      // Formatter::FormatterImpl formatter_ptr = *();
+      value = formatter_it->get()->format(*Config::request_headers_.get(),
+                                          *Config::response_headers_.get(),
+                                          *Config::response_trailers_.get(), stream_info, value);
       formatter_it++;
       new_descriptor.entries_.push_back({descriptorEntry.key_, value});
     }
