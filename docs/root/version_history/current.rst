@@ -44,6 +44,8 @@ Minor Behavior Changes
 * sip-proxy: add support for the ``503`` response code. When there is something wrong occurred, send ``503 Service Unavailable`` back to downstream.
 * stateful session http filter: only enable cookie based session state when request path matches the configured cookie path.
 * tracing: set tracing error tag for grpc non-ok response code only when it is a upstream error. Client error will not be tagged as a grpc error. This fix is guarded by ``envoy.reloadable_features.update_grpc_response_error_tag``.
+* http: added the ability to have multiple URI type Subject Alternative Names of the client certificate in the
+  :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
 
 Bug Fixes
 ---------
