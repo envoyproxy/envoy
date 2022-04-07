@@ -904,6 +904,12 @@ def _com_github_grpc_grpc():
         name = "protobuf_headers",
         actual = "@com_google_protobuf//:protobuf_headers",
     )
+
+    native.bind(
+        name = "libcrypto",
+        actual = "@boringssl//:crypto",
+    )
+
     native.bind(
         name = "libssl",
         actual = "//external:ssl",
