@@ -149,9 +149,6 @@ public:
     }
     EXPECT_CALL(*worker_, addListener(_, _, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
-    if (socket.has_value()) {
-      EXPECT_CALL(socket.value().get(), close);
-    }
     EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
 
     EXPECT_TRUE(manager_->addOrUpdateListener(new_listener_proto, "", true));
