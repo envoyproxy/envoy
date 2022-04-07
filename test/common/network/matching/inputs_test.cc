@@ -107,7 +107,7 @@ TEST(MatchingData, SourcePortInput) {
 }
 
 TEST(MatchingData, DirectSourceIPInput) {
-  DirectSourceIPInput input;
+  DirectSourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -131,7 +131,7 @@ TEST(MatchingData, DirectSourceIPInput) {
 }
 
 TEST(MatchingData, SourceTypeInput) {
-  SourceTypeInput input;
+  SourceTypeInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -155,7 +155,7 @@ TEST(MatchingData, SourceTypeInput) {
 }
 
 TEST(MatchingData, ServerNameInput) {
-  ServerNameInput input;
+  ServerNameInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -178,7 +178,7 @@ TEST(MatchingData, ServerNameInput) {
 }
 
 TEST(MatchingData, TransportProtocolInput) {
-  TransportProtocolInput input;
+  TransportProtocolInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -201,7 +201,7 @@ TEST(MatchingData, TransportProtocolInput) {
 }
 
 TEST(MatchingData, ApplicationProtocolInput) {
-  ApplicationProtocolInput input;
+  ApplicationProtocolInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 

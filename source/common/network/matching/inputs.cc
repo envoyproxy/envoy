@@ -94,7 +94,8 @@ SourcePortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
           absl::StrCat(address.ip()->port())};
 }
 
-Matcher::DataInputGetResult DirectSourceIPInput::get(const MatchingData& data) const {
+template <>
+Matcher::DataInputGetResult DirectSourceIPInput<MatchingData>::get(const MatchingData& data) const {
   const auto& address = data.socket().connectionInfoProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
@@ -103,7 +104,8 @@ Matcher::DataInputGetResult DirectSourceIPInput::get(const MatchingData& data) c
           address->ip()->addressAsString()};
 }
 
-Matcher::DataInputGetResult SourceTypeInput::get(const MatchingData& data) const {
+template <>
+Matcher::DataInputGetResult SourceTypeInput<MatchingData>::get(const MatchingData& data) const {
   const bool is_local_connection = Network::Utility::isSameIpOrLoopback(data.socket());
   if (is_local_connection) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
@@ -111,7 +113,8 @@ Matcher::DataInputGetResult SourceTypeInput::get(const MatchingData& data) const
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-Matcher::DataInputGetResult ServerNameInput::get(const MatchingData& data) const {
+template <>
+Matcher::DataInputGetResult ServerNameInput<MatchingData>::get(const MatchingData& data) const {
   const auto server_name = data.socket().requestedServerName();
   if (!server_name.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -120,7 +123,9 @@ Matcher::DataInputGetResult ServerNameInput::get(const MatchingData& data) const
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
+template <>
+Matcher::DataInputGetResult
+TransportProtocolInput<MatchingData>::get(const MatchingData& data) const {
   const auto transport_protocol = data.socket().detectedTransportProtocol();
   if (!transport_protocol.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -129,7 +134,9 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
+template <>
+Matcher::DataInputGetResult
+ApplicationProtocolInput<MatchingData>::get(const MatchingData& data) const {
   const auto& protocols = data.socket().requestedApplicationProtocols();
   if (!protocols.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
