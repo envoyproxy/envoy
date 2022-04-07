@@ -15,12 +15,15 @@ namespace RBACFilter {
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
+    Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
-      engine_(Filters::Common::RBAC::createEngine(proto_config, validation_visitor)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config, validation_visitor)),
+      engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
+                                                  validation_visitor_)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(
+          proto_config, context, validation_visitor, validation_visitor_)),
       enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {

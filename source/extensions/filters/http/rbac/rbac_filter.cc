@@ -15,14 +15,17 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
+    Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix,
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
-      engine_(Filters::Common::RBAC::createEngine(proto_config, validation_visitor)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config, validation_visitor)) {}
+      engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
+                                                  validation_visitor_)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(
+          proto_config, context, validation_visitor, validation_visitor_)) {}
 
-const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+const Filters::Common::RBAC::RoleBasedAccessControlEngine*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
@@ -37,13 +40,15 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 
 RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
+    Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   // Moved from member initializer to ctor body to overcome clang false warning about memory
   // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).
   // Potentially https://lists.llvm.org/pipermail/llvm-bugs/2018-July/066769.html
-  engine_ = Filters::Common::RBAC::createEngine(per_route_config.rbac(), validation_visitor);
-  shadow_engine_ =
-      Filters::Common::RBAC::createShadowEngine(per_route_config.rbac(), validation_visitor);
+  engine_ = Filters::Common::RBAC::createEngine(per_route_config.rbac(), context,
+                                                validation_visitor, validation_visitor_);
+  shadow_engine_ = Filters::Common::RBAC::createShadowEngine(
+      per_route_config.rbac(), context, validation_visitor, validation_visitor_);
 }
 
 Http::FilterHeadersStatus

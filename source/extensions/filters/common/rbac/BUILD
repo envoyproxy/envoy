@@ -58,6 +58,7 @@ envoy_cc_library(
     srcs = ["engine_impl.cc"],
     hdrs = ["engine_impl.h"],
     deps = [
+        "//source/common/matcher:matcher_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//source/extensions/filters/common/rbac/matching:data_lib",

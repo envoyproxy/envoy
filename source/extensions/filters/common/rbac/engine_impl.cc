@@ -1,14 +1,65 @@
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/config/rbac/v3/rbac.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/common/rbac/matching/data_impl.h"
+#include "source/extensions/filters/common/rbac/matching/inputs.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace RBAC {
+
+Envoy::Matcher::ActionFactoryCb
+ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionContext&,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& action_config =
+      MessageUtil::downcastAndValidate<const envoy::config::rbac::v3::Action&>(config,
+                                                                               validation_visitor);
+  const auto& name = action_config.name();
+  const auto& action = action_config.action();
+
+  return [name, action]() { return std::make_unique<Action>(name, action); };
+}
+
+REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
+
+absl::Status NetworkActionValidationVisitor::performDataInputValidation(
+    const Envoy::Matcher::DataInputFactory<Matching::MatchingData>&, absl::string_view) {
+  return absl::OkStatus();
+}
+
+absl::Status HttpActionValidationVisitor::performDataInputValidation(
+    const Envoy::Matcher::DataInputFactory<Matching::MatchingData>&, absl::string_view type_url) {
+  static absl::flat_hash_set<std::string> allowed_inputs_set{
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
+                                                 v3::DestinationPortInput::descriptor()
+                                                     ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::SourcePortInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
+              ->full_name())}};
+  if (allowed_inputs_set.contains(type_url)) {
+    return absl::OkStatus();
+  }
+
+  return absl::InvalidArgumentError(
+      fmt::format("RBAC network filter cannot match on HTTP inputs, saw {}", type_url));
+}
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
@@ -78,6 +129,67 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
   }
 
   return matched;
+}
+
+RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl(
+    const xds::type::matcher::v3::Matcher& matcher,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ActionValidationVisitor& validation_visitor, const EnforcementMode mode)
+    : mode_(mode) {
+  ActionContext context{};
+  Envoy::Matcher::MatchTreeFactory<Matching::MatchingData, ActionContext> factory(
+      context, factory_context, validation_visitor);
+  matcher_ = factory.create(matcher)();
+
+  if (!validation_visitor.errors().empty()) {
+    // TODO(snowp): Output all violations.
+    throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
+                                     validation_visitor.errors()[0]));
+  }
+}
+
+bool RoleBasedAccessControlMatcherEngineImpl::handleAction(const Network::Connection& connection,
+                                                           StreamInfo::StreamInfo& info,
+                                                           std::string* effective_policy_id) const {
+  return handleAction(connection, *Http::StaticEmptyHeaders::get().request_headers, info,
+                      effective_policy_id);
+}
+
+bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
+    const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+    StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
+  Matching::MatchingDataImpl data(connection, headers, info);
+  const auto& result = Envoy::Matcher::evaluateMatch<Matching::MatchingData>(*matcher_, data);
+  ASSERT(result.match_state_ == Envoy::Matcher::MatchState::MatchComplete);
+  if (result.result_) {
+    auto action = result.result_()->getTyped<Action>();
+    if (effective_policy_id != nullptr) {
+      *effective_policy_id = action.name();
+    }
+
+    switch (action.action()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::rbac::v3::RBAC::ALLOW:
+      return true;
+    case envoy::config::rbac::v3::RBAC::DENY:
+      return false;
+    case envoy::config::rbac::v3::RBAC::LOG: {
+      // If not shadow enforcement, set shared log metadata
+      if (mode_ != EnforcementMode::Shadow) {
+        ProtobufWkt::Struct log_metadata;
+        auto& log_fields = *log_metadata.mutable_fields();
+        log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(true);
+        info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
+      }
+
+      return true;
+    }
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  // Default to DENY.
+  return false;
 }
 
 } // namespace RBAC
