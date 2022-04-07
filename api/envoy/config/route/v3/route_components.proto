@@ -643,7 +643,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 41]
+// [#next-free-field: 40]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1113,7 +1113,7 @@ message RouteAction {
   // Specifies how to send request over TLS early data.
   // If absent, allows `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data.
   // [#extension-category: envoy.route.early_data_option]
-  core.v3.TypedExtensionConfig early_data_option = 40;
+  core.v3.TypedExtensionConfig early_data_option = 39;
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely
