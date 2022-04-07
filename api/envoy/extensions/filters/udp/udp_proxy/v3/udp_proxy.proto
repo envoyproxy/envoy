@@ -7,6 +7,10 @@ import "envoy/config/core/v3/udp_socket_config.proto";
 
 import "google/protobuf/duration.proto";
 
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -22,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -52,7 +56,18 @@ message UdpProxyConfig {
     option (validate.required) = true;
 
     // The upstream cluster to connect to.
-    string cluster = 2 [(validate.rules).string = {min_len: 1}];
+    // This field is deprecated in favor of
+    // :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>`.
+    string cluster = 2 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
+
+    // The match tree to use when resolving route actions for incoming requests.
+    // See :ref:`Routing <config_udp_listener_filters_udp_proxy_routing>` for more information.
+    xds.type.matcher.v3.Matcher matcher = 9
+        [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by

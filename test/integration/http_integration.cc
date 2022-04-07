@@ -985,7 +985,7 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
                                                                  {":path", "/dynamo/url"},
                                                                  {":scheme", "http"},
                                                                  {":authority", "sni.lyft.com"},
-                                                                 {"expect", "100-continue"}});
+                                                                 {"expect", "100-contINUE"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -1056,7 +1056,7 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                                  {":path", "/dynamo/url"},
                                                                  {":scheme", "http"},
                                                                  {":authority", "sni.lyft.com"},
-                                                                 {"expect", "100-continue"}});
+                                                                 {"expect", "100-contINUE"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
@@ -1113,8 +1113,6 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
     config_helper_.prependFilter(
         fmt::format(R"EOF(
   name: pause-filter{}
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF",
                     downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
   }
@@ -1449,8 +1447,7 @@ void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t 
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+)EOF"));
 
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
