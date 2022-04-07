@@ -63,9 +63,8 @@ public:
 
 private:
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
-    //const std::string prefix = absl::StrCat(stats_prefix, "gcp_authn.");
-    return {ALL_GCP_AUTHN_FILTER_STATS(
-        POOL_COUNTER_PREFIX(scope, stats_prefix))};
+    // const std::string prefix = absl::StrCat(stats_prefix, "gcp_authn.");
+    return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};
   }
   FilterConfigProtoSharedPtr filter_config_;
   Server::Configuration::FactoryContext& context_;
