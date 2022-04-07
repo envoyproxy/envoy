@@ -81,6 +81,8 @@ route_config:
       cluster: A
 sip_filters:
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
@@ -98,6 +100,8 @@ route_config:
   name: local_route
 sip_filters:
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
@@ -114,6 +118,8 @@ route_config:
 sip_filters:
   - name: no_such_filter
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
@@ -136,6 +142,8 @@ sip_filters:
       value:
         key: value
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 settings:
   transaction_timeout: 32s
   local_services:

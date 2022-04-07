@@ -629,6 +629,9 @@ public:
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
+  testing::AssertionResult assertPendingConnectionsEmpty();
+
+  ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);

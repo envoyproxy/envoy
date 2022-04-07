@@ -21,19 +21,17 @@ namespace Router {
 class ConfigTraitsImpl : public Rds::ConfigTraits {
 public:
   ConfigTraitsImpl(const OptionalHttpFilters& optional_http_filters,
-                   Server::Configuration::ServerFactoryContext& factory_context,
-                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default)
-      : optional_http_filters_(optional_http_filters), factory_context_(factory_context),
-        validator_(validator), validate_clusters_default_(validate_clusters_default) {}
+                   ProtobufMessage::ValidationVisitor& validator)
+      : optional_http_filters_(optional_http_filters), validator_(validator) {}
 
   Rds::ConfigConstSharedPtr createNullConfig() const override;
-  Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override;
+  Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
+                                         Server::Configuration::ServerFactoryContext& context,
+                                         bool validate_clusters_default) const override;
 
 private:
   const OptionalHttpFilters optional_http_filters_;
-  Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
-  bool validate_clusters_default_;
 };
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
@@ -41,9 +39,8 @@ public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context,
                                 const OptionalHttpFilters& optional_http_filters)
-      : config_traits_(optional_http_filters, factory_context,
-                       factory_context.messageValidationContext().dynamicValidationVisitor(),
-                       false),
+      : config_traits_(optional_http_filters,
+                       factory_context.messageValidationContext().dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),

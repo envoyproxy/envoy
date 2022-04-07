@@ -143,7 +143,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
-# Compression
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
 # Core upstream code
