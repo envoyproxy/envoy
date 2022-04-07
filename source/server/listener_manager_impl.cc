@@ -1052,12 +1052,13 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 
     // In case of this listener was in-place updated previously and in the filter chains draining
     // procedure, so close the sockets for the previous draining listener.
-    for (auto iter = draining_filter_chains_manager_.begin();
-         iter != draining_filter_chains_manager_.end(); iter++) {
+    auto iter = draining_filter_chains_manager_.begin();
+    while (iter != draining_filter_chains_manager_.end()) {
       if (iter->getDrainingListenerTag() == listener.listenerTag()) {
         iter->getDrainingListener().listenSocketFactory().closeAllSockets();
         break;
       }
+      iter++;
     }
   }
 }
