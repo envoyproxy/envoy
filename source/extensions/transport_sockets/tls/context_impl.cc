@@ -484,14 +484,17 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
-  for (auto& ctx : tls_contexts_) {
-    daysUntilExpiration = std::min<int>(
-        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_), daysUntilExpiration);
+absl::optional<size_t> ContextImpl::daysUntilFirstCertExpires() const {
+  absl::optional<size_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+  if (!daysUntilExpiration.has_value()) {
+    return absl::nullopt;
   }
-  if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
-    return 0;
+  for (auto& ctx : tls_contexts_) {
+    auto tmp = Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    }
+    daysUntilExpiration = std::min<size_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }

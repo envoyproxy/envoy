@@ -47,11 +47,15 @@ ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
   return context;
 }
 
-size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
+absl::optional<size_t> ContextManagerImpl::daysUntilFirstCertExpires() const {
   size_t ret = std::numeric_limits<int>::max();
   for (const auto& context : contexts_) {
     if (context) {
-      ret = std::min<size_t>(context->daysUntilFirstCertExpires(), ret);
+      auto tmp = context->daysUntilFirstCertExpires();
+      if (!tmp.has_value()) {
+        return absl::nullopt;
+      }
+      ret = std::min<size_t>(tmp.value(), ret);
     }
   }
   return ret;

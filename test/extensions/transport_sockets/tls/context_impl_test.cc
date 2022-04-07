@@ -171,7 +171,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
+  EXPECT_EQ(absl::nullopt, context->daysUntilFirstCertExpires().value());
 }
 
 // Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
@@ -224,8 +224,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   manager_.removeContext(new_context);
   auto cleanup = cleanUpHelper(updated_context);
 
-  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), 0U);
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires().value(), absl::nullopt);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires().value(), absl::nullopt);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
