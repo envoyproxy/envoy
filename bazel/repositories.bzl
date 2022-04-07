@@ -850,9 +850,14 @@ def _com_googlesource_chromium_zlib():
     )
 
 def _com_github_google_quiche():
-    external_genrule_repository(
+    external_http_archive(
         name = "com_github_google_quiche",
-        genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
+        #        patch_cmds = ["(date && pwd && ls && echo @envoy//bazel/external:googleurl.patch) > /tmp/out; find . -type f -print -exec sed -f /tmp/patch -i {} \\; > /tmp/o 2>&1"],
+        patch_cmds = ["find . -type f -exec sed '/^#include/ s!third_party/boringssl/src/include/!! ; /^#include/ s!third_party/nghttp2/src/lib/includes/!!; /^#include/ s!third_party/zlib/!! ; /^#pragma/ s!clang!GCC!; /^#pragma/ s!-Weverything!-Wall!' -i {} \\; "],
+
+        # Rewrite third_party includes.
+
+        # Rewrite #pragma clang
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
