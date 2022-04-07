@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
@@ -1019,6 +1020,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   // if necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
     transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 

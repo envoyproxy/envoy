@@ -28,14 +28,6 @@ A sample filter configuration could be:
 .. code-block:: yaml
 
   listener_filters:
-  - name: "envoy.filters.listener.tls_inspector"
-
-Or by specifying the `type_url <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Any.FIELDS.string.google.protobuf.Any.type_url>`_
-of the *typed_config*:
-
-.. code-block:: yaml
-
-  listener_filters:
   - name: "tls_inspector"
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
