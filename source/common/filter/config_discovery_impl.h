@@ -29,6 +29,24 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
+enum STAT_PREFIX_TYPE { HTTP_FILTER, TCP_LISTENER_FILTER, UDP_LISTENER_FILTER, MAX_FILTER_INDEX };
+
+constexpr absl::string_view StatPrefix[STAT_PREFIX_TYPE::MAX_FILTER_INDEX] = {
+    "http_filter.",          // HTTP_FILTER
+    "tcp_listener_filter.",  // TCP_LISTENER_FILTER
+    "udp_listener_filter."}; // UDP_LISTENER_FILTER
+
+namespace {
+static inline void validateTypeUrlHelper(const std::string& type_url,
+                                         const absl::flat_hash_set<std::string> require_type_urls) {
+  if (!require_type_urls.contains(type_url)) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls, ", ")));
+  }
+}
+
+} // namespace
+
 /**
  * Base class for a filter config provider using discovery subscriptions.
  **/
@@ -365,7 +383,8 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb, class FactoryCtx>
+template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynFilterCfg,
+          STAT_PREFIX_TYPE StatPrefixIndex>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
@@ -436,103 +455,82 @@ public:
     return {std::move(message), factory.name()};
   }
 
-  absl::string_view statPrefix() const override PURE;
+  absl::string_view statPrefix() const override {
+    ASSERT(StatPrefixIndex >= STAT_PREFIX_TYPE::HTTP_FILTER &&
+           StatPrefixIndex <= STAT_PREFIX_TYPE::UDP_LISTENER_FILTER);
+    return StatPrefix[StatPrefixIndex];
+  }
 
 protected:
-  virtual ProtobufTypes::MessagePtr
+  virtual void validateFilters(const std::string&, const std::string&, const std::string&, bool,
+                               bool) const {};
+  virtual bool isTerminalFilter(Factory*, Protobuf::Message&, FactoryCtx&) const { return false; }
+
+  ProtobufTypes::MessagePtr
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                    FactoryCtx& factory_context, bool last_filter_in_filter_chain,
                    const std::string& filter_chain_type,
-                   const absl::flat_hash_set<std::string>& require_type_urls) const PURE;
+                   const absl::flat_hash_set<std::string>& require_type_urls) const {
+    auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
+    if (default_factory == nullptr) {
+      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
+                                       "configuration with type URL {}.",
+                                       filter_config_name, proto_config.type_url()));
+    }
+    validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        proto_config, factory_context.messageValidationVisitor(), *default_factory);
+    validateFilters(filter_config_name, default_factory->name(), filter_chain_type,
+                    isTerminalFilter(default_factory, *message, factory_context),
+                    last_filter_in_filter_chain);
+    return message;
+  }
 
 private:
-  virtual std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>
-  createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                 const absl::flat_hash_set<std::string>& require_type_urls,
-                                 FactoryCtx& factory_context,
-                                 ProtobufTypes::MessagePtr&& default_config,
-                                 bool last_filter_in_filter_chain,
-                                 const std::string& filter_chain_type,
-                                 absl::string_view stat_prefix) PURE;
+  std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> createFilterConfigProviderImpl(
+      FilterConfigSubscriptionSharedPtr& subscription,
+      const absl::flat_hash_set<std::string>& require_type_urls, FactoryCtx& factory_context,
+      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type, absl::string_view stat_prefix) {
+    return std::make_unique<ListenerDynFilterCfg>(
+        subscription, require_type_urls, factory_context, std::move(default_config),
+        last_filter_in_filter_chain, filter_chain_type, stat_prefix);
+  }
 };
 
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
-    : public FilterConfigProviderManagerImpl<Server::Configuration::NamedHttpFilterConfigFactory,
-                                             Http::FilterFactoryCb,
-                                             Server::Configuration::FactoryContext> {
-public:
-  absl::string_view statPrefix() const override;
-
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb,
+          Server::Configuration::FactoryContext, HttpDynamicFilterConfigProviderImpl,
+          STAT_PREFIX_TYPE::HTTP_FILTER> {
 protected:
-  ProtobufTypes::MessagePtr
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-                   Server::Configuration::FactoryContext& factory_context,
-                   bool last_filter_in_filter_chain, const std::string& filter_chain_type,
-                   const absl::flat_hash_set<std::string>& require_type_urls) const override;
-
-private:
-  std::unique_ptr<DynamicFilterConfigProviderImpl<Http::FilterFactoryCb>>
-  createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                 const absl::flat_hash_set<std::string>& require_type_urls,
-                                 Server::Configuration::FactoryContext& factory_context,
-                                 ProtobufTypes::MessagePtr&& default_config,
-                                 bool last_filter_in_filter_chain,
-                                 const std::string& filter_chain_type,
-                                 absl::string_view stat_prefix) override;
+  bool isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
+                        Protobuf::Message& message,
+                        Server::Configuration::FactoryContext& factory_context) const override {
+    return default_factory->isTerminalFilterByProto(message, factory_context);
+  }
+  void validateFilters(const std::string& filter_config_name, const std::string& filter_type,
+                       const std::string& filter_chain_type, bool is_terminal_filter,
+                       bool last_filter_in_filter_chain) const override {
+    Config::Utility::validateTerminalFilters(filter_config_name, filter_type, filter_chain_type,
+                                             is_terminal_filter, last_filter_in_filter_chain);
+  }
 };
 
 // TCP listener filter
 class TcpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedListenerFilterConfigFactory, Network::ListenerFilterFactoryCb,
-          Server::Configuration::ListenerFactoryContext> {
-public:
-  absl::string_view statPrefix() const override;
-
-protected:
-  ProtobufTypes::MessagePtr
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-                   Server::Configuration::ListenerFactoryContext& factory_context, bool,
-                   const std::string&,
-                   const absl::flat_hash_set<std::string>& require_type_urls) const override;
-
-private:
-  std::unique_ptr<DynamicFilterConfigProviderImpl<Network::ListenerFilterFactoryCb>>
-  createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                 const absl::flat_hash_set<std::string>& require_type_urls,
-                                 Server::Configuration::ListenerFactoryContext& factory_context,
-                                 ProtobufTypes::MessagePtr&& default_config,
-                                 bool last_filter_in_filter_chain,
-                                 const std::string& filter_chain_type,
-                                 absl::string_view stat_prefix) override;
-};
+          Server::Configuration::ListenerFactoryContext, TcpListenerDynamicFilterConfigProviderImpl,
+          STAT_PREFIX_TYPE::TCP_LISTENER_FILTER> {};
 
 // UDP listener filter
 class UdpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUdpListenerFilterConfigFactory,
-          Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext> {
-public:
-  absl::string_view statPrefix() const override;
-
-protected:
-  ProtobufTypes::MessagePtr
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-                   Server::Configuration::ListenerFactoryContext& factory_context, bool,
-                   const std::string&,
-                   const absl::flat_hash_set<std::string>& require_type_urls) const override;
-
-private:
-  std::unique_ptr<DynamicFilterConfigProviderImpl<Network::UdpListenerFilterFactoryCb>>
-  createFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                 const absl::flat_hash_set<std::string>& require_type_urls,
-                                 Server::Configuration::ListenerFactoryContext& factory_context,
-                                 ProtobufTypes::MessagePtr&& default_config,
-                                 bool last_filter_in_filter_chain,
-                                 const std::string& filter_chain_type,
-                                 absl::string_view stat_prefix) override;
-};
+          Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          UdpListenerDynamicFilterConfigProviderImpl, STAT_PREFIX_TYPE::UDP_LISTENER_FILTER> {};
 
 } // namespace Filter
 } // namespace Envoy
