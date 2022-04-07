@@ -48,9 +48,9 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
   const auto file_config = MessageUtil::anyConvertAndValidate<
       envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>(
       typed_config.config().typed_config(), validation_visitor);
-  auto milliseconds =
+  const auto milliseconds =
       std::chrono::milliseconds(DurationUtil::durationToMilliseconds(file_config.flush_interval()));
-  uint32_t max_entries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(file_config, max_entries, 1000);
+  const uint32_t max_entries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(file_config, max_entries, 1000);
   return std::make_unique<FileBasedKeyValueStore>(dispatcher, milliseconds, file_system,
                                                   file_config.filename(), max_entries);
 }
