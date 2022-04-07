@@ -726,14 +726,14 @@ TEST_F(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
                                                false, /*hash=*/static_cast<uint64_t>(0), 1),
                               EnvoyException,
-                              "error adding listener 'envoy:test_internal_listener_name': has "
+                              "error adding listener 'envoy://test_internal_listener_name': has "
                               "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
     new_listener.mutable_socket_options()->Add();
     EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener, "", true), EnvoyException,
-                              "error adding listener 'envoy:test_internal_listener_name': does "
+                              "error adding listener 'envoy://test_internal_listener_name': does "
                               "not support socket option")
   }
   {
