@@ -31,7 +31,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::MockFunction;

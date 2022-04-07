@@ -82,6 +82,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Filter filter(cfg);
     filter.onAccept(cb);
     RELEASE_ASSERT(dispatcher.file_event_callback_ == nullptr, "");
