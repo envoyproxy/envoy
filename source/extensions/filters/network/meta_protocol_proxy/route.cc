@@ -71,16 +71,19 @@ RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const Request& request) co
   auto match = Matcher::evaluateMatch<Request>(*matcher_, request);
 
   if (match.result_) {
+    auto action = match.result_();
+
     // The only possible action that can be used within the route matching context
     // is the RouteMatchAction, so this must be true.
-    ASSERT(match.result_->typeUrl() == RouteMatchAction::staticTypeUrl());
-    ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
-    const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*match.result_);
+    ASSERT(action->typeUrl() == RouteMatchAction::staticTypeUrl());
+    ASSERT(dynamic_cast<RouteMatchAction*>(action.get()));
+    const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*action);
 
     return route_action.route();
   }
 
-  ENVOY_LOG(debug, "failed to match incoming request: {}", match.match_state_);
+  ENVOY_LOG(debug, "failed to match incoming request: {}",
+            static_cast<uint32_t>(match.match_state_));
   return nullptr;
 }
 

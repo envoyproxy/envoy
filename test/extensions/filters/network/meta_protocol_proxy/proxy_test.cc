@@ -30,6 +30,10 @@ namespace {
 TEST(BasicFilterConfigTest, CreatingCodecFactory) {
   const std::string yaml_config = R"EOF(
     name: envoy.meta_protocol_proxy.codec.fake
+    typed_config:
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
+      type_url: envoy.meta_protocol_proxy.codec.fake.type
+      value: {}
   )EOF";
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
@@ -95,16 +99,34 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
 
   ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
 
-  auto filter_0 = filters_proto_config.Add();
-  filter_0->set_name("mock_meta_protocol_filter_name_0");
-  auto filter_1 = filters_proto_config.Add();
-  filter_1->set_name("mock_meta_protocol_filter_name_1");
+  const std::string yaml_config_0 = R"EOF(
+    name: mock_meta_protocol_filter_name_0
+    typed_config:
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
+      type_url: mock_meta_protocol_filter_name_0
+      value: {}
+  )EOF";
+
+  const std::string yaml_config_1 = R"EOF(
+    name: mock_meta_protocol_filter_name_1
+    typed_config:
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
+      type_url: mock_meta_protocol_filter_name_1
+      value: {}
+  )EOF";
+
+  TestUtility::loadFromYaml(yaml_config_0, *filters_proto_config.Add());
+  TestUtility::loadFromYaml(yaml_config_1, *filters_proto_config.Add());
 
   NiceMock<MockStreamFilterConfig> mock_filter_config_0;
   NiceMock<MockStreamFilterConfig> mock_filter_config_1;
 
   ON_CALL(mock_filter_config_0, name()).WillByDefault(Return("mock_meta_protocol_filter_name_0"));
   ON_CALL(mock_filter_config_1, name()).WillByDefault(Return("mock_meta_protocol_filter_name_1"));
+  ON_CALL(mock_filter_config_0, configType())
+      .WillByDefault(Return("mock_meta_protocol_filter_name_0"));
+  ON_CALL(mock_filter_config_1, configType())
+      .WillByDefault(Return("mock_meta_protocol_filter_name_1"));
 
   Registry::InjectFactory<NamedFilterConfigFactory> registration_0(mock_filter_config_0);
   Registry::InjectFactory<NamedFilterConfigFactory> registration_1(mock_filter_config_1);
