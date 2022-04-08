@@ -86,7 +86,7 @@ public:
                   bool removable, bool mutates_server_state,
                   const ParamDescriptorVec& params = {}) override;
   bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
-                           GenRequestCb callback, bool removable, bool mutates_server_state,
+                           GenRequestFn callback, bool removable, bool mutates_server_state,
                            const ParamDescriptorVec& params = {}) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;

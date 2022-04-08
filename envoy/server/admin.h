@@ -131,10 +131,9 @@ public:
   using RequestPtr = std::unique_ptr<Request>;
 
   /**
-   * Add an admin handler.
-   * Lambda to generate a Handler.
+   * Lambda to generate a Request.
    */
-  using GenRequestCb = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
+  using GenRequestFn = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
 
   /**
    * Individual admin handler including prefix, help text, and callback.
@@ -142,7 +141,7 @@ public:
   struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
-    const GenRequestCb handler_;
+    const GenRequestFn handler_;
     const bool removable_;
     const bool mutates_server_state_;
     const ParamDescriptorVec params_{};
@@ -161,11 +160,6 @@ public:
   using HandlerCb = std::function<Http::Code(
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
-
-  /**
-   * Lambda to generate a Request.
-   */
-  using GenRequestFn = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
 
   /**
    * Add a legacy admin handler where the entire response is written in

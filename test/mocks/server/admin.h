@@ -25,7 +25,7 @@ public:
               (const std::string& prefix, const std::string& help_text, HandlerCb callback,
                bool removable, bool mutates_server_state, const ParamDescriptorVec& params));
   MOCK_METHOD(bool, addStreamingHandler,
-              (const std::string& prefix, const std::string& help_text, GenRequestCb callback,
+              (const std::string& prefix, const std::string& help_text, GenRequestFn callback,
                bool removable, bool mutates_server_state, const ParamDescriptorVec& params));
   MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
   MOCK_METHOD(Network::Socket&, socket, ());
