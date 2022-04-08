@@ -100,16 +100,7 @@ public:
 
 private:
   StatsParams params_;
-  /*
-  const bool used_only_;
-  const bool json_;
-  const Utility::HistogramBucketsMode histogram_buckets_mode_;
-  absl::optional<std::regex> regex_;
-  absl::optional<std::string> format_value_;
-  */
-
   std::unique_ptr<StatsRender> render_;
-
   Stats::Store& stats_;
   ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;

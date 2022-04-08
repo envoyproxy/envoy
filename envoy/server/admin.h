@@ -269,5 +269,3 @@ public:
 
 } // namespace Server
 } // namespace Envoy
-
-//                                const ParamDescriptorVec& params = {});

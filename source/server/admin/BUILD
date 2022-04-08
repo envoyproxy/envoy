@@ -14,7 +14,6 @@ envoy_cc_library(
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
-        ":admin_html_generator_lib",
         ":clusters_handler_lib",
         ":config_dump_handler_lib",
         ":config_tracker_lib",

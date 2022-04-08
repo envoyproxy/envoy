@@ -3,19 +3,6 @@
 namespace Envoy {
 namespace Server {
 
-/*bool StatsParams::shouldShowMetric(const Stats::Metric& metric) const {
-  if (used_only_ && !metric.used()) {
-    return false;
-  }
-  if (filter_.has_value()) {
-    std::string name = metric.name();
-    if (!std::regex_search(name, filter_.value())) {
-      return false;
-    }
-  }
-  return true;
-  }*/
-
 Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response) {
   query_ = Http::Utility::parseAndDecodeQueryString(url);
   used_only_ = query_.find("usedonly") != query_.end();

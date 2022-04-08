@@ -217,23 +217,6 @@ private:
   friend class AdminTestingPeer;
 
   /**
-   * Creates a Handler instance given a request.
-   */
-  // RequestPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
-
-  /*
-   * Individual admin handler including prefix, help text, and callback.
-   */
-  /*  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const GenRequestFn handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-  };
-  */
-
-  /**
    * Creates a Request from a url.
    */
   RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
