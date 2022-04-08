@@ -115,7 +115,6 @@ DnsQueryContextPtr DnsResponseValidator::createResponseContext(Network::UdpRecvD
 
 bool DnsResponseValidator::validateDnsResponeObject(DnsQueryContextPtr& context,
                                                     const Buffer::InstancePtr& buffer) {
-
   static constexpr uint64_t field_size = sizeof(uint16_t);
   size_t available_bytes = buffer->length();
   uint64_t offset = 0;

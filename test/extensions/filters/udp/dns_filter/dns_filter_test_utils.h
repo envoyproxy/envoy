@@ -16,6 +16,7 @@ std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint
                                 const uint16_t query_id = 0);
 void verifyAddress(const std::list<std::string>& addresses, const DnsAnswerRecordPtr& answer);
 size_t getResponseQueryCount(DnsMessageParser& parser);
+
 /**
  * @brief Extracts the protocol name from the fully qualified service name. The leading underscore
  * is discarded from the output
@@ -42,6 +43,7 @@ public:
     const uint32_t ttl_;
     uint64_t& offset_;
   };
+
   /**
    * @brief Parse the response DNS message and create a context object
    *
@@ -50,6 +52,7 @@ public:
    */
   DnsQueryContextPtr createResponseContext(Network::UdpRecvData& client_request,
                                            DnsParserCounters& counters);
+
   /**
    * @param buffer a reference to the incoming DNS response object
    * @return bool true if all DNS records and flags were successfully parsed from the buffer
@@ -81,8 +84,7 @@ public:
    * @brief parse a Server Selection (SRV) DNS Record
    *
    * @param context the query context for which we are generating a response
-   * @return DnsSrvRecordPtr a pointer to a DnsSrvRecord object containing the parsed server
-   record
+   * @return DnsSrvRecordPtr a pointer to a DnsSrvRecord object containing the parsed server record
    */
   DnsSrvRecordPtr parseDnsSrvRecord(DnsAnswerCtx& ctx);
 
@@ -93,8 +95,7 @@ public:
    * @param offset the buffer offset at which parsing is to begin. This parameter is updated when
    * one record is parsed from the buffer and returned to the caller.
    * @return DnsQueryRecordPtr a pointer to a DnsAnswerRecord object containing all query and
-   answer
-   * data parsed from the buffer
+   * answer data parsed from the buffer
    */
   DnsAnswerRecordPtr parseDnsAnswerRecord(const Buffer::InstancePtr& buffer, uint64_t& offset);
 
