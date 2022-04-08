@@ -718,6 +718,14 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
   return AssertionFailure() << "Timed out waiting for HTTP connection.";
 }
 
+ABSL_MUST_USE_RESULT
+testing::AssertionResult FakeUpstream::assertPendingConnectionsEmpty() {
+  return runOnDispatcherThreadAndWait([&]() {
+    absl::MutexLock lock(&lock_);
+    return new_connections_.empty() ? AssertionSuccess() : AssertionFailure();
+  });
+}
+
 AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connection,
                                                    milliseconds timeout) {
   {

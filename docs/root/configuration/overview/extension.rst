@@ -4,9 +4,8 @@ Extension configuration
 -----------------------
 
 Each configuration resource in Envoy has a type URL in the ``typed_config``. This
-type corresponds to a versioned schema. If the type URL uniquely identifies an
-extension capable of interpreting the configuration, then the extension is
-selected regardless of the ``name`` field. In this case the ``name`` field becomes
+type corresponds to a versioned schema. The type URL uniquely identifies an
+extension capable of interpreting the configuration. The ``name`` field is
 optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:

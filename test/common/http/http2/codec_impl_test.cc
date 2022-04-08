@@ -48,8 +48,15 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+enum class Http2Impl {
+  Nghttp2,
+  WrappedNghttp2,
+  Oghttp2,
+};
+
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
-using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool>;
+using Http2SettingsTestParam =
+    ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, Http2Impl, bool>;
 namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
@@ -101,9 +108,9 @@ public:
 
   Http2CodecImplTestFixture() = default;
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings,
-                            bool enable_new_codec_wrapper, bool defer_processing_backedup_streams)
+                            Http2Impl http2_implementation, bool defer_processing_backedup_streams)
       : client_settings_(client_settings), server_settings_(server_settings),
-        enable_new_codec_wrapper_(enable_new_codec_wrapper),
+        http2_implementation_(http2_implementation),
         defer_processing_backedup_streams_(defer_processing_backedup_streams) {
     // Make sure we explicitly test for stream flush timer creation.
     EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
@@ -135,9 +142,25 @@ public:
     }
   }
 
+  void setupHttp2Overrides() {
+    switch (http2_implementation_) {
+    case Http2Impl::Nghttp2:
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      break;
+    case Http2Impl::WrappedNghttp2:
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      break;
+    case Http2Impl::Oghttp2:
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+      break;
+    }
+  }
+
   virtual void initialize() {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper",
-                                  enable_new_codec_wrapper_ ? "true" : "false"}});
+    setupHttp2Overrides();
     scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
                                   defer_processing_backedup_streams_ ? "true" : "false"}});
 
@@ -236,7 +259,7 @@ public:
 
   template <typename T>
   uint32_t getStreamReceiveWindowLimit(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       return connection->adapter()->GetStreamReceiveWindowLimit(stream_id);
     } else {
       return nghttp2_session_get_stream_effective_local_window_size(connection->session(),
@@ -246,7 +269,7 @@ public:
 
   template <typename T>
   uint32_t getStreamReceiveWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       return connection->adapter()->GetStreamReceiveWindowSize(stream_id);
     } else {
       return nghttp2_session_get_stream_local_window_size(connection->session(), stream_id);
@@ -255,7 +278,7 @@ public:
 
   template <typename T>
   uint32_t getStreamSendWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       return connection->adapter()->GetStreamSendWindowSize(stream_id);
     } else {
       return nghttp2_session_get_stream_remote_window_size(connection->session(), stream_id);
@@ -263,7 +286,7 @@ public:
   }
 
   template <typename T> uint32_t getSendWindowSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       return connection->adapter()->GetSendWindowSize();
     } else {
       return nghttp2_session_get_remote_window_size(connection->session());
@@ -273,7 +296,7 @@ public:
   template <typename T>
   void submitSettings(std::unique_ptr<T>& connection,
                       const std::list<std::pair<uint16_t, uint32_t>>& settings_values) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       std::vector<http2::adapter::Http2Setting> settings;
       for (const auto& setting_pair : settings_values) {
         settings.push_back({setting_pair.first, setting_pair.second});
@@ -290,7 +313,7 @@ public:
   }
 
   template <typename T> int getHpackEncoderDynamicTableSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       return connection->adapter()->GetHpackEncoderDynamicTableSize();
     } else {
       return nghttp2_session_get_hd_deflate_dynamic_table_size(connection->session());
@@ -298,7 +321,7 @@ public:
   }
 
   template <typename T> int getHpackDecoderDynamicTableSize(std::unique_ptr<T>& connection) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       return connection->adapter()->GetHpackDecoderDynamicTableSize();
     } else {
       return nghttp2_session_get_hd_inflate_dynamic_table_size(connection->session());
@@ -306,7 +329,7 @@ public:
   }
 
   template <typename T> void submitPing(std::unique_ptr<T>& connection, uint32_t ping_id) {
-    if (enable_new_codec_wrapper_) {
+    if (http2_implementation_ != Http2Impl::Nghttp2) {
       connection->adapter()->SubmitPing(ping_id);
     } else {
       EXPECT_EQ(0, nghttp2_submit_ping(connection->session(), NGHTTP2_FLAG_NONE, nullptr));
@@ -323,10 +346,24 @@ public:
     }
   }
 
+  // Only safe to call when using the wrapped nghttp2 codec implementation.
+  size_t getClientDataSourcesSize() {
+    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(
+               *client_wrapper_->connection_->adapter_)
+        .sources_size();
+  }
+
+  // Only safe to call when using the wrapped nghttp2 codec implementation.
+  size_t getServerDataSourcesSize() {
+    return reinterpret_cast<http2::adapter::NgHttp2Adapter&>(
+               *server_wrapper_->connection_->adapter_)
+        .sources_size();
+  }
+
   TestScopedRuntime scoped_runtime_;
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
-  bool enable_new_codec_wrapper_ = false;
+  Http2Impl http2_implementation_ = Http2Impl::Nghttp2;
   bool defer_processing_backedup_streams_ = false;
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
@@ -391,7 +428,7 @@ protected:
     constexpr uint32_t max_allowed =
         2 * CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-      if (enable_new_codec_wrapper_) {
+      if (http2_implementation_ != Http2Impl::Nghttp2) {
         client_->adapter()->SubmitPriorityForStream(1, 0, 10, false);
       } else {
         EXPECT_EQ(0, nghttp2_submit_priority(client_->session(), NGHTTP2_FLAG_NONE, 1, &spec));
@@ -424,7 +461,7 @@ protected:
                              DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
                          1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-      if (enable_new_codec_wrapper_) {
+      if (http2_implementation_ != Http2Impl::Nghttp2) {
         client_->adapter()->SubmitWindowUpdate(1, 1);
       } else {
         EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
@@ -452,6 +489,50 @@ protected:
     }
   }
 };
+
+TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+
+  // Encode request headers.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Queue request body.
+  Buffer::OwnedImpl request_body(std::string(1024, 'a'));
+  request_encoder_->encodeData(request_body, true);
+
+  // Flush request body.
+  EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Encode response headers.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // Queue response body.
+  Buffer::OwnedImpl response_body(std::string(1024, 'b'));
+  response_encoder_->encodeData(response_body, true);
+
+  // Flush response body.
+  EXPECT_CALL(response_decoder_, decodeData(_, true)).Times(AtLeast(1));
+  driveToCompletion();
+
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+
+  if (http2_implementation_ == Http2Impl::WrappedNghttp2) {
+    // Regression test for issue #19761.
+    EXPECT_EQ(0, getClientDataSourcesSize());
+    EXPECT_EQ(0, getServerDataSourcesSize());
+  }
+}
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
@@ -742,11 +823,15 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   }
 
   response_encoder_->encodeHeaders(response_headers, false);
-  EXPECT_LOG_CONTAINS(
-      "debug",
-      "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], "
-      "value: [3]",
-      driveToCompletion());
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    driveToCompletion();
+  } else {
+    EXPECT_LOG_CONTAINS(
+        "debug",
+        "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], "
+        "value: [3]",
+        driveToCompletion());
+  }
   EXPECT_FALSE(client_wrapper_->status_.ok());
   EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
@@ -2178,13 +2263,19 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool(),
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
                                             ::testing::Bool()));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
                          ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE, ::testing::Bool(),
+                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
                                             ::testing::Bool()));
 
 // we separate default/edge cases here to avoid combinatorial explosion
@@ -2199,12 +2290,18 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 // edge settings allow for the number of streams needed by the test.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
                                             ::testing::Bool()));
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
                                             ::testing::Bool()));
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
@@ -2225,11 +2322,17 @@ using Http2CodecImplTestAll = Http2CodecImplTest;
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
                                             ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE,
-                                            ::testing::Bool(), ::testing::Bool()));
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
+                                            ::testing::Bool()));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
@@ -2282,9 +2385,9 @@ public:
   };
 
   Http2CustomSettingsTestBase(Http2SettingsTuple client_settings,
-                              Http2SettingsTuple server_settings, bool use_new_codec_wrapper,
+                              Http2SettingsTuple server_settings, Http2Impl http2_implementation,
                               bool defer_processing_backedup_streams, bool validate_client)
-      : Http2CodecImplTestFixture(client_settings, server_settings, use_new_codec_wrapper,
+      : Http2CodecImplTestFixture(client_settings, server_settings, http2_implementation,
                                   defer_processing_backedup_streams),
         validate_client_(validate_client) {}
 
@@ -2329,7 +2432,7 @@ protected:
 class Http2CustomSettingsTest
     : public Http2CustomSettingsTestBase,
       public ::testing::TestWithParam<
-          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, bool, bool>> {
+          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, Http2Impl, bool, bool>> {
 public:
   Http2CustomSettingsTest()
       : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
@@ -2338,7 +2441,10 @@ public:
 };
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            ::testing::Values(Http2Impl::Nghttp2,
+                                                              Http2Impl::WrappedNghttp2,
+                                                              Http2Impl::Oghttp2),
                                             ::testing::Bool(), ::testing::Bool()));
 
 // Validates that custom parameters (those which are not explicitly named in the
@@ -2571,6 +2677,12 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersOverDefaultCodecLibraryLimit) {
 }
 
 TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    // The new HTTP/2 library does not have a hard-coded per-header limit.
+    initialize();
+    return;
+  }
+
   // The name-value pair max is set by NGHTTP2_HD_MAX_NV in lib/nghttp2_hd.h to 64KB, and
   // creates a per-request header limit for us in h2. Note that the nghttp2
   // calculated byte size will differ from envoy due to H2 compression and frames.
@@ -3540,7 +3652,7 @@ public:
       Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& scope,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       Random::RandomGenerator& random, uint32_t max_request_headers_kb,
-      uint32_t max_request_headers_count, Nghttp2SessionFactory& http2_session_factory)
+      uint32_t max_request_headers_count, Http2SessionFactory& http2_session_factory)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options, random,
                                  max_request_headers_kb, max_request_headers_count,
                                  http2_session_factory) {}
@@ -3577,7 +3689,7 @@ protected:
   NewMetadataEncoder encoder_;
 };
 
-class TestNghttp2SessionFactory : public Nghttp2SessionFactory {
+class TestNghttp2SessionFactory : public Http2SessionFactory {
 public:
   ~TestNghttp2SessionFactory() override {
     nghttp2_session_callbacks_del(callbacks_);
@@ -3614,6 +3726,27 @@ public:
 
   void initOld(nghttp2_session*, ConnectionImpl*,
                const envoy::config::core::v3::Http2ProtocolOptions&) override {}
+
+  std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks*, ConnectionImpl* connection,
+         const http2::adapter::OgHttp2Adapter::Options& options) override {
+    // Only need to provide callbacks required to send METADATA frames. The new codec wrapper
+    // requires the send callback, but not the pack_extension callback.
+    nghttp2_session_callbacks_new(&callbacks_);
+    nghttp2_session_callbacks_set_send_callback(
+        callbacks_,
+        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
+          return static_cast<MetadataTestClientConnectionImpl*>(
+                     static_cast<ConnectionImpl*>(user_data))
+              ->onSend(data, length);
+        });
+    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
+        http2::adapter::Perspective::kClient, *callbacks_, connection);
+    http2::adapter::Http2VisitorInterface& v = *visitor;
+    connection->setVisitor(std::move(visitor));
+    return http2::adapter::OgHttp2Adapter::Create(v, options);
+  }
 
   std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks*,
                                                        ConnectionImpl* connection,
@@ -3652,8 +3785,7 @@ public:
 
 protected:
   void initialize() override {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper",
-                                  enable_new_codec_wrapper_ ? "true" : "false"}});
+    setupHttp2Overrides();
     scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
                                   defer_processing_backedup_streams_ ? "true" : "false"}});
     allow_metadata_ = true;

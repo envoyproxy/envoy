@@ -686,6 +686,11 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   return handler.getRoot();
 }
 
+std::string Factory::serialize(absl::string_view str) {
+  nlohmann::json j(str);
+  return j.dump();
+}
+
 } // namespace Nlohmann
 } // namespace Json
 } // namespace Envoy

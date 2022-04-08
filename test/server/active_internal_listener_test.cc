@@ -1,6 +1,5 @@
 #include <memory>
 
-#include "envoy/api/io_error.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
@@ -18,7 +17,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ByMove;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -113,14 +111,10 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
 TEST_F(ActiveInternalListenerTest, DestroyListenerClosesActiveSocket) {
   addListener();
   expectFilterChainFactory();
-  Network::MockListenerFilter* test_listener_filter = new Network::MockListenerFilter(10);
+  Network::MockListenerFilter* test_listener_filter = new Network::MockListenerFilter();
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   NiceMock<Network::MockIoHandle> io_handle;
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-  EXPECT_CALL(io_handle, recv)
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                             Network::IoSocketError::deleteIoError)))));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))

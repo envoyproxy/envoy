@@ -1674,9 +1674,6 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   ASSERT_NE(nullptr, route);
   auto route_entry = route->routeEntry();
   ASSERT_NE(nullptr, route_entry);
-  auto& path_match_criterion = route_entry->pathMatchCriterion();
-  EXPECT_EQ("", path_match_criterion.matcher());
-  EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
   const auto& route_config = route_entry->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());

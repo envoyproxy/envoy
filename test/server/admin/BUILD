@@ -70,6 +70,32 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "stats_render_test",
+    srcs = ["stats_render_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_render_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_request_test",
+    srcs = ["stats_request_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_request_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "stats_handler_speed_test",
     srcs = ["stats_handler_speed_test.cc"],
@@ -77,8 +103,8 @@ envoy_cc_benchmark_binary(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:admin_lib",
         "//source/server/admin:stats_handler_lib",
-        "//test/mocks/server:admin_stream_mocks",
     ],
 )
 
