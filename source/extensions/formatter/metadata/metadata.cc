@@ -52,17 +52,15 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
-MetadataFormatterCommandParser::parse(const std::string& token, size_t, size_t) const {
-  constexpr absl::string_view METADATA_TOKEN = "METADATA(";
-  if (absl::StartsWith(token, METADATA_TOKEN)) {
+MetadataFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
+                                      absl::optional<size_t>& max_length) const {
+  if (command == "METADATA") {
     // Extract type of metadata and keys.
     std::string type, filter_namespace;
-    absl::optional<size_t> max_length;
     std::vector<std::string> path;
-    const size_t start = METADATA_TOKEN.size();
 
-    ::Envoy::Formatter::SubstitutionFormatParser::parseCommand(token, start, ':', max_length, type,
-                                                               filter_namespace, path);
+    ::Envoy::Formatter::SubstitutionFormatParser::parseSubcommand(subcommand, ':', type,
+                                                                  filter_namespace, path);
 
     auto provider = metadata_formatter_providers_.find(type);
     if (provider == metadata_formatter_providers_.end()) {
