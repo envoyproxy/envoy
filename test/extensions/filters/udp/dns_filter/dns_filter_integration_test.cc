@@ -25,8 +25,6 @@ public:
 
   void setupResponseParser() {
     histogram_.unit_ = Stats::Histogram::Unit::Milliseconds;
-    // response_parser_ = std::make_unique<DnsMessageParser>(
-    //     true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
     response_parser_ = std::make_unique<Utils::DnsResponseValidator>();
   }
 

@@ -167,7 +167,6 @@ bool DnsResponseValidator::validateDnsResponeObject(DnsQueryContextPtr& context,
     }
   } while (!done);
 
-  // if not qr == 0 && answers > 0 && authority > 0 && additional rrs > 0 return false
   if (context->header_.flags.qr != 1) {
     ENVOY_LOG(debug, "Is not a DNS response");
     return false;
@@ -220,10 +219,7 @@ bool DnsResponseValidator::validateDnsResponeObject(DnsQueryContextPtr& context,
 
   if (context->header_.authority_rrs) {
     // We are not generating these in the filter and don't have a use for them at the moment.
-    // If they exist, we will not parse them and return an error to the client since they appear
-    // between the answers and additional resource records in the buffer. We return true so that
-    // the proper status code is sent to the client
-    ENVOY_LOG(debug, "Authority RRs not supported");
+    ENVOY_LOG(debug, "Authority RRs are not supported");
     return false;
   }
 

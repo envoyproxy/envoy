@@ -193,7 +193,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     }
   } while (!done);
 
-  // if not qr == 0 && answers > 0 && authority > 0 && additional rrs > 0 return false
+  // Only QR == 0 and question are expected
   if (!(context->header_.flags.qr == 0 && context->header_.answers == 0 &&
         context->header_.authority_rrs == 0 && context->header_.additional_rrs == 0)) {
     ENVOY_LOG(debug, "Answer, Authority, and Additional RRs present in query");
