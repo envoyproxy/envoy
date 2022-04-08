@@ -62,14 +62,41 @@ public:
   void DescribeNegationTo(::std::ostream* os) const { *os << "is not OK"; }
 };
 
+// Check that an absl::Status or absl::StatusOr is OK.
+//
+// For example:
+//
+// StatusOr<int> statusor(absl::InvalidArgumentError("bad argument!"));
+// EXPECT_THAT(statusor, IsOk());  // fails!
+//
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline ::testing::PolymorphicMatcher<IsOkMatcher> IsOk() {
   return ::testing::MakePolymorphicMatcher(IsOkMatcher());
 }
 
 #ifndef EXPECT_OK
+// Fails if an absl::Status or absl::StatusOr is not OK.
+//
+// For example:
+//
+// StatusOr<int> statusor(absl::InvalidArgumentError("bad argument!"));
+// EXPECT_OK(statusor);  // fails!
+// absl::Status status{absl::OkStatus()};
+// EXPECT_OK(status);  // passes!
 #define EXPECT_OK(v) EXPECT_THAT((v), ::Envoy::StatusHelpers::IsOk())
 #endif // EXPECT_OK
+
+#ifndef ASSERT_OK
+// Asserts if an absl::Status or absl::StatusOr is not OK.
+//
+// For example:
+//
+// StatusOr<int> statusor(absl::InvalidArgumentError("bad argument!"));
+// ASSERT_OK(statusor);  // asserts!
+// absl::Status status{absl::OkStatus()};
+// ASSERT_OK(status);  // passes!
+#define ASSERT_OK(v) ASSERT_THAT((v), ::Envoy::StatusHelpers::IsOk())
+#endif // ASSERT_OK
 
 } // namespace StatusHelpers
 } // namespace Envoy
