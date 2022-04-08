@@ -71,11 +71,11 @@ The sandbox is configured with one endpoint on port ``10000`` for uploading down
 
 - ``/upload``
 
-Use ``wget`` to get compressed file ``file.gz``
+Use ``curl`` to get compressed file ``file.gz``
 
 .. code-block:: console
 
-    $ wget --header="Accept-Encoding: gzip" localhost:10000/file.json -O file.gz
+    $ curl -s -H "Accept-Encoding: gzip" -o file.gz localhost:10000/file.json
 
 Use ``curl`` to check that the response from uploading ``file.gz`` contains the ``decompressed-size: 10485760`` header.
 
