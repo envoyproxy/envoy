@@ -104,7 +104,6 @@ DnsQueryContextPtr DnsResponseValidator::createResponseContext(Network::UdpRecvD
                                                                DnsParserCounters& counters) {
   DnsQueryContextPtr query_context = std::make_unique<DnsQueryContext>(
       client_request.addresses_.local_, client_request.addresses_.peer_, counters, 1);
-  ENVOY_LOG(info, "Boteng test");
   query_context->parse_status_ = validateDnsResponeObject(query_context, client_request.buffer_);
   if (!query_context->parse_status_) {
     query_context->response_code_ = DNS_RESPONSE_CODE_FORMAT_ERROR;
@@ -167,6 +166,7 @@ bool DnsResponseValidator::validateDnsResponeObject(DnsQueryContextPtr& context,
     }
   } while (!done);
 
+  // Only response is parsed and verified
   if (context->header_.flags.qr != 1) {
     ENVOY_LOG(debug, "Is not a DNS response");
     return false;
@@ -355,7 +355,7 @@ DnsAnswerRecordPtr DnsResponseValidator::parseDnsAnswerRecord(const Buffer::Inst
   uint64_t available_bytes = buffer->length() - offset;
   const std::string record_name = parseDnsNameRecord(buffer, available_bytes, offset);
   if (record_name.empty()) {
-    // ENVOY_LOG(debug, "Unable to parse name record from buffer");
+    ENVOY_LOG(debug, "Unable to parse name record from buffer");
     return nullptr;
   }
 

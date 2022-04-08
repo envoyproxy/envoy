@@ -64,8 +64,8 @@ public:
 
   void setupResponseParser() {
     histogram_.unit_ = Stats::Histogram::Unit::Milliseconds;
-    // response_parser_ = std::make_unique<DnsMessageParser>(
-    //     true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
+    query_parser_ = std::make_unique<DnsMessageParser>(
+        true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
     response_parser_ = std::make_unique<Utils::DnsResponseValidator>();
   }
 
@@ -127,6 +127,7 @@ public:
   std::shared_ptr<Network::MockDnsResolver> resolver_;
   std::unique_ptr<DnsFilter> filter_;
   std::unique_ptr<Utils::DnsResponseValidator> response_parser_;
+  std::unique_ptr<DnsMessageParser> query_parser_;
 
   const std::string forward_query_off_config = R"EOF(
 stat_prefix: "my_prefix"
@@ -1560,48 +1561,70 @@ TEST_F(DnsFilterTest, TruncatedQueryBufferTest) {
   EXPECT_TRUE(query_ctx_->answers_.empty());
 }
 
-// TEST_F(DnsFilterTest, InvalidQueryClassAndAnswerTypeTest) {
-//   InSequence s;
+TEST_F(DnsFilterTest, InvalidQueryClassTypeTest) {
+  InSequence s;
 
-//   // In this buffer the answer type is unsupported, and the query class is unsupported.
-//   constexpr unsigned char dns_request[] = {
-//       0x36, 0x6b,                               // Transaction ID
-//       0x81, 0x80,                               // Flags
-//       0x00, 0x01,                               // Questions
-//       0x00, 0x01,                               // Answers
-//       0x00, 0x00,                               // Authority RRs
-//       0x00, 0x01,                               // Additional RRs
-//       0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
-//       0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
-//       0x00, 0x01,                               // Record Type
-//       0x00, 0x02,                               // Record Class
-//       0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Answer record for
-//       0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
-//       0x00, 0x17,                               // Answer Record Type
-//       0x00, 0x01,                               // Answer Record Class
-//       0x00, 0x00, 0x01, 0x19,                   // Answer TTL
-//       0x00, 0x04,                               // Answer Data Length
-//       0x42, 0xdc, 0x02, 0x4b,                   // Answer IP Address
-//       0x00,                                     // Additional RR (we do not parse this)
-//       0x00, 0x29, 0x10, 0x00,                   // UDP Payload Size (4096)
-//       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-//   };
+  // In this buffer the query class is unsupported.
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x00,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+      0x00, 0x02,                               // Record Class
+  };
 
-//   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
-//   Network::UdpRecvData data{};
-//   data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
-//   data.addresses_.local_ = listener_address_;
-//   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
-//   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
 
-//   query_ctx_ = response_parser_->createResponseContext(data, counters_);
-//   EXPECT_FALSE(query_ctx_->parse_status_);
+  query_ctx_ = query_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
 
-//   // We should have zero parsed queries or answers
-//   EXPECT_TRUE(query_ctx_->queries_.empty());
-//   EXPECT_TRUE(query_ctx_->answers_.empty());
-// }
+  // We should have zero parsed queries or answers
+  EXPECT_TRUE(query_ctx_->queries_.empty());
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, InsufficientDataforQueryRecord) {
+  InSequence s;
+
+  // In this buffer the query class is unsupported.
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x00,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  query_ctx_ = query_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have zero parsed queries or answers
+  EXPECT_TRUE(query_ctx_->queries_.empty());
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
 
 TEST_F(DnsFilterTest, InvalidQueryNameTest2) {
   InSequence s;
