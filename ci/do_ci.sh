@@ -11,7 +11,7 @@ if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || 
           "$1" == "verify_build_examples" ]]; then
     build_setup_args="-nofetch"
 fi
-build_setup_args="-nofetch"
+
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
