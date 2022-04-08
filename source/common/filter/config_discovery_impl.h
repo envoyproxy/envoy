@@ -29,12 +29,9 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
-enum STAT_PREFIX_TYPE { HTTP_FILTER, TCP_LISTENER_FILTER, UDP_LISTENER_FILTER, MAX_FILTER_INDEX };
-
-constexpr absl::string_view StatPrefix[STAT_PREFIX_TYPE::MAX_FILTER_INDEX] = {
-    "http_filter.",          // HTTP_FILTER
-    "tcp_listener_filter.",  // TCP_LISTENER_FILTER
-    "udp_listener_filter."}; // UDP_LISTENER_FILTER
+constexpr absl::string_view HttpStatPrefix = "http_filter.";
+constexpr absl::string_view TcpListenerStatPrefix = "tcp_listener_filter.";
+constexpr absl::string_view UdpListenerStatPrefix = "udp_listener_filter.";
 
 // These helper functions throw exceptions. Thus can not be defined in .h files.
 void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
@@ -380,7 +377,7 @@ private:
  * An implementation of FilterConfigProviderManager.
  */
 template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynFilterCfg,
-          STAT_PREFIX_TYPE StatPrefixIndex>
+          const absl::string_view& StatPrefix>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
@@ -451,11 +448,7 @@ public:
     return {std::move(message), factory.name()};
   }
 
-  absl::string_view statPrefix() const override {
-    ASSERT(StatPrefixIndex >= STAT_PREFIX_TYPE::HTTP_FILTER &&
-           StatPrefixIndex <= STAT_PREFIX_TYPE::UDP_LISTENER_FILTER);
-    return StatPrefix[StatPrefixIndex];
-  }
+  const absl::string_view& statPrefix() const override { return StatPrefix; }
 
 protected:
   virtual void validateFilters(const std::string&, const std::string&, const std::string&, bool,
@@ -470,8 +463,8 @@ protected:
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
     validateProtoConfigDefaultFactoryHelper(default_factory == nullptr, filter_config_name,
                                             proto_config.type_url());
-    validateProtoConfigTypeUrlHelper(
-        Config::Utility::getFactoryType(proto_config), require_type_urls);
+    validateProtoConfigTypeUrlHelper(Config::Utility::getFactoryType(proto_config),
+                                     require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         proto_config, factory_context.messageValidationVisitor(), *default_factory);
     validateFilters(filter_config_name, default_factory->name(), filter_chain_type,
@@ -494,10 +487,10 @@ private:
 
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
-    : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb,
-          Server::Configuration::FactoryContext, HttpDynamicFilterConfigProviderImpl,
-          STAT_PREFIX_TYPE::HTTP_FILTER> {
+    : public FilterConfigProviderManagerImpl<Server::Configuration::NamedHttpFilterConfigFactory,
+                                             Http::FilterFactoryCb,
+                                             Server::Configuration::FactoryContext,
+                                             HttpDynamicFilterConfigProviderImpl, HttpStatPrefix> {
 protected:
   bool isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
                         Protobuf::Message& message,
@@ -517,14 +510,14 @@ class TcpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedListenerFilterConfigFactory, Network::ListenerFilterFactoryCb,
           Server::Configuration::ListenerFactoryContext, TcpListenerDynamicFilterConfigProviderImpl,
-          STAT_PREFIX_TYPE::TCP_LISTENER_FILTER> {};
+          TcpListenerStatPrefix> {};
 
 // UDP listener filter
 class UdpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUdpListenerFilterConfigFactory,
           Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          UdpListenerDynamicFilterConfigProviderImpl, STAT_PREFIX_TYPE::UDP_LISTENER_FILTER> {};
+          UdpListenerDynamicFilterConfigProviderImpl, UdpListenerStatPrefix> {};
 
 } // namespace Filter
 } // namespace Envoy
