@@ -14,8 +14,7 @@ class OnDemandRouteUpdate;
 
 // DecodeHeadersBehavior implementations are used by OnDemandRouteUpdate in its decodeHeaders
 // method.
-class DecodeHeadersBehavior
-{
+class DecodeHeadersBehavior {
 public:
   virtual ~DecodeHeadersBehavior() = default;
 
@@ -58,7 +57,8 @@ public:
   OptRef<const Router::Route> handleMissingRoute();
   // Do on-demand cluster discovery if the cluster used by the route
   // is missing.
-  void handleOnDemandCDS(const Router::Route& route, Upstream::OdCdsApiHandle& odcds, std::chrono::milliseconds timeout);
+  void handleOnDemandCDS(const Router::Route& route, Upstream::OdCdsApiHandle& odcds,
+                         std::chrono::milliseconds timeout);
   // Get the per-route config if it's available, otherwise the
   // extension's config.
   const OnDemandFilterConfig* getConfig(const Router::RouteConstSharedPtr& route);
