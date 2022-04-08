@@ -13,7 +13,7 @@ envoy_cc_extension(
     srcs = ["default_early_data_option.cc"],
     hdrs = ["default_early_data_option.h"],
     # This is core Envoy config.
-    visibility = [
+    extra_visibility = [
         "//source/common/router:__subpackages__",
     ],
     deps = [
