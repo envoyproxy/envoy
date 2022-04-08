@@ -25,8 +25,9 @@ public:
 
   void setupResponseParser() {
     histogram_.unit_ = Stats::Histogram::Unit::Milliseconds;
-    response_parser_ = std::make_unique<DnsMessageParser>(
-        true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
+    // response_parser_ = std::make_unique<DnsMessageParser>(
+    //     true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
+    response_parser_ = std::make_unique<Utils::DnsResponseValidator>();
   }
 
   static std::string configToUse() {
@@ -217,7 +218,7 @@ listener_filters:
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;
   DnsParserCounters counters_;
-  std::unique_ptr<DnsMessageParser> response_parser_;
+  std::unique_ptr<Utils::DnsResponseValidator> response_parser_;
   DnsQueryContextPtr query_ctx_;
 };
 
@@ -236,7 +237,7 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
       Utils::buildQueryForDomain("www.google.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(1, query_ctx_->answers_.size());
@@ -254,7 +255,7 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
       Utils::buildQueryForDomain("www.google.com", DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(1, query_ctx_->answers_.size());
@@ -272,7 +273,7 @@ TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
       Utils::buildQueryForDomain("www.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(4, query_ctx_->answers_.size());
@@ -296,7 +297,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
   std::string query = Utils::buildQueryForDomain("cluster_0", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(2, query_ctx_->answers_.size());
@@ -321,7 +322,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
       Utils::buildQueryForDomain("cluster.foo1.com", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(2, query_ctx_->answers_.size());
@@ -339,7 +340,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithPortServiceRecordLookupTest)
   std::string query = Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(2, query_ctx_->answers_.size());
@@ -374,7 +375,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTe
   std::string query = Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  query_ctx_ = response_parser_->createResponseContext(response, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
 
   EXPECT_EQ(endpoints, query_ctx_->answers_.size());
