@@ -1,6 +1,7 @@
 #include "source/server/admin/stats_render.h"
 
 #include "source/common/html/utility.h"
+#include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
 
 namespace {
@@ -94,14 +95,16 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
 // buffer once we exceed JsonStatsFlushCount stats.
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
-  addScalar(response, name, ValueUtil::numberValue(value));
+  addJson(response, absl::StrCat("{\"name\":\"", Json::sanitize(name_buffer_, name),
+                                 "\",\"value\":", value, "}"));
 }
 
 // Buffers a JSON fragment for a text-readout stat, flushing to the response
 // buffer once we exceed JsonStatsFlushCount stats.
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
-  addScalar(response, name, ValueUtil::stringValue(value));
+  addJson(response, absl::StrCat("{\"name\":\"", Json::sanitize(name_buffer_, name),
+                                 "\",\"value\":\"", Json::sanitize(value_buffer_, value), "\"}"));
 }
 
 // In JSON we buffer all histograms and don't write them immediately, so we
@@ -165,38 +168,10 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
     // untrappable error message to stdout) if it receives an invalid input, so
     // we exclude that here.
     if (!str.empty()) {
-      addStatAsRenderedJson(response, str);
+      addJson(response, str);
     }
   }
   response.add("]}");
-}
-
-// Collects a scalar metric (text-readout, counter, or gauge) into an array of
-// stats, so they can all be serialized in one shot when a threshold is
-// reached. Serializing each one individually results in much worse
-// performance (see stats_handler_speed_test.cc).
-template <class Value>
-void StatsJsonRender::addScalar(Buffer::Instance& response, const std::string& name,
-                                const Value& value) {
-  ProtobufWkt::Struct stat_obj;
-  ProtoMap& stat_obj_fields = *stat_obj.mutable_fields();
-  stat_obj_fields["name"] = ValueUtil::stringValue(name);
-  stat_obj_fields["value"] = value;
-  addJson(response, ValueUtil::structValue(stat_obj));
-}
-
-// Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
-void StatsJsonRender::addJson(Buffer::Instance& response, const ProtobufWkt::Value& json) {
-  stats_array_.push_back(json);
-
-  // We build up stats_array to a certain size so we can amortize the overhead
-  // of entering into the JSON serialization infrastructure. If we set the
-  // threshold too high we buffer too much memory, likely impacting processor
-  // cache. The optimum threshold found after a few experiments on a local
-  // host appears to be between 50 and 100.
-  if (stats_array_.size() >= JsonStatsFlushCount) {
-    flushStats(response);
-  }
 }
 
 // Flushes all stats that were buffered in addJson() above.
@@ -215,12 +190,12 @@ void StatsJsonRender::flushStats(Buffer::Instance& response) {
   ASSERT(json_array.size() >= 3);
   ASSERT(json_array[0] == '[');
   ASSERT(json_array[json_array.size() - 1] == ']');
-  addStatAsRenderedJson(response, absl::string_view(json_array).substr(1, json_array.size() - 2));
+  addJson(response, absl::string_view(json_array).substr(1, json_array.size() - 2));
 }
 
 // Adds a json fragment of scalar stats to the response buffer, including a
 // "," delimiter if this is not the first fragment.
-void StatsJsonRender::addStatAsRenderedJson(Buffer::Instance& response, absl::string_view json) {
+void StatsJsonRender::addJson(Buffer::Instance& response, absl::string_view json) {
   ASSERT(!json.empty());
   if (first_) {
     response.add(json);

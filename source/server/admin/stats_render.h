@@ -67,22 +67,12 @@ public:
   void finalize(Buffer::Instance& response) override;
 
 private:
-  // Collects a scalar metric (text-readout, counter, or gauge) into an array of
-  // stats, so they can all be serialized in one shot when a threshold is
-  // reached. Serializing each one individually results in much worse
-  // performance (see stats_handler_speed_test.cc).
-  template <class Value>
-  void addScalar(Buffer::Instance& response, const std::string& name, const Value& value);
-
-  // Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
-  void addJson(Buffer::Instance& response, const ProtobufWkt::Value& json);
-
   // Flushes all stats that were buffered in addJson() above.
   void flushStats(Buffer::Instance& response);
 
   // Adds a json fragment of scalar stats to the response buffer, including a
   // "," delimiter if this is not the first fragment.
-  void addStatAsRenderedJson(Buffer::Instance& response, absl::string_view json);
+  void addJson(Buffer::Instance& response, absl::string_view json);
 
   // Summarizes the buckets in the specified histogram, collecting JSON objects.
   // Note, we do not flush this buffer to the network when it grows large, and
@@ -103,6 +93,8 @@ private:
   bool found_used_histogram_{false};
   bool first_{true};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
+  std::string name_buffer_;  // Used for Json::sanitize for names.
+  std::string value_buffer_; // Used for Json::sanitize for text-readout values.
 };
 
 } // namespace Server
