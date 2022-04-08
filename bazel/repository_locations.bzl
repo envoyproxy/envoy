@@ -112,6 +112,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-04-04",
         cpe = "N/A",
     ),
+    com_github_axboe_liburing = dict(
+        project_name = "liburing",
+        project_desc = "C helpers to set up and tear down io_uring instances",
+        project_url = "https://github.com/axboe/liburing",
+        version = "2.1",
+        sha256 = "f1e0500cb3934b0b61c5020c3999a973c9c93b618faff1eba75aadc95bb03e07",
+        strip_prefix = "liburing-liburing-{version}",
+        urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2021-09-09",
+        cpe = "N/A",
+    ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     com_github_google_perfetto = dict(
