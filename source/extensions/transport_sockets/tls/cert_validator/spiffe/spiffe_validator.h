@@ -15,7 +15,7 @@
 
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/matchers.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 #include "source/extensions/transport_sockets/tls/stats.h"

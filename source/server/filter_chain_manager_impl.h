@@ -49,7 +49,7 @@ public:
   // DrainDecision
   bool drainClose() const override;
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
 
@@ -91,9 +91,9 @@ public:
 private:
   Configuration::FactoryContext& parent_context_;
   // The scope that has empty prefix.
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   // filter_chain_scope_ has the same prefix as listener owners scope.
-  Stats::ScopePtr filter_chain_scope_;
+  Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };

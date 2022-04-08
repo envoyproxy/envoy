@@ -4,16 +4,18 @@ import sys
 from functools import cached_property
 from typing import Iterator, List, Pattern
 
-from envoy.base import checker
+from aio.run import checker
 
 INVALID_REFLINK = r".* ref:.*"
 REF_WITH_PUNCTUATION_REGEX = r".*\. <[^<]*>`\s*"
-VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([a-z \-_]+): ([a-z:`]+)"
+VERSION_HISTORY_NEW_LINE_REGEX = r"\* ([0-9a-z \-_]+): ([a-z:`]+)"
 VERSION_HISTORY_SECTION_NAME = r"^[A-Z][A-Za-z ]*$"
 # Make sure backticks come in pairs.
 # Exceptions: reflinks (ref:`` where the backtick won't be preceded by a space
 #             links `title <link>`_ where the _ is checked for in the regex.
-BAD_TICKS_REGEX = re.compile(r".* `[^`].*`[^_]")
+SINGLE_TICK_REGEX = re.compile(r"[^`]`[^`]")
+REF_TICKS_REGEX = re.compile(r" ref:`.*`")
+LINK_TICKS_REGEX = re.compile(r".* `[^`].*`_")
 
 # TODO(phlax):
 #   - generalize these checks to all rst files
@@ -34,8 +36,16 @@ class CurrentVersionFile:
                 yield line.strip()
 
     @cached_property
-    def backticks_re(self) -> Pattern[str]:
-        return re.compile(BAD_TICKS_REGEX)
+    def single_tick_re(self) -> Pattern[str]:
+        return re.compile(SINGLE_TICK_REGEX)
+
+    @cached_property
+    def ref_ticks_re(self) -> Pattern[str]:
+        return re.compile(REF_TICKS_REGEX)
+
+    @cached_property
+    def link_ticks_re(self) -> Pattern[str]:
+        return re.compile(LINK_TICKS_REGEX)
 
     @cached_property
     def invalid_reflink_re(self) -> Pattern[str]:
@@ -120,7 +130,9 @@ class CurrentVersionFile:
     def check_ticks(self, line: str) -> List[str]:
         return ([
             f"Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): {line}"
-        ] if (self.backticks_re.match(line)) else [])
+        ] if (
+            self.single_tick_re.match(line) and (not self.ref_ticks_re.match(line)) and
+            (not self.link_ticks_re.match(line))) else [])
 
     def run_checks(self) -> Iterator[str]:
         self.set_tokens()
@@ -141,7 +153,7 @@ class CurrentVersionFile:
 class RSTChecker(checker.Checker):
     checks = ("current_version",)
 
-    def check_current_version(self) -> None:
+    async def check_current_version(self) -> None:
         errors = list(
             CurrentVersionFile(pathlib.Path("docs/root/version_history/current.rst")).run_checks())
         if errors:
@@ -149,7 +161,7 @@ class RSTChecker(checker.Checker):
 
 
 def main(*args: str) -> int:
-    return RSTChecker(*args).run()
+    return RSTChecker(*args)()
 
 
 if __name__ == "__main__":

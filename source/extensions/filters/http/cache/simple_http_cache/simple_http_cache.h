@@ -22,6 +22,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     ResponseMetadata metadata_;
     std::string body_;
+    Http::ResponseTrailerMapPtr trailers_;
   };
 
   // Looks for a response that has been varied. Only called from lookup.
@@ -36,8 +37,10 @@ private:
 
 public:
   // HttpCache
-  LookupContextPtr makeLookupContext(LookupRequest&& request) override;
-  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
+  LookupContextPtr makeLookupContext(LookupRequest&& request,
+                                     Http::StreamDecoderFilterCallbacks& callbacks) override;
+  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
+                                     Http::StreamEncoderFilterCallbacks& callbacks) override;
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata) override;
@@ -45,13 +48,14 @@ public:
 
   Entry lookup(const LookupRequest& request);
   void insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-              ResponseMetadata&& metadata, std::string&& body);
+              ResponseMetadata&& metadata, std::string&& body,
+              Http::ResponseTrailerMapPtr&& trailers);
 
   // Inserts a response that has been varied on certain headers.
   void varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
                   ResponseMetadata&& metadata, std::string&& body,
                   const Http::RequestHeaderMap& request_headers,
-                  const VaryAllowList& vary_allow_list);
+                  const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
 
   absl::Mutex mutex_;
   absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);

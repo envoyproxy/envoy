@@ -188,6 +188,7 @@ envoy_cc_test(
     srcs = ["raw_buffer_socket_test.cc"],
     deps = [
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//test/test_common:network_utility_lib",
     ],
 )
@@ -405,6 +406,19 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "win32_socket_handle_impl_test",
+    srcs = ["win32_socket_handle_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 

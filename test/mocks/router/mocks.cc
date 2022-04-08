@@ -7,6 +7,7 @@
 
 using testing::_;
 using testing::DoAll;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -30,8 +31,12 @@ MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
-  EXPECT_CALL(*this, shouldRetryHeaders(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+  EXPECT_CALL(*this, shouldRetryHeaders(_, _, _))
+      .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&,
+                              DoRetryHeaderCallback callback) {
+        callback_ = [callback]() { callback(false); };
+        return RetryStatus::Yes;
+      }));
 }
 
 void MockRetryState::expectHedgedPerTryTimeoutRetry() {
@@ -40,8 +45,12 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 }
 
 void MockRetryState::expectResetRetry() {
-  EXPECT_CALL(*this, shouldRetryReset(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+  EXPECT_CALL(*this, shouldRetryReset(_, _, _))
+      .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,
+                              DoRetryResetCallback callback) {
+        callback_ = [callback]() { callback(false); };
+        return RetryStatus::Yes;
+      }));
 }
 
 MockRetryState::~MockRetryState() = default;
@@ -78,13 +87,6 @@ MockMetadataMatchCriteria::~MockMetadataMatchCriteria() = default;
 MockTlsContextMatchCriteria::MockTlsContextMatchCriteria() = default;
 MockTlsContextMatchCriteria::~MockTlsContextMatchCriteria() = default;
 
-MockPathMatchCriterion::MockPathMatchCriterion() {
-  ON_CALL(*this, matchType()).WillByDefault(ReturnPointee(&type_));
-  ON_CALL(*this, matcher()).WillByDefault(ReturnPointee(&matcher_));
-}
-
-MockPathMatchCriterion::~MockPathMatchCriterion() = default;
-
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
@@ -98,7 +100,6 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
-  ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
@@ -136,6 +137,7 @@ MockRoute::~MockRoute() = default;
 
 MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));
+  ON_CALL(*this, configCast()).WillByDefault(Return(route_config_));
 }
 MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 

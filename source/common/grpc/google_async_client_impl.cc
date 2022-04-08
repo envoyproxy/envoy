@@ -235,6 +235,13 @@ void GoogleAsyncStreamImpl::closeStream() {
 
 void GoogleAsyncStreamImpl::resetStream() {
   ENVOY_LOG(debug, "resetStream");
+  // The gRPC API requires calling Finish() at the end of a stream, even
+  // if the stream is cancelled.
+  if (!finish_pending_) {
+    finish_pending_ = true;
+    rw_->Finish(&status_, &finish_tag_);
+    ++inflight_tags_;
+  }
   cleanup();
 }
 
@@ -369,8 +376,6 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     cleanup();
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

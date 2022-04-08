@@ -37,6 +37,12 @@ message RouteMatch {
     // The domain from Request URI or Route Header.
     string domain = 1;
   }
+
+  // The header to get match parameter, default is "Route".
+  string header = 2;
+
+  // The parameter to get domain, default is "host".
+  string parameter = 3;
 }
 
 message RouteAction {

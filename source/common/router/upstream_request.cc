@@ -42,7 +42,8 @@ namespace Envoy {
 namespace Router {
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
-                                 std::unique_ptr<GenericConnPool>&& conn_pool)
+                                 std::unique_ptr<GenericConnPool>&& conn_pool,
+                                 bool can_send_early_data, bool can_use_http3)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -50,7 +51,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
+      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
+      cleaned_up_(false), had_upstream_(false),
+      stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
@@ -71,7 +74,13 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 }
 
-UpstreamRequest::~UpstreamRequest() {
+UpstreamRequest::~UpstreamRequest() { cleanUp(); }
+
+void UpstreamRequest::cleanUp() {
+  if (cleaned_up_) {
+    return;
+  }
+  cleaned_up_ = true;
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
                                                      upstream_trailers_.get(), stream_info_,
@@ -410,6 +419,7 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
+  had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
@@ -476,6 +486,11 @@ void UpstreamRequest::onPoolReady(
 
   if (span_ != nullptr) {
     span_->injectContext(*parent_.downstreamHeaders());
+  } else {
+    // No independent child span for current upstream request then inject the parent span's tracing
+    // context into the request headers.
+    // The injectContext() of the parent span may be called repeatedly when the request is retried.
+    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders());
   }
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());

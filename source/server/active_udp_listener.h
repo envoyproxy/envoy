@@ -106,9 +106,11 @@ public:
   }
   // These two are unreachable because a config will be rejected if it configures both this listener
   // and any L4 filter chain.
-  void updateListenerConfig(Network::ListenerConfig&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void updateListenerConfig(Network::ListenerConfig&) override {
+    IS_ENVOY_BUG("unexpected call to updateListenerConfig");
+  }
   void onFilterChainDraining(const std::list<const Network::FilterChain*>&) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected call to onFilterChainDraining");
   }
 
   // Network::UdpListenerFilterManager

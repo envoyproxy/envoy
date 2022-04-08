@@ -154,6 +154,12 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       stats_.incResponseInvalidType(cluster, upstream_host_);
       break;
     }
+
+    if (callbacks.responseMetadata()->isDraining()) {
+      stats_.incCloseDrain(cluster);
+      resetStream();
+    }
+
     onResponseComplete();
   } else if (status == ThriftFilters::ResponseStatus::Reset) {
     // Note: invalid responses are not accounted in the response size histogram.
@@ -204,9 +210,10 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "upstream local close");
     onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
+  case Network::ConnectionEvent::ConnectedZeroRtt:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("reached unexpectedly");
   }
 
   releaseConnection(false);
@@ -303,8 +310,6 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     // Error occurred after a partial response, propagate the reset to the downstream.
     parent_.resetDownstreamConnection();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

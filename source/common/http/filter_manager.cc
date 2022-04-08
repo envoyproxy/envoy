@@ -78,7 +78,7 @@ void ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do1xxHeaders() if we've actually seen 1xx headers.
-  if (has1xxheaders()) {
+  if (has1xxHeaders()) {
     continued_1xx_headers_ = true;
     do1xxHeaders();
     // If the response headers have not yet come in, don't continue on with
@@ -285,10 +285,11 @@ void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_f
   match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
 
   if (match_tree_evaluated_ && match_result.result_) {
-    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
+    const auto result = match_result.result_();
+    if (SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
-      filter_->onMatchCallback(*match_result.result_);
+      filter_->onMatchCallback(*result);
     }
   }
 }
@@ -300,6 +301,12 @@ bool ActiveStreamDecoderFilter::canContinue() {
   // last data frame comes in and the filter continues, but the final buffering takes the stream
   // over the high watermark such that a 413 is returned.
   return !parent_.state_.local_complete_;
+}
+
+bool ActiveStreamEncoderFilter::canContinue() {
+  // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
+  // continue if a local reply has been sent.
+  return !parent_.state_.remote_encode_complete_;
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -315,7 +322,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_complete_; }
+bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_decode_complete_; }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -368,6 +375,10 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -746,9 +757,9 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid request data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidRequestData);
   }
 }
 
@@ -827,8 +838,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 }
 
 void FilterManager::maybeEndDecode(bool end_stream) {
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
+  ASSERT(!state_.remote_decode_complete_);
+  state_.remote_decode_complete_ = end_stream;
   if (end_stream) {
     stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(dispatcher().timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
@@ -904,7 +915,6 @@ void FilterManager::sendLocalReply(
   }
 
   stream_info_.setResponseCodeDetails(details);
-
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
@@ -1227,9 +1237,9 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
     // choose to buffer/stop iteration that's fine.
     encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
-    // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw an exception here.
-    PANIC("fatal error adding decoded data");
+    IS_ENVOY_BUG("Invalid response data");
+    sendLocalReply(Http::Code::BadGateway, "Filter error", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().FilterAddedInvalidResponseData);
   }
 }
 
@@ -1351,6 +1361,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ASSERT(!state_.remote_encode_complete_);
+    state_.remote_encode_complete_ = true;
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1482,8 +1494,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() ||
-      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
+  if (!complete()) {
     return false;
   }
 
@@ -1538,7 +1549,7 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
-bool ActiveStreamEncoderFilter::has1xxheaders() {
+bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
 void ActiveStreamEncoderFilter::do1xxHeaders() {
@@ -1584,8 +1595,10 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  // TODO(yosrym93): Check if this filter had previously stopped headers iteration.
-  // If so, it should be continued before injecting data.
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -1640,6 +1653,7 @@ Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOpt
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {
+  ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", parent_);
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
@@ -1663,6 +1677,14 @@ uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
 
 Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const {
   return parent_.account();
+}
+
+void ActiveStreamDecoderFilter::setUpstreamOverrideHost(absl::string_view host) {
+  parent_.upstream_override_host_.emplace(std::move(host));
+}
+
+absl::optional<absl::string_view> ActiveStreamDecoderFilter::upstreamOverrideHost() const {
+  return parent_.upstream_override_host_;
 }
 
 } // namespace Http

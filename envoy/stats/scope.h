@@ -6,7 +6,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -25,18 +24,47 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-using ScopePtr = std::unique_ptr<Scope>;
+using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
+
+// TODO(jmarantz): In the initial transformation to store Scope as shared_ptr,
+// we don't change all the references, as that would result in an unreviewable
+// PR that combines a small number of semantic changes and a large number of
+// files with trivial changes. Furthermore, code that depends on the Envoy stats
+// infrastructure that's not in this repo will stop compiling when we remove
+// ScopePtr. We should fully remove this alias in a future PR and change all the
+// references, once known consumers that might break from this change have a
+// chance to do the global replace in their own repos.
+using ScopePtr = ScopeSharedPtr;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
+ *
+ * We enable use of shared pointers for Scopes to make it possible for the admin
+ * stats handler to safely capture all the scope references and remain robust to
+ * other threads deleting those scopes while rendering an admin stats page.
+ *
+ * We use std::shared_ptr rather than Stats::RefcountPtr, which we use for other
+ * stats, because:
+ *  * existing uses of shared_ptr<Scope> exist in the Wasm extension and would need
+ *    to be rewritten to allow for RefcountPtr<Scope>.
+ *  * the main advantage of RefcountPtr is it's smaller per instance by (IIRC) 16
+ *    bytes, but there are not typically enough scopes that the extra per-scope
+ *    overhead would matter.
+ *  * It's a little less coding to use enable_shared_from_this compared to adding
+ *    a ref_count to the scope object, for each of its implementations.
  */
-class Scope {
+class Scope : public std::enable_shared_from_this<Scope> {
 public:
   virtual ~Scope() = default;
+
+  /** @return a shared_ptr for this */
+  ScopeSharedPtr getShared() { return shared_from_this(); }
+  /** @return a const shared_ptr for this */
+  ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -47,7 +75,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr createScope(const std::string& name) PURE;
+  virtual ScopeSharedPtr createScope(const std::string& name) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -56,7 +84,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr scopeFromStatName(StatName name) PURE;
+  virtual ScopeSharedPtr scopeFromStatName(StatName name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.
@@ -249,6 +277,14 @@ public:
    *         was hit.
    */
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+
+  /**
+   * @return the aggregated prefix for this scope. A trailing dot is not
+   * included, even if one was supplied when creating the scope. If this is a
+   * nested scope, it will include names from every level. E.g.
+   *     store.createScope("foo").createScope("bar").prefix() will be the StatName "foo.bar"
+   */
+  virtual StatName prefix() const PURE;
 };
 
 } // namespace Stats

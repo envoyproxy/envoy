@@ -1,15 +1,18 @@
 #include <chrono>
+#include <cstddef>
 #include <memory>
 
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_time.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 #include "contrib/sip_proxy/filters/network/source/config.h"
@@ -22,7 +25,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ContainsRegex;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
@@ -38,35 +40,100 @@ namespace Router {
 class SipRouterTest : public testing::Test {
 public:
   SipRouterTest() = default;
-  void initializeTrans(bool has_option = true) {
-    if (has_option == true) {
-      const std::string yaml = R"EOF(
-session_affinity: true
-registration_affinity: true
+  ~SipRouterTest() override { delete (filter_); }
+
+  void initializeTrans(const std::string& sip_protocol_options_yaml = "",
+                       const std::string& sip_proxy_yaml = "") {
+
+    if (sip_proxy_yaml.empty()) {
+      std::string sip_proxy_yaml1 = R"EOF(
+           stat_prefix: egress_sip
+           route_config:
+             routes:
+             - match:
+                domain: "icscf-internal.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+             - match:
+                domain: "scscf-internal.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster2
+           settings:
+             transaction_timeout: 32s
+             local_services:
+             - domain: "pcsf-cfed.cncs.svc.cluster.local"
+               parameter: "x-suri"
+             tra_service_config:
+               grpc_service:
+                 envoy_grpc:
+                   cluster_name: tra_service
+               timeout: 2s
+               transport_api_version: V3
 )EOF";
-
-      envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions config;
-      TestUtility::loadFromYaml(yaml, config);
-
-      const auto options = std::make_shared<ProtocolOptionsConfigImpl>(config);
-      EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
-                  extensionProtocolOptions(_))
-          .WillRepeatedly(Return(options));
+      TestUtility::loadFromYaml(sip_proxy_yaml1, sip_proxy_config_);
+    } else {
+      TestUtility::loadFromYaml(sip_proxy_yaml, sip_proxy_config_);
     }
 
+    if (sip_protocol_options_yaml.empty()) {
+      const std::string sip_protocol_options_yaml1 = R"EOF(
+        session_affinity: true
+        registration_affinity: true
+        customized_affinity:
+          entries:
+          - key_name: lskpmc
+            query: true
+            subscribe: true
+          - key_name: ep
+            query: false
+            subscribe: false
+)EOF";
+      TestUtility::loadFromYaml(sip_protocol_options_yaml1, sip_protocol_options_config_);
+    } else {
+      TestUtility::loadFromYaml(sip_protocol_options_yaml, sip_protocol_options_config_);
+    }
+
+    const auto options = std::make_shared<ProtocolOptionsConfigImpl>(sip_protocol_options_config_);
+    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+                extensionProtocolOptions(_))
+        .WillRepeatedly(Return(options));
+
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(factory_context_));
+    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
+
     transaction_infos_ = std::make_shared<TransactionInfos>();
-    context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
+    context_.cluster_manager_.initializeThreadLocalClusters({cluster_name_});
+
+    StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
+    SipFilterStats stat = SipFilterStats::generateStats("test.", store_);
+    EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
+
+    filter_ =
+        new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr);
+    sip_settings_ = std::make_shared<SipSettings>(sip_proxy_config_.settings());
+
+    EXPECT_CALL(*filter_, settings()).WillRepeatedly(Return(sip_settings_));
+    tra_handler_ = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandler>>(
+        *filter_, sip_proxy_config_.settings().tra_service_config(), context_, stream_info);
   }
 
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
+    router_ =
+        std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(), context_);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
+    EXPECT_CALL(callbacks_, settings()).WillRepeatedly(Return(sip_settings_));
     EXPECT_CALL(callbacks_, transactionInfos()).WillOnce(Return(transaction_infos_));
+    EXPECT_CALL(callbacks_, traHandler()).WillRepeatedly(Return(tra_handler_));
     router_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -74,7 +141,8 @@ registration_affinity: true
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
+    router_ =
+        std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(), context_);
 
     EXPECT_CALL(callbacks_, transactionInfos()).WillOnce(Return(transaction_infos_));
     router_->setDecoderFilterCallbacks(callbacks_);
@@ -89,12 +157,8 @@ registration_affinity: true
     metadata_->setMethodType(method);
     metadata_->setMsgType(msg_type);
     metadata_->setTransactionId("<branch=cluster>");
-    metadata_->setRouteEP("10.0.0.1");
-    metadata_->setRouteOpaque("10.0.0.1");
-    metadata_->setDomain(
-        "<sip:10.0.0.1;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip="
-        "192.169.110.50;x-skey=000075b77a8f02240001;x-fbi=cfed;ue-addr=10.30.29.58>",
-        "host");
+    metadata_->setEP("10.0.0.1");
+    metadata_->addParam("ep", "10.0.0.1");
     if (set_destination) {
       metadata_->setDestination("10.0.0.1");
     }
@@ -102,28 +166,18 @@ registration_affinity: true
 
   void initializeTransaction() {
     auto transaction_info_ptr = std::make_shared<TransactionInfo>(
-        "test", thread_local_, static_cast<std::chrono::seconds>(2), "", "x-suri");
+        cluster_name_, thread_local_, static_cast<std::chrono::seconds>(2));
     transaction_info_ptr->init();
     transaction_infos_->emplace(cluster_name_, transaction_info_ptr);
   }
 
-  void startRequest(MsgType msg_type, MethodType method = MethodType::Invite) {
-    // const bool strip_service_name = false)
-    initializeMetadata(msg_type, method);
-    EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
-
+  void startRequest(FilterStatus status = FilterStatus::StopIteration) {
     EXPECT_CALL(callbacks_, route()).WillRepeatedly(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillRepeatedly(Return(&route_entry_));
     EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
+    EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
-    EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-
-    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
-
-    EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_EQ(&connection_, router_->downstreamConnection());
-
-    EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
+    EXPECT_EQ(status, router_->messageBegin(metadata_));
   }
 
   void connectUpstream() {
@@ -138,7 +192,6 @@ registration_affinity: true
                 connectionState())
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
-
     context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
 
     EXPECT_NE(nullptr, upstream_callbacks_);
@@ -160,13 +213,85 @@ registration_affinity: true
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse(MsgType msg_type = MsgType::Response, bool is_success = true) {
+  void returnResponse(MsgType msg_type = MsgType::Response) {
     Buffer::OwnedImpl buffer;
+
+    const std::string SIP_OK200_FULL =
+        "SIP/2.0 200 OK\x0d\x0a"
+        "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+        "CSeq: 1 INVITE\x0d\x0a"
+        "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+        "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Service-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=cluster\x0d\x0a"
+        "Path: "
+        "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
+        "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
+        "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
+        "Content-Length:  0\x0d\x0a"
+        "\x0d\x0a";
+    buffer.add(SIP_OK200_FULL);
 
     initializeMetadata(msg_type, MethodType::Ok200, false);
 
-    ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
+    EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+        .WillRepeatedly(
+            Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
+                       std::string& host) -> QueryStatus {
+              host = "10.0.0.11";
+              return QueryStatus::Pending;
+            }));
+    upstream_callbacks_->onUpstreamData(buffer, false);
+  }
 
+  void returnResponseNoActiveTrans(MsgType msg_type = MsgType::Response) {
+    Buffer::OwnedImpl buffer;
+
+    const std::string SIP_OK200_FULL =
+        "SIP/2.0 200 OK\x0d\x0a"
+        "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+        "CSeq: 1 INVITE\x0d\x0a"
+        "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+        "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Service-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=111\x0d\x0a"
+        "Path: "
+        "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
+        "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
+        "Content-Length:  0\x0d\x0a"
+        "\x0d\x0a";
+    buffer.add(SIP_OK200_FULL);
+
+    initializeMetadata(msg_type, MethodType::Ok200, false);
+
+    metadata_->setTransactionId("");
+    upstream_callbacks_->onUpstreamData(buffer, false);
+  }
+
+  void returnResponseNoTransId(MsgType msg_type = MsgType::Response) {
+    Buffer::OwnedImpl buffer;
+
+    const std::string SIP_OK200_FULL =
+        "SIP/2.0 200 OK\x0d\x0a"
+        "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+        "CSeq: 1 INVITE\x0d\x0a"
+        "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+        "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Service-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+        "Via: SIP/2.0/TCP 11.0.0.10:15060;\x0d\x0a"
+        "Path: "
+        "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
+        "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
+        "Content-Length:  0\x0d\x0a"
+        "\x0d\x0a";
+    buffer.add(SIP_OK200_FULL);
+
+    initializeMetadata(msg_type, MethodType::Ok200, false);
+
+    metadata_->setTransactionId("");
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
@@ -185,6 +310,9 @@ registration_affinity: true
     router_.reset();
   }
 
+  envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions
+      sip_protocol_options_config_;
+  envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy sip_proxy_config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Network::MockClientConnection> connection_;
   NiceMock<StreamInfo::MockStreamInfo> streamInfo_;
@@ -193,17 +321,26 @@ registration_affinity: true
   NiceMock<SipFilters::MockDecoderFilterCallbacks> callbacks_;
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Upstream::MockHostDescription>* host_{};
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
   Buffer::OwnedImpl buffer_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
+  NiceMock<MockConnectionManager>* filter_{};
+  NiceMock<MockConfig> config_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  Stats::TestUtil::TestStore store_;
 
   std::shared_ptr<TransactionInfos> transaction_infos_;
+  std::shared_ptr<SipSettings> sip_settings_;
 
   RouteConstSharedPtr route_ptr_;
   std::unique_ptr<Router> router_;
 
-  std::string cluster_name_{"cluster"};
+  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandler> tra_handler_;
+
+  std::string cluster_name_{"fake_cluster"};
 
   MsgType msg_type_{MsgType::Request};
   MessageMetadataSharedPtr metadata_;
@@ -212,11 +349,32 @@ registration_affinity: true
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-TEST_F(SipRouterTest, Call) {
+TEST_F(SipRouterTest, CustomizedAffinity) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
-  startRequest(MsgType::Request);
+
+  initializeMetadata(MsgType::Request);
+  metadata_->setPCookieIpMap({"S1F1", "10.0.0.1"});
+
+  startRequest();
+  connectUpstream();
+  completeRequest();
+  returnResponseNoTransId();
+  EXPECT_CALL(callbacks_, transactionId()).WillRepeatedly(Return("test"));
+  destroyRouter();
+}
+
+TEST_F(SipRouterTest, SessionAffinity) {
+  const std::string sip_protocol_options_yaml = R"EOF(
+        session_affinity: true
+        registration_affinity: true
+)EOF";
+  initializeTrans(sip_protocol_options_yaml);
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  startRequest();
   connectUpstream();
   completeRequest();
   returnResponse();
@@ -224,147 +382,108 @@ TEST_F(SipRouterTest, Call) {
   destroyRouter();
 }
 
-TEST_F(SipRouterTest, CallWithNotify) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-
-  initializeMetadata(MsgType::Request, MethodType::Notify);
-  metadata_->setEP("10.0.0.1");
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-
-  auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
-  EXPECT_NE(nullptr, transaction_info_ptr);
-  std::shared_ptr<UpstreamRequest> upstream_request_ptr =
-      transaction_info_ptr->getUpstreamRequest("10.0.0.1");
-  EXPECT_NE(nullptr, upstream_request_ptr);
-  upstream_request_ptr->resetStream();
-
-  transaction_info_ptr->deleteUpstreamRequest("10.0.0.1");
-  upstream_request_ptr = transaction_info_ptr->getUpstreamRequest("10.0.0.1");
-  EXPECT_EQ(nullptr, upstream_request_ptr);
-}
-
-TEST_F(SipRouterTest, DiffRouter) {
-  initializeTrans(false);
-  initializeRouter();
-  router_->metadataMatchCriteria();
-  EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
-  initializeTransaction();
-  EXPECT_EQ(router_->metadataMatchCriteria(), route_entry_.metadataMatchCriteria());
-  startRequest(MsgType::Request);
-
-  initializeRouter();
-  startRequest(MsgType::Request);
-}
-
-TEST_F(SipRouterTest, DiffRouterDiffTrans) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
-
-  initializeRouter();
-
-  initializeMetadata(MsgType::Request, MethodType::Invite);
-  EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
-
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-
-  metadata_->setTransactionId("cluster");
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-}
-
-TEST_F(SipRouterTest, DiffDestination) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  initializeMetadata(MsgType::Request, MethodType::Register);
-  metadata_->setEP("10.0.0.1");
-  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-
-  initializeRouter();
-  initializeMetadata(MsgType::Request, MethodType::Register);
-  metadata_->setEP("10.0.0.1");
-  metadata_->setDestination("10.0.0.1");
-
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-}
-
-TEST_F(SipRouterTest, DiffDestinationDiffTrans) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
-
-  initializeRouter();
-  initializeMetadata(MsgType::Request, MethodType::Ack);
-  metadata_->setDestination("10.0.0.1");
-
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-
-  metadata_->setTransactionId("cluster");
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-}
-
-TEST_F(SipRouterTest, DiffDestinationNoTrans) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
-
-  initializeRouter();
-  initializeMetadata(MsgType::Request, MethodType::Ack);
-  metadata_->setDestination("10.0.0.1");
-
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-
-  metadata_->setTransactionId("<branch=testNoTrans>");
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-}
-
-TEST_F(SipRouterTest, NoDestination) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-
-  initializeMetadata(MsgType::Request, MethodType::Invite, false);
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-}
-
-TEST_F(SipRouterTest, CallNoRouter) {
+TEST_F(SipRouterTest, SendAnotherMsgInConnectedUpstreamRequest) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
+  startRequest();
+  connectUpstream();
+  completeRequest();
+  returnResponseNoActiveTrans();
+
+  EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
+  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
+}
+
+TEST_F(SipRouterTest, NoTcpConnPool) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(Return(absl::nullopt));
+  try {
+    startRequest(FilterStatus::Continue);
+  } catch (const AppException& ex) {
+    EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+  }
+}
+
+TEST_F(SipRouterTest, NoTcpConnPoolEmptyDest) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  metadata_->resetParam();
+  metadata_->addParam("ep", "");
+
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(Return(absl::nullopt));
+  try {
+    startRequest(FilterStatus::Continue);
+  } catch (const AppException& ex) {
+    EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+  }
+}
+
+TEST_F(SipRouterTest, QueryPending) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  metadata_->resetParam();
+  metadata_->addParam("lskpmc", "S1F1");
+  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+      .WillRepeatedly(
+          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
+                     std::string& host) -> QueryStatus {
+            host = "10.0.0.11";
+            return QueryStatus::Pending;
+          }));
+  startRequest();
+}
+
+TEST_F(SipRouterTest, QueryStop) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  metadata_->resetParam();
+  metadata_->addParam("lskpmc", "S1F1");
+  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+      .WillRepeatedly(
+          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
+                     std::string& host) -> QueryStatus {
+            host = "10.0.0.11";
+            return QueryStatus::Stop;
+          }));
+  startRequest(FilterStatus::Continue);
+}
+
+TEST_F(SipRouterTest, SendAnotherMsgInConnectingUpstreamRequest) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  startRequest();
+
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+}
+
+TEST_F(SipRouterTest, CallNoRoute) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  metadata_->resetParam();
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
+  try {
+    EXPECT_EQ(FilterStatus::StopIteration, router_->transportBegin(metadata_));
+  } catch (const AppException& ex) {
+    EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
+  }
 
   destroyRouterOutofRange();
 }
@@ -374,21 +493,19 @@ TEST_F(SipRouterTest, CallNoCluster) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
+  metadata_->resetParam();
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq(cluster_name_)))
       .WillOnce(Return(nullptr));
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
+
+  try {
+    EXPECT_EQ(FilterStatus::StopIteration, router_->transportBegin(metadata_));
+  } catch (const AppException& ex) {
+    EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
+  }
 
   destroyRouter();
 }
@@ -405,39 +522,11 @@ TEST_F(SipRouterTest, ClusterMaintenanceMode) {
   EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, maintenanceMode())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
-  destroyRouter();
-}
-
-TEST_F(SipRouterTest, NoHealthyHosts) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  initializeMetadata(MsgType::Request);
-
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
-  EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-  EXPECT_CALL(route_entry_, clusterName()).WillOnce(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
-
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+  try {
+    EXPECT_EQ(FilterStatus::StopIteration, router_->transportBegin(metadata_));
+  } catch (const AppException& ex) {
+    EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
+  }
   destroyRouter();
 }
 
@@ -450,6 +539,7 @@ TEST_F(SipRouterTest, NoHost) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillOnce(ReturnRef(cluster_name_));
+  EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, host())
       .WillOnce(Return(nullptr));
@@ -457,7 +547,7 @@ TEST_F(SipRouterTest, NoHost) {
   destroyRouter();
 }
 
-TEST_F(SipRouterTest, NoNewConnection) {
+TEST_F(SipRouterTest, DestNotEqualToHost) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
@@ -466,25 +556,79 @@ TEST_F(SipRouterTest, NoNewConnection) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillOnce(ReturnRef(cluster_name_));
-
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
-      .WillOnce(Return(nullptr));
+  EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
+  metadata_->resetDestinationList();
+  metadata_->addDestination("ep", "192.168.1.1");
 
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
 
 TEST_F(SipRouterTest, CallWithExistingConnection) {
-  initializeTrans();
+  const std::string sip_protocol_options_yaml = R"EOF(
+        session_affinity: true
+        registration_affinity: true
+)EOF";
+  initializeTrans(sip_protocol_options_yaml);
   initializeRouter();
   initializeTransaction();
-  startRequest(MsgType::Request);
+  initializeMetadata(MsgType::Request);
+  startRequest();
   connectUpstream();
   completeRequest();
   returnResponse();
-  metadata_->setDestination("10.0.0.1");
-  router_->cleanup();
-  startRequestWithExistingConnection(MsgType::Request);
+
+  auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
+  transaction_info_ptr->getUpstreamRequest("10.0.0.1")
+      ->setConnectionState(ConnectionState::NotConnected);
+
+  metadata_->resetDestinationList();
+  metadata_->addDestination("ep", "10.0.0.1");
+  metadata_->setDestIter(metadata_->destinationList().begin());
+
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
+            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+                upstream_connection_);
+            return nullptr;
+          }));
+  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
+  destroyRouter();
+}
+
+TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
+  const std::string sip_protocol_options_yaml = R"EOF(
+        session_affinity: true
+        registration_affinity: true
+)EOF";
+  initializeTrans(sip_protocol_options_yaml);
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  startRequest();
+  connectUpstream();
+  completeRequest();
+  returnResponse();
+
+  auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
+  transaction_info_ptr->getUpstreamRequest("10.0.0.1")
+      ->setConnectionState(ConnectionState::NotConnected);
+
+  // initializeMetadata(MsgType::Request);
+  metadata_->resetDestinationList();
+  metadata_->resetDestination();
+
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
+            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+                upstream_connection_);
+            return nullptr;
+          }));
+  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
 
@@ -492,11 +636,22 @@ TEST_F(SipRouterTest, PoolFailure) {
   initializeTrans();
   initializeRouterWithCallback();
   initializeTransaction();
-  startRequest(MsgType::Request);
-  // connectUpstream();
+  initializeMetadata(MsgType::Response);
+  startRequest();
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  completeRequest();
+}
+
+TEST_F(SipRouterTest, NextAffinityAfterPoolFailure) {
+  initializeTrans();
+  initializeRouterWithCallback();
+  initializeTransaction();
+  initializeMetadata(MsgType::Response);
+  startRequest();
+  metadata_->addDestination("ep", "10.0.0.2");
+  metadata_->setDestIter(metadata_->destinationList().begin());
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(SipRouterTest, NewConnectionFailure) {
@@ -511,20 +666,23 @@ TEST_F(SipRouterTest, NewConnectionFailure) {
                 upstream_connection_);
             return nullptr;
           }));
-  startRequest(MsgType::Request);
+  initializeMetadata(MsgType::Response);
+  metadata_->resetParam();
+  startRequest(FilterStatus::Continue);
 }
 
 TEST_F(SipRouterTest, UpstreamCloseMidResponse) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
-  startRequest(MsgType::Request);
+  initializeMetadata(MsgType::Request);
+  metadata_->resetParam();
+  startRequest();
   connectUpstream();
 
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-  // Panic: NOT_REACHED_GCOVR_EXCL_LINE
-  // upstream_callbacks_->onEvent(static_cast<Network::ConnectionEvent>(9999));
+  upstream_callbacks_->onEvent(static_cast<Network::ConnectionEvent>(9999));
 }
 
 TEST_F(SipRouterTest, RouteEntryImplBase) {
@@ -535,22 +693,21 @@ TEST_F(SipRouterTest, RouteEntryImplBase) {
   EXPECT_EQ(nullptr, base->metadataMatchCriteria());
 }
 
-envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration
-parseConfigFromYaml(const std::string& yaml) {
-  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration route;
-  TestUtility::loadFromYaml(yaml, route);
-  return route;
-}
-
-TEST_F(SipRouterTest, RouteMatcher) {
-
+TEST_F(SipRouterTest, RouteMatch) {
   const std::string yaml = R"EOF(
-  name: local_route
-  routes:
-    match:
-      domain: pcsf-cfed.cncs.svc.cluster.local
-    route:
-      cluster: A
+             routes:
+             - match:
+                domain: "icscf-internal.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+             - match:
+                domain: "scscf-internal.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster2
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
@@ -560,103 +717,224 @@ TEST_F(SipRouterTest, RouteMatcher) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  metadata_->setDomain("<sip:10.177.8.232;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip="
-                       "192.169.110.50;x-skey=000075b77a8f02240001;x-fbi=cfed;ue-addr=10.30.29.58>",
-                       "x-suri");
-  matcher_ptr->route(*metadata_);
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
+      .emplace_back("Route: "
+                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
 
-  // Not match domain
-  metadata_->setDomain(
-      "<sip:10.177.8.232;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local.test:5060;inst-ip=192.169.110."
-      "50;x-skey=000075b77a8f02240001;x-fbi=cfed;ue-addr=10.30.29.58>",
-      "x-suri");
-  matcher_ptr->route(*metadata_);
+  EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
 
-TEST_F(SipRouterTest, HandlePendingRequest) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
-  connectUpstream();
-  completeRequest();
+TEST_F(SipRouterTest, RouteEmptyDomain) {
 
-  auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
-  EXPECT_NE(nullptr, transaction_info_ptr);
-  std::shared_ptr<UpstreamRequest> upstream_request_ptr =
-      transaction_info_ptr->getUpstreamRequest("10.0.0.1");
-  EXPECT_NE(nullptr, upstream_request_ptr);
-  upstream_request_ptr->addIntoPendingRequest(metadata_);
-  // trigger full
-  upstream_request_ptr->onRequestStart();
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: ""
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+)EOF";
 
-  for (int i = 0; i < 1000003; i++) {
-    upstream_request_ptr->addIntoPendingRequest(metadata_);
-  }
-
-  upstream_request_ptr->resetStream();
-
-  // Other UpstreamRequest in definition
-  upstream_request_ptr->onAboveWriteBufferHighWatermark();
-  upstream_request_ptr->onBelowWriteBufferLowWatermark();
-}
-
-TEST_F(SipRouterTest, ResponseDecoder) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
-
-  initializeMetadata(MsgType::Response, MethodType::Ok200);
-  auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
-  EXPECT_NE(nullptr, transaction_info_ptr);
-  std::shared_ptr<UpstreamRequest> upstream_request_ptr =
-      transaction_info_ptr->getUpstreamRequest("10.0.0.1");
-  EXPECT_NE(nullptr, upstream_request_ptr);
-  std::shared_ptr<ResponseDecoder> response_decoder_ptr =
-      std::make_shared<ResponseDecoder>(*upstream_request_ptr);
-  EXPECT_EQ(FilterStatus::Continue, response_decoder_ptr->transportBegin(metadata_));
-  EXPECT_EQ(FilterStatus::Continue, response_decoder_ptr->messageBegin(metadata_));
-  EXPECT_EQ(FilterStatus::Continue, response_decoder_ptr->messageEnd());
-  EXPECT_EQ(FilterStatus::Continue, response_decoder_ptr->transportEnd());
-  response_decoder_ptr->newDecoderEventHandler(metadata_);
-
-  // No active trans
-  metadata_->setTransactionId(nullptr);
-  EXPECT_EQ(FilterStatus::Continue, response_decoder_ptr->transportBegin(metadata_));
-  // No transid
-  metadata_->resetTransactionId();
-  EXPECT_EQ(FilterStatus::StopIteration, response_decoder_ptr->transportBegin(metadata_));
-}
-
-TEST_F(SipRouterTest, TransactionInfoItem) {
-  initializeTrans();
-  initializeRouter();
-  initializeTransaction();
-  startRequest(MsgType::Request);
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
 
   initializeMetadata(MsgType::Request);
-  auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
-  EXPECT_NE(nullptr, transaction_info_ptr);
-  std::shared_ptr<UpstreamRequest> upstream_request_ptr =
-      transaction_info_ptr->getUpstreamRequest("10.0.0.1");
-  EXPECT_NE(nullptr, upstream_request_ptr);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
-  std::shared_ptr<TransactionInfoItem> item =
-      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_request_ptr);
-  item->appendMessageList(metadata_);
-  item->resetTrans();
-  EXPECT_NE(nullptr, item->upstreamRequest());
-  EXPECT_EQ(false, item->deleted());
+  // Match domain
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
+      .emplace_back("Route: "
+                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+
+  EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteDefaultDomain) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "pcsf-cfed.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  // Match domain
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
+      .emplace_back("Route: "
+                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+
+  EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteEmptyHeader) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "scscf-internal.cncs.svc.cluster.local"
+                header: ""
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  // Match domain
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
+      .emplace_back("Route: "
+                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+
+  EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteNoRouteHeaderUsingTopLine) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "scscf-internal.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  // Match domain
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::TopLine])
+      .emplace_back("INVITE sip:User.0000@scscf-internal.cncs.svc.cluster.local;ep=127.0.0.1 "
+                    "SIP/2.0\x0d\x0a");
+
+  EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteUsingEmptyTopLine) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "scscf-internal.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteUsingEmptyRecordRoute) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "scscf-internal.cncs.svc.cluster.local"
+                header: "Record-Route"
+                parameter: "x-suri"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteHeaderHostDomain) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "pcsf-cfed.cncs.svc.cluster.local"
+                header: "Route"
+                parameter: "host"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  // Match domain
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
+      .emplace_back("Route: "
+                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+
+  EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
+}
+
+TEST_F(SipRouterTest, RouteHeaderWildcardDomain) {
+
+  const std::string yaml = R"EOF(
+             routes:
+             - match:
+                domain: "*"
+                header: "Route"
+                parameter: "host"
+               route:
+                cluster: fake_cluster
+)EOF";
+
+  envoy::extensions::filters::network::sip_proxy::v3alpha::RouteConfiguration config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  initializeMetadata(MsgType::Request);
+  auto matcher_ptr = std::make_shared<RouteMatcher>(config);
+
+  // Match domain
+  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
+      .emplace_back("Route: "
+                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+
+  EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
 
 TEST_F(SipRouterTest, Audit) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
-  startRequest(MsgType::Request);
-
   initializeMetadata(MsgType::Request);
+  startRequest();
+
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
   EXPECT_NE(nullptr, transaction_info_ptr);
   std::shared_ptr<UpstreamRequest> upstream_request_ptr =
@@ -669,7 +947,7 @@ TEST_F(SipRouterTest, Audit) {
       std::make_shared<TransactionInfoItem>(&callbacks_, upstream_request_ptr);
   itemToDelete->toDelete();
   ThreadLocalTransactionInfo threadInfo(transaction_info_ptr, dispatcher_,
-                                        std::chrono::milliseconds(0), "", "x-suri");
+                                        std::chrono::milliseconds(0));
   threadInfo.transaction_info_map_.emplace(cluster_name_, item);
   threadInfo.transaction_info_map_.emplace("test1", itemToDelete);
   threadInfo.auditTimerAction();

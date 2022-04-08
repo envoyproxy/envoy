@@ -53,15 +53,6 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   EXPECT_NE(nullptr, tracer);
 }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(DynamicOtTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.dynamic.ot";
-
-  ASSERT_EQ(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
-                         deprecated_name));
-}
-
 } // namespace
 } // namespace DynamicOt
 } // namespace Tracers

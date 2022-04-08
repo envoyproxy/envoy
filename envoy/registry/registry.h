@@ -14,7 +14,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/common/utility.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -281,9 +280,6 @@ public:
       return nullptr;
     }
 
-    if (!checkDeprecated(name)) {
-      return nullptr;
-    }
     return it->second;
   }
 
@@ -302,17 +298,6 @@ public:
   static absl::string_view canonicalFactoryName(absl::string_view name) {
     const auto it = deprecatedFactoryNames().find(name);
     return (it == deprecatedFactoryNames().end()) ? name : it->second;
-  }
-
-  static bool checkDeprecated(absl::string_view name) {
-    auto it = deprecatedFactoryNames().find(name);
-    const bool deprecated = it != deprecatedFactoryNames().end();
-    if (deprecated) {
-      return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-          "", it->first, it->second);
-    }
-
-    return true;
   }
 
   /**

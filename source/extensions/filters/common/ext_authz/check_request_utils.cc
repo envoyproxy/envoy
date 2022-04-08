@@ -199,9 +199,11 @@ void CheckRequestUtils::createTcpCheck(
   auto attrs = request.mutable_attributes();
 
   auto* cb = const_cast<Network::ReadFilterCallbacks*>(callbacks);
+  const std::string server_name(cb->connection().requestedServerName());
+
   setAttrContextPeer(*attrs->mutable_source(), cb->connection(), "", false,
                      include_peer_certificate);
-  setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), "", true,
+  setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }

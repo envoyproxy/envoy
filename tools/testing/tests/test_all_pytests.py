@@ -1,9 +1,9 @@
 
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
-from envoy.base.runner import BazelRunError
+from aio.api.bazel import BazelRunError
 from tools.testing import all_pytests
 
 
@@ -87,29 +87,32 @@ def test_all_pytests_pytest_bazel_args(patches, cov_enabled):
     assert "pytest_bazel_args" not in checker.__dict__
 
 
-def test_all_pytests_pytest_targets():
+async def test_all_pytests_pytest_targets():
     checker = all_pytests.PytestChecker("path1", "path2", "path3")
     bazel_mock = patch("tools.testing.all_pytests.PytestChecker.bazel", new_callable=PropertyMock)
 
     with bazel_mock as m_bazel:
-        m_bazel.return_value.query.return_value = [
-            "foo", ":pytest_foo",
-            ":notpytest_foo", ":not_foo",
-            "bar", "//asdf:pytest_barbaz"]
+        m_bazel.return_value.query = AsyncMock(
+            return_value=[
+                "foo", ":pytest_foo",
+                ":notpytest_foo", ":not_foo",
+                "bar", "//asdf:pytest_barbaz"])
         assert (
-            checker.pytest_targets
+            await checker.pytest_targets
             == set([":pytest_foo", "//asdf:pytest_barbaz"]))
     assert (
         list(m_bazel.return_value.query.call_args)
         == [('tools/...',), {}])
 
 
-def test_all_pytests_add_arguments():
+def test_all_pytests_add_arguments(patches):
     checker = all_pytests.PytestChecker("path1", "path2", "path3")
+    patched = patches(
+        "checker.Checker.add_arguments",
+        prefix="tools.testing.all_pytests")
     parser = MagicMock()
-    super_mock = patch("tools.testing.all_pytests.checker.BazelChecker.add_arguments")
 
-    with super_mock as m_super:
+    with patched as (m_super, ):
         checker.add_arguments(parser)
 
     assert (
@@ -125,9 +128,7 @@ def test_all_pytests_add_arguments():
               'help': 'Specify a path to collect html coverage with'}]])
 
 
-
-
-def test_all_pytests_check_pytests(patches):
+async def test_all_pytests_check_pytests(patches):
     checker = all_pytests.PytestChecker("path1", "path2", "path3")
     patched = patches(
         "PytestChecker.error",
@@ -145,14 +146,14 @@ def test_all_pytests_check_pytests(patches):
         check6=False,
         check7=True)
 
-    def _run_bazel(target):
+    async def _run_bazel(target):
         if not check_runs[target]:
             raise BazelRunError()
 
     with patched as (m_error, m_succeed, m_targets, m_bazel):
-        m_targets.return_value = check_runs.keys()
-        m_bazel.return_value.run.side_effect = _run_bazel
-        checker.check_pytests()
+        m_targets.side_effect = AsyncMock(return_value=check_runs.keys())
+        m_bazel.return_value.run.side_effect = AsyncMock(side_effect=_run_bazel)
+        assert not await checker.check_pytests()
 
     assert (
         list(list(c) for c in m_bazel.return_value.run.call_args_list)
@@ -178,7 +179,7 @@ def test_all_pytests_check_pytests(patches):
 
 @pytest.mark.parametrize("exists", [True, False])
 @pytest.mark.parametrize("cov_path", ["", "SOMEPATH"])
-def test_all_pytests_on_checks_begin(patches, exists, cov_path):
+async def test_all_pytests_on_checks_begin(patches, exists, cov_path):
     checker = all_pytests.PytestChecker("path1", "path2", "path3")
     patched = patches(
         "os.path.exists",
@@ -189,7 +190,7 @@ def test_all_pytests_on_checks_begin(patches, exists, cov_path):
     with patched as (m_exists, m_unlink, m_cov_path):
         m_cov_path.return_value = cov_path
         m_exists.return_value = exists
-        checker.on_checks_begin()
+        assert not await checker.on_checks_begin()
 
     if cov_path and exists:
         assert (
@@ -200,7 +201,7 @@ def test_all_pytests_on_checks_begin(patches, exists, cov_path):
 
 
 @pytest.mark.parametrize("cov_html", ["", "SOMEPATH"])
-def test_all_pytests_on_checks_complete(patches, cov_html):
+async def test_all_pytests_on_checks_complete(patches, cov_html):
     checker = all_pytests.PytestChecker("path1", "path2", "path3")
     patched = patches(
         ("PytestChecker.bazel", dict(new_callable=PropertyMock)),
@@ -211,7 +212,8 @@ def test_all_pytests_on_checks_complete(patches, cov_html):
 
     with patched as (m_bazel, m_complete, m_cov_path, m_cov_html):
         m_cov_html.return_value = cov_html
-        assert checker.on_checks_complete() == m_complete.return_value
+        m_bazel.return_value.run = AsyncMock()
+        assert await checker.on_checks_complete() == m_complete.return_value
         assert (
             list(m_complete.call_args)
             == [(), {}])

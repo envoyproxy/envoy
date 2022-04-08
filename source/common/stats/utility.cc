@@ -68,7 +68,7 @@ struct ElementVisitor {
 
 namespace Utility {
 
-ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& elements) {
+ScopeSharedPtr scopeFromStatNames(Scope& scope, const StatNameVec& elements) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.scopeFromStatName(StatName(joined.get()));
 }

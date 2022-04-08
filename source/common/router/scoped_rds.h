@@ -153,7 +153,7 @@ private:
         parent_.stats_.on_demand_scopes_.dec();
       }
     }
-    ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
+    ConfigConstSharedPtr routeConfig() { return route_provider_->configCast(); }
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
 
@@ -286,10 +286,8 @@ public:
   Envoy::Config::ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                              const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
-    ASSERT(false,
-           "SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
-           "overload that accepts a config proto set as an argument.");
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
+          "overload that accepts a config proto set as an argument.");
   }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,

@@ -14,7 +14,7 @@
 
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,15 +49,15 @@ private:
   static FilterRequestType requestTypeEnum(
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
     switch (request_type) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::BOTH:
       return FilterRequestType::BOTH;
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::INTERNAL:
       return FilterRequestType::INTERNAL;
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::EXTERNAL:
       return FilterRequestType::EXTERNAL;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   void incCounter(Stats::StatName name);

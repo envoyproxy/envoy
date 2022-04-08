@@ -136,14 +136,13 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   const envoy::config::core::v3::Metadata* metadata_source;
 
   switch (source_) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
     metadata_source = &info.route()->metadata();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const std::string metadata_string_value =
@@ -163,6 +162,7 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "header_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
       action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
 
@@ -171,7 +171,7 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
                                                 const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo&) const {
   if (expect_match_ == Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
-    descriptor_entry = {"header_match", descriptor_value_};
+    descriptor_entry = {descriptor_key_, descriptor_value_};
     return true;
   } else {
     return false;
@@ -228,8 +228,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       break;
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
+      throw EnvoyException("invalid config");
     }
   }
   if (config.has_limit()) {
@@ -238,8 +238,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       limit_override_.emplace(
           new DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
+        OVERRIDE_SPECIFIER_NOT_SET:
+      throw EnvoyException("invalid config");
     }
   }
 }

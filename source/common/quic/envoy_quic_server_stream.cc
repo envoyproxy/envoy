@@ -15,6 +15,7 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
+#include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -35,8 +36,6 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
       headers_with_underscores_action_(headers_with_underscores_action) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
-  // TODO(alyssawilk, danzh) if http3_options_.allow_extended_connect() is true,
-  // send the correct SETTINGS.
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -49,7 +48,11 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  }
+
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -65,19 +68,22 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   Buffer::RawSliceVector raw_slices = data.getRawSlices();
-  absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
+  absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
   quic_slices.reserve(raw_slices.size());
   for (auto& slice : raw_slices) {
     ASSERT(slice.len_ != 0);
     // Move each slice into a stand-alone buffer.
     // TODO(danzh): investigate the cost of allocating one buffer per slice.
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
-    // interface and re-design QuicMemSliceImpl.
-    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+    // interface and re-design QuicheMemSliceImpl.
+    quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
   }
-  absl::Span<quic::QuicMemSlice> span(quic_slices);
+  absl::Span<quiche::QuicheMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  WriteBodySlices(span, end_stream);
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+    WriteBodySlices(span, end_stream);
+  }
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -93,7 +99,11 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  }
   onLocalEndStream();
 }
 
@@ -135,6 +145,7 @@ void EnvoyQuicServerStream::switchStreamBlockState() {
 
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   // TODO(danzh) Fix in QUICHE. If the stream has been reset in the call stack,
   // OnInitialHeadersComplete() shouldn't be called.
   if (read_side_closed()) {
@@ -160,7 +171,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt ||
       Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      (headers->Protocol() && !http3_options_.allow_extended_connect())) {
+      (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
@@ -168,6 +179,15 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   request_decoder_->decodeHeaders(std::move(headers),
                                   /*end_stream=*/fin);
   ConsumeHeaderList();
+}
+
+void EnvoyQuicServerStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
+  uint64_t highest_byte_received = frame.data_length + frame.offset;
+  if (highest_byte_received > bytesMeter()->wireBytesReceived()) {
+    mutableBytesMeter()->addWireBytesReceived(highest_byte_received -
+                                              bytesMeter()->wireBytesReceived());
+  }
+  quic::QuicSpdyServerStreamBase::OnStreamFrame(frame);
 }
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
@@ -221,6 +241,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
     return;
   }

@@ -34,6 +34,7 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
@@ -43,7 +44,7 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t high_watermark) override;
+  void setWatermarks(uint32_t high_watermark, uint32_t overflow_watermark = 0) override;
   uint32_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.

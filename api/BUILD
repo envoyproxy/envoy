@@ -80,7 +80,9 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg",
+        "//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
         "//contrib/envoy/extensions/vcl/v3alpha:pkg",
         "//envoy/admin/v3:pkg",
@@ -89,6 +91,7 @@ proto_library(
         "//envoy/config/cluster/v3:pkg",
         "//envoy/config/common/key_value/v3:pkg",
         "//envoy/config/common/matcher/v3:pkg",
+        "//envoy/config/common/mutation_rules/v3:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/config/endpoint/v3:pkg",
         "//envoy/config/filter/thrift/router/v2alpha1:pkg",
@@ -117,6 +120,7 @@ proto_library(
         "//envoy/extensions/access_loggers/open_telemetry/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
+        "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
@@ -129,6 +133,7 @@ proto_library(
         "//envoy/extensions/compression/brotli/decompressor/v3:pkg",
         "//envoy/extensions/compression/gzip/compressor/v3:pkg",
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
+        "//envoy/extensions/config/validators/minimum_clusters/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/common/matcher/action/v3:pkg",
@@ -171,6 +176,7 @@ proto_library(
         "//envoy/extensions/filters/http/rbac/v3:pkg",
         "//envoy/extensions/filters/http/router/v3:pkg",
         "//envoy/extensions/filters/http/set_metadata/v3:pkg",
+        "//envoy/extensions/filters/http/stateful_session/v3:pkg",
         "//envoy/extensions/filters/http/tap/v3:pkg",
         "//envoy/extensions/filters/http/wasm/v3:pkg",
         "//envoy/extensions/filters/listener/http_inspector/v3:pkg",
@@ -211,11 +217,13 @@ proto_library(
         "//envoy/extensions/http/header_formatters/preserve_case/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
+        "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
         "//envoy/extensions/key_value/file_based/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
+        "//envoy/extensions/matching/common_inputs/network/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
         "//envoy/extensions/network/dns_resolver/apple/v3:pkg",
@@ -279,11 +287,22 @@ proto_library(
 )
 
 proto_library(
+    name = "xds_protos",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_cncf_udpa//xds/core/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/v3:pkg",
+    ],
+)
+
+proto_library(
     name = "all_protos",
     visibility = ["//visibility:public"],
     deps = [
         ":v2_protos",
         ":v3_protos",
+        ":xds_protos",
     ],
 )
 

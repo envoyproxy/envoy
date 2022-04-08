@@ -52,6 +52,28 @@ The number of sessions that can be created per upstream cluster is limited by th
 :ref:`maximum connection circuit breaker <arch_overview_circuit_break_cluster_maximum_connections>`.
 By default this is 1024.
 
+
+.. _config_udp_listener_filters_udp_proxy_routing:
+
+Routing
+-------
+
+The filter can route different datagrams to different upstream clusters with their source
+addresses. The matching API can be used with UDP routing, by specifying a matcher, a
+:ref:`UDP network input <extension_category_envoy.matching.network.input>` as the matching rule and
+:ref:`Route <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.Route>` as the resulting action.
+
+The following matcher configuration will lead Envoy to route UDP datagrams according to their
+source IPs, ignore datagrams other than those with a source IP of 127.0.0.1, and then filter the
+remaining datagrams to different clusters according to their source ports.
+
+.. literalinclude:: _include/udp-proxy-router.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 14
+   :lines: 14-53
+   :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
+
 Example configuration
 ---------------------
 
@@ -82,7 +104,7 @@ statistics are rooted at *udp.<stat_prefix>.* with the following statistics:
   downstream_sess_total, Counter, Number sessions created in total
   downstream_sess_tx_bytes, Counter, Number of bytes transmitted
   downstream_sess_tx_datagrams, Counter, Number of datagrams transmitted
-  downstream_sess_tx_errors, counter, Number of datagram transmission errors
+  downstream_sess_tx_errors, Counter, Number of datagram transmission errors
   idle_timeout, Counter, Number of sessions destroyed due to idle timeout
   downstream_sess_active, Gauge, Number of sessions currently active
 

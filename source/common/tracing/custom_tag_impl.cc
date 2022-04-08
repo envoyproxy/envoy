@@ -14,6 +14,15 @@ void CustomTagBase::applySpan(Span& span, const CustomTagContext& ctx) const {
   }
 }
 
+void CustomTagBase::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                             const CustomTagContext& ctx) const {
+  absl::string_view tag_value = value(ctx);
+  if (!tag_value.empty()) {
+    auto& custom_tags = *entry.mutable_custom_tags();
+    custom_tags[std::string(tag())] = std::string(tag_value);
+  }
+}
+
 EnvironmentCustomTag::EnvironmentCustomTag(
     const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment)
     : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
@@ -52,6 +61,22 @@ void MetadataCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const
   }
 
   span.setTag(tag(), meta_str.value());
+}
+
+void MetadataCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                                 const CustomTagContext& ctx) const {
+  const envoy::config::core::v3::Metadata* meta = metadata(ctx);
+  const auto meta_str = metadataToString(meta);
+  auto& custom_tags = *entry.mutable_custom_tags();
+
+  if (!meta_str.has_value()) {
+    if (!default_value_.empty()) {
+      custom_tags[std::string(tag())] = default_value_;
+    }
+    return;
+  }
+
+  custom_tags[std::string(tag())] = meta_str.value();
 }
 
 absl::optional<std::string>
@@ -104,7 +129,8 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
     return nullptr;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unknown config");
+    return nullptr;
   }
 }
 
@@ -119,9 +145,10 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
+    break; // Panic below.
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tracing

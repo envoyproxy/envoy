@@ -41,6 +41,15 @@ public:
    * @param ctx the custom tag context.
    */
   virtual void applySpan(Span& span, const CustomTagContext& ctx) const PURE;
+
+  /**
+   * Get string tag value from various type of custom tags. (e.g. Literal, Environment, Header,
+   * Metadata)
+   * @param log entry.
+   * @param ctx the custom tag context.
+   */
+  virtual void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                        const CustomTagContext& ctx) const PURE;
 };
 
 using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;

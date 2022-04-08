@@ -50,7 +50,7 @@ public:
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(
             Invoke([](os_fd_t fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
-              ENVOY_LOG_MISC(error, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
+              ENVOY_LOG_MISC(debug, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
               return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
             }));
     EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
@@ -403,17 +403,6 @@ TEST_P(TlsInspectorTest, InlineReadSucceed) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onAccept(cb_));
-}
-
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(TlsInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.tls_inspector";
-
-  ASSERT_EQ(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
 }
 
 } // namespace

@@ -181,7 +181,7 @@ bool MainCommonBase::run() {
     PERF_DUMP();
     return true;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return false; // for gcc.
 }
 
 void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,

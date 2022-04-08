@@ -22,6 +22,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -516,12 +517,115 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_ADDRESS");
+
+    // Validate for IPv4 address
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 18443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("127.1.2.3:18443", upstream_format.format(request_headers, response_headers,
+                                                        response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("127.1.2.3:18443")));
+
+    // Validate for IPv6 address
+    address =
+        Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 19443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("[::1]:19443", upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("[::1]:19443")));
+
+    // Validate for Pipe
+    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("/foo", upstream_format.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("/foo")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT");
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.3", 18443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("127.0.0.3", upstream_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("127.0.0.3")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_PORT");
+
+    // Validate for IPv4 address
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 18443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("18443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("18443")));
+
+    // Validate for IPv6 address
+    address =
+        Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 19443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("19443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("19443")));
+
+    // Validate for Pipe
+    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+    EXPECT_EQ("", upstream_format.format(request_headers, response_headers, response_trailers,
+                                         stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("")));
+  }
+
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
     EXPECT_EQ("10.0.0.1:443", upstream_format.format(request_headers, response_headers,
                                                      response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
+    EXPECT_EQ("10.0.0.1:443", upstream_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+  }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
+    EXPECT_EQ("10.0.0.1", upstream_format.format(request_headers, response_headers,
+                                                 response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_PORT");
+    EXPECT_EQ("443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("443")));
   }
 
   {
@@ -537,23 +641,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::stringValue("observability_name")));
-  }
-
-  {
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
-    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    const std::string upstream_cluster_name = "cluster_name";
-    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
-    EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(upstream_cluster_name));
-    EXPECT_EQ("cluster_name", upstream_format.format(request_headers, response_headers,
-                                                     response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::stringValue("cluster_name")));
   }
 
   {
@@ -680,21 +767,39 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_REMOTE_PORT");
+    EXPECT_EQ("0", upstream_format.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("0")));
+  }
+
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT");
-    EXPECT_EQ("127.0.0.1", upstream_format.format(request_headers, response_headers,
+    EXPECT_EQ("127.0.0.3", upstream_format.format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("127.0.0.1")));
+                ProtoEq(ValueUtil::stringValue("127.0.0.3")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS");
-    EXPECT_EQ("127.0.0.1:0", upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
+    EXPECT_EQ("127.0.0.3:63443", upstream_format.format(request_headers, response_headers,
+                                                        response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("127.0.0.1:0")));
+                ProtoEq(ValueUtil::stringValue("127.0.0.3:63443")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_PORT");
+    EXPECT_EQ("63443", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("63443")));
   }
 
   {
@@ -1508,18 +1613,6 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
     EXPECT_EQ("test_value", formatter.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
-    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                      stream_info, body),
-                ProtoEq(ValueUtil::stringValue("test_value")));
-  }
-  // Disable string value unquoting and expect the same result as above but quoted.
-  {
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.unquote_log_string_values", "false"}});
-    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
-    EXPECT_EQ("\"test_value\"", formatter.format(request_headers, response_headers,
-                                                 response_trailers, stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                       stream_info, body),
                 ProtoEq(ValueUtil::stringValue("test_value")));
@@ -3017,8 +3110,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "RESP(FIRST)%",
       "%REQ(valid)% %NOT_VALID%",
       "%REQ(FIRST?SECOND%",
-      "%%",
-      "%%HOSTNAME%PROTOCOL%",
+      "%HOSTNAME%PROTOCOL%",
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
@@ -3076,6 +3168,20 @@ TEST(SubstitutionFormatterTest, EmptyFormatParse) {
                                      stream_info, body));
 }
 
+TEST(SubstitutionFormatterTest, EscapingFormatParse) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  auto providers = SubstitutionFormatParser::parse("%%");
+
+  ASSERT_EQ(providers.size(), 1);
+  EXPECT_EQ("%", providers[0]->format(request_headers, response_headers, response_trailers,
+                                      stream_info, body));
+}
+
 TEST(SubstitutionFormatterTest, FormatterExtension) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
@@ -3091,6 +3197,89 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
   EXPECT_EQ(providers.size(), 2);
   EXPECT_EQ("TestFormatter", providers[1]->format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
+}
+
+TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, gethostname(_, _))
+      .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+        StringUtil::strlcpy(name, "myhostname", 11);
+        return {0, 0};
+      }));
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  auto providers = SubstitutionFormatParser::parse("%HOSTNAME%%PROTOCOL%");
+
+  ASSERT_EQ(providers.size(), 2);
+  EXPECT_EQ("myhostname", providers[0]->format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+  EXPECT_EQ("HTTP/1.1", providers[1]->format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+}
+
+TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%"), EnvoyException,
+                              "Empty environment name is not allowed.");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    StreamInfo::MockStreamInfo stream_info;
+    std::string body;
+
+    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
+
+    ASSERT_EQ(providers.size(), 1);
+
+    EXPECT_EQ("-", providers[0]->format(request_headers, response_headers, response_trailers,
+                                        stream_info, body));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    StreamInfo::MockStreamInfo stream_info;
+    std::string body;
+
+    TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+    Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+
+    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
+
+    ASSERT_EQ(providers.size(), 1);
+
+    EXPECT_EQ("test", providers[0]->format(request_headers, response_headers, response_trailers,
+                                           stream_info, body));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    StreamInfo::MockStreamInfo stream_info;
+    std::string body;
+
+    TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+    Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+
+    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV):2%");
+
+    ASSERT_EQ(providers.size(), 1);
+
+    EXPECT_EQ("te", providers[0]->format(request_headers, response_headers, response_trailers,
+                                         stream_info, body));
+  }
 }
 
 } // namespace

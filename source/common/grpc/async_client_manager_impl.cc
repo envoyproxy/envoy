@@ -127,8 +127,8 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
                                                           config, api_, stat_names_);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
   return nullptr;
 }

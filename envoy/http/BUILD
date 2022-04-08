@@ -101,6 +101,7 @@ envoy_cc_library(
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:http_tracer_interface",
+        "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
     ],
 )
@@ -181,4 +182,29 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/server:factory_context_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "header_evaluator",
+    hdrs = ["header_evaluator.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "stateful_session_interface",
+    hdrs = ["stateful_session.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "persistent_quic_info_interface",
+    hdrs = ["persistent_quic_info.h"],
 )

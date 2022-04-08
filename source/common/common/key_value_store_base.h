@@ -19,7 +19,7 @@ class KeyValueStoreBase : public KeyValueStore,
                           public Logger::Loggable<Logger::Id::key_value_store> {
 public:
   // Sets up flush() for the configured interval.
-  KeyValueStoreBase(Event::Dispatcher& dispatcher, std::chrono::seconds flush_interval);
+  KeyValueStoreBase(Event::Dispatcher& dispatcher, std::chrono::milliseconds flush_interval);
 
   // If |contents| is in the form of
   // [length]\n[key][length]\n[value]

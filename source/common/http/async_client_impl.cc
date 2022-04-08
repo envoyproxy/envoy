@@ -25,8 +25,6 @@ const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
-const AsyncStreamImpl::NullPathMatchCriterion
-    AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
     AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
@@ -158,11 +156,17 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // TODO(mattklein123): We trust callers currently to not do anything insane here if they set up
-  // buffering on an async client call. We should potentially think about limiting the size of
-  // buffering that we allow here.
   if (buffered_body_ != nullptr) {
-    buffered_body_->add(data);
+    // TODO(shikugawa): Currently, data is dropped when the retry buffer overflows and there is no
+    // ability implement any error handling. We need to implement buffer overflow handling in the
+    // future. Options include configuring the max buffer size, or for use cases like gRPC
+    // streaming, deleting old data in the retry buffer.
+    if (buffered_body_->length() + data.length() > kBufferLimitForRetry) {
+      ENVOY_LOG_EVERY_POW_2(
+          warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
+    } else {
+      buffered_body_->add(data);
+    }
   }
 
   router_.decodeData(data, end_stream);
@@ -256,7 +260,11 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
-  child_span_->setSampled(options.sampled_);
+  // Span gets sampled by default, as sampled_ defaults to true.
+  // If caller overrides sampled_ with empty value, sampling status of the parent is kept.
+  if (options.sampled_.has_value()) {
+    child_span_->setSampled(options.sampled_.value());
+  }
 }
 
 void AsyncRequestImpl::initialize() {

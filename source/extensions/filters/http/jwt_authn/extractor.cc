@@ -208,7 +208,8 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
     addCookieConfig(provider.issuer(), cookie);
   }
   // If not specified, use default locations.
-  if (provider.from_headers().empty() && provider.from_params().empty()) {
+  if (provider.from_headers().empty() && provider.from_params().empty() &&
+      provider.from_cookies().empty()) {
     addHeaderConfig(provider.issuer(), Http::CustomHeaders::get().Authorization,
                     JwtConstValues::get().BearerPrefix);
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);

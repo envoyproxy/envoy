@@ -226,7 +226,7 @@ private:
   const Network::DnsLookupFamily dns_lookup_family_;
   const Network::DnsResolverSharedPtr resolver_;
   ThreadLocal::TypedSlot<ThreadLocalHostInfo> tls_slot_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::Mutex primary_hosts_lock_;
@@ -235,6 +235,7 @@ private:
   std::unique_ptr<KeyValueStore> key_value_store_;
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
+  const std::chrono::milliseconds min_refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
   Filesystem::Instance& file_system_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

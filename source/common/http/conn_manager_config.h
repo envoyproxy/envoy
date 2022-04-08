@@ -13,7 +13,7 @@
 #include "source/common/http/date_provider.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {
@@ -500,6 +500,11 @@ public:
    * @return maximum requests for downstream.
    */
   virtual uint64_t maxRequestsPerConnection() const PURE;
+  /**
+   * @return the config describing if/how to write the Proxy-Status HTTP response header.
+   * If nullptr, don't write the Proxy-Status HTTP response header.
+   */
+  virtual const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

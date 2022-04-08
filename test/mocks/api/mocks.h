@@ -81,6 +81,10 @@ public:
   MOCK_METHOD(SysCallSizeResult, writev, (os_fd_t, const iovec*, int));
   MOCK_METHOD(SysCallSizeResult, sendmsg, (os_fd_t fd, const msghdr* msg, int flags));
   MOCK_METHOD(SysCallSizeResult, readv, (os_fd_t, const iovec*, int));
+  MOCK_METHOD(SysCallSizeResult, pwrite,
+              (os_fd_t fd, const void* buffer, size_t length, off_t offset), (const));
+  MOCK_METHOD(SysCallSizeResult, pread, (os_fd_t fd, void* buffer, size_t length, off_t offset),
+              (const));
   MOCK_METHOD(SysCallSizeResult, recv, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags));
   MOCK_METHOD(SysCallIntResult, recvmmsg,
@@ -101,6 +105,15 @@ public:
   MOCK_METHOD(SysCallIntResult, getpeername, (os_fd_t sockfd, sockaddr* name, socklen_t* namelen));
   MOCK_METHOD(SysCallIntResult, setsocketblocking, (os_fd_t sockfd, bool block));
   MOCK_METHOD(SysCallIntResult, connect, (os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen));
+  MOCK_METHOD(SysCallIntResult, open, (const char* pathname, int flags), (const));
+  MOCK_METHOD(SysCallIntResult, open, (const char* pathname, int flags, mode_t mode), (const));
+  MOCK_METHOD(SysCallIntResult, unlink, (const char* pathname), (const));
+  MOCK_METHOD(SysCallIntResult, linkat,
+              (os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd, const char* newpath,
+               int flags),
+              (const));
+  MOCK_METHOD(SysCallIntResult, mkstemp, (char* tmplate), (const));
+  MOCK_METHOD(bool, supportsAllPosixFileOperations, (), (const));
   MOCK_METHOD(SysCallIntResult, shutdown, (os_fd_t sockfd, int how));
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));

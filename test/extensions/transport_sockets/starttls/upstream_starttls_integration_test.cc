@@ -248,7 +248,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
   // Send a message to fake_upstream via Envoy.
   ASSERT_TRUE(tcp_client->write("hello"));

@@ -15,7 +15,7 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& /*server_
                                         absl::string_view /*chlo_hash*/,
                                         std::unique_ptr<quic::ProofSource::Callback> /*callback*/) {
   // Only reachable in Google QUIC which is not supported by Envoy.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected call to EnvoyQuicProofSourceBase::GetProof");
 }
 
 absl::InlinedVector<uint16_t, 8> EnvoyQuicProofSourceBase::SupportedTlsSignatureAlgorithms() const {

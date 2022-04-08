@@ -68,6 +68,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":cryptomb_stats_lib",
         ":ipp_crypto_wrapper_lib",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
@@ -80,6 +81,22 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/config:datasource_lib",
         "@envoy_api//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cryptomb_stats_lib",
+    srcs = [
+        "cryptomb_stats.cc",
+    ],
+    hdrs = [
+        "cryptomb_stats.h",
+    ],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 

@@ -19,6 +19,9 @@ namespace Api {
 
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
+  // Congestion window, in bytes. Note that posix's TCP_INFO socket option returns cwnd in packets,
+  // we multiply it by MSS to get bytes.
+  uint32_t tcpi_snd_cwnd = 0;
 };
 
 // Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the
@@ -71,6 +74,17 @@ public:
    * @see readv (man 2 readv)
    */
   virtual SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) PURE;
+
+  /**
+   * @see man 2 pwrite
+   */
+  virtual SysCallSizeResult pwrite(os_fd_t fd, const void* buffer, size_t length,
+                                   off_t offset) const PURE;
+
+  /**
+   * @see man 2 pread
+   */
+  virtual SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const PURE;
 
   /**
    * @see recv (man 2 recv)
@@ -181,6 +195,37 @@ public:
    * @see man 2 connect
    */
   virtual SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
+
+  /**
+   * @see man 2 open
+   */
+  virtual SysCallIntResult open(const char* pathname, int flags) const PURE;
+
+  /**
+   * @see man 2 open
+   */
+  virtual SysCallIntResult open(const char* pathname, int flags, mode_t mode) const PURE;
+
+  /**
+   * @see man 2 unlink
+   */
+  virtual SysCallIntResult unlink(const char* pathname) const PURE;
+
+  /**
+   * @see man 2 unlink
+   */
+  virtual SysCallIntResult linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
+                                  const char* newpath, int flags) const PURE;
+
+  /**
+   * @see man 2 mkstemp
+   */
+  virtual SysCallIntResult mkstemp(char* tmplate) const PURE;
+
+  /**
+   * Returns true if mkstemp, linkat, unlink, open, close, pread and pwrite are fully supported.
+   */
+  virtual bool supportsAllPosixFileOperations() const PURE;
 
   /**
    * @see man 2 shutdown

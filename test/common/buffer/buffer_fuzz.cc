@@ -114,6 +114,21 @@ public:
     ::memcpy(data, this->start() + start, size);
   }
 
+  uint64_t copyOutToSlices(uint64_t length, Buffer::RawSlice* slices,
+                           uint64_t num_slices) const override {
+    uint64_t size_copied = 0;
+    uint64_t num_slices_copied = 0;
+    while (size_copied < length && num_slices_copied < num_slices) {
+      auto copy_length = std::min((length - size_copied), slices[num_slices_copied].len_);
+      ::memcpy(slices[num_slices_copied].mem_, this->start(), copy_length);
+      size_copied += copy_length;
+      if (copy_length == slices[num_slices_copied].len_) {
+        num_slices_copied++;
+      }
+    }
+    return size_copied;
+  }
+
   void drain(uint64_t size) override {
     FUZZ_ASSERT(size <= size_);
     start_ += size;
@@ -187,7 +202,17 @@ public:
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
 
-  void setWatermarks(uint32_t) override {
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override {
+    size_t total_size_to_write = 0;
+
+    for (const auto& fragment : fragments) {
+      total_size_to_write += fragment.size();
+      add(fragment.data(), fragment.size());
+    }
+    return total_size_to_write;
+  }
+
+  void setWatermarks(uint32_t, uint32_t) override {
     // Not implemented.
     // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
     // WatermarkBuffer implementations.
@@ -306,6 +331,18 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     target_buffer.copyOut(start, length, copy_buffer);
     const std::string data = target_buffer.toString();
     FUZZ_ASSERT(::memcmp(copy_buffer, data.data() + start, length) == 0);
+    break;
+  }
+  case test::common::buffer::Action::kCopyOutToSlices: {
+    const uint32_t length =
+        std::min(static_cast<uint32_t>(target_buffer.length()), action.copy_out_to_slices());
+    Buffer::OwnedImpl buffer;
+    auto reservation = buffer.reserveForRead();
+    auto rc = target_buffer.copyOutToSlices(length, reservation.slices(), reservation.numSlices());
+    reservation.commit(rc);
+    const std::string data = buffer.toString();
+    const std::string target_data = target_buffer.toString();
+    FUZZ_ASSERT(::memcmp(data.data(), target_data.data(), reservation.length()) == 0);
     break;
   }
   case test::common::buffer::Action::kDrain: {

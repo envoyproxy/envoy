@@ -72,16 +72,19 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
 quic::QuicSpdyStream*
 EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Only client side server push stream should trigger this call.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected function call");
+  return nullptr;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   // Disallow server initiated stream.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected function call");
+  return nullptr;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream() {
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected function call");
+  return nullptr;
 }
 
 void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) {
@@ -168,12 +171,23 @@ void EnvoyQuicServerSession::setHttp3Options(
           quic::QuicTime::Delta::FromMilliseconds(initial_interval));
     }
   }
+  set_allow_extended_connect(http3_options_->allow_extended_connect());
 }
 
 void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
                                                         const Network::FilterChain& filter_chain,
                                                         ConnectionMapIter position) {
   position_.emplace(connection_map, filter_chain, position);
+}
+
+quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
+  quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
+  config.early_data_enabled = position_.has_value()
+                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                        position_->filter_chain_.transportSocketFactory())
+                                        .earlyDataEnabled()
+                                  : true;
+  return config;
 }
 
 } // namespace Quic

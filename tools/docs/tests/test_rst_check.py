@@ -15,7 +15,9 @@ def test_rst_check_current_version_constructor():
 
 @pytest.mark.parametrize(
     "constant",
-    (("backticks_re", "BAD_TICKS_REGEX"),
+    (("single_tick_re", "SINGLE_TICK_REGEX"),
+     ("ref_ticks_re", "REF_TICKS_REGEX"),
+     ("link_ticks_re", "LINK_TICKS_REGEX"),
      ("invalid_reflink_re", "INVALID_REFLINK"),
      ("new_line_re", "VERSION_HISTORY_NEW_LINE_REGEX"),
      ("punctuation_re", "REF_WITH_PUNCTUATION_REGEX"),
@@ -238,21 +240,27 @@ def test_rst_check_current_version_check_reflink(patches, matches):
         assert result == []
 
 
-@pytest.mark.parametrize("matches", [True, False])
-def test_rst_check_current_version_check_ticks(patches, matches):
+@pytest.mark.parametrize("single_tick_re_matches", [True, False])
+@pytest.mark.parametrize("ref_ticks_re", [True, False])
+@pytest.mark.parametrize("link_ticks_re", [True, False])
+def test_rst_check_current_version_check_ticks(patches, single_tick_re_matches, ref_ticks_re, link_ticks_re):
     version_file = rst_check.CurrentVersionFile("PATH")
     patched = patches(
-        ("CurrentVersionFile.backticks_re", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.single_tick_re", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.ref_ticks_re", dict(new_callable=PropertyMock)),
+        ("CurrentVersionFile.link_ticks_re", dict(new_callable=PropertyMock)),
         prefix="tools.docs.rst_check")
 
-    with patched as (m_re, ):
-        m_re.return_value.match.return_value = matches
+    with patched as (m_single_tick_re, m_ref_tickes_re, m_link_ticks_re):
+        m_single_tick_re.return_value.match.return_value = single_tick_re_matches
+        m_ref_tickes_re.return_value.match.return_value = ref_ticks_re
+        m_link_ticks_re.return_value.match.return_value = link_ticks_re
         assert (
             version_file.check_ticks("LINE")
             == (["Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): LINE"]
-                if matches else []))
+                if (single_tick_re_matches and (not ref_ticks_re) and (not link_ticks_re)) else []))
     assert (
-        list(m_re.return_value.match.call_args)
+        list(m_single_tick_re.return_value.match.call_args)
         == [('LINE',), {}])
 
 
@@ -341,7 +349,7 @@ def test_rst_checker_constructor():
 
 
 @pytest.mark.parametrize("errors", [[], ["err1", "err2"]])
-def test_rst_checker_check_current_version(patches, errors):
+async def test_rst_checker_check_current_version(patches, errors):
     checker = rst_check.RSTChecker("path1", "path2", "path3")
     patched = patches(
         "pathlib",
@@ -351,7 +359,7 @@ def test_rst_checker_check_current_version(patches, errors):
 
     with patched as (m_plib, m_version, m_error):
         m_version.return_value.run_checks.return_value = errors
-        checker.check_current_version()
+        assert not await checker.check_current_version()
 
     assert (
         list(m_plib.Path.call_args)

@@ -27,6 +27,7 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//envoy/rds:rds_interface",
         "//envoy/router:router_interface",
         "//envoy/tcp:conn_pool_interface",
         "//source/common/buffer:buffer_lib",
@@ -125,5 +126,29 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_interface",
+    hdrs = ["rds.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/rds:rds_interface",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_lib",
+    hdrs = [
+        "rds_impl.h",
+    ],
+    deps = [
+        ":config",
+        ":rds_interface",
+        "//envoy/rds:rds_interface",
+        "//source/common/rds:rds_lib",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )

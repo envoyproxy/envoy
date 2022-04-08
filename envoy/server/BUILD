@@ -158,6 +158,7 @@ envoy_cc_library(
     name = "worker_interface",
     hdrs = ["worker.h"],
     deps = [
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:guarddog_interface",
         "//envoy/server/overload:overload_manager_interface",
     ],
@@ -298,7 +299,7 @@ envoy_cc_library(
     name = "proactive_resource_monitor_interface",
     hdrs = ["proactive_resource_monitor.h"],
     deps = [
-        "//envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 

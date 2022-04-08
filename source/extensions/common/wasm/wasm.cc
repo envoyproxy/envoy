@@ -93,7 +93,7 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
                [&base_wasm_handle]() {
                  return createWasmVm(absl::StrCat(
                      "envoy.wasm.runtime.",
-                     toAbslStringView(base_wasm_handle->wasm()->wasm_vm()->runtime())));
+                     toAbslStringView(base_wasm_handle->wasm()->wasm_vm()->getEngineName())));
                }),
       scope_(getWasm(base_wasm_handle)->scope_), api_(getWasm(base_wasm_handle)->api_),
       stat_name_pool_(scope_->symbolTable()),

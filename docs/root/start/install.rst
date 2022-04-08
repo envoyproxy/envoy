@@ -124,6 +124,17 @@ contains all contrib extensions on top of an Ubuntu base. The
 image contains all contrib extensions on top of an Ubuntu base as well as debug symbols. Throughout
 the documentation, extensions are clearly marked as being a contrib extension or a core extension.
 
+.. _install_tools:
+
+Tools images
+~~~~~~~~~~~~
+
+The Envoy project ships images for tools that are separate from the proxy binary but are useful
+in supporting systems such as CI, configuration generation pipelines, etc. Currently installed
+tools in `/usr/local/bin` include:
+
+* :ref:`Schema validator check tool <install_tools_schema_validator_check_tool>`
+
 .. _install_binaries:
 
 Pre-built Envoy Docker images
@@ -166,12 +177,6 @@ The following table shows the available Docker images
      -
      -
      -
-   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
-     - |DOCKER_IMAGE_TAG_NAME|
-     -
-     -
-     -
    * - `envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows/tags/>`_
      - Release binary with symbols stripped on top of a Windows Server 1809 base.
      - |DOCKER_IMAGE_TAG_NAME|
@@ -186,6 +191,12 @@ The following table shows the available Docker images
      -
    * - `envoyproxy/envoy-contrib-debug <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug/tags/>`_
      - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-tools <https://hub.docker.com/r/envoyproxy/envoy-tools/tags/>`_
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
      - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
@@ -208,12 +219,6 @@ The following table shows the available Docker images
      -
      - latest
      -
-   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
-     - Release binary with symbols stripped on top of a **glibc** alpine base.
-     -
-     -
-     - latest
-     -
    * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
      - Release binary with debug symbols on top of an Ubuntu Bionic base.
      -
@@ -232,6 +237,12 @@ The following table shows the available Docker images
      -
      - latest
      -
+   * - `envoyproxy/envoy-tools-dev <https://hub.docker.com/r/envoyproxy/envoy-tools-dev/tags/>`_
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
    * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
      - Build image which includes tools for building multi-arch Envoy and containers.
      -

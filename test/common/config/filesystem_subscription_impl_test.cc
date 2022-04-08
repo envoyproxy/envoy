@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
@@ -51,10 +52,10 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
   NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
-  EXPECT_THROW_WITH_MESSAGE(FilesystemSubscriptionImpl(dispatcher, "##!@/dev/null", callbacks,
-                                                       resource_decoder, stats, validation_visitor,
-                                                       *api),
-                            EnvoyException, "bad path");
+  EXPECT_THROW_WITH_MESSAGE(
+      FilesystemSubscriptionImpl(dispatcher, makePathConfigSource("##!@/dev/null"), callbacks,
+                                 resource_decoder, stats, validation_visitor, *api),
+      EnvoyException, "bad path");
 }
 
 // Validate that the update_time statistic isn't changed when the configuration update gets
@@ -87,18 +88,20 @@ class FilesystemCollectionSubscriptionImplTest : public testing::Test,
                                                  Event::TestUsingSimulatedTime {
 public:
   FilesystemCollectionSubscriptionImplTest()
-      : path_(TestEnvironment::temporaryPath("lds.yaml")),
+      : path_(makePathConfigSource(TestEnvironment::temporaryPath("lds.yaml"))),
         stats_(Utility::generateStats(stats_store_)),
         api_(Api::createApiForTest(stats_store_, simTime())), dispatcher_(setupDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, resource_decoder_, stats_,
                       ProtobufMessage::getStrictValidationVisitor(), *api_) {}
-  ~FilesystemCollectionSubscriptionImplTest() override { TestEnvironment::removePath(path_); }
+  ~FilesystemCollectionSubscriptionImplTest() override {
+    TestEnvironment::removePath(path_.path());
+  }
 
   Event::DispatcherPtr setupDispatcher() {
     auto dispatcher = std::make_unique<Event::MockDispatcher>();
     EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
-      EXPECT_CALL(*mock_watcher, addWatch(path_, Filesystem::Watcher::Events::MovedTo, _))
+      EXPECT_CALL(*mock_watcher, addWatch(path_.path(), Filesystem::Watcher::Events::MovedTo, _))
           .WillOnce(Invoke([this](absl::string_view, uint32_t,
                                   Filesystem::Watcher::OnChangedCb cb) { on_changed_cb_ = cb; }));
       return mock_watcher;
@@ -109,7 +112,7 @@ public:
   void updateFile(const std::string& yaml) {
     // Write YAML contents to file, rename to path_ and invoke on change callback
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("lds.yaml.tmp", yaml);
-    TestEnvironment::renameFile(temp_path, path_);
+    TestEnvironment::renameFile(temp_path, path_.path());
     on_changed_cb_(Filesystem::Watcher::Events::MovedTo);
   }
 
@@ -143,7 +146,7 @@ public:
     return testing::AssertionSuccess();
   }
 
-  const std::string path_;
+  const envoy::config::core::v3::PathConfigSource path_;
   Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;
   Api::ApiPtr api_;

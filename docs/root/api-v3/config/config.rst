@@ -30,8 +30,10 @@ Extensions
   request_id/request_id
   http/header_formatters
   http/original_ip_detection
+  http/stateful_session
   stat_sinks/stat_sinks
   quic/quic_extensions
   formatter/formatter
   contrib/contrib
   rbac/matchers
+  config_validators/config_validators

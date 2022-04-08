@@ -519,5 +519,30 @@ public:
                                             UdpReadFilterCallbacks& callbacks) PURE;
 };
 
+/**
+ * Network filter matching context data for unified matchers.
+ */
+class MatchingData {
+public:
+  static absl::string_view name() { return "network"; }
+
+  virtual ~MatchingData() = default;
+
+  virtual const ConnectionSocket& socket() const PURE;
+};
+
+/**
+ * UDP listener filter matching context data for unified matchers.
+ */
+class UdpMatchingData {
+public:
+  static absl::string_view name() { return "network"; }
+
+  virtual ~UdpMatchingData() = default;
+
+  virtual const Address::Instance& localAddress() const PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
+};
+
 } // namespace Network
 } // namespace Envoy

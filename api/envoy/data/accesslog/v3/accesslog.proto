@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -184,10 +184,15 @@ message AccessLogCommon {
   // state serialized to any message other than `google.protobuf.Any` it will be packed into
   // `google.protobuf.Any`.
   map<string, google.protobuf.Any> filter_state_objects = 21;
+
+  // A list of custom tags, which annotate logs with additional information.
+  // To configure this value, users should configure
+  // :ref:`custom_tags <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.custom_tags>`.
+  map<string, string> custom_tags = 22;
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -285,6 +290,9 @@ message ResponseFlags {
 
   // Indicates overload manager terminated the request.
   bool overload_manager = 26;
+
+  // Indicates a DNS resolution failed.
+  bool dns_resolution_failure = 27;
 }
 
 // Properties of a negotiated TLS connection.
