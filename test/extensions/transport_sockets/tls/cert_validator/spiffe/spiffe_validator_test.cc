@@ -540,7 +540,7 @@ typed_config:
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
   initialize();
-  EXPECT_EQ(0, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(0, validator().daysUntilFirstCertExpires().value());
 
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
@@ -558,9 +558,9 @@ typed_config:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert.pem"
   )EOF"),
              time_system);
-  EXPECT_EQ(19231, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(19231, validator().daysUntilFirstCertExpires().value());
   time_system.setSystemTime(std::chrono::milliseconds(864000000));
-  EXPECT_EQ(19221, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(19221, validator().daysUntilFirstCertExpires().value());
 }
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
@@ -580,7 +580,7 @@ typed_config:
   )EOF"),
              time_system);
 
-  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires().value());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {
