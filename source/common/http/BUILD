@@ -503,7 +503,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_googlesource_googleurl//url:envoy_url",
+        "@com_googlesource_googleurl//url",
     ],
 )
 

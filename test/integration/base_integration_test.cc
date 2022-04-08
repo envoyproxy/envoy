@@ -66,6 +66,9 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+  // Allow extension lookup by name in the integration tests.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
+                                    "false");
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -446,7 +449,10 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(
       },
       std::move(transport_socket));
 
-  connection->run();
+  if (connection->run() != testing::AssertionSuccess()) {
+    FAIL() << "Failed to get expected response within the time bound\n"
+           << "received " << *response << "\n";
+  }
 }
 
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {

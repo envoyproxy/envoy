@@ -87,6 +87,16 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setClientWithIntermediateCert(bool client_intermediate_cert) {
+      client_with_intermediate_cert_ = client_intermediate_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setVerifyDepth(absl::optional<uint32_t> depth) {
+      max_verify_depth_ = depth;
+      return *this;
+    }
+
     ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool local_negative,
                                          bool remote_negative, std::string log_path,
                                          bool multiple_ips, Network::Address::IpVersion version) {
@@ -118,6 +128,8 @@ public:
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
+    bool client_with_intermediate_cert_{false};
+    absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
@@ -146,6 +158,9 @@ public:
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
+
+  // A string for the test inspector filter.
+  static std::string testInspectorFilter();
 
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
@@ -245,6 +260,10 @@ public:
 
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
+
+  // Disable delay close. This is especially useful for tests doing raw TCP for
+  // HTTP/1.1 which functionally frame by connection close.
+  void disableDelayClose();
 
   // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
   void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);

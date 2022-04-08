@@ -235,10 +235,8 @@ TEST(MatchingData, ApplicationProtocolInput) {
 
 TEST(UdpMatchingData, UdpDestinationIPInput) {
   DestinationIPInput<UdpMatchingData> input;
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
-  const Address::InstanceConstSharedPtr pipe =
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -259,10 +257,8 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
 
 TEST(UdpMatchingData, UdpDestinationPortInput) {
   DestinationPortInput<UdpMatchingData> input;
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
-  const Address::InstanceConstSharedPtr pipe =
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -283,10 +279,8 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
 
 TEST(UdpMatchingData, UdpSourceIPInput) {
   SourceIPInput<UdpMatchingData> input;
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
-  const Address::InstanceConstSharedPtr pipe =
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -307,10 +301,8 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
 
 TEST(UdpMatchingData, UdpSourcePortInput) {
   SourcePortInput<UdpMatchingData> input;
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
-  const Address::InstanceConstSharedPtr pipe =
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path");
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
