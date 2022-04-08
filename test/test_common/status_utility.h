@@ -1,5 +1,6 @@
 #pragma once
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -37,6 +38,38 @@ MATCHER_P(StatusIs, expected_code, "") {
   }
   return true;
 }
+
+class IsOkMatcher {
+public:
+  template <typename StatusT>
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  bool MatchAndExplain(StatusT status, ::testing::MatchResultListener* listener) const {
+    if (status.ok()) {
+      return true;
+    }
+    *listener << "status is " << status;
+    return false;
+  }
+
+  template <typename T>
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  bool MatchAndExplain(absl::StatusOr<T> statusor, ::testing::MatchResultListener* listener) const {
+    return MatchAndExplain(statusor.status(), listener);
+  }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void DescribeTo(::std::ostream* os) const { *os << "is OK"; }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void DescribeNegationTo(::std::ostream* os) const { *os << "is not OK"; }
+};
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+inline ::testing::PolymorphicMatcher<IsOkMatcher> IsOk() {
+  return ::testing::MakePolymorphicMatcher(IsOkMatcher());
+}
+
+#ifndef EXPECT_OK
+#define EXPECT_OK(v) EXPECT_THAT((v), ::Envoy::StatusHelpers::IsOk())
+#endif // EXPECT_OK
 
 } // namespace StatusHelpers
 } // namespace Envoy
