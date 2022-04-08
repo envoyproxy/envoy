@@ -33,7 +33,7 @@ public:
   //
   // Returns a cancellation function, which aborts the operation (and closes
   // the file if opened) unless the callback has already been called.
-  virtual std::function<void()>
+  virtual CancelFunction
   createAnonymousFile(absl::string_view path,
                       std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) PURE;
 
@@ -45,7 +45,7 @@ public:
   //
   // Returns a cancellation function, which aborts the operation (and closes
   // the file if opened) unless the callback has already been called.
-  virtual std::function<void()>
+  virtual CancelFunction
   openExistingFile(absl::string_view filename, Mode mode,
                    std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) PURE;
 
@@ -54,8 +54,8 @@ public:
   //
   // Returns a cancellation function, which aborts the operation
   // unless it has already been performed.
-  virtual std::function<void()> unlink(absl::string_view filename,
-                                       std::function<void(absl::Status)> on_complete) PURE;
+  virtual CancelFunction unlink(absl::string_view filename,
+                                std::function<void(absl::Status)> on_complete) PURE;
 
   // whenReady can be used to only perform an action when the caller hits the
   // front of the thread pool's queue - this can be used to defer requesting
@@ -77,14 +77,14 @@ public:
   // controlled (since the callback occurs in a different thread than the thread
   // the state belongs to), versus simpler unchained operations can use queue
   // based actions and not worry about ownership.
-  std::function<void()> whenReady(std::function<void(absl::Status)> on_complete);
+  CancelFunction whenReady(std::function<void(absl::Status)> on_complete);
 
   // Return a string description of the configuration of the manager.
   // (This is mostly to facilitate testing.)
   virtual std::string describe() const PURE;
 
 private:
-  virtual std::function<void()> enqueue(const std::shared_ptr<AsyncFileAction> context) PURE;
+  virtual CancelFunction enqueue(const std::shared_ptr<AsyncFileAction> context) PURE;
 
   friend class AsyncFileContextBase;
   friend class AsyncFileManagerTest;

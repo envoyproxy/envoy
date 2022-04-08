@@ -11,6 +11,7 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
+class AsyncFileAction;
 class AsyncFileManager;
 
 // The base implementation of an AsyncFileHandle that uses the manager thread pool - includes

@@ -14,8 +14,8 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
@@ -68,10 +68,10 @@ TEST_F(AsyncFileManagerWithMockFilesTest, ChainedOperationsWorkAndSkipQueue) {
   manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
     AsyncFileHandle handle = result.value();
     Buffer::OwnedImpl buf("hello");
-    auto queued = handle->write(buf, 0, [&](absl::StatusOr<size_t> result) {
-      EXPECT_THAT(result, IsOkAndHolds(5));
-      auto queued = handle->close([&](absl::Status result) { EXPECT_OK(result); });
-    });
+    EXPECT_OK(handle->write(buf, 0, [handle](absl::StatusOr<size_t> result) {
+      EXPECT_THAT(result, IsOkAndHolds(5U));
+      EXPECT_OK(handle->close([](absl::Status result) { EXPECT_OK(result); }));
+    }));
   });
   // Separately queue another action.
   std::promise<void> did_second_action;
@@ -190,7 +190,7 @@ TEST_F(AsyncFileManagerWithMockFilesTest, OpenFailureInCreateAnonymousReturnsAnE
   EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   std::promise<void> first_open_was_called;
   manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
-    auto queued = result.value()->close([](absl::Status) {});
+    EXPECT_OK(result.value()->close([](absl::Status) {}));
     first_open_was_called.set_value();
   });
   // We have to synchronize on this to avoid racily adding a different matching expectation for the
@@ -283,10 +283,10 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
   std::promise<void> callback_complete;
   manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
     EXPECT_OK(result);
-    auto queued = result.value()->close([&](absl::Status result) {
+    EXPECT_OK(result.value()->close([&](absl::Status result) {
       EXPECT_OK(result);
       callback_complete.set_value();
-    });
+    }));
   });
   callback_complete.get_future().wait();
 }

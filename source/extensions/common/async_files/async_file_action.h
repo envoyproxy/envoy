@@ -12,6 +12,15 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
+// A CancelFunction attempts to stop an action in flight.
+// * If the action already occurred, the CancelFunction does nothing.
+// * If the action is already calling the callback, CancelFunction blocks until the callback
+//   completes.
+// * If the action is already executing, CancelFunction causes the removal of any resource-consuming
+//   return value (e.g. file handles), and prevents the callback.
+// * If the action is still just queued, CancelFunction prevents its execution.
+using CancelFunction = std::function<void()>;
+
 // Actions to be passed to asyncFileManager->enqueue.
 class AsyncFileAction {
 public:

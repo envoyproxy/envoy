@@ -111,7 +111,7 @@ public:
 protected:
   void onCancelledBeforeCallback(absl::StatusOr<AsyncFileHandle> result) override {
     if (result.ok()) {
-      result.value()->close([](absl::Status) {});
+      result.value()->close([](absl::Status) {}).IgnoreError();
     }
   }
   AsyncFileManagerThreadPool& manager_;

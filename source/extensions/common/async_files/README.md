@@ -29,8 +29,8 @@ manager->createAnonymousFile("/tmp", [](absl::StatusOr<AsyncFileHandle> opened) 
       if (!closed.ok()) {
         std::cout << "oh no, an error: " << closed << std::endl;
       }
-    });
-  });
+    }).IgnoreError(); // A returned error only occurs if the file handle was closed.
+  }).IgnoreError(); // A returned error only occurs if the file handle was closed.
 });
 ```
 

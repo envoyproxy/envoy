@@ -101,18 +101,18 @@ TEST_F(AsyncFileHandleTest, WriteReadClose) {
     write_status = std::move(status);
     // Make sure writing at an offset works
     Buffer::OwnedImpl two_chars("p!");
-    auto queued = handle->write(two_chars, 3, [&](absl::StatusOr<size_t> status) {
+    EXPECT_OK(handle->write(two_chars, 3, [&](absl::StatusOr<size_t> status) {
       second_write_status = std::move(status);
-      auto queued = handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+      EXPECT_OK(handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
         read_status = std::move(status);
         // Verify reading at an offset.
-        auto queued = handle->read(2, 3, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+        EXPECT_OK(handle->read(2, 3, [&](absl::StatusOr<Buffer::InstancePtr> status) {
           second_read_status = std::move(status);
-          auto queued = handle->close(
-              [&](absl::Status status) { close_status.set_value(std::move(status)); });
-        });
-      });
-    });
+          EXPECT_OK(handle->close(
+              [&](absl::Status status) { close_status.set_value(std::move(status)); }));
+        }));
+      }));
+    }));
   }));
   ASSERT_OK(close_status.get_future().get());
   // The first write was 5 characters.
@@ -123,10 +123,12 @@ TEST_F(AsyncFileHandleTest, WriteReadClose) {
 
   // This should be "hello" from the first write, with the last two characters replaced with "p!"
   // from the second write.
-  EXPECT_THAT(read_status, IsOkAndHolds(BufferStringEqual("help!")));
+  EXPECT_OK(read_status);
+  EXPECT_THAT(*read_status.value(), BufferStringEqual("help!"));
 
   // Second read should have three characters in it.
-  EXPECT_THAT(second_read_status, IsOkAndHolds(BufferStringEqual("lp!")));
+  EXPECT_OK(second_read_status);
+  EXPECT_THAT(*second_read_status.value(), BufferStringEqual("lp!"));
 }
 
 TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
@@ -279,7 +281,8 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
     read_status_promise.set_value(std::move(status));
   }));
   auto read_status = read_status_promise.get_future().get();
-  ASSERT_THAT(read_status, IsOkAndHolds(BufferStringEqual("help me!")));
+  EXPECT_OK(read_status);
+  EXPECT_THAT(*read_status.value(), BufferStringEqual("help me!"));
   close(handle);
 }
 
@@ -315,7 +318,8 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialReadReturnsPartialResult) {
     read_status_promise.set_value(std::move(status.value()));
   }));
   auto read_status = read_status_promise.get_future().get();
-  EXPECT_THAT(read_status, IsOkAndHolds(BufferStringEqual("hel")));
+  EXPECT_OK(read_status);
+  EXPECT_THAT(*read_status.value(), BufferStringEqual("hel"));
   close(handle);
 }
 
@@ -355,7 +359,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingDuplicateInProgressClosesTheF
     // so this is unimportant.
   });
   entering_dup.get_future().wait();
-  cancel_dup.value();
+  cancel_dup.value()();
   std::promise<void> closing;
   EXPECT_CALL(mock_posix_file_operations_, close(4242)).WillOnce([&]() {
     closing.set_value();
@@ -379,7 +383,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingCreateHardLinkInProgressRemov
     // Callback is not called if we cancel, so this is unimportant.
   });
   entering_hardlink.get_future().wait();
-  cancel_hardlink.value();
+  cancel_hardlink.value()();
   std::promise<void> unlinking;
   EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(filename))).WillOnce([&]() {
     unlinking.set_value();
@@ -403,7 +407,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingFailedCreateHardLinkInProgres
     // Callback is not called if we cancel, so this is unimportant.
   });
   entering_hardlink.get_future().wait();
-  cancel_hardlink.value();
+  cancel_hardlink.value()();
   EXPECT_CALL(mock_posix_file_operations_, unlink(_)).Times(0);
   finishing_hardlink.set_value();
   std::this_thread::yield();
@@ -413,13 +417,11 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingFailedCreateHardLinkInProgres
 TEST_F(AsyncFileHandleWithMockPosixTest, CloseFailureReportsError) {
   auto handle = createAnonymousFile();
   EXPECT_CALL(mock_posix_file_operations_, close(1))
-      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}))
-      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
   std::promise<absl::Status> close_status_promise;
   EXPECT_OK(handle->close([&](absl::Status status) { close_status_promise.set_value(status); }));
   auto close_status = close_status_promise.get_future().get();
   EXPECT_EQ(absl::StatusCode::kFailedPrecondition, close_status.code()) << close_status;
-  close(handle);
 }
 
 TEST_F(AsyncFileHandleWithMockPosixTest, DuplicateFailureReportsError) {
