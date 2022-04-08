@@ -1026,7 +1026,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
-// The server (local) identity is test://foo.com/be and http://backend.foo.com. The client does not set XFCC.
+// The server (local) identity is test://foo.com/be and http://backend.foo.com. The client does not
+// set XFCC.
 TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
@@ -1095,16 +1096,19 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   details.push_back(Http::ClientCertDetailsType::Chain);
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test://foo.com/fe;By=http://frontend.foo.com;"
-                                                               "URI=test://bar.com/be;"
-                                                               "DNS=test.com;DNS=test.com"}};
+  TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert",
+                                    "By=test://foo.com/fe;By=http://frontend.foo.com;"
+                                    "URI=test://bar.com/be;"
+                                    "DNS=test.com;DNS=test.com"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ(
-      "By=test://foo.com/fe;By=http://frontend.foo.com;URI=test://bar.com/be;DNS=test.com;DNS=test.com,"
-      "By=test://foo.com/be;By=http://backend.foo.com;Hash=abcdefg;URI=test://foo.com/fe;URI=http://frontend.foo.com;"
+      "By=test://foo.com/fe;By=http://frontend.foo.com;URI=test://bar.com/"
+      "be;DNS=test.com;DNS=test.com,"
+      "By=test://foo.com/be;By=http://backend.foo.com;Hash=abcdefg;URI=test://foo.com/fe;URI=http:/"
+      "/frontend.foo.com;"
       "Cert=\"%3D%3Dabc%0Ade%3D\";Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";DNS=www.example.com",
       headers.get_("x-forwarded-client-cert"));
 }
@@ -1173,10 +1177,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("By=test://foo.com/be;By=http://backend.foo.com;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
-            "Francisco/OU=Lyft/CN=test.lyft.com\";URI=test://foo.com/fe;URI=http://frontend.foo.com;"
-            "Cert=\"abcde=\";Chain=\"abcde=lmnop=\"",
-            headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ(
+      "By=test://foo.com/be;By=http://backend.foo.com;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+      "Francisco/OU=Lyft/CN=test.lyft.com\";URI=test://foo.com/fe;URI=http://frontend.foo.com;"
+      "Cert=\"abcde=\";Chain=\"abcde=lmnop=\"",
+      headers.get_("x-forwarded-client-cert"));
 }
 
 // This test assumes the following scenario:
