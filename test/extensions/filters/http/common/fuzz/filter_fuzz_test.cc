@@ -6,8 +6,6 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/fuzz/fuzz_runner.h"
 
-#include <vector>
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
