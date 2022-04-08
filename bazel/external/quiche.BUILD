@@ -1,6 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -39,14 +38,6 @@ src_files = glob([
     "**/*.inc",
     "**/*.proto",
 ])
-
-genrule(
-    name = "quiche_files",
-    srcs = src_files,
-    outs = ["quiche/" + f for f in src_files],
-    cmd = genrule_cmd("@envoy//bazel/external:quiche.genrule_cmd"),
-    visibility = ["//visibility:private"],
-)
 
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
