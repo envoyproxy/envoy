@@ -138,14 +138,6 @@ protected:
   }
 };
 
-using AsyncFileManagerDeathTest = AsyncFileManagerTest;
-
-TEST_F(AsyncFileManagerDeathTest, PanicsWithUnspecifiedConfig) {
-  envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
-  EXPECT_DEATH({ factory_->getAsyncFileManager(config); },
-               "unrecognized AsyncFileManagerConfig::ManagerType");
-}
-
 TEST_F(AsyncFileManagerTest, WorksWithThreadPoolSizeZero) {
   envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
   config.mutable_thread_pool()->set_thread_count(0);

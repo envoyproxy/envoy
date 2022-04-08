@@ -31,7 +31,7 @@ AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(
     Api::OsSysCalls& posix)
     : posix_(posix) {
   if (!posix.supportsAllPosixFileOperations()) {
-    PANIC("AsyncFileManagerThreadPool not supported");
+    throw EnvoyException("AsyncFileManagerThreadPool not supported");
   }
   unsigned int thread_pool_size = config.thread_pool().thread_count();
   if (thread_pool_size == 0) {

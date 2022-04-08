@@ -58,10 +58,10 @@ std::shared_ptr<AsyncFileManager> AsyncFileManagerFactoryImpl::getAsyncFileManag
       configs_.insert({config.id(), config});
       break;
     default:
-      PANIC("unrecognized AsyncFileManagerConfig::ManagerType");
+      throw EnvoyException("unrecognized AsyncFileManagerConfig::ManagerType");
     };
   } else if (!Protobuf::util::MessageDifferencer::Equivalent(configs_[config.id()], config)) {
-    PANIC("AsyncFileManager mismatched config");
+    throw EnvoyException("AsyncFileManager mismatched config");
   }
   return it->second;
 }
