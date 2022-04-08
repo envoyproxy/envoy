@@ -4,8 +4,9 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 
-#include "ares.h"
 #include "test/test_common/utility.h"
+
+#include "ares.h"
 
 namespace Envoy {
 namespace Extensions {
