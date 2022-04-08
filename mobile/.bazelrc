@@ -6,6 +6,8 @@ build --platform_mappings=envoy/bazel/platform_mappings
 build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
+build --experimental_inmemory_dotd_files
+build --experimental_inmemory_jdeps_files
 build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
@@ -133,8 +135,6 @@ build:remote-ci-local-java8 --java_language_version=8
 # Common Engflow flags
 build:remote-ci-linux --define=EXECUTOR=remote
 build:remote-ci-linux --disk_cache=
-build:remote-ci-linux --experimental_inmemory_dotd_files
-build:remote-ci-linux --experimental_inmemory_jdeps_files
 build:remote-ci-linux --incompatible_strict_action_env=true
 build:remote-ci-linux --remote_timeout=600
 # GCC toolchain options
