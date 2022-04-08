@@ -122,12 +122,12 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(-1, Utility::getDaysUntilExpiration(cert.get(), time_source));
+  EXPECT_EQ(absl::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
   Event::SimulatedTimeSystem time_source;
-  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source));
+  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source).value());
 }
 
 TEST(UtilityTest, TestValidFrom) {
