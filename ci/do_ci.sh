@@ -328,7 +328,7 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 elif [[ "$CI_TARGET" == "bazel.dev.contrib" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
-  echo "bazel fastbuild build with tests..."
+  echo "bazel fastbuild build with contrib extensions and tests..."
   echo "Building..."
   bazel_contrib_binary_build fastbuild
 
