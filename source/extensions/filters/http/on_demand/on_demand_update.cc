@@ -61,7 +61,7 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(OptRef<const envoy::config:
 }
 
 template <typename ProtoConfig>
-OptRef<const envoy::config::core::v3::ConfigSource&> getODCDSConfig(const ProtoConfig& proto_config) {
+OptRef<const envoy::config::core::v3::ConfigSource> getODCDSConfig(const ProtoConfig& proto_config) {
   if (!proto_config.has_odcds_config()) {
     return absl::nullopt;
   }
@@ -71,7 +71,7 @@ OptRef<const envoy::config::core::v3::ConfigSource&> getODCDSConfig(const ProtoC
 template <typename ProtoConfig>
 std::chrono::milliseconds getTimeout(const ProtoConfig& proto_config) {
   // If changing the default timeout, please update the documentation in on_demand.proto too.
-  return PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 5000);
+  return std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 5000));
 }
 
 } // namespace
@@ -120,7 +120,7 @@ void OnDemandRouteUpdate::handleOnDemandCDS(const Router::Route& route, Upstream
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return;
   }
-  auto entry = route->routeEntry();
+  auto entry = route.routeEntry();
   if (entry == nullptr) {
     // No entry? Nothing we can do here.
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
@@ -138,7 +138,7 @@ void OnDemandRouteUpdate::handleOnDemandCDS(const Router::Route& route, Upstream
       [this](Upstream::ClusterDiscoveryStatus cluster_status) {
         onClusterDiscoveryCompletion(cluster_status);
       });
-  cluster_discovery_handle_ = odcds->requestOnDemandClusterDiscovery(
+  cluster_discovery_handle_ = odcds.requestOnDemandClusterDiscovery(
       cluster_name, std::move(callback), timeout);
 }
 
