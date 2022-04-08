@@ -22,3 +22,4 @@ services:
       dockerfile: Dockerfile-service
     volumes:
     - ./service.py:/code/service.py
+    - ./example.json:/code/data/file.json

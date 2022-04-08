@@ -19,11 +19,20 @@ responds_without_header \
 
 run_log "Test service: localhost:10000/upload with decompression"
 curl -s -H "Accept-Encoding: gzip" -o file.gz localhost:10000/file.json
-responds_with \
-    "decompressed-size: 10485760" \
+
+ORIG_FILE_SIZE=$(stat -c%s example.json)
+COMPRESSED_FILE_SIZE=$(stat -c%s file.gz)
+
+responds_with_header \
+    "transferred-size: ${COMPRESSED_FILE_SIZE}" \
     http://localhost:10000/upload \
-    -X POST -i -H "Content-Encoding: gzip" --data-binary "@file.gz"
-rm file.gz
+    -X POST -T file.gz
+
+responds_with_header \
+    "transferred-size: ${ORIG_FILE_SIZE}" \
+    http://localhost:10000/upload \
+    -X POST -H "Content-Encoding: gzip" -T file.gz
+# rm file.gz
 
 run_log "Test service: localhost:9901/stats/prometheus without compression"
 responds_without_header \
