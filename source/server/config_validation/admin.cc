@@ -9,6 +9,11 @@ bool ValidationAdmin::addStreamingHandler(const std::string&, const std::string&
   return true;
 }
 
+bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
+                                 const ParamDescriptorVec&) {
+  return true;
+}
+
 bool ValidationAdmin::removeHandler(const std::string&) { return true; }
 
 const Network::Socket& ValidationAdmin::socket() { return *socket_; }
