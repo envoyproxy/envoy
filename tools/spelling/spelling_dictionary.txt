@@ -37,7 +37,6 @@ CWND
 DSR
 DSS
 EBADF
-ENDIF
 ENOTCONN
 EPIPE
 HEXDIG
@@ -768,8 +767,6 @@ intra
 ints
 invariance
 invoker
-iov
-iovcnt
 iovec
 iovecs
 ips
@@ -1085,7 +1082,6 @@ retriable
 retriggers
 revalidated
 revalidation
-rfield
 rmdir
 rocketmq
 rewriter

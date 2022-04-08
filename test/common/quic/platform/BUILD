@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -62,7 +61,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "epoll_server_platform_impl_lib",
     hdrs = [
         "epoll_address_test_utils_impl.h",
