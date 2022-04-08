@@ -37,12 +37,9 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   const auto parse_state = parseHttpHeader(absl::string_view(buf, raw_slice.len_));
   switch (parse_state) {
   case ParseState::Error:
+    // Invalid HTTP preface found, then just continue for next filter.
     done(false);
-    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
-    // we don't add new enum in FilterStatus so we have to signal the caller
-    // the new condition.
-    cb_->socket().close();
-    return Network::FilterStatus::StopIteration;
+    return Network::FilterStatus::Continue;
   case ParseState::Done:
     done(true);
     return Network::FilterStatus::Continue;
