@@ -21,7 +21,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     gazelle_dependencies()
     apple_rules_dependencies()
     rules_rust_dependencies()
-    rust_register_toolchains()
+    rust_register_toolchains(include_rustc_srcs = True)
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
