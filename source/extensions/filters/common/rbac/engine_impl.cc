@@ -20,9 +20,10 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionCont
       MessageUtil::downcastAndValidate<const envoy::config::rbac::v3::Action&>(config,
                                                                                validation_visitor);
   const auto& name = action_config.name();
-  const auto& action = action_config.action();
+  const auto allow = action_config.allow();
+  const auto log = action_config.log();
 
-  return [name, action]() { return std::make_unique<Action>(name, action); };
+  return [name, allow, log]() { return std::make_unique<Action>(name, allow, log); };
 }
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
@@ -167,13 +168,7 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
       *effective_policy_id = action.name();
     }
 
-    switch (action.action()) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::config::rbac::v3::RBAC::ALLOW:
-      return true;
-    case envoy::config::rbac::v3::RBAC::DENY:
-      return false;
-    case envoy::config::rbac::v3::RBAC::LOG: {
+    if (action.log()) {
       // If not shadow enforcement, set shared log metadata
       if (mode_ != EnforcementMode::Shadow) {
         ProtobufWkt::Struct log_metadata;
@@ -181,11 +176,9 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
         log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(true);
         info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
       }
+    }
 
-      return true;
-    }
-    }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    return action.allow();
   }
 
   // Default to DENY.

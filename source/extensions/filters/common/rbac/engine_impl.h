@@ -33,15 +33,16 @@ struct ActionContext {};
 
 class Action : public Envoy::Matcher::ActionBase<envoy::config::rbac::v3::Action> {
 public:
-  Action(const std::string& name, const envoy::config::rbac::v3::RBAC::Action action)
-      : name_(name), action_(action) {}
+  Action(const std::string& name, bool allow, bool log) : name_(name), allow_(allow), log_(log) {}
 
   const std::string& name() const { return name_; }
-  envoy::config::rbac::v3::RBAC::Action action() const { return action_; }
+  bool allow() const { return allow_; }
+  bool log() const { return log_; }
 
 private:
   const std::string name_;
-  const envoy::config::rbac::v3::RBAC::Action action_;
+  const bool allow_;
+  const bool log_;
 };
 
 class ActionFactory : public Envoy::Matcher::ActionFactory<ActionContext> {

@@ -32,7 +32,10 @@ message RBAC {
     // If present and empty, DENY.
     config.rbac.v3.RBAC rules = 1;
 
-    // The match tree to use when resolving RBAC action for incoming requests.
+    // The match tree to use when resolving RBAC action for incoming requests. Requests do not
+    // match any matcher will be denied.
+    // If absent, no enforcing RBAC matcher will be applied.
+    // If present and empty, deny all requests.
     xds.type.matcher.v3.Matcher matcher = 4
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
@@ -45,6 +48,7 @@ message RBAC {
 
     // The match tree to use for emitting stats and logs which can be used for rule testing for
     // incoming requests.
+    // If absent, no shadow matcher will be applied.
     xds.type.matcher.v3.Matcher shadow_matcher = 5
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
