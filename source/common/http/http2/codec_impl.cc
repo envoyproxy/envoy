@@ -31,6 +31,7 @@
 #include "absl/container/fixed_array.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
+#include "quiche/http2/adapter/oghttp2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -121,6 +122,18 @@ void ProdNghttp2SessionFactory::initOld(
     nghttp2_session*, ConnectionImpl* connection,
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
   connection->sendSettings(options, true);
+}
+
+std::unique_ptr<http2::adapter::Http2Adapter>
+ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
+                                  ConnectionImpl* connection,
+                                  const http2::adapter::OgHttp2Adapter::Options& options) {
+  auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
+      http2::adapter::Perspective::kClient, *callbacks, connection);
+  std::unique_ptr<http2::adapter::Http2Adapter> adapter =
+      http2::adapter::OgHttp2Adapter::Create(*visitor, options);
+  connection->setVisitor(std::move(visitor));
+  return adapter;
 }
 
 std::unique_ptr<http2::adapter::Http2Adapter>
@@ -879,6 +892,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
     : use_new_codec_wrapper_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_new_codec_wrapper")),
+      use_oghttp2_library_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_oghttp2")),
       http2_callbacks_(use_new_codec_wrapper_), stats_(stats), connection_(connection),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
@@ -889,6 +904,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
       dispatching_(false), raised_goaway_(false), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
+  // This library can only be used with the wrapper API enabled.
+  ASSERT(!use_oghttp2_library_ || use_new_codec_wrapper_);
+
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(http2_options.connection_keepalive(), interval, 0));
@@ -1873,7 +1891,13 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
 ConnectionImpl::Http2Options::Http2Options(
-    const envoy::config::core::v3::Http2ProtocolOptions& http2_options) {
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb) {
+  og_options_.perspective = http2::adapter::Perspective::kServer;
+  og_options_.max_hpack_encoding_table_capacity = http2_options.hpack_table_size().value();
+  og_options_.max_header_list_bytes = max_headers_kb * 1024;
+  og_options_.max_header_field_size = max_headers_kb * 1024;
+  og_options_.allow_extended_connect = http2_options.allow_connect();
+
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
@@ -1910,8 +1934,9 @@ ConnectionImpl::Http2Options::Http2Options(
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
-    const envoy::config::core::v3::Http2ProtocolOptions& http2_options)
-    : Http2Options(http2_options) {
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb)
+    : Http2Options(http2_options, max_headers_kb) {
+  og_options_.perspective = http2::adapter::Perspective::kClient;
   // Temporarily disable initial max streams limit/protection, since we might want to create
   // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
   //
@@ -2040,14 +2065,19 @@ ClientConnectionImpl::ClientConnectionImpl(
     Random::RandomGenerator& random_generator,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
-    Nghttp2SessionFactory& http2_session_factory)
+    Http2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
-  ClientHttp2Options client_http2_options(http2_options);
+  ClientHttp2Options client_http2_options(http2_options, max_response_headers_kb);
   if (use_new_codec_wrapper_) {
-    adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
-                                            client_http2_options.options());
+    if (use_oghttp2_library_) {
+      adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
+                                              client_http2_options.ogOptions());
+    } else {
+      adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
+                                              client_http2_options.options());
+    }
     http2_session_factory.init(base(), http2_options);
   } else {
     session_ = http2_session_factory.createOld(http2_callbacks_.callbacks(), base(),
@@ -2144,19 +2174,24 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
-  Http2Options h2_options(http2_options);
+  Http2Options h2_options(http2_options, max_request_headers_kb);
 
   if (use_new_codec_wrapper_) {
     auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
-    auto adapter =
-        http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
-    auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
-      p->RemoveStream(stream_id);
-    };
-    visitor->set_stream_close_listener(std::move(stream_close_listener));
-    visitor_ = std::move(visitor);
-    adapter_ = std::move(adapter);
+    if (use_oghttp2_library_) {
+      visitor_ = std::move(visitor);
+      adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    } else {
+      auto adapter =
+          http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
+      auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+        p->RemoveStream(stream_id);
+      };
+      visitor->set_stream_close_listener(std::move(stream_close_listener));
+      visitor_ = std::move(visitor);
+      adapter_ = std::move(adapter);
+    }
   } else {
     nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                                 h2_options.options());
