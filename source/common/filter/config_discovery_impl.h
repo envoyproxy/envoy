@@ -36,16 +36,12 @@ constexpr absl::string_view StatPrefix[STAT_PREFIX_TYPE::MAX_FILTER_INDEX] = {
     "tcp_listener_filter.",  // TCP_LISTENER_FILTER
     "udp_listener_filter."}; // UDP_LISTENER_FILTER
 
-namespace {
-static inline void validateTypeUrlHelper(const std::string& type_url,
-                                         const absl::flat_hash_set<std::string> require_type_urls) {
-  if (!require_type_urls.contains(type_url)) {
-    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls, ", ")));
-  }
-}
-
-} // namespace
+// These helper functions throw exceptions. Thus can not be defined in .h files.
+void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
+                                             const std::string& filter_config_name,
+                                             const std::string& type_url);
+void validateProtoConfigTypeUrlHelper(const std::string& type_url,
+                                      const absl::flat_hash_set<std::string> require_type_urls);
 
 /**
  * Base class for a filter config provider using discovery subscriptions.
@@ -472,12 +468,10 @@ protected:
                    const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
-    if (default_factory == nullptr) {
-      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                       "configuration with type URL {}.",
-                                       filter_config_name, proto_config.type_url()));
-    }
-    validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
+    validateProtoConfigDefaultFactoryHelper(default_factory == nullptr, filter_config_name,
+                                            proto_config.type_url());
+    validateProtoConfigTypeUrlHelper(
+        Config::Utility::getFactoryType(proto_config), require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         proto_config, factory_context.messageValidationVisitor(), *default_factory);
     validateFilters(filter_config_name, default_factory->name(), filter_chain_type,
