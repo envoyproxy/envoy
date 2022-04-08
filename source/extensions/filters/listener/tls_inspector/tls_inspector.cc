@@ -189,33 +189,11 @@ ParseState Filter::onRead() {
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-<<<<<<< HEAD
-  if (static_cast<uint64_t>(raw_slice.len_) > read_) {
-    const uint8_t* data = static_cast<const uint8_t*>(raw_slice.mem_) + read_;
-    const size_t len = raw_slice.len_ - read_;
-    read_ = raw_slice.len_;
-    ParseState parse_state = parseClientHello(data, len);
-    ENVOY_LOG(trace, "tls inspector: set transport protocol to {}",
-              cb_->socket().detectedTransportProtocol());
-    switch (parse_state) {
-    case ParseState::Error:
-      cb_->socket().ioHandle().close();
-      return Network::FilterStatus::StopIteration;
-    case ParseState::Done:
-      // Finish the inspect.
-      return Network::FilterStatus::Continue;
-    case ParseState::Continue:
-      // Do nothing but wait for the next event.
-      return Network::FilterStatus::StopIteration;
-    }
-    IS_ENVOY_BUG("unexpected tcp filter parse_state");
-=======
   if (static_cast<uint64_t>(result.return_value_) > read_) {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.return_value_ - read_;
     read_ = result.return_value_;
     return parseClientHello(data, len);
->>>>>>> main
   }
   return ParseState::Continue;
 }
