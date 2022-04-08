@@ -143,6 +143,7 @@ New Features
   into all sub messages, including Any messages, and perform full validation (deprecation,
   work-in-progress, PGV, etc.). Previously only top-level messages were fully validated.
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
+* tap: added support for buffering an arbitrary number of tapped traces before returning to the client via a new :ref:`buffered admin sink <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`.
 * tcp_proxy: added support for on demand cluster. If the :ref:`on_demand <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.on_demand>` is set and the destination cluster is not present, a delta CDS request will be sent and the tcp proxy flow will be resumed after that cds response.
 * thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 * thrift: added support for dynamic routing through aggregated discovery service.
