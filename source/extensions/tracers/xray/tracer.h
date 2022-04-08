@@ -25,7 +25,10 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr auto XRayTraceHeader = "x-amzn-trace-id";
+constexpr absl::string_view SpanClientIp = "client_ip";
+constexpr absl::string_view SpanXForwardedFor = "x_forwarded_for";
+constexpr absl::string_view XForwardedForHeader = "x-forwarded-for";
+constexpr absl::string_view XRayTraceHeader = "x-amzn-trace-id";
 constexpr absl::string_view Subsegment = "subsegment";
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
@@ -113,6 +116,27 @@ public:
    */
   void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
     aws_metadata_ = aws_metadata;
+  }
+
+  /*
+   * Adds to the http request annotation field of the Span.
+   */
+  void addToHttpRequestAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
+    http_request_annotations_.emplace(std::string(key), value);
+  }
+
+  /*
+   * Check if key is set in http request annotation field of a Span.
+   */
+  bool hasKeyInHttpRequestAnnotations(absl::string_view key) {
+    return http_request_annotations_.find(key) != http_request_annotations_.end();
+  }
+
+  /*
+   * Adds to the http response annotation field of the Span.
+   */
+  void addToHttpResponseAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
+    http_response_annotations_.emplace(std::string(key), value);
   }
 
   /**
@@ -252,16 +276,15 @@ public:
    */
   Tracing::SpanPtr startSpan(const Tracing::Config&, const std::string& operation_name,
                              Envoy::SystemTime start_time,
-                             const absl::optional<XRayHeader>& xray_header);
+                             const absl::optional<XRayHeader>& xray_header,
+                             const absl::optional<absl::string_view> client_ip);
   /**
    * Creates a Span that is marked as not-sampled.
    * This is useful when the sampling decision is done in Envoy's X-Ray and we want to avoid
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
    * tracing. Also at the same time if X-Ray header is set then preserve its value.
    */
-  XRay::SpanPtr createNonSampledSpan(const Tracing::Config&, const std::string& operation_name,
-                                     Envoy::SystemTime start_time,
-                                     const absl::optional<XRayHeader>& xray_header) const;
+  XRay::SpanPtr createNonSampledSpan(const absl::optional<XRayHeader>& xray_header) const;
 
 private:
   const std::string segment_name_;

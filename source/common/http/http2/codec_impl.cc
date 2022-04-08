@@ -27,6 +27,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/container/fixed_array.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
@@ -127,9 +128,13 @@ ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
                                   ConnectionImpl* connection, const nghttp2_option* options) {
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
       http2::adapter::Perspective::kClient, *callbacks, connection);
-  http2::adapter::Http2VisitorInterface& v = *visitor;
+  auto adapter = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor, options);
+  auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+    p->RemoveStream(stream_id);
+  };
+  visitor->set_stream_close_listener(std::move(stream_close_listener));
   connection->setVisitor(std::move(visitor));
-  return http2::adapter::NgHttp2Adapter::CreateClientAdapter(v, options);
+  return adapter;
 }
 
 void ProdNghttp2SessionFactory::init(ConnectionImpl* connection,
@@ -357,6 +362,25 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
 void ConnectionImpl::StreamImpl::processBufferedData() {
   ENVOY_CONN_LOG(debug, "Stream {} processing buffered data.", parent_.connection_, stream_id_);
 
+  // Restore crash dump context when processing buffered data.
+  Event::Dispatcher& dispatcher = parent_.connection_.dispatcher();
+  // This method is only called from a callback placed directly on the
+  // dispatcher, as such the dispatcher shouldn't have any tracked objects.
+  ASSERT(dispatcher.trackedObjectStackIsEmpty());
+  Envoy::ScopeTrackedObjectStack stack;
+  stack.add(parent_.connection_);
+
+  absl::Cleanup clear_current_stream_id = [this]() { parent_.current_stream_id_.reset(); };
+  // TODO(kbaichoo): When we add support to *ConnectionImpl::getStream* for
+  // deferred closed streams we can use their stream id here.
+  if (!stream_manager_.buffered_on_stream_close_) {
+    ASSERT(!parent_.current_stream_id_.has_value());
+    parent_.current_stream_id_ = stream_id_;
+  }
+
+  stack.add(parent_);
+  ScopeTrackerScopeState scope{&stack, dispatcher};
+
   if (stream_manager_.body_buffered_ && continueProcessingBufferedData()) {
     decodeData();
   }
@@ -375,7 +399,10 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
-    parent_.onStreamClose(this, 0);
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message());
+    }
   }
 }
 
@@ -764,7 +791,10 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
         parent_.connection_, stream_id_);
     // The stream didn't originally have an NGHTTP2 error, since we buffered
     // its stream close.
-    parent_.onStreamClose(this, 0);
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message());
+    }
     return;
   }
 
@@ -1356,7 +1386,7 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   return length;
 }
 
-int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
+Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
     const int32_t stream_id = stream->stream_id_;
 
@@ -1406,7 +1436,7 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       // to end up invoking.
       stream->stream_manager_.buffered_on_stream_close_ = true;
       stats_.deferred_stream_close_.inc();
-      return 0;
+      return okStatus();
     }
 
     stream->destroy();
@@ -1428,10 +1458,10 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     }
   }
 
-  return 0;
+  return okStatus();
 }
 
-int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
+Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   return onStreamClose(getStream(stream_id), error_code);
 }
 
@@ -1778,7 +1808,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
   nghttp2_session_callbacks_set_on_stream_close_callback(
       callbacks_,
       [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
       });
 
   nghttp2_session_callbacks_set_on_frame_send_callback(
@@ -2115,9 +2147,16 @@ ServerConnectionImpl::ServerConnectionImpl(
   Http2Options h2_options(http2_options);
 
   if (use_new_codec_wrapper_) {
-    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
+    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
-    adapter_ = http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor_, h2_options.options());
+    auto adapter =
+        http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
+    auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+      p->RemoveStream(stream_id);
+    };
+    visitor->set_stream_close_listener(std::move(stream_close_listener));
+    visitor_ = std::move(visitor);
+    adapter_ = std::move(adapter);
   } else {
     nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                                 h2_options.options());

@@ -258,7 +258,7 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
       "",
       "':authority', 'www.foo.com:443'\n"
       "':method', 'CONNECT'",
-      sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false););
+      sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, true););
 }
 
 // For this class, forward the CONNECT request upstream

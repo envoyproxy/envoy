@@ -18,18 +18,6 @@ src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constant
 
 # sed commands to apply to each source file.
 cat <<EOF >sed_commands
-# Rewrite include directives for testonly platform impl files.
-/^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/common/quic/platform/quiche_test_impl.h!
-/^#include/ s!net/quiche/common/platform/impl/quiche_test_helpers_impl.h!test/common/quic/platform/quiche_test_helpers_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_expect_bug_impl.h!"test/common/quic/platform/quiche_expect_bug_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_mock_log_impl.h!"test/common/quic/platform/quiche_mock_log_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_test_output_impl.h!"test/common/quic/platform/quiche_test_output_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_thread_impl.h!"test/common/quic/platform/quiche_thread_impl.h!
-
-
-# Rewrite include directives for platform impl files.
-/^#include/ s!net/quiche/common/platform/impl/!common/quic/platform/!
-
 # Rewrite include directives for epoll_server platform impl files.
 /^#include/ s!net/tools/epoll_server/platform/impl!test/common/quic/platform/!
 
@@ -40,28 +28,8 @@ cat <<EOF >sed_commands
 /^#include/ s!"common/!"quiche/common/!
 /^#include/ s!"epoll_server/!"quiche/epoll_server/!
 
-# The above global substitutions will prepend "quiche" to the platform code which we want to undo.
-/^#include/ s!"quiche/common/quic/platform/!"source/common/quic/platform/!
-
-# Use envoy specific implementations for below platform APIs.
-/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"source/common/quic/platform/quiche_logging_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_bug_tracker_impl.h!"source/common/quic/platform/quiche_bug_tracker_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_error_code_wrappers_impl.h!"source/common/quic/platform/quiche_error_code_wrappers_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_flags_impl.h!"source/common/quic/platform/quiche_flags_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_hostname_utils_impl.h!"source/common/quic/platform/quiche_hostname_utils_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_mem_slice_impl.h!"source/common/quic/platform/quiche_mem_slice_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_server_stats_impl.h!"source/common/quic/platform/quiche_server_stats_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_stack_trace_impl.h!"source/common/quic/platform/quiche_stack_trace_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_stream_buffer_allocator_impl.h!"source/common/quic/platform/quiche_stream_buffer_allocator_impl.h!
-/^#include/ s!"quiche_platform_impl/quiche_udp_socket_platform_impl.h!"source/common/quic/platform/quiche_udp_socket_platform_impl.h!
-/^#include/ s!"quiche_platform_impl/quic_flags_impl.h!"source/common/quic/platform/quic_flags_impl.h!
-
-# The rest of the platform APIs use the QUICHE default implementations.
-/^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!
-
-# Rewrite gmock & gtest includes.
-/^#include/ s!testing/gmock/include/gmock/!gmock/!
-/^#include/ s!testing/gtest/include/gtest/!gtest/!
+# Transform "old style" platform includes to "new style".
+/^#include/ s!net/quiche/common/platform/impl/!quiche_platform_impl/!
 
 # Rewrite third_party includes.
 /^#include/ s!third_party/boringssl/src/include/!!

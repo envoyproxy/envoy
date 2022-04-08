@@ -114,6 +114,12 @@ public:
     keylog_local_negative_ = false;
     keylog_remote_negative_ = false;
   }
+  void setNeitherLocalNorRemoteFilter() {
+    keylog_remote_ = false;
+    keylog_local_ = false;
+    keylog_local_negative_ = false;
+    keylog_remote_negative_ = false;
+  }
   void setNegative() {
     keylog_local_ = true;
     keylog_remote_ = true;
@@ -303,6 +309,31 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
+  config_helper_.addFilter("name: sni-to-header-filter");
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
+  };
+  initialize();
+  codec_client_ = makeHttpConnection(
+      makeSslClientConnection(ClientSslTransportOptions().setSni("www.host.com")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "https"}, {":authority", "host.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("www.host.com", upstream_request_->headers()
+                                .get(Http::LowerCaseString("x-envoy-client-sni"))[0]
+                                ->value()
+                                .getStringView());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+
+  checkStats();
+}
+
 class RawWriteSslIntegrationTest : public SslIntegrationTest {
 protected:
   std::unique_ptr<Http::TestRequestHeaderMapImpl>
@@ -333,7 +364,7 @@ protected:
 
     // Drive the connection until we get a response.
     while (response.empty()) {
-      connection->run(Event::Dispatcher::RunType::NonBlock);
+      EXPECT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
     }
     EXPECT_THAT(response, testing::HasSubstr("HTTP/1.1 200 OK\r\n"));
 
@@ -743,8 +774,9 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   const uint64_t first_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
   Http::TestRequestHeaderMapImpl post_request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
   auto response =
       sendRequestAndWaitForResponse(post_request_headers, 128, default_response_headers_, 256);
   EXPECT_TRUE(upstream_request_->complete());
@@ -783,8 +815,9 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
   Http::TestRequestHeaderMapImpl get_request_headers{
-      {":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+      {":method", "GET"},        {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
   response =
       sendRequestAndWaitForResponse(get_request_headers, 128, default_response_headers_, 256);
   EXPECT_TRUE(upstream_request_->complete());
@@ -819,8 +852,10 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
 
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
   auto result = codec_client_->startRequest(request_headers);
   auto response = std::move(result.second);
   Buffer::OwnedImpl data1("one");
@@ -866,7 +901,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   TestUtility::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
-                               "POST /test/long/url HTTP/1.1"));
+                               "GET /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(1).write().data().as_bytes(),
                                "HTTP/1.1 200 OK"));
   EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
@@ -896,7 +931,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   TestUtility::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
 
   // Test some obvious properties.
-  EXPECT_EQ(trace.socket_buffered_trace().events(0).write().data().as_string(), "POST");
+  EXPECT_EQ(trace.socket_buffered_trace().events(0).write().data().as_string(), "GET ");
   EXPECT_EQ(trace.socket_buffered_trace().events(1).read().data().as_string(), "HTTP/");
   EXPECT_TRUE(trace.socket_buffered_trace().read_truncated());
   EXPECT_TRUE(trace.socket_buffered_trace().write_truncated());
@@ -935,7 +970,7 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   EXPECT_TRUE(traces[0].socket_streamed_trace_segment().connection().has_remote_address());
 
   // Verify truncated request/response data.
-  EXPECT_EQ(traces[1].socket_streamed_trace_segment().event().write().data().as_bytes(), "POST");
+  EXPECT_EQ(traces[1].socket_streamed_trace_segment().event().write().data().as_bytes(), "GET ");
   EXPECT_TRUE(traces[1].socket_streamed_trace_segment().event().write().data().truncated());
   EXPECT_EQ(traces[2].socket_streamed_trace_segment().event().read().data().as_bytes(), "HTTP/");
   EXPECT_TRUE(traces[2].socket_streamed_trace_segment().event().read().data().truncated());
@@ -978,6 +1013,21 @@ TEST_P(SslKeyLogTest, SetRemoteFilter) {
 TEST_P(SslKeyLogTest, SetLocalAndRemoteFilter) {
   setLogPath();
   setBothLocalAndRemoteFilter();
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto result = codec_client_->startRequest(request_headers);
+  codec_client_->close();
+  logCheck();
+}
+
+TEST_P(SslKeyLogTest, SetNeitherLocalNorRemoteFilter) {
+  setLogPath();
+  setNeitherLocalNorRemoteFilter();
   initialize();
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});

@@ -235,6 +235,7 @@ private:
   std::unique_ptr<KeyValueStore> key_value_store_;
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
+  const std::chrono::milliseconds min_refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
   Filesystem::Instance& file_system_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
