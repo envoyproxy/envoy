@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Server {
 
-bool StatsParams::shouldShowMetric(const Stats::Metric& metric) const {
+/*bool StatsParams::shouldShowMetric(const Stats::Metric& metric) const {
   if (used_only_ && !metric.used()) {
     return false;
   }
@@ -14,7 +14,7 @@ bool StatsParams::shouldShowMetric(const Stats::Metric& metric) const {
     }
   }
   return true;
-}
+  }*/
 
 Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response) {
   query_ = Http::Utility::parseAndDecodeQueryString(url);
@@ -22,15 +22,15 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   pretty_ = query_.find("pretty") != query_.end();
   prometheus_text_readouts_ = query_.find("text_readouts") != query_.end();
   if (!Utility::filterParam(query_, response, filter_)) {
-    response.add("bad filter");
     return Http::Code::BadRequest;
   }
   if (filter_.has_value()) {
     filter_string_ = query_.find("filter")->second;
   }
 
-  if (!Utility::histogramBucketsParam(query_, histogram_buckets_mode_).ok()) {
-    response.add("bad histogram_buckets");
+  absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode_);
+  if (!status.ok()) {
+    response.add(status.message());
     return Http::Code::BadRequest;
   }
 

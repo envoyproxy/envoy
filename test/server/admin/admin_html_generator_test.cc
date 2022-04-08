@@ -21,8 +21,8 @@ protected:
                                false,
                                {{Admin::ParamDescriptor::Type::Boolean, "param", "param help"}}} {}
 
-  static Admin::HandlerPtr handlerCallback(absl::string_view, AdminStream&) {
-    return Admin::makeStaticTextHandler("", Http::Code::OK);
+  static Admin::RequestPtr handlerCallback(absl::string_view, AdminStream&) {
+    return Admin::makeStaticTextRequest("", Http::Code::OK);
   }
 
   Buffer::OwnedImpl data_;

@@ -26,7 +26,7 @@ public:
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
                   const ParamDescriptorVec& = {}) override;
   bool addStreamingHandler(const std::string&, const std::string&, GenHandlerCb, bool, bool,
-                         const ParamDescriptorVec& = {}) override;
+                           const ParamDescriptorVec& = {}) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;

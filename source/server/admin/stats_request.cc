@@ -5,23 +5,37 @@ namespace Server {
 
 StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
                            UrlHandlerFn url_handler_fn)
-    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {}
+    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {
+  switch (params_.type_) {
+  case StatsType::TextReadouts:
+  case StatsType::All:
+    phase_ = Phase::TextReadouts;
+    break;
+  case StatsType::Counters:
+  case StatsType::Gauges:
+    phase_ = Phase::CountersAndGauges;
+    break;
+  case StatsType::Histograms:
+    phase_ = Phase::Histograms;
+    break;
+  }
+}
 
 Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
   switch (params_.format_) {
-    case StatsFormat::Json:
-      render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
-      break;
-    case StatsFormat::Text:
-      render_ = std::make_unique<StatsTextRender>(params_);
-      break;
-    case StatsFormat::Html:
-      render_ = std::make_unique<StatsHtmlRender>(response_headers, response_, url_handler_fn_(),
-                                                  params_);
-      break;
-    case StatsFormat::Prometheus:
-      ASSERT(false);
-      return Http::Code::BadRequest;
+  case StatsFormat::Json:
+    render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
+    break;
+  case StatsFormat::Text:
+    render_ = std::make_unique<StatsTextRender>(params_);
+    break;
+  case StatsFormat::Html:
+    render_ =
+        std::make_unique<StatsHtmlRender>(response_headers, response_, url_handler_fn_(), params_);
+    break;
+  case StatsFormat::Prometheus:
+    ASSERT(false);
+    return Http::Code::BadRequest;
   }
 
   // Populate the top-level scopes and the stats underneath any scopes with an empty name.
@@ -45,13 +59,23 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   }
   while (response.length() < chunk_size_) {
     while (stat_map_.empty()) {
+      if (phase_stat_count_ == 0) {
+        render_->noStats(response, phase_string_);
+      } else {
+        phase_stat_count_ = 0;
+      }
+      if (params_.type_ != StatsType::All) {
+        return false;
+      }
       switch (phase_) {
       case Phase::TextReadouts:
         phase_ = Phase::CountersAndGauges;
+        phase_string_ = "Counters and Gauges";
         startPhase();
         break;
       case Phase::CountersAndGauges:
         phase_ = Phase::Histograms;
+        phase_string_ = "Histograms";
         startPhase();
         break;
       case Phase::Histograms:
@@ -75,20 +99,24 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
     case StatOrScopesIndex::TextReadout:
       renderStat<Stats::TextReadoutSharedPtr>(iter->first, response, variant);
       stat_map_.erase(iter);
+      ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Counter:
       renderStat<Stats::CounterSharedPtr>(iter->first, response, variant);
       stat_map_.erase(iter);
+      ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Gauge:
       renderStat<Stats::GaugeSharedPtr>(iter->first, response, variant);
       stat_map_.erase(iter);
+      ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Histogram: {
       auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
       auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
       if (parent_histogram != nullptr) {
         render_->generate(response, iter->first, *parent_histogram);
+        ++phase_stat_count_;
       }
       stat_map_.erase(iter);
     }
@@ -118,8 +146,12 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
     populateStatsFromScopes<Stats::TextReadout>(scope_vec);
     break;
   case Phase::CountersAndGauges:
-    populateStatsFromScopes<Stats::Counter>(scope_vec);
-    populateStatsFromScopes<Stats::Gauge>(scope_vec);
+    if (params_.type_ != StatsType::Gauges) {
+      populateStatsFromScopes<Stats::Counter>(scope_vec);
+    }
+    if (params_.type_ != StatsType::Counters) {
+      populateStatsFromScopes<Stats::Gauge>(scope_vec);
+    }
     break;
   case Phase::Histograms:
     populateStatsFromScopes<Stats::Histogram>(scope_vec);

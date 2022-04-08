@@ -17,7 +17,7 @@ constexpr absl::string_view Counters = "Counters";
 constexpr absl::string_view Gauges = "Gauges";
 constexpr absl::string_view Histograms = "Histograms";
 constexpr absl::string_view TextReadouts = "TextReadouts";
-} // namespace
+} // namespace Labels
 
 enum class StatsFormat {
   Html,
@@ -36,8 +36,13 @@ enum class StatsType {
 };
 
 struct StatsParams {
+  /**
+   * Parses the URL's query parameter, populating this.
+   *
+   * @param url the URL from which to parse the query params.
+   * @param response used to write error messages, if necessary.
+   */
   Http::Code parse(absl::string_view url, Buffer::Instance& response);
-  bool shouldShowMetric(const Stats::Metric& metric) const;
 
   /**
    * @return a string representation for a type.

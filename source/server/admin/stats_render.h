@@ -1,13 +1,12 @@
 #pragma once
 
+#include "envoy/server/admin.h"
 #include "envoy/stats/stats.h"
 
-#include "envoy/server/admin.h"
-
 #include "source/common/buffer/buffer_impl.h"
+#include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
-#include "source/server/admin/admin_html_generator.h"
 
 namespace Envoy {
 namespace Server {
@@ -34,6 +33,9 @@ public:
 
   // Completes rendering any buffered data.
   virtual void finalize(Buffer::Instance& response) PURE;
+
+  // Indicates that no stats for a particular type have been found.
+  virtual void noStats(Buffer::Instance&, absl::string_view) {}
 };
 
 // Implements the Render interface for simple textual representation of stats.
@@ -115,7 +117,7 @@ public:
   StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                   const Admin::UrlHandler& url_handler, const StatsParams& params);
 
-  //void noStats(Type type) override;
+  void noStats(Buffer::Instance&, absl::string_view types) override;
   void finalize(Buffer::Instance&) override;
 
 private:

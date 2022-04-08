@@ -384,14 +384,13 @@ AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
                                              const std::string& help_text, HandlerCb callback,
                                              bool removable, bool mutates_state,
                                              const ParamDescriptorVec& params) {
-  return UrlHandler{
-    prefix, help_text, RequestGasket::makeGen(callback), removable, mutates_state, params
-  };
+  return UrlHandler{prefix,    help_text,     RequestGasket::makeGen(callback),
+                    removable, mutates_state, params};
 }
 
 bool AdminImpl::addStreamingHandler(const std::string& prefix, const std::string& help_text,
                                     GenRequestFn callback, bool removable, bool mutates_state,
-                                     const ParamDescriptorVec& params) {
+                                    const ParamDescriptorVec& params) {
   ASSERT(prefix.size() > 1);
   ASSERT(prefix[0] == '/');
 
@@ -418,7 +417,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
                            HandlerCb callback, bool removable, bool mutates_state,
                            const ParamDescriptorVec& params) {
   return addStreamingHandler(prefix, help_text, RequestGasket::makeGen(callback), removable,
-                           mutates_state, params);
+                             mutates_state, params);
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {

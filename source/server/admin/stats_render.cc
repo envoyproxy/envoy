@@ -82,8 +82,7 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 }
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response,
-                                 const StatsParams& params)
+                                 Buffer::Instance& response, const StatsParams& params)
     : histogram_buckets_mode_(params.histogram_buckets_mode_) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the entire stats output, as that
@@ -318,9 +317,9 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
 }
 
-StatsHtmlRender::StatsHtmlRender(
-    Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-    const Admin::UrlHandler& url_handler, const StatsParams& params)
+StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
+                                 Buffer::Instance& response, const Admin::UrlHandler& url_handler,
+                                 const StatsParams& params)
     : StatsTextRender(params), html_(response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   html_.setSubmitOnChange(true);
@@ -333,14 +332,11 @@ StatsHtmlRender::StatsHtmlRender(
   response.add("<pre>\n");
 }
 
-void StatsHtmlRender::finalize(Buffer::Instance& response) {
-  response.add("</pre></body>\n");
-}
+void StatsHtmlRender::finalize(Buffer::Instance& response) { response.add("</pre></body>\n"); }
 
-/*void StatsHtmlRender::noStats(Type type) {
-  response_.add(
-      absl::StrCat("</pre>\n<br/><i>No ", typeToString(type), " found</i><br/>\n<pre>\n"));
-      }*/
+void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
+  response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
+}
 
 } // namespace Server
 } // namespace Envoy

@@ -86,8 +86,8 @@ public:
                   bool removable, bool mutates_server_state,
                   const ParamDescriptorVec& params = {}) override;
   bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
-                         GenRequestCb callback, bool removable, bool mutates_server_state,
-                         const ParamDescriptorVec& params = {}) override;
+                           GenRequestCb callback, bool removable, bool mutates_server_state,
+                           const ParamDescriptorVec& params = {}) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -219,7 +219,7 @@ private:
   /**
    * Creates a Handler instance given a request.
    */
-  //RequestPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
+  // RequestPtr findHandler(absl::string_view path_and_query, AdminStream& admin_stream);
 
   /*
    * Individual admin handler including prefix, help text, and callback.

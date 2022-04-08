@@ -60,6 +60,7 @@ public:
   Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        StatsRequest::UrlHandlerFn url_handler_fn);
+
 private:
   class Context;
   class HtmlRender;

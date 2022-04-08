@@ -109,8 +109,8 @@ envoy_cc_test(
     name = "stats_params_test",
     srcs = ["stats_params_test.cc"],
     deps = [
-        "//source/server/admin:stats_params_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/server/admin:stats_params_lib",
     ],
 )
 

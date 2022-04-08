@@ -2,8 +2,8 @@
 
 #include "envoy/server/admin.h"
 
-#include "source/server/admin/stats_render.h"
 #include "source/server/admin/stats_params.h"
+#include "source/server/admin/stats_render.h"
 #include "source/server/admin/utils.h"
 
 #include "absl/container/btree_map.h"
@@ -114,6 +114,8 @@ private:
   ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;
   Phase phase_{Phase::TextReadouts};
+  uint64_t phase_stat_count_{0};
+  absl::string_view phase_string_{"text readouts"};
   Buffer::OwnedImpl response_;
   uint64_t chunk_size_{2 * 1000 * 1000};
   UrlHandlerFn url_handler_fn_;
