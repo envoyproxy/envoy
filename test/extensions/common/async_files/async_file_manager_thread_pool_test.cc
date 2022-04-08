@@ -1,3 +1,4 @@
+#include <chrono>
 #include <future>
 #include <memory>
 #include <string>
@@ -12,6 +13,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
@@ -212,20 +214,18 @@ TEST_F(AsyncFileManagerSingleThreadTest, AbortingDuringCallbackBlocksUntilCallba
   blocker_[0]->waitUntilExecutionBlocked();
   blocker_[0]->unblockExecution();
   blocker_[0]->waitUntilCallbackBlocked();
-  auto delayed_action_occurred = std::make_unique<std::atomic<bool>>(false);
-  std::thread callback_unblocker([this, delayed_action_occurred = delayed_action_occurred.get()] {
-    absl::Mutex mu;
-    // Using AwaitWithTimeout because lint forbids us from sleeping in
+  std::atomic<bool> delayed_action_occurred;
+  std::thread callback_unblocker([&] {
+    // Using future::wait_for because lint forbids us from sleeping in
     // real-time, but here we're forcing a race to go a specific way, using
     // real-time because there's no other practical option here.
-    auto cond = []() { return false; };
-    absl::MutexLock guard(&mu);
-    mu.AwaitWithTimeout(absl::Condition(&cond), absl::Milliseconds(50));
-    delayed_action_occurred->store(true);
+    std::promise<void> pauser;
+    pauser.get_future().wait_for(std::chrono::milliseconds(50));
+    delayed_action_occurred.store(true);
     blocker_[0]->unblockCallback();
   });
   cancel();
-  EXPECT_TRUE(delayed_action_occurred->load());
+  EXPECT_TRUE(delayed_action_occurred.load());
   EXPECT_EQ(BlockerState::UnblockedCallback, blocker_last_state_[0].load());
   callback_unblocker.join();
 }
@@ -259,13 +259,13 @@ TEST_F(AsyncFileManagerSingleThreadTest, CreateAnonymousFileWorks) {
   manager_->createAnonymousFile(tmpdir_, second_handle_blocker.callback());
   AsyncFileHandle second_handle = second_handle_blocker.getResult().value();
   WaitForResult<absl::Status> close_blocker;
-  handle->close(close_blocker.callback());
+  EXPECT_OK(handle->close(close_blocker.callback()));
   absl::Status status = close_blocker.getResult();
-  EXPECT_EQ(absl::OkStatus(), status);
+  EXPECT_OK(status);
   WaitForResult<absl::Status> second_close_blocker;
-  second_handle->close(second_close_blocker.callback());
+  EXPECT_OK(second_handle->close(second_close_blocker.callback()));
   status = second_close_blocker.getResult();
-  EXPECT_EQ(absl::OkStatus(), status);
+  EXPECT_OK(status);
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileAndUnlinkWork) {
@@ -279,13 +279,13 @@ TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileAndUnlinkWork) {
                              handle_blocker.callback());
   AsyncFileHandle handle = handle_blocker.getResult().value();
   WaitForResult<absl::Status> close_blocker;
-  handle->close(close_blocker.callback());
+  EXPECT_OK(handle->close(close_blocker.callback()));
   absl::Status status = close_blocker.getResult();
-  EXPECT_EQ(absl::OkStatus(), status);
+  EXPECT_OK(status);
   WaitForResult<absl::Status> unlink_blocker;
   manager_->unlink(filename, unlink_blocker.callback());
   status = unlink_blocker.getResult();
-  EXPECT_EQ(absl::OkStatus(), status);
+  EXPECT_OK(status);
   struct stat s;
   EXPECT_EQ(-1, stat(filename, &s));
 }

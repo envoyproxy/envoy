@@ -22,12 +22,11 @@ public:
   // createAnonymousFile to turn that file into a named file after finishing writing its contents.
   //
   // If cancelled before the callback is called but after creating the file, unlinks the file.
-  virtual std::function<void()> createHardLink(absl::string_view filename,
-                                               std::function<void(absl::Status)> on_complete) PURE;
+  virtual absl::StatusOr<std::function<void()>>
+  createHardLink(absl::string_view filename, std::function<void(absl::Status)> on_complete) PURE;
 
   // Enqueues an action to close the currently open file.
   // It is an error to use an AsyncFileContext after calling close.
-  // There must not already be an action queued for this handle.
   // It is an error to destroy an AsyncFileHandle without calling close.
   // It is an error to call close twice.
   // Note that because an AsyncFileHandle is a shared_ptr, it is okay to
@@ -35,13 +34,14 @@ public:
   // event, which will keep the handle alive until after the close operation
   // is completed. (But be careful that the on_complete callback doesn't require any
   // context from the destroyed owner!)
-  virtual std::function<void()> close(std::function<void(absl::Status)> on_complete) PURE;
+  // close cannot be cancelled.
+  virtual absl::Status close(std::function<void(absl::Status)> on_complete) PURE;
 
   // Enqueues an action to read from the currently open file, at position offset, up to the number
   // of bytes specified by length. The size of the buffer passed to on_complete informs you if less
   // than the requested amount was read. It is an error to read on an AsyncFileContext that does not
   // have a file open. There must not already be an action queued for this handle.
-  virtual std::function<void()>
+  virtual absl::StatusOr<std::function<void()>>
   read(off_t offset, size_t length,
        std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) PURE;
 
@@ -54,14 +54,15 @@ public:
   //
   // on_complete is called with the number of bytes written on success.
   // There must not already be an action queued for this handle.
-  virtual std::function<void()> write(Buffer::Instance& contents, off_t offset,
-                                      std::function<void(absl::StatusOr<size_t>)> on_complete) PURE;
+  virtual absl::StatusOr<std::function<void()>>
+  write(Buffer::Instance& contents, off_t offset,
+        std::function<void(absl::StatusOr<size_t>)> on_complete) PURE;
 
   // Creates a new AsyncFileHandle referencing the same file.
   // Note that a file handle duplicated in this way shares positioning and permissions
   // with the original. Since AsyncFileContext functions are all position-explicit, this should not
   // matter.
-  virtual std::function<void()> duplicate(
+  virtual absl::StatusOr<std::function<void()>> duplicate(
       std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete) PURE;
 
 protected:

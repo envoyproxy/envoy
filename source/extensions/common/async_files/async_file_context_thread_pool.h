@@ -21,15 +21,17 @@ class AsyncFileContextThreadPool final : public AsyncFileContextBase {
 public:
   explicit AsyncFileContextThreadPool(AsyncFileManager& manager, int fd);
 
-  std::function<void()> createHardLink(absl::string_view filename,
-                                       std::function<void(absl::Status)> on_complete) override;
-  std::function<void()> close(std::function<void(absl::Status)> on_complete) override;
-  std::function<void()>
+  absl::StatusOr<std::function<void()>>
+  createHardLink(absl::string_view filename,
+                 std::function<void(absl::Status)> on_complete) override;
+  absl::Status close(std::function<void(absl::Status)> on_complete) override;
+  absl::StatusOr<std::function<void()>>
   read(off_t offset, size_t length,
        std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) override;
-  std::function<void()> write(Buffer::Instance& contents, off_t offset,
-                              std::function<void(absl::StatusOr<size_t>)> on_complete) override;
-  std::function<void()>
+  absl::StatusOr<std::function<void()>>
+  write(Buffer::Instance& contents, off_t offset,
+        std::function<void(absl::StatusOr<size_t>)> on_complete) override;
+  absl::StatusOr<std::function<void()>>
   duplicate(std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
 
   int& fileDescriptor() { return file_descriptor_; }
@@ -37,6 +39,9 @@ public:
   ~AsyncFileContextThreadPool() override;
 
 protected:
+  absl::StatusOr<std::function<void()>>
+  checkFileAndEnqueue(std::shared_ptr<AsyncFileAction> action);
+
   int file_descriptor_;
 };
 
