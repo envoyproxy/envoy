@@ -53,8 +53,9 @@ public:
 
   template <typename T>
   // NOLINTNEXTLINE(readability-identifier-naming)
-  bool MatchAndExplain(absl::StatusOr<T> statusor, ::testing::MatchResultListener* listener) const {
-    return MatchAndExplain(statusor.status(), listener);
+  bool MatchAndExplain(absl::StatusOr<T> status_or,
+                       ::testing::MatchResultListener* listener) const {
+    return MatchAndExplain(status_or.status(), listener);
   }
   // NOLINTNEXTLINE(readability-identifier-naming)
   void DescribeTo(::std::ostream* os) const { *os << "is OK"; }
@@ -66,8 +67,8 @@ public:
 //
 // For example:
 //
-// StatusOr<int> statusor(absl::InvalidArgumentError("bad argument!"));
-// EXPECT_THAT(statusor, IsOk());  // fails!
+// StatusOr<int> status_or(absl::InvalidArgumentError("bad argument!"));
+// EXPECT_THAT(status_or, IsOk());  // fails!
 //
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline ::testing::PolymorphicMatcher<IsOkMatcher> IsOk() {
@@ -79,8 +80,8 @@ inline ::testing::PolymorphicMatcher<IsOkMatcher> IsOk() {
 //
 // For example:
 //
-// StatusOr<int> statusor(absl::InvalidArgumentError("bad argument!"));
-// EXPECT_OK(statusor);  // fails!
+// StatusOr<int> status_or(absl::InvalidArgumentError("bad argument!"));
+// EXPECT_OK(status_or);  // fails!
 // absl::Status status{absl::OkStatus()};
 // EXPECT_OK(status);  // passes!
 #define EXPECT_OK(v) EXPECT_THAT((v), ::Envoy::StatusHelpers::IsOk())
@@ -91,8 +92,8 @@ inline ::testing::PolymorphicMatcher<IsOkMatcher> IsOk() {
 //
 // For example:
 //
-// StatusOr<int> statusor(absl::InvalidArgumentError("bad argument!"));
-// ASSERT_OK(statusor);  // asserts!
+// StatusOr<int> status_or(absl::InvalidArgumentError("bad argument!"));
+// ASSERT_OK(status_or);  // asserts!
 // absl::Status status{absl::OkStatus()};
 // ASSERT_OK(status);  // passes!
 #define ASSERT_OK(v) ASSERT_THAT((v), ::Envoy::StatusHelpers::IsOk())
