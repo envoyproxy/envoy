@@ -67,13 +67,6 @@ public:
   void finalize(Buffer::Instance& response) override;
 
 private:
-  // Flushes all stats that were buffered in addJson() above.
-  void flushStats(Buffer::Instance& response);
-
-  // Adds a json fragment of scalar stats to the response buffer, including a
-  // "," delimiter if this is not the first fragment.
-  void addJson(Buffer::Instance& response, absl::string_view json);
-
   // Summarizes the buckets in the specified histogram, collecting JSON objects.
   // Note, we do not flush this buffer to the network when it grows large, and
   // if this becomes an issue it should be possible to do, noting that we are
@@ -86,12 +79,11 @@ private:
                       const std::vector<uint64_t>& interval_buckets,
                       const std::vector<uint64_t>& cumulative_buckets);
 
-  std::vector<ProtobufWkt::Value> stats_array_;
   ProtobufWkt::Struct histograms_obj_;
   ProtobufWkt::Struct histograms_obj_container_;
   std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
   bool found_used_histogram_{false};
-  bool first_{true};
+  absl::string_view delim_{""};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
