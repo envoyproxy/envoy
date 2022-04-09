@@ -451,7 +451,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: "windows-2019"
     steps:
     - task: Cache@2
       inputs:
@@ -486,7 +486,7 @@ stages:
   - job: clang_cl
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: "windows-2019"
     steps:
     - task: Cache@2
       inputs:
@@ -522,7 +522,7 @@ stages:
     dependsOn: ["release"]
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: "windows-2019"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
