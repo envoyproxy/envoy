@@ -51,9 +51,8 @@ Config::applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info) {
     for (const RateLimit::DescriptorEntry& descriptor_entry : descriptor.entries_) {
 
       std::string value = descriptor_entry.value_;
-      value = formatter_it->get()->format(*Config::request_headers_.get(),
-                                          *Config::response_headers_.get(),
-                                          *Config::response_trailers_.get(), stream_info, value);
+      value = formatter_it->get()->format(*request_headers_.get(), *response_headers_.get(),
+                                          *response_trailers_.get(), stream_info, value);
       formatter_it++;
       new_descriptor.entries_.push_back({descriptor_entry.key_, value});
     }
