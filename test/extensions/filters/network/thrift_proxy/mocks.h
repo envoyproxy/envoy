@@ -333,6 +333,69 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
+class MockBidirectionFilter : public BidirectionFilter {
+public:
+  MockBidirectionFilter();
+  ~MockBidirectionFilter() override;
+
+  // ThriftProxy::ThriftFilters::BidirectionFilter
+  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
+  MOCK_METHOD(bool, encodePassthroughSupported, (), (const));
+  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
+  MOCK_METHOD(bool, decodePassthroughSupported, (), (const));
+
+  MOCK_METHOD(FilterStatus, encodePassthroughData, (Buffer::Instance & data));
+  MOCK_METHOD(FilterStatus, encodeTransportBegin, (MessageMetadataSharedPtr metadata));
+  MOCK_METHOD(FilterStatus, encodeTransportEnd, ());
+  MOCK_METHOD(FilterStatus, encodeMessageBegin, (MessageMetadataSharedPtr metadata));
+  MOCK_METHOD(FilterStatus, encodeMessageEnd, ());
+  MOCK_METHOD(FilterStatus, encodeStructBegin, (absl::string_view name));
+  MOCK_METHOD(FilterStatus, encodeStructEnd, ());
+  MOCK_METHOD(FilterStatus, encodeFieldBegin,
+              (absl::string_view name, FieldType& msg_type, int16_t& field_id));
+  MOCK_METHOD(FilterStatus, encodeFieldEnd, ());
+  MOCK_METHOD(FilterStatus, encodeBoolValue, (bool& value));
+  MOCK_METHOD(FilterStatus, encodeByteValue, (uint8_t & value));
+  MOCK_METHOD(FilterStatus, encodeInt16Value, (int16_t & value));
+  MOCK_METHOD(FilterStatus, encodeInt32Value, (int32_t & value));
+  MOCK_METHOD(FilterStatus, encodeInt64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, encodeDoubleValue, (double& value));
+  MOCK_METHOD(FilterStatus, encodeStringValue, (absl::string_view value));
+  MOCK_METHOD(FilterStatus, encodeMapBegin,
+              (FieldType & key_type, FieldType& value_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, encodeMapEnd, ());
+  MOCK_METHOD(FilterStatus, encodeListBegin, (FieldType & elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, encodeListEnd, ());
+  MOCK_METHOD(FilterStatus, encodeSetBegin, (FieldType & elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, encodeSetEnd, ());
+
+  MOCK_METHOD(FilterStatus, decodePassthroughData, (Buffer::Instance & data));
+  MOCK_METHOD(FilterStatus, decodeTransportBegin, (MessageMetadataSharedPtr metadata));
+  MOCK_METHOD(FilterStatus, decodeTransportEnd, ());
+  MOCK_METHOD(FilterStatus, decodeMessageBegin, (MessageMetadataSharedPtr metadata));
+  MOCK_METHOD(FilterStatus, decodeMessageEnd, ());
+  MOCK_METHOD(FilterStatus, decodeStructBegin, (absl::string_view name));
+  MOCK_METHOD(FilterStatus, decodeStructEnd, ());
+  MOCK_METHOD(FilterStatus, decodeFieldBegin,
+              (absl::string_view name, FieldType& msg_type, int16_t& field_id));
+  MOCK_METHOD(FilterStatus, decodeFieldEnd, ());
+  MOCK_METHOD(FilterStatus, decodeBoolValue, (bool& value));
+  MOCK_METHOD(FilterStatus, decodeByteValue, (uint8_t & value));
+  MOCK_METHOD(FilterStatus, decodeInt16Value, (int16_t & value));
+  MOCK_METHOD(FilterStatus, decodeInt32Value, (int32_t & value));
+  MOCK_METHOD(FilterStatus, decodeInt64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, decodeDoubleValue, (double& value));
+  MOCK_METHOD(FilterStatus, decodeStringValue, (absl::string_view value));
+  MOCK_METHOD(FilterStatus, decodeMapBegin,
+              (FieldType & key_type, FieldType& value_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, decodeMapEnd, ());
+  MOCK_METHOD(FilterStatus, decodeListBegin, (FieldType & elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, decodeListEnd, ());
+  MOCK_METHOD(FilterStatus, decodeSetBegin, (FieldType & elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, decodeSetEnd, ());
+};
+
 class MockFilterConfigFactory : public NamedThriftFilterConfigFactory {
 public:
   MockFilterConfigFactory();

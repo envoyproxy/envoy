@@ -42,9 +42,12 @@ public:
                  Server::Configuration::MockFactoryContext& context,
                  Router::RouteConfigProviderManager& route_config_provider_manager,
                  ThriftFilters::DecoderFilterSharedPtr decoder_filter,
-                 ThriftFilters::EncoderFilterSharedPtr encoder_filter, ThriftFilterStats& stats)
+                 ThriftFilters::EncoderFilterSharedPtr encoder_filter,
+                 ThriftFilters::BidirectionFilterSharedPtr bidirection_filter,
+                 ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context, route_config_provider_manager),
-        decoder_filter_(decoder_filter), encoder_filter_(encoder_filter), stats_(stats) {}
+        decoder_filter_(decoder_filter), encoder_filter_(encoder_filter),
+        bidirection_filter_(bidirection_filter), stats_(stats) {}
 
   // ConfigImpl
   ThriftFilterStats& stats() override { return stats_; }
@@ -54,6 +57,7 @@ public:
     }
     callbacks.addDecoderFilter(decoder_filter_);
     callbacks.addEncoderFilter(encoder_filter_);
+    callbacks.addBidirectionFilter(bidirection_filter_);
   }
   TransportPtr createTransport() override {
     if (transport_) {
@@ -71,6 +75,7 @@ public:
   ThriftFilters::DecoderFilterSharedPtr custom_filter_;
   ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
   ThriftFilters::EncoderFilterSharedPtr encoder_filter_;
+  ThriftFilters::BidirectionFilterSharedPtr bidirection_filter_;
   ThriftFilterStats& stats_;
   MockTransport* transport_{};
   MockProtocol* protocol_{};
@@ -118,10 +123,11 @@ public:
     proto_config_ = config;
     decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
     encoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockEncoderFilter>>();
+    bidirection_filter_ = std::make_shared<NiceMock<ThriftFilters::MockBidirectionFilter>>();
 
-    config_ =
-        std::make_unique<TestConfigImpl>(proto_config_, context_, *route_config_provider_manager_,
-                                         decoder_filter_, encoder_filter_, stats_);
+    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_,
+                                               *route_config_provider_manager_, decoder_filter_,
+                                               encoder_filter_, bidirection_filter_, stats_);
     if (custom_transport_) {
       config_->transport_ = custom_transport_;
     }
@@ -380,6 +386,8 @@ public:
             Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
     EXPECT_CALL(*decoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*bidirection_filter_, decodeTransportBegin(_))
+        .WillOnce(Return(FilterStatus::Continue));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
@@ -390,6 +398,17 @@ public:
     callbacks->startUpstreamResponse(transport, proto);
 
     EXPECT_CALL(*encoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*bidirection_filter_, encodeTransportBegin(_))
+        .WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, messageBegin(_, _)).WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, structBegin(_, _)).WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, fieldBegin(_, _, _, _))
+    //     .WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, fieldEnd(_, _)).WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, structEnd(_)).WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, messageEnd(_)).WillOnce(Return(FilterStatus::Continue));
+    // EXPECT_CALL(*encoder_filter_, transportEnd(_)).WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
@@ -419,10 +438,22 @@ public:
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
   }
+  void expectCallPassthroughSupported(int times = -1) {
+    EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*bidirection_filter_, decodePassthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*bidirection_filter_, encodePassthroughSupported()).WillRepeatedly(Return(true));
 
+    if (times == -1) {
+      EXPECT_CALL(*decoder_filter_, passthroughData(_));
+    } else {
+      EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(times);
+    }
+  }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
+  std::shared_ptr<ThriftFilters::MockBidirectionFilter> bidirection_filter_;
   Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
@@ -1683,9 +1714,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  expectCallPassthroughSupported();
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, buffer_.length());
@@ -1708,9 +1737,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  expectCallPassthroughSupported();
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -1735,9 +1762,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  expectCallPassthroughSupported();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1779,9 +1804,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  expectCallPassthroughSupported();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1823,9 +1846,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  expectCallPassthroughSupported();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1876,9 +1897,7 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  expectCallPassthroughSupported();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1921,9 +1940,7 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
+  expectCallPassthroughSupported(0);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))

@@ -199,8 +199,8 @@ private:
 using DelegateEncoderFilterSharedPtr = std::shared_ptr<DelegateEncoderFilter>;
 
 BidirectionFilterWrapper::BidirectionFilterWrapper(BidirectionFilterSharedPtr filter)
-    : decoder_filter_(std::make_shared<DelegateDecoderFilter>(parent_)),
-      encoder_filter_(std::make_shared<DelegateEncoderFilter>(parent_)), parent_(filter) {}
+    : decoder_filter_(std::make_shared<DelegateDecoderFilter>(filter)),
+      encoder_filter_(std::make_shared<DelegateEncoderFilter>(filter)), parent_(filter) {}
 
 } // namespace ThriftFilters
 } // namespace ThriftProxy

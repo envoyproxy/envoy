@@ -202,6 +202,7 @@ using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
 
 class BidirectionFilter : public FilterBase {
 public:
+  ~BidirectionFilter() override = default;
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
   virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
   virtual bool decodePassthroughSupported() const PURE;
