@@ -55,8 +55,8 @@ message Zstd {
   // A dictionary for compression. Zstd offers dictionary compression, which greatly improves
   // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
   // that can be used to search the same dictionary during decompression.
-  // Please refer to zstd manual to train a specific dictionary for compression:
-  // https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder
+  // Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  // to train a specific dictionary for compression.
   config.core.v3.DataSource dictionary = 4;
 
   // Value for compressor's next output buffer. If not set, defaults to 4096.

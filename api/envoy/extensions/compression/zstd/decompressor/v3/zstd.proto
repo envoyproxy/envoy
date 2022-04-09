@@ -24,8 +24,8 @@ message Zstd {
   // decompression is the same as the compression dictionary. Multiple dictionaries can be set, and the
   // dictionary will be automatically selected for decompression according to the dictionary ID in the
   // source content.
-  // Please refer to zstd manual to train a specific dictionary for decompression:
-  // https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder
+  // Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  // to train specific dictionaries for decompression.
   repeated config.core.v3.DataSource dictionaries = 1;
 
   // Value for decompressor's next output buffer. If not set, defaults to 4096.
