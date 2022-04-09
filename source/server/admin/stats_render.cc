@@ -98,8 +98,8 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
 // buffer once we exceed JsonStatsFlushCount stats.
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
-  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name),
-      JsonValueTag, std::to_string(value), JsonCloseBrace});
+  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTag,
+                         std::to_string(value), JsonCloseBrace});
   delim_ = ",";
 }
 
@@ -107,8 +107,8 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 // buffer once we exceed JsonStatsFlushCount stats.
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
-  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name),
-      JsonValueTagQuote, Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
+  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTagQuote,
+                         Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
   delim_ = ",";
 }
 
