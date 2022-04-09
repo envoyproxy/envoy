@@ -22,11 +22,12 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
       std::make_shared<const RouterStats>(stat_prefix, context.scope(), context.localInfo());
   auto shadow_writer = std::make_shared<ShadowWriterImpl>(
       context.clusterManager(), *stats, context.mainThreadDispatcher(), context.threadLocal());
+  bool keep_downstream = proto_config.keep_downstream();
 
-  return [&context, stats,
-          shadow_writer](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(std::make_shared<Router>(context.clusterManager(), *stats,
-                                                        context.runtime(), *shadow_writer));
+  return [&context, stats, shadow_writer,
+          keep_downstream](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addDecoderFilter(std::make_shared<Router>(
+        context.clusterManager(), *stats, context.runtime(), *shadow_writer, keep_downstream));
   };
 }
 

@@ -18,4 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.thrift.router.v2alpha1.Router";
+
+  // Don't close downstream connection in case of routing or upstream connection problem.
+  bool keep_downstream = 1;
 }

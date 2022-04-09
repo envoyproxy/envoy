@@ -217,9 +217,9 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public ThriftFilters::DecoderFilter {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
-         Runtime::Loader& runtime, ShadowWriter& shadow_writer)
+         Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool keep_downstream)
       : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
-        shadow_writer_(shadow_writer) {}
+        shadow_writer_(shadow_writer), keep_downstream_(keep_downstream) {}
 
   ~Router() override = default;
 
@@ -238,6 +238,7 @@ public:
   void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
     callbacks_->sendLocalReply(response, end_stream);
   }
+  void onReset() override { callbacks_->onReset(); }
 
   // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -311,6 +312,8 @@ private:
   Runtime::Loader& runtime_;
   ShadowWriter& shadow_writer_;
   std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_{};
+
+  bool keep_downstream_;
 };
 
 } // namespace Router
