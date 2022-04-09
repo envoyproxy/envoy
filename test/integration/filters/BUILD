@@ -651,6 +651,19 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "inspect_data_listener_filter_lib",
+    srcs = [
+        "inspect_data_listener_filter.cc",
+    ],
+    deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "set_route_filter_lib",
     srcs = [
         "set_route_filter.cc",

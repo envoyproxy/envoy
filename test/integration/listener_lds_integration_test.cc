@@ -564,6 +564,12 @@ class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion
 public:
   RebalancerTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    listener_filters:
+    # The inspect data filter is used for test the file event reset after
+    # rebalance the request.
+    - name: envoy.filters.listener.inspect_data
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filters:
       - name: envoy.filters.network.tcp_proxy
