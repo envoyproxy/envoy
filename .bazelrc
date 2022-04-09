@@ -18,6 +18,7 @@ build --incompatible_strict_action_env
 build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
+build --experimental_unsupported_and_brittle_include_scanning --features=cc_include_scanning
 
 build --enable_platform_specific_config
 
