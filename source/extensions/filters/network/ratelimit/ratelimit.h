@@ -50,18 +50,17 @@ public:
   Config(const envoy::extensions::filters::network::ratelimit::v3::RateLimit& config,
          Stats::Scope& scope, Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
-  const std::vector<RateLimit::Descriptor>& descriptors() { return descriptors_; }
+  const std::vector<RateLimit::Descriptor>& descriptors() { return original_descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
-  Formatter::FormatterImpl substitutionFormatter() { return Formatter::FormatterImpl(""); }
-  void applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
-                                  StreamInfo::StreamInfo& stream_info);
+  std::vector<RateLimit::Descriptor>
+  applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info);
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   std::string domain_;
-  std::vector<RateLimit::Descriptor> descriptors_;
+  std::vector<RateLimit::Descriptor> original_descriptors_;
   std::vector<std::unique_ptr<Formatter::FormatterImpl>> substitution_formatters_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
@@ -92,8 +91,6 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
-    config_->applySubstitutionFormatter(config_->descriptors(),
-                                        filter_callbacks_->connection().streamInfo());
   }
 
   // Network::ConnectionCallbacks

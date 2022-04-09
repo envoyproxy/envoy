@@ -98,7 +98,7 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
-  const std::string replace_ip_config_enabled = R"EOF(
+  const std::string formatter_test_1 = R"EOF(
 domain: foo
 descriptors:
 - entries:
@@ -109,7 +109,7 @@ descriptors:
 stat_prefix: name
 )EOF";
 
-  const std::string replace_ip_config_disabled = R"EOF(
+  const std::string formatter_test_2 = R"EOF(
 domain: foo
 descriptors:
 - entries:
@@ -160,15 +160,24 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
-TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
+TEST_F(RateLimitFilterTest, SubstitutionFormatterTest1) {
   InSequence s;
-  setUpTest(replace_ip_config_enabled);
+  setUpTest(formatter_test_1);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "HTTP/1.1"}}});
 
-  std::vector<RateLimit::Descriptor> actual_descriptors{config_->descriptors().begin(),
-                                                        config_->descriptors().end()};
+  std::vector<RateLimit::Descriptor> actual_descriptors =
+      config_->applySubstitutionFormatter(filter_callbacks_.connection_.stream_info_);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"remote_address", "8.8.8.8"}, {"hello", "HTTP/1.1"}}}}),
+                              testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
        it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();
@@ -181,15 +190,6 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
       EXPECT_EQ(de_actual->value_, de_expected->value_);
     }
   }
-
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"remote_address", "8.8.8.8"}, {"hello", "HTTP/1.1"}}}}),
-                              testing::A<Tracing::Span&>(), _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -209,15 +209,15 @@ TEST_F(RateLimitFilterTest, ReplaceDownstreamIpEnabled) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
-TEST_F(RateLimitFilterTest, ReplaceDownstreamIpDisabled) {
+TEST_F(RateLimitFilterTest, SubstitutionFormatterTest2) {
   InSequence s;
-  setUpTest(replace_ip_config_disabled);
+  setUpTest(formatter_test_2);
 
   std::vector<RateLimit::Descriptor> expected_descriptors;
   expected_descriptors.push_back({{{"remote_address", "8.8.8.8"}, {"hello", "world"}}});
 
-  std::vector<RateLimit::Descriptor> actual_descriptors{config_->descriptors().begin(),
-                                                        config_->descriptors().end()};
+  std::vector<RateLimit::Descriptor> actual_descriptors =
+      config_->applySubstitutionFormatter(filter_callbacks_.connection_.stream_info_);
 
   for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
        it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();

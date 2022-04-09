@@ -34,31 +34,32 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
       substitution_formatters_.push_back(
           std::make_unique<Formatter::FormatterImpl>(entry.value(), false));
     }
-    descriptors_.push_back(new_descriptor);
+    original_descriptors_.push_back(new_descriptor);
   }
 }
 
-void Config::applySubstitutionFormatter(std::vector<RateLimit::Descriptor> original_descriptors,
-                                        StreamInfo::StreamInfo& stream_info) {
+std::vector<RateLimit::Descriptor>
+Config::applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info) {
 
-  std::vector<RateLimit::Descriptor> dynamic_descriptors = std::vector<RateLimit::Descriptor>();
+  std::vector<RateLimit::Descriptor> dynamic_descriptors;
+  dynamic_descriptors.reserve(descriptors().size());
   std::vector<std::unique_ptr<Formatter::FormatterImpl>>::iterator formatter_it =
       substitution_formatters_.begin();
-  for (const RateLimit::Descriptor& descriptor : original_descriptors) {
+  for (const RateLimit::Descriptor& descriptor : descriptors()) {
     RateLimit::Descriptor new_descriptor;
-    for (const RateLimit::DescriptorEntry& descriptorEntry : descriptor.entries_) {
+    new_descriptor.entries_.reserve(descriptor.entries_.size());
+    for (const RateLimit::DescriptorEntry& descriptor_entry : descriptor.entries_) {
 
-      std::string value = descriptorEntry.value_;
-      // Formatter::FormatterImpl formatter_ptr = *();
+      std::string value = descriptor_entry.value_;
       value = formatter_it->get()->format(*Config::request_headers_.get(),
                                           *Config::response_headers_.get(),
                                           *Config::response_trailers_.get(), stream_info, value);
       formatter_it++;
-      new_descriptor.entries_.push_back({descriptorEntry.key_, value});
+      new_descriptor.entries_.push_back({descriptor_entry.key_, value});
     }
     dynamic_descriptors.push_back(new_descriptor);
   }
-  descriptors_ = dynamic_descriptors;
+  return dynamic_descriptors;
 }
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
@@ -83,8 +84,10 @@ Network::FilterStatus Filter::onNewConnection() {
     config_->stats().active_.inc();
     config_->stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance(),
-                   filter_callbacks_->connection().streamInfo());
+    client_->limit(
+        *this, config_->domain(),
+        config_->applySubstitutionFormatter(filter_callbacks_->connection().streamInfo()),
+        Tracing::NullSpan::instance(), filter_callbacks_->connection().streamInfo());
     calling_limit_ = false;
   }
 
