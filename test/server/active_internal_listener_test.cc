@@ -117,10 +117,6 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerClosesActiveSocket) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-  EXPECT_CALL(io_handle, recv)
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                             Network::IoSocketError::deleteIoError)))));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
