@@ -130,6 +130,7 @@ void Filter::done(bool success) {
       // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
       protocol = Http::Utility::AlpnNames::get().Http2c;
     }
+    ENVOY_LOG(trace, "http inspector: set application protocol to {}", protocol);
 
     cb_->socket().setRequestedApplicationProtocols({protocol});
   } else {

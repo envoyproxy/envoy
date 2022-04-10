@@ -85,6 +85,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 // TODO(rgs1): Make this enabled after Pinterest tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
+// TODO(birenroy) flip after a burn-in period
+// Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT

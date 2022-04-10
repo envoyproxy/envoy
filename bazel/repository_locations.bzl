@@ -112,6 +112,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-04-04",
         cpe = "N/A",
     ),
+    com_github_axboe_liburing = dict(
+        project_name = "liburing",
+        project_desc = "C helpers to set up and tear down io_uring instances",
+        project_url = "https://github.com/axboe/liburing",
+        version = "2.1",
+        sha256 = "f1e0500cb3934b0b61c5020c3999a973c9c93b618faff1eba75aadc95bb03e07",
+        strip_prefix = "liburing-liburing-{version}",
+        urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2021-09-09",
+        cpe = "N/A",
+    ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     com_github_google_perfetto = dict(
@@ -629,6 +641,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
         version = "3.19.4",
+        # When upgrading the protobuf library, please re-run
+        # test/common/json:gen_excluded_unicodes to recompute the ranges
+        # excluded from differential fuzzing that are populated in
+        # test/common/json/json_sanitizer_test_util.cc.
         sha256 = "ba0650be1b169d24908eeddbe6107f011d8df0da5b1a5a4449a913b10e578faf",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
@@ -860,12 +876,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "f9c571caca89b6648c0ea7ecdf1b6e2130da8334",
-        sha256 = "1535ef9d8951a34991f8c5052cd46cb9dbc3cbd172b7b272ee369b8adfdd05a4",
+        version = "bac04054bccb2a249d4705ecc94a646404d41c1b",
+        sha256 = "3072c0eb5c2a482cf5936b2ff38856895c3562bdd50627377cb351044a262c71",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-04-06",
+        release_date = "2022-04-07",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -933,12 +949,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "RE2",
         project_desc = "RE2, a regular expression library",
         project_url = "https://github.com/google/re2",
-        version = "2022-02-01",
-        sha256 = "9c1e6acfd0fed71f40b025a7a1dabaf3ee2ebb74d64ced1f9ee1b0b01d22fd27",
+        version = "2022-04-01",
+        sha256 = "1ae8ccfdb1066a731bba6ee0881baad5efd2cd661acd9569b689f2586e1a50e9",
         strip_prefix = "re2-{version}",
         urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-01-31",
+        release_date = "2022-03-31",
         cpe = "N/A",
     ),
     # Included to access FuzzedDataProvider.h. This is compiler agnostic but

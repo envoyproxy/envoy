@@ -252,6 +252,7 @@ envoy_cc_test(
     srcs = [
         "drain_close_integration_test.cc",
     ],
+    shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:utility_lib",
@@ -551,7 +552,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 16,
+    shard_count = 32,
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -683,7 +684,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 4,
+    shard_count = 6,
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -1013,7 +1014,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1710,6 +1711,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
+    shard_count = 2,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1771,7 +1773,7 @@ envoy_cc_test(
         "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
     ],
     data = ["//test/config/integration/certs"],
-    shard_count = 8,
+    shard_count = 12,
     tags = [
         "nofips",
     ],

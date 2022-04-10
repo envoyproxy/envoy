@@ -993,7 +993,11 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
         response.append(data.toString());
       });
   ASSERT_TRUE(connection->run());
-  EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_THAT(response, HasSubstr("ParseError"));
+  } else {
+    EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  }
 }
 
 // Send client headers, a GoAway and then a body and ensure the full request and
@@ -1320,7 +1324,11 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseAfterBadFrame) {
       });
 
   ASSERT_TRUE(connection->run());
-  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_THAT(response, HasSubstr("ParseError"));
+  } else {
+    EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  }
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible the delayed close timer could fire and close the server socket
   // prior to the data callback above firing. Therefore, we may either still be connected, or have
@@ -1349,7 +1357,11 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
       });
 
   ASSERT_TRUE(connection->run());
-  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_THAT(response, HasSubstr("ParseError"));
+  } else {
+    EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  }
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
   // prior to the FIN being received from the server.
@@ -2083,6 +2095,9 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
+  } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.remote_reset"));
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
     // http2.violation.of.messaging.rule
