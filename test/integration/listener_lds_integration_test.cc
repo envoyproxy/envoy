@@ -559,6 +559,91 @@ struct PerConnection {
   std::unique_ptr<RawConnectionDriver> client_conn_;
   FakeRawConnectionPtr upstream_conn_;
 };
+
+class ListenerFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                      public BaseIntegrationTest {
+public:
+  ListenerFilterIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF") {}
+};
+
+TEST_P(ListenerFilterIntegrationTest, MultipleInspectDataFilters) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, MultipleInspectDataFilters2) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersCloseConnection) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: true
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  tcp_client->waitForDisconnect();
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion>,
                        public BaseIntegrationTest {
 public:
@@ -569,7 +654,9 @@ public:
     # rebalance the request.
     - name: envoy.filters.listener.inspect_data
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
     filter_chains:
     - filters:
       - name: envoy.filters.network.tcp_proxy
