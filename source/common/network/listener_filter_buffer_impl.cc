@@ -87,7 +87,9 @@ void ListenerFilterBufferImpl::resetCapacity(uint64_t size) {
   data_size_ = 0;
 }
 
-void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) { io_handle_.activateFileEvents(events); }
+void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) {
+  io_handle_.activateFileEvents(events);
+}
 
 void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ENVOY_LOG(trace, "onFileEvent: {}", events);
