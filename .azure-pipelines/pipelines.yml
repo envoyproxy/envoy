@@ -417,7 +417,7 @@ stages:
   - job: test
     timeoutInMinutes: 180
     pool:
-      vmImage: "macos-latest"
+      vmImage: "macos-10.15"
     steps:
     - script: ./ci/mac_ci_setup.sh
       displayName: "Install dependencies"
