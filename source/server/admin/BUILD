@@ -129,7 +129,6 @@ envoy_cc_library(
         ":stats_render_lib",
         ":utils_lib",
         "//envoy/http:codes_interface",
-        "//envoy/server:admin_interface",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",
@@ -181,8 +180,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/memory:stats_lib",
-        "//source/common/stats:histogram_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

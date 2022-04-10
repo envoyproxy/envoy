@@ -93,6 +93,9 @@ class Admin {
 public:
   virtual ~Admin() = default;
 
+  // Describes a parameter for a stats endpoint. This structure is used to
+  // populate an HTML form to enable a visitor to the admin console to
+  // intuitively specify parameters for each command that takes them.
   struct ParamDescriptor {
     enum class Type { Boolean, String, Enum, Hidden };
     const Type type_;

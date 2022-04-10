@@ -80,10 +80,11 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
   // hierarchy.
   ASSERT(!path.empty());
   ASSERT(path[0] == '/');
-  path = path.substr(1);
+  std::string sanitized_path = Html::Utility::sanitize(path.substr(1));
+  path = sanitized_path;
 
-  // Alternate gray and white param-blocks. The pure CSS way of doing based on
-  // row index doesn't work correctly for us we are using a row for each
+  // Alternate gray and white param-blocks. The pure CSS way of coloring based
+  // on row index doesn't work correctly for us we are using a row for each
   // parameter, and we want each endpoint/option-block to be colored the same.
   const char* row_class = (++index_ & 1) ? " class='gray'" : "";
 
@@ -92,26 +93,24 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
   // page from accidentally mutating all the server state by GETting all the hrefs.
   const char* method = handler.mutates_server_state_ ? "post" : "get";
   if (submit_on_change_) {
-    response_.add(absl::StrCat("\n<form action='", path, "' method='", method, "' id='", path,
-                               "' class='home-form'></form>\n"));
+    response_.addFragments({"\n<form action='", path, "' method='", method, "' id='",
+        path, "' class='home-form'></form>\n"});
   } else {
     // Render an explicit visible submit as a link (for GET) or button (for POST).
     const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
-    response_.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
-                               "  <td class='home-data'><form action='", path, "' method='", method,
-                               "' id='", path, "' class='home-form'>\n", "    <button",
-                               button_style, ">", path, "</button>\n",
-                               "  </form></td>\n"
-                               "  <td class='home-data'>",
-                               Html::Utility::sanitize(handler.help_text_), "</td>\n", "</tr>\n"));
+    response_.addFragments({
+        "\n<tr class='vert-space'></tr>\n<tr", row_class,
+        ">\n  <td class='home-data'><form action='", path, "' method='", method, "' id='", path,
+        "' class='home-form'>\n    <button", button_style, ">", path,
+        "</button>\n  </form></td>\n  <td class='home-data'>",
+        Html::Utility::sanitize(handler.help_text_), "</td>\n</tr>\n"});
   }
 
-  std::vector<std::string> params;
   for (const Admin::ParamDescriptor& param : handler.params_) {
-    response_.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'>"));
+    response_.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
     renderInput(param.id_, path, param.type_, query, param.enum_choices_);
-    response_.add(absl::StrCat("</td>\n", "  <td class='home-data'>",
-                               Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
+    response_.addFragments({"</td>\n  <td class='home-data'>",
+        Html::Utility::sanitize(param.help_), "</td>\n</tr>\n"});
   }
 }
 
@@ -132,29 +131,31 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
     on_change = absl::StrCat(" onchange='", path, ".submit()'");
   }
 
+  auto value_tag = [](const std::string& value) -> std::string {
+    return value.empty() ? "" : absl::StrCat(" value=", value);
+  };
+
   switch (type) {
   case Admin::ParamDescriptor::Type::Boolean:
-    response_.add(absl::StrCat("<input type='checkbox' name='", id, "' id='", id, "' form='", path,
-                               "'", on_change, value.empty() ? "" : " checked", "/>"));
+    response_.addFragments({"<input type='checkbox' name='", id, "' id='", id, "' form='", path,
+        "'", on_change, value.empty() ? "" : " checked/>"});
     break;
   case Admin::ParamDescriptor::Type::String:
-    response_.add(absl::StrCat("<input type='text' name='", id, "' id='", id, "' form='", path, "'",
-                               on_change, value.empty() ? "" : absl::StrCat(" value='", value, "'"),
-                               "/>"));
+    response_.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",
+        on_change, value_tag(value), "/>"});
     break;
   case Admin::ParamDescriptor::Type::Hidden:
-    response_.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
-                               "'", on_change,
-                               value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
+    response_.addFragments({"<input type='hidden' name='", id, "' id='", id, "' form='", path,
+        "'", on_change, value_tag(value), "/>"});
     break;
   case Admin::ParamDescriptor::Type::Enum:
-    response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'",
-                               on_change, ">\n"));
+    response_.addFragments({"\n    <select name='", id, "' id='", id, "' form='", path, "'",
+        on_change, ">\n"});
     for (absl::string_view choice : enum_choices) {
       std::string sanitized = Html::Utility::sanitize(choice);
-      response_.add(absl::StrCat("      <option value='", sanitized, "'",
-                                 (value == sanitized) ? " selected" : "", ">", sanitized,
-                                 "</option>\n"));
+      absl::string_view selected = (value == sanitized) ? " selected" : "";
+      response_.addFragments({"      <option value='", sanitized, "'", selected, ">", sanitized,
+          "</option>\n"});
     }
     response_.add("    </select>\n  ");
     break;
