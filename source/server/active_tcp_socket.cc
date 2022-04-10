@@ -98,6 +98,9 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
               // available in the socket buffer.
               filter_buffer.activateFileEvent(Event::FileReadyType::Read);
             }
+          } else {
+            // The filter closed the socket.
+            continueFilterChain(false);
           }
           return;
         }
