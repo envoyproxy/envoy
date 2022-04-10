@@ -387,13 +387,8 @@ TEST_P(TlsInspectorTest, NotSsl) {
 
   // Use 100 bytes of zeroes. This is not valid as a ClientHello.
   data.resize(100);
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.size());
-            memcpy(buffer, data.data(), data.size());
-            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }));
+  mockSysCallForPeek(data);
+  // trigger the event to copy the client hello message into buffer:q
   file_event_callback_(Event::FileReadyType::Read);
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
