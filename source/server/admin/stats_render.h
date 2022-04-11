@@ -83,7 +83,7 @@ private:
   ProtobufWkt::Struct histograms_obj_container_;
   std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
   bool found_used_histogram_{false};
-  absl::string_view delim_;
+  absl::string_view delim_{""};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
