@@ -863,12 +863,6 @@ def _com_googlesource_chromium_zlib():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
-        # Rewrite third_party includes.
-        patch_cmds = ["find . -type f -exec sed -e '\
-    /^#include/ s!third_party/boringssl/src/include/!! ;\
-    /^#include/ s!third_party/nghttp2/src/lib/includes/!! ;\
-    /^#include/ s!third_party/zlib/!! ;\
-    ' -i -- {} \\; "],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
