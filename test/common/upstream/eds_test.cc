@@ -78,10 +78,14 @@ public:
         name: secure-mode
         transport_socket:
           name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
       - match: {}
         name: default-mode
         transport_socket:
           name: envoy.transport_sockets.raw_buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
  )EOF",
                  Cluster::InitializePhase::Secondary);
   }
@@ -126,7 +130,7 @@ public:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_.loader(), factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -162,6 +166,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -1700,6 +1705,9 @@ TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
 // Validate that onConfigUpdate() propagates locality weights to the host set when the cluster uses
 // load balancing policy extensions.
 TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   expectLocalityWeightsPresentForClusterConfig(R"EOF(

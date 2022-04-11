@@ -61,10 +61,8 @@ message JwtProvider {
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
   // the JWT, usually a URL or an email address.
   //
-  // It is optional. If specified, it has to match the *iss* field in JWT.
-  //
-  // If a JWT has *iss* field and this field is specified, they have to match, otherwise the
-  // JWT *iss* field is not checked.
+  // It is optional. If specified, it has to match the *iss* field in JWT,
+  // otherwise the JWT *iss* field is not checked.
   //
   // Note: *JwtRequirement* :ref:`allow_missing <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing>`
   // and :ref:`allow_missing_or_failed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing_or_failed>`

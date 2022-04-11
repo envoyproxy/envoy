@@ -200,5 +200,13 @@ void EnvoyQuicClientSession::OnProofVerifyDetailsAvailable(
   }
 }
 
+void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
+    quic::EncryptionLevel level, std::unique_ptr<quic::QuicEncrypter> encrypter) {
+  quic::QuicSpdyClientSession::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
+  if (level == quic::ENCRYPTION_ZERO_RTT) {
+    raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  }
+}
+
 } // namespace Quic
 } // namespace Envoy

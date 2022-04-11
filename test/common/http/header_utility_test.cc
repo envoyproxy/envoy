@@ -13,6 +13,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
+
 namespace Envoy {
 namespace Http {
 
@@ -922,6 +924,75 @@ TEST(ValidateHeaders, ContentLength) {
       HeaderUtility::HeaderValidationResult::REJECT,
       HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
+}
+
+TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
+  // Basic case
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one,two,three"),
+              ElementsAre("one", "two", "three"));
+
+  // Whitespace at the end or beginning of tokens
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one  ,two,three"),
+              ElementsAre("one", "two", "three"));
+
+  // Empty tokens are removed (from beginning, middle, and end of the string)
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader(", one,, two, three,,,"),
+              ElementsAre("one", "two", "three"));
+
+  // Whitespace is not removed from the middle of the tokens
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one, two, t  hree"),
+              ElementsAre("one", "two", "t  hree"));
+
+  // Semicolons are kept as part of the tokens
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one, two;foo, three"),
+              ElementsAre("one", "two;foo", "three"));
+
+  // Check that a single token is parsed regardless of commas
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("foo"), ElementsAre("foo"));
+  EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader(",foo,"), ElementsAre("foo"));
+
+  // Empty string is handled
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader("").empty());
+
+  // Empty string is handled (whitespace)
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader("   ").empty());
+
+  // Empty string is handled (commas)
+  EXPECT_TRUE(HeaderUtility::parseCommaDelimitedHeader(",,,").empty());
+}
+
+TEST(ValidateHeaders, GetSemicolonDelimitedAttribute) {
+  // Basic case
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;bar=1"), "foo");
+
+  // Only attribute without semicolon
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo"), "foo");
+
+  // Only attribute with semicolon
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;"), "foo");
+
+  // Two semicolons, case 1
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute("foo;;"), "foo");
+
+  // Two semicolons, case 2
+  EXPECT_EQ(HeaderUtility::getSemicolonDelimitedAttribute(";foo;"), "");
+}
+
+TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
+  // Add a new encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one,two", "three"), "one,two,three");
+
+  // Add an already existing encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one,two", "one"), "two,one");
+
+  // Preserve q-values for other tokens than the added encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one;q=0.3,two", "two"), "one;q=0.3,two");
+
+  // Remove q-values for the current encoding
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("one;q=0.3,two", "one"), "two,one");
+
+  // Add encoding to an empty header
+  EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
 }
 
 } // namespace Http

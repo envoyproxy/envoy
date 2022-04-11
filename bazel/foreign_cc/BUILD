@@ -6,6 +6,13 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+configure_make(
+    name = "liburing",
+    configure_in_place = True,
+    lib_source = "@com_github_axboe_liburing//:all",
+    tags = ["skip_on_windows"],
+)
+
 # autotools packages are unusable on Windows as-is
 # TODO: Consider our own gperftools.BUILD file as we do with many other packages
 configure_make(
@@ -100,6 +107,18 @@ configure_make(
     lib_source = "@com_github_moonjit_moonjit//:all",
     out_include_dir = "include/moonjit-2.2",
     out_static_libs = ["libluajit-5.1.a"],
+    tags = ["skip_on_windows"],
+)
+
+configure_make(
+    name = "ragel",
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_ragel//:all",
+    out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
 )
 

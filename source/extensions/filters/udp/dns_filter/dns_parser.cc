@@ -201,7 +201,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   if (context->header_.questions != 1) {
     context->response_code_ = DNS_RESPONSE_CODE_FORMAT_ERROR;
     ENVOY_LOG(debug, "Unexpected number [{}] of questions in DNS query",
-              context->header_.questions);
+              static_cast<int>(context->header_.questions));
     return false;
   }
 
@@ -214,7 +214,8 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   // Almost always, we will have only one query here. Per the RFC, QDCOUNT is usually 1
   context->queries_.reserve(context->header_.questions);
   for (auto index = 0; index < context->header_.questions; index++) {
-    ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, context->header_.questions);
+    ENVOY_LOG(trace, "Parsing [{}/{}] questions", index,
+              static_cast<int>(context->header_.questions));
     auto rec = parseDnsQueryRecord(buffer, offset);
     if (rec == nullptr) {
       context->counters_.query_parsing_failure.inc();

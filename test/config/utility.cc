@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -17,6 +18,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/config/integration/certs/client2cert_hash.h"
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
@@ -145,11 +147,20 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
+std::string ConfigHelper::testInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.test"
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+}
+
 std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
   if (!enable_ja3_fingerprinting) {
     return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 )EOF";
   }
 
@@ -175,7 +186,9 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
           delayed_close_timeout:
             nanos: 10000000
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP1
           access_log:
             name: accesslog
@@ -206,13 +219,17 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
       filters:
         name: http
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP3
           access_log:
             name: file_access_log
@@ -341,7 +358,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP2
           route_config:
             name: route_config_0
@@ -615,7 +634,10 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
               config_source:
                 resource_api_version: V3
                 ads: {{}}
-            http_filters: [{{ name: envoy.filters.http.router }}]
+            http_filters:
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     )EOF",
       stat_prefix, route_config);
   return buildBaseListener(name, address, hcm);
@@ -1049,6 +1071,12 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
+void ConfigHelper::disableDelayClose() {
+  addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
+}
+
 void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
   addConfigModifier(
       [max_requests_per_connection](
@@ -1114,7 +1142,8 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
 void ConfigHelper::configDownstreamTransportSocketWithTls(
     envoy::config::bootstrap::v3::Bootstrap& bootstrap,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-        configure_tls_context) {
+        configure_tls_context,
+    bool enable_quic_early_data) {
   for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
     ASSERT(listener.filter_chains_size() > 0);
     auto* filter_chain = listener.mutable_filter_chains(0);
@@ -1125,6 +1154,7 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
           quic_transport_socket_config;
       configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
                                  ->mutable_common_tls_context());
+      quic_transport_socket_config.mutable_enable_early_data()->set_value(enable_quic_early_data);
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     } else if (!listener.has_udp_listener_config()) {
       transport_socket->set_name("envoy.transport_sockets.tls");
@@ -1150,7 +1180,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1162,7 +1192,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
       bootstrap_,
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
-      });
+      },
+      enable_early_data);
 }
 
 bool ConfigHelper::setAccessLog(
@@ -1211,6 +1242,70 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   return true;
 }
 
+void ConfigHelper::initializeTlsKeyLog(
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& tls_context,
+    const ServerSslOptions& options) {
+  if (options.keylog_path_.empty()) {
+    return;
+  }
+  auto tls_keylog_path = tls_context.mutable_key_log()->mutable_path();
+  *tls_keylog_path = options.keylog_path_;
+
+  if (options.keylog_local_filter_) {
+    auto tls_keylog_local = tls_context.mutable_key_log()->mutable_local_address_range();
+    auto new_element_local = tls_keylog_local->Add();
+    if (options.keylog_local_negative_) {
+      if (options.ip_version_ == Network::Address::IpVersion::v6) {
+        new_element_local->set_address_prefix("1::2");
+        new_element_local->mutable_prefix_len()->set_value(128);
+      } else {
+        new_element_local->set_address_prefix("127.0.0.2");
+        new_element_local->mutable_prefix_len()->set_value(32);
+      }
+    } else {
+      new_element_local->set_address_prefix(
+          Network::Test::getLoopbackAddressString(options.ip_version_));
+      if (options.keylog_multiple_ips_) {
+        auto more_local = tls_keylog_local->Add();
+        if (options.ip_version_ == Network::Address::IpVersion::v6) {
+          more_local->set_address_prefix("1::2");
+          more_local->mutable_prefix_len()->set_value(128);
+        } else {
+          more_local->set_address_prefix("127.0.0.2");
+          more_local->mutable_prefix_len()->set_value(32);
+        }
+      }
+    }
+  }
+
+  if (options.keylog_remote_filter_) {
+    auto tls_keylog_remote = tls_context.mutable_key_log()->mutable_remote_address_range();
+    auto new_element_remote = tls_keylog_remote->Add();
+    if (options.keylog_remote_negative_) {
+      if (options.ip_version_ == Network::Address::IpVersion::v6) {
+        new_element_remote->set_address_prefix("1::2");
+        new_element_remote->mutable_prefix_len()->set_value(128);
+      } else {
+        new_element_remote->set_address_prefix("127.0.0.2");
+        new_element_remote->mutable_prefix_len()->set_value(32);
+      }
+    } else {
+      new_element_remote->set_address_prefix(
+          Network::Test::getLoopbackAddressString(options.ip_version_));
+      if (options.keylog_multiple_ips_) {
+        auto more_remote = tls_keylog_remote->Add();
+        if (options.ip_version_ == Network::Address::IpVersion::v6) {
+          more_remote->set_address_prefix("1::2");
+          more_remote->mutable_prefix_len()->set_value(128);
+        } else {
+          more_remote->set_address_prefix("127.0.0.2");
+          more_remote->mutable_prefix_len()->set_value(32);
+        }
+      }
+    }
+  }
+}
+
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
@@ -1221,10 +1316,24 @@ void ConfigHelper::initializeTls(
   if (options.custom_validator_config_) {
     validation_context->set_allocated_custom_validator_config(options.custom_validator_config_);
   } else {
-    validation_context->mutable_trusted_ca()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    validation_context->add_verify_certificate_hash(
-        options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+    if (options.client_with_intermediate_cert_) {
+      validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
+      std::string cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_cert_chain.pem"
+      )EOF";
+      if (options.max_verify_depth_) {
+        cert_yaml += R"EOF(
+        max_verify_depth: 1
+      )EOF";
+      }
+      TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+    } else {
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      validation_context->add_verify_certificate_hash(
+          options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+    }
   }
   validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
@@ -1259,6 +1368,7 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
+  initializeTlsKeyLog(common_tls_context, options);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

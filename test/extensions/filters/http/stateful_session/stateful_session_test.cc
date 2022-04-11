@@ -191,6 +191,21 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
+// Test the case that no valid session state.
+TEST_F(StatefulSessionTest, NullSessionState) {
+  initialize(ConfigYaml);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(nullptr)));
+  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+}
+
 } // namespace
 } // namespace StatefulSession
 } // namespace HttpFilters
