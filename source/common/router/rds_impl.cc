@@ -254,7 +254,7 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
     ProtobufMessage::ValidationVisitor& validator) {
   auto provider = manager_.addStaticProvider(
       [&optional_http_filters, &factory_context, &validator, &route_config, this]() {
-        ConfigTraitsImpl config_traits(optional_http_filters, factory_context, validator, true);
+        ConfigTraitsImpl config_traits(optional_http_filters, validator);
         return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits,
                                                                factory_context, manager_);
       });

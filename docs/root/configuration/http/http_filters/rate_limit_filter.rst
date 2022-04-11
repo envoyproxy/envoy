@@ -14,7 +14,7 @@ can optionally include the virtual host rate limit configurations. More than one
 apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
 
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
-429 response is returned. The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header,
+429 response is returned (the response is configurable via :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>`). The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header,
 unless :ref:`disable_x_envoy_ratelimited_header <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.disable_x_envoy_ratelimited_header>` is
 set to true.
 
@@ -142,7 +142,7 @@ Statistics
 ----------
 
 The rate limit filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
-429 responses are emitted to the normal cluster :ref:`dynamic HTTP statistics
+429 responses or the configured :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>` are emitted to the normal cluster :ref:`dynamic HTTP statistics
 <config_cluster_manager_cluster_stats_dynamic_http>`.
 
 .. csv-table::

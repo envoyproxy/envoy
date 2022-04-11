@@ -29,6 +29,8 @@ struct StreamTee {
 
   std::function<Http::FilterDataStatus(StreamTee&, Http::StreamEncoderFilterCallbacks* encoder_cbs)>
       on_encode_data_ ABSL_GUARDED_BY(mutex_){nullptr};
+  std::function<Http::FilterDataStatus(StreamTee&, Http::StreamDecoderFilterCallbacks* decoder_cbs)>
+      on_decode_data_ ABSL_GUARDED_BY(mutex_){nullptr};
 };
 
 using StreamTeeSharedPtr = std::shared_ptr<StreamTee>;
@@ -45,6 +47,10 @@ public:
   bool setEncodeDataCallback(int /*stream_number*/,
                              std::function<Http::FilterDataStatus(
                                  StreamTee&, Http::StreamEncoderFilterCallbacks* encoder_cbs)>
+                                 cb);
+  bool setDecodeDataCallback(int /*stream_number*/,
+                             std::function<Http::FilterDataStatus(
+                                 StreamTee&, Http::StreamDecoderFilterCallbacks* decoder_cbs)>
                                  cb);
 
 private:

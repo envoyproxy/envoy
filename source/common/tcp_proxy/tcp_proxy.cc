@@ -59,6 +59,10 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
+OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
+  return {ON_DEMAND_TCP_PROXY_STATS(POOL_COUNTER(scope))};
+}
+
 Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
@@ -80,6 +84,11 @@ Config::SharedConfig::SharedConfig(
     const uint64_t connection_duration =
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
+  }
+
+  if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
+    on_demand_config_ =
+        std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
   }
 }
 
@@ -190,11 +199,18 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().enableHalfClose(true);
 
+  // Check that we are generating only the byte meters we need.
+  // The Downstream should be unset and the Upstream should be populated.
+  ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
+  ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
+
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
+  getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+
   config_->stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
     read_callbacks_->connection().setConnectionStats(
@@ -261,7 +277,8 @@ void Filter::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected) {
+  if (event == Network::ConnectionEvent::Connected ||
+      event == Network::ConnectionEvent::ConnectedZeroRtt) {
     return;
   }
   if (drainer_ == nullptr) {
@@ -321,28 +338,37 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
   parent_ = nullptr;
 }
 
-Network::FilterStatus Filter::initializeUpstreamConnection() {
-  ASSERT(upstream_ == nullptr);
-
-  route_ = pickRoute();
-
+Network::FilterStatus Filter::establishUpstreamConnection() {
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
-
   Upstream::ThreadLocalCluster* thread_local_cluster =
       cluster_manager_.getThreadLocalCluster(cluster_name);
 
-  if (thread_local_cluster) {
-    ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
-                   cluster_name);
-  } else {
-    ENVOY_CONN_LOG(debug, "Cluster not found {}", read_callbacks_->connection(), cluster_name);
-    config_->stats().downstream_cx_no_route_.inc();
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
-    onInitFailure(UpstreamFailureReason::NoRoute);
+  if (!thread_local_cluster) {
+    auto odcds = config_->onDemandCds();
+    if (!odcds.has_value()) {
+      // No ODCDS? It means that on-demand discovery is disabled.
+      ENVOY_CONN_LOG(debug, "Cluster not found {} and no on demand cluster set.",
+                     read_callbacks_->connection(), cluster_name);
+      config_->stats().downstream_cx_no_route_.inc();
+      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+      onInitFailure(UpstreamFailureReason::NoRoute);
+    } else {
+      ASSERT(!cluster_discovery_handle_);
+      auto callback = std::make_unique<Upstream::ClusterDiscoveryCallback>(
+          [this](Upstream::ClusterDiscoveryStatus cluster_status) {
+            onClusterDiscoveryCompletion(cluster_status);
+          });
+      config_->onDemandStats().on_demand_cluster_attempt_.inc();
+      cluster_discovery_handle_ = odcds->requestOnDemandClusterDiscovery(
+          cluster_name, std::move(callback), config_->odcdsTimeout());
+    }
     return Network::FilterStatus::StopIteration;
   }
 
-  Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
+  ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
+                 cluster_name);
+
+  const Upstream::ClusterInfoConstSharedPtr& cluster = thread_local_cluster->info();
   getStreamInfo().setUpstreamClusterInfo(cluster);
 
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
@@ -393,6 +419,37 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
   }
   return Network::FilterStatus::StopIteration;
+}
+
+void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status) {
+  // Clear the cluster_discovery_handle_ before calling establishUpstreamConnection since we may
+  // request cluster again.
+  cluster_discovery_handle_.reset();
+  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
+  switch (cluster_status) {
+  case Upstream::ClusterDiscoveryStatus::Missing:
+    ENVOY_CONN_LOG(debug, "On demand cluster {} is missing", read_callbacks_->connection(),
+                   cluster_name);
+    config_->onDemandStats().on_demand_cluster_missing_.inc();
+    break;
+  case Upstream::ClusterDiscoveryStatus::Timeout:
+    ENVOY_CONN_LOG(debug, "On demand cluster {} was not found before timeout.",
+                   read_callbacks_->connection(), cluster_name);
+    config_->onDemandStats().on_demand_cluster_timeout_.inc();
+    break;
+  case Upstream::ClusterDiscoveryStatus::Available:
+    // cluster_discovery_handle_ would have been cancelled if the downstream were closed.
+    ASSERT(!downstream_closed_);
+    ENVOY_CONN_LOG(debug, "On demand cluster {} is found. Establishing connection.",
+                   read_callbacks_->connection(), cluster_name);
+    config_->onDemandStats().on_demand_cluster_success_.inc();
+    establishUpstreamConnection();
+    return;
+  }
+  // Failure path.
+  config_->stats().downstream_cx_no_route_.inc();
+  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+  onInitFailure(UpstreamFailureReason::NoRoute);
 }
 
 bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
@@ -493,7 +550,9 @@ void Filter::onConnectTimeout() {
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
+  getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
   if (upstream_) {
+    getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
   }
   // The upstream should consume all of the data.
@@ -510,13 +569,18 @@ Network::FilterStatus Filter::onNewConnection() {
         [this]() -> void { onMaxDownstreamConnectionDuration(); });
     connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
   }
-  return initializeUpstreamConnection();
+
+  ASSERT(upstream_ == nullptr);
+  route_ = pickRoute();
+  return establishUpstreamConnection();
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     downstream_closed_ = true;
+    // Cancel the potential odcds callback.
+    cluster_discovery_handle_ = nullptr;
   }
 
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
@@ -530,7 +594,8 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                                   std::move(upstream_callbacks_), std::move(idle_timer_),
                                   read_callbacks_->upstreamHost());
     }
-    if (event != Network::ConnectionEvent::Connected) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
       upstream_.reset();
       disableIdleTimer();
     }
@@ -547,14 +612,19 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
+  getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
+  getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::ConnectedZeroRtt) {
+    return;
+  }
   // Update the connecting flag before processing the event because we may start a new connection
-  // attempt in initializeUpstreamConnection.
+  // attempt in establishUpstreamConnection.
   bool connecting = connecting_;
   connecting_ = false;
 
@@ -569,9 +639,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
-
       if (!downstream_closed_) {
-        initializeUpstreamConnection();
+        route_ = pickRoute();
+        establishUpstreamConnection();
       }
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {

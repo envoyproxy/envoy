@@ -207,7 +207,7 @@ def envoy_dependencies(skip_targets = []):
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
-    _emscripten_toolchain()
+    _emsdk()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
@@ -861,9 +861,16 @@ def _com_googlesource_chromium_zlib():
     )
 
 def _com_github_google_quiche():
-    external_genrule_repository(
+    external_http_archive(
         name = "com_github_google_quiche",
-        genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
+        # Rewrite third_party includes and #pragma clang.
+        patch_cmds = ["find . -type f -exec sed -e '\
+    /^#include/ s!third_party/boringssl/src/include/!! ;\
+    /^#include/ s!third_party/nghttp2/src/lib/includes/!! ;\
+    /^#include/ s!third_party/zlib/!! ;\
+    /^#pragma/ s!clang!GCC!; \
+    /^#pragma/ s!-Weverything!-Wall!\
+    ' -i -- {} \\; "],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
@@ -989,17 +996,8 @@ def _proxy_wasm_cpp_sdk():
 def _proxy_wasm_cpp_host():
     external_http_archive(name = "proxy_wasm_cpp_host")
 
-def _emscripten_toolchain():
-    external_http_archive(
-        name = "emscripten_toolchain",
-        build_file_content = _build_all_content(exclude = [
-            "upstream/emscripten/cache/is_vanilla.txt",
-            ".emscripten_sanity",
-        ]),
-        patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 3.1.7 && ./emsdk activate --embedded 3.1.7; fi",
-        ],
-    )
+def _emsdk():
+    external_http_archive(name = "emsdk")
 
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")

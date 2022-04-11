@@ -7,7 +7,7 @@ all the Thrift transport and protocol variations that Envoy's Thrift
 proxy supports (or will eventually support):
 
 Transports: framed, unframed, header
-Protocols: binary, compact, json, ttwitter (e.g., finagle-thrift)
+Protocols: binary, compact, json
 
 The client script can be configured to write its request and the
 server's response to a file. The server script can be configured to
