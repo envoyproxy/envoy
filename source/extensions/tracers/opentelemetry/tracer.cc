@@ -17,8 +17,8 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 // TODO: handle tracestate as well.
-static const absl::string_view kTraceParent = "traceparent";
-static const std::string kDefaultVersion = "00";
+constexpr absl::string_view kTraceParent = "traceparent";
+constexpr absl::string_view kDefaultVersion = "00";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
@@ -38,7 +38,7 @@ Span::Span(const Tracing::Config& config, const std::string& name, SystemTime st
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
-  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled());
+  SpanContext span_context(std::string(kDefaultVersion), getTraceIdAsHex(), spanId(), sampled());
   return parent_tracer_.startSpan(config, name, start_time, span_context);
 }
 

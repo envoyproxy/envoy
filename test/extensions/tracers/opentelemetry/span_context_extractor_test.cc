@@ -12,10 +12,10 @@ namespace OpenTelemetry {
 
 namespace {
 
-const std::string version{"00"};
-const std::string trace_id{"00000000000000000000000000000001"};
-const std::string parent_id{"0000000000000003"};
-const std::string trace_flags{"01"};
+constexpr absl::string_view version = "00";
+constexpr absl::string_view trace_id = "00000000000000000000000000000001";
+constexpr absl::string_view parent_id = "0000000000000003";
+constexpr absl::string_view trace_flags = "01";
 
 TEST(SpanContextExtractorTest, ExtractSpanContext) {
   Http::TestRequestHeaderMapImpl request_headers{
