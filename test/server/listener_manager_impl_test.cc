@@ -25,6 +25,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/init/mocks.h"
@@ -515,7 +516,8 @@ filter_chains:
   name: foo
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
       "Didn't find a registered implementation for 'invalid' with type URL: ''");
 }
 
@@ -4379,7 +4381,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MatcherFilterChainWithoutName) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: tls_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     filter_chain_matcher:
       matcher_tree:
         input:
@@ -4409,7 +4413,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MatcherFilterChainWithDuplicateNa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: tls_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     filter_chain_matcher:
       matcher_tree:
         input:

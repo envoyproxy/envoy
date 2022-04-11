@@ -323,6 +323,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/request_id/uuid:config",
