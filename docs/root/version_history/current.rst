@@ -130,8 +130,8 @@ New Features
 * local_ratelimit: added support for X-RateLimit-* headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
-* ratelimit: network rate limiter supports runtime value substitution using stream info and substitution formatting via :ref:` Network Rate Limiter <config_network_filters_rate_limit>`.
 * ratelimit: added :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>` to support return a custom HTTP response status code to the downstream client when the request has been rate limited.
+* ratelimit: network rate limiter supports runtime value substitution using stream info and substitution formatting via :ref:` Network Rate Limiter <config_network_filters_rate_limit>`.
 * redis: support for hostnames returned in ``cluster_slots`` response is now available.
 * router: added a path-separated prefix matcher, to make route creation more efficient. :ref:`path_separated_prefix <envoy_v3_api_field_config.route.v3.RouteMatch.path_separated_prefix>`.
 * schema_validator_tool: added ``bootstrap`` checking to the
