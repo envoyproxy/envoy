@@ -182,7 +182,11 @@ Admin::UrlHandler StatsHandler::statsHandler() {
             "type",
             "Stat types to include.",
             {Labels::All, Labels::Counters, Labels::Histograms, Labels::Gauges,
-             Labels::TextReadouts}}}};
+             Labels::TextReadouts}},
+           {Admin::ParamDescriptor::Type::Enum,
+            "histogram_buckets",
+            "Histogram bucket display mode",
+            {"cumulative", "disjoint", "none"}}}};
 }
 
 } // namespace Server
