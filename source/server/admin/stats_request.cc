@@ -65,6 +65,7 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
         phase_stat_count_ = 0;
       }
       if (params_.type_ != StatsType::All) {
+        render_->finalize(response);
         return false;
       }
       switch (phase_) {
