@@ -373,6 +373,23 @@ void HttpIntegrationTest::initialize() {
 #endif
 }
 
+void HttpIntegrationTest::setupHttp2Overrides(Http2Impl implementation) {
+  switch (implementation) {
+  case Http2Impl::Nghttp2:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
+    break;
+  case Http2Impl::WrappedNghttp2:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "true");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
+    break;
+  case Http2Impl::Oghttp2:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "true");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");
+    break;
+  }
+}
+
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecType downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
@@ -1113,8 +1130,6 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
     config_helper_.prependFilter(
         fmt::format(R"EOF(
   name: pause-filter{}
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF",
                     downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
   }
@@ -1449,8 +1464,7 @@ void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t 
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+)EOF"));
 
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;

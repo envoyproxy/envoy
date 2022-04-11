@@ -74,7 +74,7 @@ envoy_cc_library(
         "//envoy/http:conn_pool_interface",
         "//envoy/http:hash_policy_interface",
         "//envoy/http:header_map_interface",
-        "//envoy/rds:rds_interface",
+        "//envoy/rds:rds_config_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tracing:http_tracer_interface",
         "//envoy/upstream:resource_manager_interface",

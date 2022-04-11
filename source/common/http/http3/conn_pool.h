@@ -128,6 +128,10 @@ public:
   // Called when the mandatory handshake is complete. This is when a HTTP/3 connection is regarded
   // as connected and is able to send requests.
   virtual void onHandshakeComplete() PURE;
+  // Called upon connection close event from a client who hasn't finish handshake but already sent
+  // early data.
+  // TODO(danzh) actually call it from h3 pool.
+  virtual void onZeroRttHandshakeFailed() PURE;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
