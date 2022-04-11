@@ -14,22 +14,10 @@ services:
     ports:
     - "8000:8000"
 
-  service1:
+  service:
     build:
       context: .
       dockerfile: Dockerfile-service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py
-    environment:
-    - SERVICE_NAME=1
-
-  service2:
-    build:
-      context: .
-      dockerfile: Dockerfile-service
-    volumes:
-    - ./responses.yaml:/etc/responses.yaml
-    - ./service.py:/code/service.py
-    environment:
-    - SERVICE_NAME=2

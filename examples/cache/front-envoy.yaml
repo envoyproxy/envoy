@@ -19,13 +19,9 @@ static_resources:
               - "*"
               routes:
               - match:
-                  prefix: "/service/1"
+                  prefix: "/"
                 route:
-                  cluster: service1
-              - match:
-                  prefix: "/service/2"
-                route:
-                  cluster: service2
+                  cluster: service
           http_filters:
           - name: "envoy.filters.http.cache"
             typed_config:
@@ -37,27 +33,15 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
-  - name: service1
+  - name: service
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: service1
+      cluster_name: service
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: service1
-                port_value: 8000
-  - name: service2
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service2
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: service2
+                address: service
                 port_value: 8000
