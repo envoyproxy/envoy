@@ -70,6 +70,8 @@ proto_library(
         "//envoy/extensions/compression/brotli/decompressor/v3:pkg",
         "//envoy/extensions/compression/gzip/compressor/v3:pkg",
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
+        "//envoy/extensions/compression/zstd/compressor/v3:pkg",
+        "//envoy/extensions/compression/zstd/decompressor/v3:pkg",
         "//envoy/extensions/config/validators/minimum_clusters/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
