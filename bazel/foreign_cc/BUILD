@@ -487,3 +487,19 @@ envoy_cmake(
         "//conditions:default": ["libz.a"],
     }),
 )
+
+envoy_cmake(
+    name = "zstd",
+    build_data = ["@com_github_facebook_zstd//:all"],
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZSTD_BUILD_SHARED": "off",
+        "ZSTD_BUILD_STATIC": "on",
+    },
+    lib_source = "@com_github_facebook_zstd//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["zstd_static.lib"],
+        "//conditions:default": ["libzstd.a"],
+    }),
+    working_directory = "build/cmake",
+)
