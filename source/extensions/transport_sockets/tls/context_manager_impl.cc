@@ -53,7 +53,7 @@ absl::optional<size_t> ContextManagerImpl::daysUntilFirstCertExpires() const {
     if (context) {
       const absl::optional<size_t> tmp = context->daysUntilFirstCertExpires();
       if (!tmp.has_value()) {
-        return absl::make_optional(absl::nullopt);
+        return absl::nullopt;
       }
       ret = std::min<size_t>(tmp.value(), ret.value());
     }

@@ -579,7 +579,7 @@ typed_config:
   )EOF"),
              time_system);
 
-  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires().value());
+  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {

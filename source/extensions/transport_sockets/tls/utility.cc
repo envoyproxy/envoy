@@ -260,9 +260,9 @@ absl::optional<size_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSou
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
-    return days >= 0 ? absl::make_optional(days) : absl::make_optional(absl::nullopt);
+    return days >= 0 ? absl::make_optional(days) : absl::nullopt;
   }
-  return absl::make_optional(absl::nullopt);
+  return absl::nullopt;
 }
 
 absl::string_view Utility::getCertificateExtensionValue(X509& cert,
