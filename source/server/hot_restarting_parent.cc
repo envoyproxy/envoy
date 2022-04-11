@@ -106,18 +106,26 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(-1);
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::resolveUrl(request.pass_listen_socket().address());
+
   for (const auto& listener : server_->listenerManager().listeners()) {
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
     if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
-      // worker_index() will default to 0 if not set which is the behavior before this field
-      // was added. Thus, this should be safe for both roll forward and roll back.
-      if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
-        wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.getListenSocket(request.pass_listen_socket().worker_index())
-                ->ioHandle()
-                .fdDoNotUse());
+      StatusOr<Network::Socket::Type> socket_type =
+          Network::Utility::socketTypeFromUrl(request.pass_listen_socket().address());
+      // socketTypeFromUrl should return a valid value since resolveUrl returned a valid address.
+      ASSERT(socket_type.ok());
+
+      if (socket_factory.socketType() == *socket_type) {
+        // worker_index() will default to 0 if not set which is the behavior before this field
+        // was added. Thus, this should be safe for both roll forward and roll back.
+        if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
+          wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
+              socket_factory.getListenSocket(request.pass_listen_socket().worker_index())
+                  ->ioHandle()
+                  .fdDoNotUse());
+        }
+        break;
       }
-      break;
     }
   }
   return wrapped_reply;
