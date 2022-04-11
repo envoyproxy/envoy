@@ -744,7 +744,7 @@ using EarlyDataOptionPtr = std::unique_ptr<EarlyDataOption>;
  */
 class EarlyDataOptionFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~EarlyDataOptionFactory() = default;
+  ~EarlyDataOptionFactory() override = default;
 
   /**
    * @param config the typed config for early data option.
