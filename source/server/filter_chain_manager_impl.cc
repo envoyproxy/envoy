@@ -50,6 +50,8 @@ public:
     const auto chain_match = filter_chains.find(name.value());
     if (chain_match != filter_chains.end()) {
       chain = chain_match->second;
+    } else {
+      ENVOY_LOG(debug, "matcher API points to an absent filter chain '{}'", name.value());
     }
     return [chain]() { return std::make_unique<FilterChainNameAction>(chain); };
   }
@@ -256,6 +258,9 @@ void FilterChainManagerImpl::addFilterChains(
         throw EnvoyException(
             fmt::format("error adding listener '{}': \"name\" field is duplicated with value '{}'",
                         address_->asString(), filter_chain->name()));
+      }
+      if (filter_chain->has_filter_chain_match()) {
+        ENVOY_LOG(debug, "filter chain match in chain '{}' is ignored", filter_chain->name());
       }
     } else {
       auto createAddressVector = [](const auto& prefix_ranges) -> std::vector<std::string> {

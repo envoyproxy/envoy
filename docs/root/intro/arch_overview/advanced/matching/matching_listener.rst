@@ -51,7 +51,7 @@ The following example uses :ref:`original_dst <config_listener_filters_original_
 original destination port. The matcher in the listener selects one of the three filter chains ``http``, ``internal``,
 and ``tls`` as follows:
 
-* If the destination port is ``80``, then the filter chain ``http``  accepts the connection.
+* If the destination port is ``80``, then the filter chain ``http`` accepts the connection.
 * If the destination port is ``443`` and the source IP is in the range ``192.0.0.0/2`` or ``10.0.0.0/24``, then the
   filter chain ``internal`` accepts the connection. If the source IP is not in the ranges then the filter chain ``tls``
   accepts the connection.
