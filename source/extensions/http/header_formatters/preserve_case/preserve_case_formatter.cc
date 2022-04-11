@@ -23,10 +23,10 @@ PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
   case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
       PROPER_CASE:
     header_key_formatter_on_unknown_headers_ =
-        makeOptRefFromPtr(std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>());
+        std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>();
     break;
   default:
-    header_key_formatter_on_unknown_headers_ = makeOptRefFromPtr(nullptr);
+    header_key_formatter_on_unknown_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
     break;
   }
 }
@@ -38,7 +38,7 @@ std::string PreserveCaseHeaderFormatter::format(absl::string_view key) const {
   // optional backing string. We can do this in a follow up if there is interest.
   if (remembered_key_itr != original_header_keys_.end()) {
     return *remembered_key_itr;
-  } else if (header_key_formatter_on_unknown_headers_.has_value()) {
+  } else if (header_key_formatter_on_unknown_headers_.get() != nullptr) {
     return header_key_formatter_on_unknown_headers_.format(key);
   } else {
     return std::string(key);

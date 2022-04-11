@@ -31,7 +31,7 @@ private:
   std::string reason_phrase_;
   envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
       FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers_{false};
-  Envoy::Http::HeaderKeyFormatterOptConstRef header_key_formatter_on_unknown_headers_;
+  Envoy::Http::HeaderKeyFormatterConstPtr header_key_formatter_on_unknown_headers_;
 };
 
 } // namespace PreserveCase
