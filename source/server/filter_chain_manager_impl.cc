@@ -38,8 +38,8 @@ struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringVal
 using FilterChainActionFactoryContext =
     absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
 
-class FilterChainNameActionFactory
-    : public Matcher::ActionFactory<FilterChainActionFactoryContext> {
+class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext>,
+                                     Logger::Loggable<Logger::Id::config> {
 public:
   std::string name() const override { return "filter-chain-name"; }
   Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
