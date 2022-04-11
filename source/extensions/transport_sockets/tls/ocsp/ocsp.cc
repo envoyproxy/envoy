@@ -268,7 +268,7 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   // only support v1, the value of v1 is 0x00
   auto version_cbs =
       unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0));
-  if (version_cbs.has_value() && version_cbs->len > 0) {
+  if (version_cbs.has_value()) {
     auto version = unwrap(Asn1Utility::parseInteger(*version_cbs));
     if (version != "00") {
       throw EnvoyException(fmt::format("OCSP ResponseData version 0x{} is not supported", version));
