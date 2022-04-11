@@ -26,9 +26,6 @@ private:
   Tracing::DriverSharedPtr
   createTracerDriverTyped(const envoy::config::trace::v3::OpenTelemetryConfig& proto_config,
                           Server::Configuration::TracerFactoryContext& context) override;
-
-  Tracing::DriverSharedPtr driver_;
-  envoy::config::trace::v3::OpenTelemetryConfig config_;
 };
 
 } // namespace OpenTelemetry

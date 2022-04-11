@@ -18,19 +18,7 @@ OpenTelemetryTracerFactory::OpenTelemetryTracerFactory()
 Tracing::DriverSharedPtr OpenTelemetryTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::OpenTelemetryConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
-  // Since OpenTelemetry can only support a single tracing configuration per entire process,
-  // we need to make sure that it is configured at most once.
-  if (driver_) {
-    if (Envoy::Protobuf::util::MessageDifferencer::Equals(config_, proto_config)) {
-      return driver_;
-    } else {
-      throw EnvoyException("OpenTelemetry has already been configured with a different config.");
-    }
-  }
-
-  driver_ = std::make_shared<Driver>(proto_config, context);
-  config_ = proto_config;
-  return driver_;
+  return std::make_shared<Driver>(proto_config, context);
 }
 
 /**
