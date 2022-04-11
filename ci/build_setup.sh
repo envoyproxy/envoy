@@ -93,7 +93,6 @@ trap cleanup EXIT
 BAZEL_BUILD_OPTIONS=(
   "${BAZEL_OPTIONS[@]}"
   "--verbose_failures"
-  "--show_task_finish"
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
   "--noshow_progress"

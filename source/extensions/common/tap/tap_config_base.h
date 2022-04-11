@@ -78,7 +78,8 @@ public:
   class PerTapSinkHandleManagerImpl : public PerTapSinkHandleManager {
   public:
     PerTapSinkHandleManagerImpl(TapConfigBaseImpl& parent, uint64_t trace_id)
-        : parent_(parent), handle_(parent.sink_to_use_->createPerTapSinkHandle(trace_id)) {}
+        : parent_(parent),
+          handle_(parent.sink_to_use_->createPerTapSinkHandle(trace_id, parent.sink_type_)) {}
 
     // PerTapSinkHandleManager
     void submitTrace(TraceWrapperPtr&& trace) override;
@@ -115,6 +116,7 @@ private:
   Sink* sink_to_use_;
   SinkPtr sink_;
   envoy::config::tap::v3::OutputSink::Format sink_format_;
+  envoy::config::tap::v3::OutputSink::OutputSinkTypeCase sink_type_;
   std::vector<MatcherPtr> matchers_;
 };
 
@@ -126,7 +128,9 @@ public:
   FilePerTapSink(const envoy::config::tap::v3::FilePerTapSink& config) : config_(config) {}
 
   // Sink
-  PerTapSinkHandlePtr createPerTapSinkHandle(uint64_t trace_id) override {
+  PerTapSinkHandlePtr
+  createPerTapSinkHandle(uint64_t trace_id,
+                         envoy::config::tap::v3::OutputSink::OutputSinkTypeCase) override {
     return std::make_unique<FilePerTapSinkHandle>(*this, trace_id);
   }
 

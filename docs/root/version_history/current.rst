@@ -7,7 +7,6 @@ Incompatible Behavior Changes
 
 * sip-proxy: change API by replacing ``own_domain`` with :ref:`local_services <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.LocalService>`.
 * tls: set TLS v1.2 as the default minimal version for servers. Users can still explicitly opt-in to 1.0 and 1.1 using :ref:`tls_minimum_protocol_version <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.tls_minimum_protocol_version>`.
-* tls-inspector: the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
 
 Minor Behavior Changes
 ----------------------
@@ -15,6 +14,7 @@ Minor Behavior Changes
 
 * access_log: log all header values in the grpc access log.
 * build: ``VERSION`` and ``API_VERSION`` have been renamed to ``VERSION.txt`` and ``API_VERSION.txt`` respectively to avoid conflicts with the C++ ``<version>`` header.
+* config: type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
 * config: warning messages for protobuf unknown fields now contain ancestors for easier troubleshooting.
 * cryptomb: remove RSA PKCS1 v1.5 padding support.
 * decompressor: decompressor does not duplicate ``accept-encoding`` header values anymore. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` to false.
@@ -68,6 +68,7 @@ Bug Fixes
 * upstream: cluster slow start config add ``min_weight_percent`` field to avoid too big EDF deadline which cause slow start endpoints receiving no traffic, default 10%. This fix is releted to `issue#19526 <https://github.com/envoyproxy/envoy/issues/19526>`_.
 * upstream: fix stack overflow when a cluster with large number of idle connections is removed.
 * xds: fix a crash that occurs when Envoy receives a discovery response without ``control_plane`` field.
+* xds: fix the wildcard resource versions that are sent upon reconnection when using delta-xds mode.
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
 * xray: fix the AWS X-Ray tracer extension to annotate a child span with ``type=subsegment`` to correctly relate subsegments to a parent segment. Previously a subsegment would be treated as an independent segment.
 * xray: fix the AWS X-Ray tracer extension to reuse the trace ID already present in the header ``x-amzn-trace-id`` instead of creating a new one.
@@ -106,6 +107,7 @@ New Features
 * cluster: added support for per host limits in :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>`. Currently only  :ref:`max_connections <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connections>` is supported.
 * cluster: added support to restore original destination address from any desired header via setting :ref:`http_header_name <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.http_header_name>`.
 * cluster: support :ref:`override host status restriction <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.override_host_status>`.
+* compression: add zstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`.
 * config: added new file based xDS configuration via :ref:`path_config_source <envoy_v3_api_field_config.core.v3.ConfigSource.path_config_source>`.
   :ref:`watched_directory <envoy_v3_api_field_config.core.v3.PathConfigSource.watched_directory>` can
   be used to setup an independent watch for when to reload the file path, for example when using
@@ -121,6 +123,7 @@ New Features
 * http: added support for :ref:`cidr_ranges <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.InternalAddressConfig.cidr_ranges>` for configuring list of CIDR ranges that are considered internal.
 * http: added support for :ref:`proxy_status_config <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.proxy_status_config>` for configuring `Proxy-Status <https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08>`_ HTTP response header fields.
 * http: make consistent custom header format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
+* http2: adds the new runtime feature ``envoy.reloadable_features.http2_use_oghttp2``, disabled by default, that guards use of a new HTTP/2 implementation.
 * http2: re-enabled the HTTP/2 wrapper API. This should be a transparent change that does not affect functionality. Any behavior changes can be reverted by setting the ``envoy.reloadable_features.http2_new_codec_wrapper`` runtime feature to false.
 * http3: add :ref:`enable_early_data <envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.enable_early_data>` to turn on/off downstream early data support.
 * http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
@@ -129,6 +132,7 @@ New Features
 * local_ratelimit: added support for X-RateLimit-* headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
+* ratelimit: added :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>` to support return a custom HTTP response status code to the downstream client when the request has been rate limited.
 * redis: support for hostnames returned in ``cluster_slots`` response is now available.
 * router: added a path-separated prefix matcher, to make route creation more efficient. :ref:`path_separated_prefix <envoy_v3_api_field_config.route.v3.RouteMatch.path_separated_prefix>`.
 * schema_validator_tool: added ``bootstrap`` checking to the
@@ -144,6 +148,7 @@ New Features
   into all sub messages, including Any messages, and perform full validation (deprecation,
   work-in-progress, PGV, etc.). Previously only top-level messages were fully validated.
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
+* tap: added support for buffering an arbitrary number of tapped traces before returning to the client via a new :ref:`buffered admin sink <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`.
 * tcp_proxy: added support for on demand cluster. If the :ref:`on_demand <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.on_demand>` is set and the destination cluster is not present, a delta CDS request will be sent and the tcp proxy flow will be resumed after that cds response.
 * thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 * thrift: added support for dynamic routing through aggregated discovery service.

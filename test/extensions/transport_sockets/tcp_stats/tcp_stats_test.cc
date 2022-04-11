@@ -294,6 +294,7 @@ TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
 
 #else // #if defined(__linux__)
 
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "test/mocks/server/transport_socket_factory_context.h"
@@ -309,6 +310,8 @@ namespace TcpStats {
 TEST(TcpStatsTest, ConfigErrorOnUnsupportedPlatform) {
   envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
   proto_config.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
+  envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+  proto_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
 
   envoy::config::core::v3::TransportSocket transport_socket_config;

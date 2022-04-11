@@ -21,6 +21,7 @@ envoy_cc_library(
         "//test:__subpackages__",
     ],
     deps = [
+        "//envoy/registry",
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
     ],
