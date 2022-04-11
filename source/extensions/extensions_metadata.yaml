@@ -102,12 +102,10 @@ envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
