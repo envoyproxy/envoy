@@ -318,9 +318,6 @@ public:
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(TransportType, downstreamTransportType, (), (const));
   MOCK_METHOD(ProtocolType, downstreamProtocolType, (), (const));
-  MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
-  MOCK_METHOD(void, startUpstreamResponse, (Transport&, Protocol&));
-  MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());

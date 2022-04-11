@@ -126,15 +126,7 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.downstreamProtocolType();
     }
-    void sendLocalReply(const DirectResponse& response, bool end_stream) override {
-      parent_.sendLocalReply(response, end_stream);
-    }
-    void startUpstreamResponse(Transport& transport, Protocol& protocol) override {
-      parent_.startUpstreamResponse(transport, protocol);
-    }
-    ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
-      return parent_.upstreamData(buffer);
-    }
+
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
     MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
@@ -152,8 +144,17 @@ private:
         : ActiveRpcFilterBase(parent), decoder_handle_(filter) {}
 
     // ThriftFilters::DecoderFilterCallbacks
+    void sendLocalReply(const DirectResponse& response, bool end_stream) override {
+      parent_.sendLocalReply(response, end_stream);
+    }
+    void startUpstreamResponse(Transport& transport, Protocol& protocol) override {
+      parent_.startUpstreamResponse(transport, protocol);
+    }
+    ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
+      return parent_.upstreamData(buffer);
+    }
     void continueDecoding() override;
-
+    DecoderEventHandler* decodeEventHandler() { return decoder_handle_.get(); }
     ThriftFilters::DecoderFilterSharedPtr decoder_handle_;
   };
   using ActiveRpcDecoderFilterPtr = std::unique_ptr<ActiveRpcDecoderFilter>;
@@ -168,7 +169,7 @@ private:
 
     // ThriftFilters::EncoderFilterCallbacks
     void continueEncoding() override;
-
+    DecoderEventHandler* decodeEventHandler() { return encoder_handle_.get(); }
     ThriftFilters::EncoderFilterSharedPtr encoder_handle_;
   };
   using ActiveRpcEncoderFilterPtr = std::unique_ptr<ActiveRpcEncoderFilter>;
@@ -280,6 +281,9 @@ private:
     bool passthroughSupported() const;
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
     FilterStatus applyEncoderFilters(ActiveRpcEncoderFilter* filter);
+    template <typename FilterType>
+    FilterStatus applyFilters(FilterType* filter,
+                              std::list<std::unique_ptr<FilterType>>& filter_list);
     void finalizeRequest();
 
     void createFilterChain();

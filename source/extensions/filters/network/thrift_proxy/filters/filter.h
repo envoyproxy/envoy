@@ -63,28 +63,6 @@ public:
   virtual ProtocolType downstreamProtocolType() const PURE;
 
   /**
-   * Create a locally generated response using the provided response object.
-   * @param response DirectResponse the response to send to the downstream client
-   * @param end_stream if true, the downstream connection should be closed after this response
-   */
-  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
-
-  /**
-   * Indicates the start of an upstream response. May only be called once.
-   * @param transport the transport used by the upstream response
-   * @param protocol the protocol used by the upstream response
-   */
-  virtual void startUpstreamResponse(Transport& transport, Protocol& protocol) PURE;
-
-  /**
-   * Called with upstream response data.
-   * @param data supplies the upstream's data
-   * @return ResponseStatus indicating if the upstream response requires more data, is complete,
-   *         or if an error occurred requiring the upstream connection to be reset.
-   */
-  virtual ResponseStatus upstreamData(Buffer::Instance& data) PURE;
-
-  /**
    * Reset the downstream connection.
    */
   virtual void resetDownstreamConnection() PURE;
@@ -111,6 +89,28 @@ public:
 class DecoderFilterCallbacks : public virtual FilterCallbacks {
 public:
   virtual ~DecoderFilterCallbacks() = default;
+
+  /**
+   * Indicates the start of an upstream response. May only be called once.
+   * @param transport the transport used by the upstream response
+   * @param protocol the protocol used by the upstream response
+   */
+  virtual void startUpstreamResponse(Transport& transport, Protocol& protocol) PURE;
+
+  /**
+   * Called with upstream response data.
+   * @param data supplies the upstream's data
+   * @return ResponseStatus indicating if the upstream response requires more data, is complete,
+   *         or if an error occurred requiring the upstream connection to be reset.
+   */
+  virtual ResponseStatus upstreamData(Buffer::Instance& data) PURE;
+
+  /**
+   * Create a locally generated response using the provided response object.
+   * @param response DirectResponse the response to send to the downstream client
+   * @param end_stream if true, the downstream connection should be closed after this response
+   */
+  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be

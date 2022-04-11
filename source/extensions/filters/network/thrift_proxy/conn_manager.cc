@@ -344,59 +344,17 @@ void ConnectionManager::ActiveRpcEncoderFilter::continueEncoding() {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderFilter* filter) {
-  ASSERT(filter_action_ != nullptr);
-
-  if (local_response_sent_) {
-    filter_action_ = nullptr;
-    filter_context_.reset();
-    return FilterStatus::Continue;
-  }
-
-  if (upgrade_handler_) {
-    // Divert events to the current protocol upgrade handler.
-    const FilterStatus status = filter_action_(upgrade_handler_.get());
-    filter_context_.reset();
-    return status;
-  }
-
-  std::list<ActiveRpcDecoderFilterPtr>::iterator entry =
-      !filter ? decoder_filters_.begin() : std::next(filter->entry());
-  for (; entry != decoder_filters_.end(); entry++) {
-    const FilterStatus status = filter_action_((*entry)->decoder_handle_.get());
-    if (local_response_sent_) {
-      // The filter called sendLocalReply but _did not_ close the connection.
-      // We return FilterStatus::Continue irrespective of the current result,
-      // which is fine because subsequent calls to this method will skip
-      // filters anyway.
-      //
-      // Note: we need to return FilterStatus::Continue here, in order for decoding
-      // to proceed. This is important because as noted above, the connection remains
-      // open so we need to consume the remaining bytes.
-      break;
-    }
-
-    if (status != FilterStatus::Continue) {
-      // If we got FilterStatus::StopIteration and a local reply happened but
-      // local_response_sent_ was not set, the connection was closed.
-      //
-      // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
-      // dispatch() stops the processing.
-      //
-      // In other words, after a local reply closes the connection and StopIteration
-      // is returned we are done.
-      return status;
-    }
-  }
-
-  filter_action_ = nullptr;
-  filter_context_.reset();
-
-  return FilterStatus::Continue;
+  return applyFilters<ActiveRpcDecoderFilter>(filter, decoder_filters_);
 }
 
-// TODO
+FilterStatus ConnectionManager::ActiveRpc::applyEncoderFilters(ActiveRpcEncoderFilter* filter) {
+  return applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_);
+}
+
+template <typename FilterType>
 FilterStatus
-ConnectionManager::ActiveRpc::applyEncoderFilters([[maybe_unused]] ActiveRpcEncoderFilter* filter) {
+ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
+                                           std::list<std::unique_ptr<FilterType>>& filter_list) {
   ASSERT(filter_action_ != nullptr);
 
   if (local_response_sent_) {
@@ -412,10 +370,10 @@ ConnectionManager::ActiveRpc::applyEncoderFilters([[maybe_unused]] ActiveRpcEnco
     return status;
   }
 
-  std::list<ActiveRpcEncoderFilterPtr>::iterator entry =
-      !filter ? encoder_filters_.begin() : std::next(filter->entry());
-  for (; entry != encoder_filters_.end(); entry++) {
-    const FilterStatus status = filter_action_((*entry)->encoder_handle_.get());
+  typename std::list<std::unique_ptr<FilterType>>::iterator entry =
+      !filter ? filter_list.begin() : std::next(filter->entry());
+  for (; entry != filter_list.end(); entry++) {
+    const FilterStatus status = filter_action_((*entry)->decodeEventHandler());
     if (local_response_sent_) {
       // The filter called sendLocalReply but _did not_ close the connection.
       // We return FilterStatus::Continue irrespective of the current result,
