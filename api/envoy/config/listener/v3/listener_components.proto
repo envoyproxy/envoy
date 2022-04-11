@@ -35,8 +35,7 @@ message Filter {
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_network_filters>`.
+  // The name of the filter configuration.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {
@@ -346,8 +345,7 @@ message ListenerFilter {
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_listener_filters>`.
+  // The name of the filter configuration.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {

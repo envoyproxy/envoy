@@ -289,8 +289,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 // Buffer the request after it's been decompressed.
 TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
 
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
 
   config_helper_.prependFilter(R"EOF(
   name: envoy.filters.http.decompressor

@@ -49,6 +49,9 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
 
+// For internal listener test only.
+SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
+
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
   ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }
@@ -56,6 +59,13 @@ protected:
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
+  void SetUp() override {
+    ListenerManagerImplTest::SetUp();
+    ASSERT_NE(nullptr, server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+                           "internal_listener_registry_singleton",
+                           [registry = internal_registry_]() { return registry; }));
+  }
+
   /**
    * Create an IPv4 listener with a given name.
    */
@@ -447,6 +457,9 @@ public:
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   NonTerminalFilterFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -503,7 +516,7 @@ filter_chains:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+      "Didn't find a registered implementation for 'invalid' with type URL: ''");
 }
 
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
@@ -536,6 +549,9 @@ private:
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -2572,7 +2588,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         destination_port: 8080
@@ -2636,8 +2654,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         direct_source_prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2707,7 +2726,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2777,7 +2798,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "server1.example.com"
@@ -2842,7 +2865,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
@@ -2902,7 +2927,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         application_protocols: "http/1.1"
@@ -2968,7 +2995,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -3045,7 +3074,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -3129,7 +3160,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -3193,7 +3226,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_ports:
@@ -3258,7 +3293,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSourceTyp
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -3403,7 +3440,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3521,7 +3560,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3657,8 +3698,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3788,7 +3830,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3886,7 +3930,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3956,7 +4002,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -4032,7 +4080,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         # empty
@@ -4094,7 +4144,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -4139,7 +4191,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -4180,7 +4234,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: a.b.c.d, prefix_len: 32 }
@@ -4225,7 +4281,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - filter_chain_match:
         server_names: "*w.example.com"
@@ -4242,7 +4300,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - name : foo
       filter_chain_match:
@@ -4268,7 +4328,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -4290,7 +4352,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -4592,6 +4656,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
                 route: { cluster: service_foo }
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
@@ -4624,6 +4690,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoTrafficDi
     filter_chains: {}
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4644,6 +4712,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoFeatureSu
     traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml));
@@ -4664,6 +4734,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(server_.api_.random_, uuid());
@@ -4736,6 +4808,9 @@ public:
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -4793,6 +4868,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
 #if defined(WIN32) && defined(SOL_IP)
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -4845,6 +4923,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -4930,6 +5011,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 

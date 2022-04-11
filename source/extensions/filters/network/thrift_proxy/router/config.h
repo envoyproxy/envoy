@@ -27,8 +27,14 @@ private:
 class ConfigImpl : public Config, Logger::Loggable<Logger::Id::config> {
 public:
   ConfigImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config)
-      : route_matcher_(std::make_unique<RouteMatcher>(config)) {}
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
+      Server::Configuration::ServerFactoryContext& context, bool validate_clusters_default) {
+    absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
+    if (validate_clusters_default) {
+      validation_clusters = context.clusterManager().clusters();
+    }
+    route_matcher_ = std::make_unique<RouteMatcher>(config, validation_clusters);
+  }
 
   // Config
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override {
