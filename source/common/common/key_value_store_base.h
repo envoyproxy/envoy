@@ -21,10 +21,10 @@ public:
 
   // If |contents| is in the form of
   // [length]\n[key][length]\n[value]
-  // parses key value pairs from |contents| into the store provided.
+  // parses key value pairs from |contents| and inserts into store_.
   // Returns true on success and false on failure.
-  bool parseContents(absl::string_view contents,
-                     quiche::QuicheLinkedHashMap<std::string, std::string>& store) const;
+  bool parseContents(absl::string_view contents);
+
   std::string error;
   // KeyValueStore
   void addOrUpdate(absl::string_view key, absl::string_view value) override;

@@ -41,14 +41,7 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
   }
 }
 
-// Assuming |contents| is in the format
-// [length]\n[key]\n[length]\n[value]
-// parses contents into the provided store.
-// This is best effort, and will return false on failure without clearing
-// partially parsed data.
-bool KeyValueStoreBase::parseContents(
-    absl::string_view contents,
-    quiche::QuicheLinkedHashMap<std::string, std::string>& store) const {
+bool KeyValueStoreBase::parseContents(absl::string_view contents) {
   std::string error;
   while (!contents.empty()) {
     absl::optional<absl::string_view> key = getToken(contents, error);
@@ -60,7 +53,7 @@ bool KeyValueStoreBase::parseContents(
       ENVOY_LOG(warn, error);
       return false;
     }
-    store.insert(std::pair(std::string(key.value()), std::string(value.value())));
+    addOrUpdate(key.value(), value.value());
   }
   return true;
 }
@@ -69,6 +62,9 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
+  // Attempt to insert the entry into the store. If it already exists, remove
+  // the old entry and insert the new one so it will be in the proper place in
+  // the linked list.
   if (!store_.emplace(key, value).second) {
     store_.erase(key);
     store_.emplace(key, value);

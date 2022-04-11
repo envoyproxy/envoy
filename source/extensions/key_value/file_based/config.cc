@@ -17,7 +17,7 @@ FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
     return;
   }
   const std::string contents = file_system_.fileReadToEnd(filename_);
-  if (!parseContents(contents, store_)) {
+  if (!parseContents(contents)) {
     ENVOY_LOG(warn, "Failed to parse key value store file {}", filename);
   }
 }
