@@ -68,6 +68,7 @@ Bug Fixes
 * upstream: cluster slow start config add ``min_weight_percent`` field to avoid too big EDF deadline which cause slow start endpoints receiving no traffic, default 10%. This fix is releted to `issue#19526 <https://github.com/envoyproxy/envoy/issues/19526>`_.
 * upstream: fix stack overflow when a cluster with large number of idle connections is removed.
 * xds: fix a crash that occurs when Envoy receives a discovery response without ``control_plane`` field.
+* xds: fix the wildcard resource versions that are sent upon reconnection when using delta-xds mode.
 * xray: fix the AWS X-Ray tracer extension to not sample the trace if ``sampled=`` keyword is not present in the header ``x-amzn-trace-id``.
 * xray: fix the AWS X-Ray tracer extension to annotate a child span with ``type=subsegment`` to correctly relate subsegments to a parent segment. Previously a subsegment would be treated as an independent segment.
 * xray: fix the AWS X-Ray tracer extension to reuse the trace ID already present in the header ``x-amzn-trace-id`` instead of creating a new one.
@@ -106,6 +107,7 @@ New Features
 * cluster: added support for per host limits in :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>`. Currently only  :ref:`max_connections <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connections>` is supported.
 * cluster: added support to restore original destination address from any desired header via setting :ref:`http_header_name <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.http_header_name>`.
 * cluster: support :ref:`override host status restriction <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.override_host_status>`.
+* compression: add zstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`.
 * config: added new file based xDS configuration via :ref:`path_config_source <envoy_v3_api_field_config.core.v3.ConfigSource.path_config_source>`.
   :ref:`watched_directory <envoy_v3_api_field_config.core.v3.PathConfigSource.watched_directory>` can
   be used to setup an independent watch for when to reload the file path, for example when using
@@ -129,6 +131,7 @@ New Features
 * local_ratelimit: added support for X-RateLimit-* headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
+* ratelimit: added :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>` to support return a custom HTTP response status code to the downstream client when the request has been rate limited.
 * redis: support for hostnames returned in ``cluster_slots`` response is now available.
 * router: added a path-separated prefix matcher, to make route creation more efficient. :ref:`path_separated_prefix <envoy_v3_api_field_config.route.v3.RouteMatch.path_separated_prefix>`.
 * schema_validator_tool: added ``bootstrap`` checking to the
