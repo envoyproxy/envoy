@@ -163,30 +163,30 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 }
 
 Admin::UrlHandler StatsHandler::statsHandler() {
-  return {"/stats",
-          "print server stats",
-          [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
-            return makeRequest(path, admin_stream);
-          },
-          false,
-          false,
-          {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-            "Only include stats that have been written by system since restart"},
-           {Admin::ParamDescriptor::Type::String, "filter",
-            "Regular expression (ecmascript) for filtering stats"},
-           {Admin::ParamDescriptor::Type::Enum,
-            "format",
-            "File format to use.",
-            {"html", "text", "json"}},
-           {Admin::ParamDescriptor::Type::Enum,
-            "type",
-            "Stat types to include.",
-            {Labels::All, Labels::Counters, Labels::Histograms, Labels::Gauges,
-             Labels::TextReadouts}},
-           {Admin::ParamDescriptor::Type::Enum,
-            "histogram_buckets",
-            "Histogram bucket display mode",
-            {"cumulative", "disjoint", "none"}}}};
+  return {
+      "/stats",
+      "print server stats",
+      [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
+        return makeRequest(path, admin_stream);
+      },
+      false,
+      false,
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (ecmascript) for filtering stats"},
+       {Admin::ParamDescriptor::Type::Enum,
+        "format",
+        "File format to use.",
+        {"html", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "type",
+        "Stat types to include.",
+        {Labels::All, Labels::Counters, Labels::Histograms, Labels::Gauges, Labels::TextReadouts}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "histogram_buckets",
+        "Histogram bucket display mode",
+        {"cumulative", "disjoint", "none"}}}};
 }
 
 } // namespace Server
