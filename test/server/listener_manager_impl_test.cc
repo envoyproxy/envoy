@@ -48,6 +48,9 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
 
+// For internal listener test only.
+SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
+
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
   ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }
@@ -55,6 +58,13 @@ protected:
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
+  void SetUp() override {
+    ListenerManagerImplTest::SetUp();
+    ASSERT_NE(nullptr, server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+                           "internal_listener_registry_singleton",
+                           [registry = internal_registry_]() { return registry; }));
+  }
+
   /**
    * Create an IPv4 listener with a given name.
    */
@@ -436,6 +446,9 @@ public:
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   NonTerminalFilterFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -488,9 +501,9 @@ filter_chains:
   - name: invalid
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "Didn't find a registered implementation for 'invalid' with type URL: ''");
 }
 
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
@@ -523,6 +536,9 @@ private:
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -3346,7 +3362,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
     - name: "envoy.filters.listener.test"
       typed_config:
         "@type": type.googleapis.com/google.protobuf.Struct
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -4091,6 +4106,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
                 route: { cluster: service_foo }
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
@@ -4123,6 +4140,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoTrafficDi
     filter_chains: {}
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4143,6 +4162,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoFeatureSu
     traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
@@ -4161,6 +4182,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(server_.api_.random_, uuid());
@@ -4233,6 +4256,9 @@ public:
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -4288,6 +4314,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
 #if defined(WIN32) && defined(SOL_IP)
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -4338,6 +4367,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -4421,6 +4453,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
@@ -5290,7 +5324,6 @@ per_connection_buffer_limit_bytes: 10
   filter_chains:
   - filters:
     - name: fake
-      typed_config: {}
     )EOF";
 
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);

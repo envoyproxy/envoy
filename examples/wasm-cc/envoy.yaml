@@ -43,6 +43,8 @@ static_resources:
                     local:
                       filename: "lib/envoy_filter_http_wasm_example.wasm"
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
   - name: web_service

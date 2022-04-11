@@ -42,9 +42,9 @@ wasm_rust_binary(
     name = "grpc_call_rust.wasm",
     srcs = ["grpc_call_rust.rs"],
     deps = [
+        "//bazel/external/cargo:protobuf",
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
-        "//bazel/external/cargo:protobuf",
     ],
 )
 
@@ -52,9 +52,9 @@ wasm_rust_binary(
     name = "grpc_stream_rust.wasm",
     srcs = ["grpc_stream_rust.rs"],
     deps = [
+        "//bazel/external/cargo:protobuf",
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
-        "//bazel/external/cargo:protobuf",
     ],
 )
 

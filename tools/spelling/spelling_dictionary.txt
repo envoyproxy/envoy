@@ -37,7 +37,6 @@ CWND
 DSR
 DSS
 EBADF
-ENDIF
 ENOTCONN
 EPIPE
 HEXDIG
@@ -135,6 +134,7 @@ FREEBIND
 FUZZER
 FUZZERS
 dereferencing
+differentially
 dnsresolvers
 guarddog
 GC
@@ -344,6 +344,7 @@ STDSTRING
 STL
 STRLEN
 STS
+SUBCOMMAND
 SVG
 SVID
 SXG
@@ -768,8 +769,6 @@ intra
 ints
 invariance
 invoker
-iov
-iovcnt
 iovec
 iovecs
 ips
@@ -1085,7 +1084,6 @@ retriable
 retriggers
 revalidated
 revalidation
-rfield
 rmdir
 rocketmq
 rewriter
@@ -1103,6 +1101,7 @@ rver
 rxhash
 sandboxed
 sanitization
+sanitizations
 sanitizer
 satisfiable
 scalability
@@ -1265,6 +1264,7 @@ underflowing
 unfreed
 unicast
 unicode
+unicodes
 unindexed
 uninstantiated
 uniq
@@ -1331,6 +1331,7 @@ zag
 zig
 zipkin
 zlib
+zstd
 OBQ
 SemVer
 SCM

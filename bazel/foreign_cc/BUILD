@@ -8,6 +8,13 @@ exports_files(["icu_data_filter.json"])
 
 envoy_package()
 
+configure_make(
+    name = "liburing",
+    configure_in_place = True,
+    lib_source = "@com_github_axboe_liburing//:all",
+    tags = ["skip_on_windows"],
+)
+
 # autotools packages are unusable on Windows as-is
 # TODO: Consider our own gperftools.BUILD file as we do with many other packages
 configure_make(
@@ -539,4 +546,20 @@ envoy_cmake(
         "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
+)
+
+envoy_cmake(
+    name = "zstd",
+    build_data = ["@com_github_facebook_zstd//:all"],
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZSTD_BUILD_SHARED": "off",
+        "ZSTD_BUILD_STATIC": "on",
+    },
+    lib_source = "@com_github_facebook_zstd//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["zstd_static.lib"],
+        "//conditions:default": ["libzstd.a"],
+    }),
+    working_directory = "build/cmake",
 )

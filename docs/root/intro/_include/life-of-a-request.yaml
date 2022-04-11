@@ -11,6 +11,8 @@ static_resources:
     # A single listener filter exists for TLS inspector.
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     # On the listener, there is a single filter chain that matches SNI for acme.com.
     filter_chains:
     - filter_chain_match:
@@ -55,6 +57,8 @@ static_resources:
           http_filters:
           # - name: some.customer.filter
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: some_service
     # Upstream TLS configuration.

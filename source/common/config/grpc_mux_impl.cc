@@ -175,12 +175,12 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
 
-  if (message->control_plane().identifier() != api_state.control_plane_identifier_) {
-    api_state.control_plane_identifier_ = message->control_plane().identifier();
-    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", type_url,
-              api_state.control_plane_identifier_);
+    if (message->control_plane().identifier() != api_state.control_plane_identifier_) {
+      api_state.control_plane_identifier_ = message->control_plane().identifier();
+      ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", type_url,
+                api_state.control_plane_identifier_);
+    }
   }
 
   if (api_state.watches_.empty()) {

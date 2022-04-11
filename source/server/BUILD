@@ -68,6 +68,8 @@ envoy_cc_library(
         ":active_tcp_listener",
         ":active_udp_listener",
         ":connection_handler_impl",
+        "//envoy/network:client_connection_factory",
+        "//source/common/network:address_lib",
     ],
 )
 
@@ -206,7 +208,6 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
     ],
@@ -232,7 +233,6 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
         "//source/common/stream_info:stream_info_lib",
     ],
 )
@@ -258,7 +258,6 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
     ],
 )
 
@@ -524,6 +523,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:client_connection_factory_lib",

@@ -266,8 +266,6 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
 TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   config_helper_.prependFilter(R"EOF(
   name: continue-headers-only-inject-body-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -294,8 +292,6 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
 TEST_P(ProtocolIntegrationTest, StopIterationHeadersInjectBodyFilter) {
   config_helper_.prependFilter(R"EOF(
   name: stop-iteration-headers-inject-body-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -322,8 +318,6 @@ TEST_P(ProtocolIntegrationTest, StopIterationHeadersInjectBodyFilter) {
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.prependFilter(R"EOF(
 name: add-trailers-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF");
   initialize();
 
@@ -485,8 +479,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
     autonomous_upstream_ = true;
   }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -530,8 +523,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
                                        downstreamProtocol() == Http::CodecType::HTTP3);
       });
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -549,8 +541,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -571,8 +562,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -595,8 +585,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -618,8 +607,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesC
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -641,8 +629,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: invalid-header-filter }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -767,9 +754,12 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 
   // The two requests are sent with https scheme rather than http for QUIC downstream.
   const size_t quic_https_extra_bytes = (downstreamProtocol() == Http::CodecType::HTTP3 ? 2u : 0u);
+  const size_t http2_header_bytes_received =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 24 : 27;
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(2566 + quic_https_extra_bytes, 635, 430 + quic_https_extra_bytes, 54),
-      BytesCountExpectation(2262, 548, 196, 27), BytesCountExpectation(2204, 520, 150, 6));
+      BytesCountExpectation(2262, 548, 196, http2_header_bytes_received),
+      BytesCountExpectation(2204, 520, 150, 6));
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -1185,8 +1175,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
 // Test hitting the decoder buffer filter with too many request bytes to buffer. Ensure the
 // connection manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1228,8 +1217,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
       });
 
   useAccessLog();
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1673,7 +1661,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     Http2Frame ack_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
     ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
     ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
-    Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(0);
+    Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(1);
     ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   } else {
@@ -2405,8 +2393,7 @@ TEST_P(ProtocolIntegrationTest, MultipleCookiesAndSetCookies) {
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2805,8 +2792,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
 TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
   config_helper_.prependFilter(R"EOF(
   name: local-reply-with-metadata-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -2875,8 +2860,6 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
 
 static std::string remove_response_headers_filter = R"EOF(
 name: remove-response-headers-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
@@ -3265,9 +3248,12 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(167, 38, 136, 18),
-                                     BytesCountExpectation(120, 13, 120, 13),
-                                     BytesCountExpectation(116, 5, 116, 3));
+  const size_t wire_bytes_received =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 10 : 13;
+  expectUpstreamBytesSentAndReceived(
+      BytesCountExpectation(167, 38, 136, 18),
+      BytesCountExpectation(120, wire_bytes_received, 120, wire_bytes_received),
+      BytesCountExpectation(116, 5, 116, 3));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
@@ -3290,8 +3276,10 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(100, 100, false);
+  const size_t header_bytes_received =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 10 : 13;
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
-                                     BytesCountExpectation(229, 122, 120, 13),
+                                     BytesCountExpectation(229, 122, 120, header_bytes_received),
                                      BytesCountExpectation(219, 109, 116, 3));
 }
 
@@ -3357,16 +3345,22 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
   // Send to the same upstream from the two clients.
   auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
-                                     BytesCountExpectation(223, 122, 120, 13),
-                                     BytesCountExpectation(223, 108, 114, 3), 0);
+  const size_t http2_header_bytes_received =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 10 : 13;
+  expectUpstreamBytesSentAndReceived(
+      BytesCountExpectation(306, 158, 164, 27),
+      BytesCountExpectation(223, 122, 120, http2_header_bytes_received),
+      BytesCountExpectation(223, 108, 114, 3), 0);
 
   // Swap clients so the other connection is used to send the request.
   std::swap(codec_client_, second_client);
   auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
                                                     default_response_headers_, response_size, 0);
+
+  const size_t http2_header_bytes_sent =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 54 : 58;
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(306, 158, 164, 27),
-                                     BytesCountExpectation(167, 119, 58, 10),
+                                     BytesCountExpectation(167, 119, http2_header_bytes_sent, 10),
                                      BytesCountExpectation(114, 108, 11, 3), 1);
   second_client->close();
 }
@@ -3383,9 +3377,12 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
 
   testTrailers(10, 20, true, true);
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(256, 120, 204, 67),
-                                     BytesCountExpectation(172, 81, 154, 52),
-                                     BytesCountExpectation(154, 33, 142, 7));
+  const size_t http2_trailer_bytes_received =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 49 : 52;
+  expectUpstreamBytesSentAndReceived(
+      BytesCountExpectation(256, 120, 204, 67),
+      BytesCountExpectation(172, 81, 154, http2_trailer_bytes_received),
+      BytesCountExpectation(154, 33, 142, 7));
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
@@ -3460,9 +3457,12 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
 
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(167, 47, 136, 27),
-                                     BytesCountExpectation(120, 13, 120, 13),
-                                     BytesCountExpectation(113, 5, 113, 3));
+  const size_t http2_header_bytes_received =
+      (GetParam().http2_implementation == Http2Impl::Oghttp2) ? 10 : 13;
+  expectUpstreamBytesSentAndReceived(
+      BytesCountExpectation(167, 47, 136, 27),
+      BytesCountExpectation(120, http2_header_bytes_received, 120, http2_header_bytes_received),
+      BytesCountExpectation(113, 5, 113, 3));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
@@ -3533,8 +3533,7 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
       });
 
   useAccessLog();
-  config_helper_.addFilter("{ name: buffer-continue-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter("{ name: buffer-continue-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -3696,8 +3695,6 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -3723,8 +3720,6 @@ TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
 TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
