@@ -16,8 +16,9 @@ determine whether or not the content should be decompressed. The content is
 decompressed and passed on to the rest of the filter chain. Note that decompression happens
 independently for request and responses based on the rules described below.
 
-Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
-and :ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`
+Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`,
+:ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`
+and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`
 compression only. Other compression libraries can be supported as extensions.
 
 An example configuration of the filter may look like the following:
