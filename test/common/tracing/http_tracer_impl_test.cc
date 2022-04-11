@@ -31,6 +31,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -865,33 +866,36 @@ TEST_F(HttpTracerImplTest, MetadataCustomTagReturnsDefaultValue) {
   EXPECT_EQ(tag.value(context), "default_value");
 }
 
-TEST_F(HttpTracerImplTest, CustomTagOverwritesCommonTag) {
-  envoy::type::tracing::v3::CustomTag::Literal testing_literal;
-  const std::string expected_component_value = "overwritten_component";
-  testing_metadata.set_value(expected_component_value)
-  Tracing::LiteralCustomTag custom_tag("component", testing_literal)
-  config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(expected_component_value)));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/test"}, {":method", "GET"}, {":scheme", "https"}};
 
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
 
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamClusterName),
-                           Eq("my_upstream_cluster_observable")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
+  EXPECT_CALL(config, customTags());
 
-  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  std::string custom_tag_str = "{ tag: component, literal: { value: override_component } }";
+  envoy::type::tracing::v3::CustomTag custom_tag;
+  TestUtility::loadFromYaml(custom_tag_str, custom_tag);
+  config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+
+  {
+    // ensure our setTag(..., "override_component") happens later, taking precedence
+    InSequence s;
+    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "proxy"));
+    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "override_component"));
+  }
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
+                                            config);
 }
-
 
 } // namespace
 } // namespace Tracing
