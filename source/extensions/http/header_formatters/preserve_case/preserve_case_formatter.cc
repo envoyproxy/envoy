@@ -38,8 +38,8 @@ std::string PreserveCaseHeaderFormatter::format(absl::string_view key) const {
   // optional backing string. We can do this in a follow up if there is interest.
   if (remembered_key_itr != original_header_keys_.end()) {
     return *remembered_key_itr;
-  } else if (header_key_formatter_on_unknown_headers_.get() != nullptr) {
-    return header_key_formatter_on_unknown_headers_.format(key);
+  } else if (formatter_on_unknown_headers().has_value()) {
+    return formatter_on_unknown_headers()->format(key);
   } else {
     return std::string(key);
   }
@@ -62,6 +62,11 @@ void PreserveCaseHeaderFormatter::setReasonPhrase(absl::string_view reason_phras
 absl::string_view PreserveCaseHeaderFormatter::getReasonPhrase() const {
   return absl::string_view(reason_phrase_);
 };
+
+Envoy::Http::HeaderKeyFormatterOptConstRef
+PreserveCaseHeaderFormatter::formatter_on_unknown_headers() const {
+  return makeOptRefFromPtr(header_key_formatter_on_unknown_headers_.get());
+}
 
 class PreserveCaseFormatterFactory : public Envoy::Http::StatefulHeaderKeyFormatterFactory {
 public:
