@@ -75,3 +75,4 @@ The following sandboxes are available:
     websocket
     win32_front_proxy
     zipkin_tracing
+    zstd
