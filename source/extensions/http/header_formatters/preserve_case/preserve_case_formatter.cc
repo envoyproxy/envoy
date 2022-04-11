@@ -15,12 +15,13 @@ namespace PreserveCase {
 PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
     const bool forward_reason_phrase,
     const envoy::extensions::http::header_formatters::preserve_case::v3::
-        FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers)
+        PreserveCaseFormatterConfig::FormatterTypeOnUnknownHeaders
+            formatter_type_on_unknown_headers)
     : forward_reason_phrase_(forward_reason_phrase),
       formatter_type_on_unknown_headers_(formatter_type_on_unknown_headers) {
   switch (formatter_type_on_unknown_headers_) {
-  case envoy::extensions::http::header_formatters::preserve_case::v3::
-      FormatterTypeOnUnknownHeaders::PROPER_CASE:
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      PROPER_CASE:
     header_key_formatter_on_unknown_headers_ =
         makeOptRefFromPtr(std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>());
     break;
@@ -66,7 +67,8 @@ class PreserveCaseFormatterFactory : public Envoy::Http::StatefulHeaderKeyFormat
 public:
   PreserveCaseFormatterFactory(const bool forward_reason_phrase,
                                const envoy::extensions::http::header_formatters::preserve_case::v3::
-                                   FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers)
+                                   PreserveCaseFormatterConfig::FormatterTypeOnUnknownHeaders
+                                       formatter_type_on_unknown_headers)
       : forward_reason_phrase_(forward_reason_phrase),
         formatter_type_on_unknown_headers_(formatter_type_on_unknown_headers) {}
 
@@ -78,8 +80,8 @@ public:
 
 private:
   const bool forward_reason_phrase_;
-  const envoy::extensions::http::header_formatters::preserve_case::v3::FormatterTypeOnUnknownHeaders
-      formatter_type_on_unknown_headers_;
+  const envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers_;
 };
 
 class PreserveCaseFormatterFactoryConfig

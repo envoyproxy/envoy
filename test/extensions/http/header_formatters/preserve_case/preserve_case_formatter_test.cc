@@ -11,7 +11,7 @@ namespace PreserveCase {
 TEST(PreserveCaseFormatterTest, All) {
   PreserveCaseHeaderFormatter formatter(false,
                                         envoy::extensions::http::header_formatters::preserve_case::
-                                            v3::FormatterTypeOnUnknownHeaders::DEFAULT);
+                                            v3::PreserveCaseFormatterConfig::DEFAULT);
   formatter.processKey("Foo");
   formatter.processKey("Bar");
   formatter.processKey("BAR");
@@ -27,7 +27,7 @@ TEST(PreserveCaseFormatterTest, All) {
 TEST(PreserveCaseFormatterTest, ReasonPhraseEnabled) {
   PreserveCaseHeaderFormatter formatter(true,
                                         envoy::extensions::http::header_formatters::preserve_case::
-                                            v3::FormatterTypeOnUnknownHeaders::DEFAULT);
+                                            v3::PreserveCaseFormatterConfig::DEFAULT);
 
   formatter.setReasonPhrase(absl::string_view("Slow Down"));
 
@@ -37,7 +37,7 @@ TEST(PreserveCaseFormatterTest, ReasonPhraseEnabled) {
 TEST(PreserveCaseFormatterTest, ReasonPhraseDisabled) {
   PreserveCaseHeaderFormatter formatter(false,
                                         envoy::extensions::http::header_formatters::preserve_case::
-                                            v3::FormatterTypeOnUnknownHeaders::DEFAULT);
+                                            v3::PreserveCaseFormatterConfig::DEFAULT);
 
   formatter.setReasonPhrase(absl::string_view("Slow Down"));
 
@@ -47,7 +47,7 @@ TEST(PreserveCaseFormatterTest, ReasonPhraseDisabled) {
 TEST(PreserveCaseFormatterTest, UseProperCaseFormatterEnabled) {
   PreserveCaseHeaderFormatter formatter(false,
                                         envoy::extensions::http::header_formatters::preserve_case::
-                                            v3::FormatterTypeOnUnknownHeaders::PROPER_CASE);
+                                            v3::PreserveCaseFormatterConfig::PROPER_CASE);
   formatter.processKey("Foo");
   formatter.processKey("Bar");
   formatter.processKey("BAR");
