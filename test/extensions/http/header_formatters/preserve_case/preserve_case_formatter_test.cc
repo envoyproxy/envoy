@@ -9,7 +9,9 @@ namespace HeaderFormatters {
 namespace PreserveCase {
 
 TEST(PreserveCaseFormatterTest, All) {
-  PreserveCaseHeaderFormatter formatter(false);
+  PreserveCaseHeaderFormatter formatter(false,
+                                        envoy::extensions::http::header_formatters::preserve_case::
+                                            v3::FormatterTypeOnUnknownHeaders::DEFAULT);
   formatter.processKey("Foo");
   formatter.processKey("Bar");
   formatter.processKey("BAR");
@@ -23,7 +25,9 @@ TEST(PreserveCaseFormatterTest, All) {
 }
 
 TEST(PreserveCaseFormatterTest, ReasonPhraseEnabled) {
-  PreserveCaseHeaderFormatter formatter(true);
+  PreserveCaseHeaderFormatter formatter(true,
+                                        envoy::extensions::http::header_formatters::preserve_case::
+                                            v3::FormatterTypeOnUnknownHeaders::DEFAULT);
 
   formatter.setReasonPhrase(absl::string_view("Slow Down"));
 
@@ -31,11 +35,31 @@ TEST(PreserveCaseFormatterTest, ReasonPhraseEnabled) {
 }
 
 TEST(PreserveCaseFormatterTest, ReasonPhraseDisabled) {
-  PreserveCaseHeaderFormatter formatter(false);
+  PreserveCaseHeaderFormatter formatter(false,
+                                        envoy::extensions::http::header_formatters::preserve_case::
+                                            v3::FormatterTypeOnUnknownHeaders::DEFAULT);
 
   formatter.setReasonPhrase(absl::string_view("Slow Down"));
 
   EXPECT_TRUE(formatter.getReasonPhrase().empty());
+}
+
+TEST(PreserveCaseFormatterTest, UseProperCaseFormatterEnabled) {
+  PreserveCaseHeaderFormatter formatter(false,
+                                        envoy::extensions::http::header_formatters::preserve_case::
+                                            v3::FormatterTypeOnUnknownHeaders::PROPER_CASE);
+  formatter.processKey("Foo");
+  formatter.processKey("Bar");
+  formatter.processKey("BAR");
+
+  EXPECT_EQ("Foo", formatter.format("foo"));
+  EXPECT_EQ("Foo", formatter.format("Foo"));
+  EXPECT_EQ("Bar", formatter.format("bar"));
+  EXPECT_EQ("Bar", formatter.format("Bar"));
+  EXPECT_EQ("Bar", formatter.format("BAR"));
+  EXPECT_EQ("Baz", formatter.format("baz"));
+  EXPECT_EQ("Hello-World", formatter.format("hello-world"));
+  EXPECT_EQ("Hello#WORLD", formatter.format("hello#wORLD"));
 }
 
 } // namespace PreserveCase
