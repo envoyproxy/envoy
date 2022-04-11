@@ -119,7 +119,7 @@ ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newSt
             describePool(**current_), grid_.origin_.hostname_);
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
-  if (next_attempt_timer_ != nullptr && !next_attempt_timer_->enabled()) {
+  if (!next_attempt_timer_->enabled()) {
     next_attempt_timer_->enableTimer(grid_.next_attempt_duration_);
   }
   // Note that in the case of immediate attempt/failure, newStream will delete this.
@@ -302,8 +302,8 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  Instance::StreamOptions overriding_options(options);
-  bool delay_tcp_attempt{true};
+  Instance::StreamOptions overriding_options = options;
+  bool delay_tcp_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
     if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
       overriding_options.can_send_early_data_ = false;
