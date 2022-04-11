@@ -20,12 +20,12 @@
 namespace Envoy {
 namespace Http {
 
-// An implementation of AlternateProtocolsCache.
-// See: source/docs/http3_upstream.md
-//
-// The primary purpose of this cache is to cache alternate protocols entries.
-// Secondarily, it maps origins to srtt information, useful for
-// tuning 0-rtt timeouts if the alternate protocol is HTTP/3.
+// A cache of HTTP server properties.
+// This caches
+//   - alternate protocol entries as documented here: source/docs/http3_upstream.md
+//   - QUIC SRTT, used for TCP failover
+//   - The last connectivity status of HTTP/3, if available.
+// TODO(alyssawilk) move and rename.
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
@@ -35,11 +35,20 @@ public:
 
   // Captures the data tracked per origin;,
   struct OriginData {
-    // The alternate protocols supported.
-    std::vector<AlternateProtocol> protocols;
-    // The last smoothed round trip time, if available.
+    OriginData() = default;
+    OriginData(OptRef<std::vector<AlternateProtocol>> new_protocols,
+               std::chrono::microseconds new_srtt, Http3StatusTrackerPtr&& new_tracker)
+        : srtt(new_srtt), h3_status_tracker(std::move(new_tracker)) {
+      if (new_protocols.has_value()) {
+        protocols = new_protocols.value().get();
+      }
+    }
+
+    // The alternate protocols supported if available.
+    absl::optional<std::vector<AlternateProtocol>> protocols;
+    // The last smoothed round trip time, if available else 0.
     std::chrono::microseconds srtt;
-    // The last connectivity status of HTTP/3, if available.
+    // The last connectivity status of HTTP/3, if available else nullptr.
     Http3StatusTrackerPtr h3_status_tracker;
   };
 
@@ -56,8 +65,7 @@ public:
   // normalization will simply not be read from cache.
   // The string format is:
   // protocols|rtt
-  static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
-                                                std::chrono::microseconds srtt);
+  static std::string originDataToStringForCache(const OriginData& data);
   // Parse an origin data into structured data, or absl::nullopt
   // if it is empty or invalid.
   // If from_cache is true, it is assumed the string was serialized using
@@ -83,9 +91,7 @@ public:
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
-  void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
-  void addOriginData(const Origin& origin, OriginData&& origin_data);
 
   // Time source used to check expiration of entries.
   Event::Dispatcher& dispatcher_;
@@ -100,8 +106,15 @@ private:
     }
   };
 
+  using ProtocolsMap = quiche::QuicheLinkedHashMap<Origin, OriginData, OriginHash>;
   // Map from origin to list of alternate protocols.
-  quiche::QuicheLinkedHashMap<Origin, OriginData, OriginHash> protocols_;
+  ProtocolsMap protocols_;
+
+  ProtocolsMap::iterator setAlternativesImpl(const Origin& origin,
+                                             OptRef<std::vector<AlternateProtocol>> protocols,
+                                             std::chrono::microseconds srtt,
+                                             Http3StatusTrackerPtr&& tracker);
+  ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;
