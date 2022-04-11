@@ -2,9 +2,7 @@
 
 #include <cstdint>
 #include <iterator>
-#include <memory>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"

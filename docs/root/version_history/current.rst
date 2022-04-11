@@ -149,7 +149,6 @@ New Features
   to the tools image.
 * udp_proxy: added support for :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log>`.
 
-
 Deprecated
 ----------
 
