@@ -223,9 +223,7 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
           fmt::format("listener.{}.",
                       !config.stat_prefix().empty()
                           ? config.stat_prefix()
-                          : absl::StrReplaceAll(
-                                Network::Address::resolveProtoAddress(config.address())->asString(),
-                                {{"/", "_"}})))),
+                          : Network::Address::resolveProtoAddress(config.address())->asString()))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
       is_quic_(config.udp_listener_config().has_quic_options()) {}
 
