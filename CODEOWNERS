@@ -277,3 +277,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/cryptomb/ @rojkov @ipuustin
 /contrib/vcl/ @florincoras @rojkov @KfreeZ
 /contrib/hyperscan/ @rojkov @zhxie
+/contrib/language/ @diceride @diceride
