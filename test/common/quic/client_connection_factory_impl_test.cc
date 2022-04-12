@@ -2,6 +2,7 @@
 
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -14,10 +15,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
-
+#include "test/mocks/api/mocks.h"
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 using testing::Return;
+using testing::AnyNumber;
 
 namespace Envoy {
 namespace Quic {
@@ -71,6 +73,7 @@ protected:
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   Stats::IsolatedStoreImpl store_;
   QuicStatNames quic_stat_names_{store_.symbolTable()};
+  Api::OsSysCallsImpl os_sys_calls_actual_;
 };
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
@@ -93,6 +96,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
 }
 
 TEST_P(QuicNetworkConnectionTest, Srtt) {
+  Api::MockOsSysCalls os_sys_calls;
   initialize();
 
   Http::MockAlternateProtocolsCache rtt_cache;
@@ -107,7 +111,15 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
 
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
-
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
   EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();
   client_connection->connect();

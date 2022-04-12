@@ -87,6 +87,11 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
       ENVOY_CONN_LOG(error, "Fail to apply listening options", *this);
       connection_socket.close();
     }
+    const auto maybe_interface_name = connection_socket.connectionInfoProvider().interfaceName();
+    if (maybe_interface_name.has_value()) {
+      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
+                           maybe_interface_name.value());
+    }
   }
   if (!connection_socket.ioHandle().isOpen()) {
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
