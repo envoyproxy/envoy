@@ -613,7 +613,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
 
-    // Trigger second listener in-place updating.
+  // Trigger second listener in-place updating.
   listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter2");
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
