@@ -1055,7 +1055,6 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
     for (auto& manager : draining_filter_chains_manager_) {
       if (manager.getDrainingListenerTag() == listener.listenerTag()) {
         manager.getDrainingListener().listenSocketFactory().closeAllSockets();
-        break;
       }
     }
   }
