@@ -1,5 +1,6 @@
 #include "source/common/network/matching/inputs.h"
 
+#include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/network/utility.h"
@@ -10,9 +11,10 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
-template <>
-Matcher::DataInputGetResult DestinationIPInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().localAddress();
+template <class MatchingDataType>
+Matcher::DataInputGetResult
+DestinationIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const auto& address = data.connectionInfoProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -31,10 +33,10 @@ DestinationIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
           address.ip()->addressAsString()};
 }
 
-template <>
+template <class MatchingDataType>
 Matcher::DataInputGetResult
-DestinationPortInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().localAddress();
+DestinationPortInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const auto& address = data.connectionInfoProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -53,9 +55,10 @@ DestinationPortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
           absl::StrCat(address.ip()->port())};
 }
 
-template <>
-Matcher::DataInputGetResult SourceIPInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().remoteAddress();
+template <class MatchingDataType>
+Matcher::DataInputGetResult
+SourceIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const auto& address = data.connectionInfoProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -73,9 +76,10 @@ Matcher::DataInputGetResult SourceIPInput<UdpMatchingData>::get(const UdpMatchin
           address.ip()->addressAsString()};
 }
 
-template <>
-Matcher::DataInputGetResult SourcePortInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().remoteAddress();
+template <class MatchingDataType>
+Matcher::DataInputGetResult
+SourcePortInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const auto& address = data.connectionInfoProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -94,8 +98,10 @@ SourcePortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
           absl::StrCat(address.ip()->port())};
 }
 
-Matcher::DataInputGetResult DirectSourceIPInput::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().directRemoteAddress();
+template <class MatchingDataType>
+Matcher::DataInputGetResult
+DirectSourceIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const auto& address = data.connectionInfoProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -111,8 +117,10 @@ Matcher::DataInputGetResult SourceTypeInput::get(const MatchingData& data) const
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-Matcher::DataInputGetResult ServerNameInput::get(const MatchingData& data) const {
-  const auto server_name = data.socket().requestedServerName();
+template <class MatchingDataType>
+Matcher::DataInputGetResult
+ServerNameInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const auto server_name = data.connectionInfoProvider().requestedServerName();
   if (!server_name.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::string(server_name)};
@@ -138,17 +146,49 @@ Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& da
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
+class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};
+class UdpDestinationIPInputFactory : public DestinationIPInputBaseFactory<UdpMatchingData> {};
+class HttpDestinationIPInputFactory : public DestinationIPInputBaseFactory<Http::HttpMatchingData> {
+};
 REGISTER_FACTORY(DestinationIPInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(UdpDestinationIPInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(HttpDestinationIPInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+class DestinationPortInputFactory : public DestinationPortInputBaseFactory<MatchingData> {};
+class UdpDestinationPortInputFactory : public DestinationPortInputBaseFactory<UdpMatchingData> {};
+class HttpDestinationPortInputFactory
+    : public DestinationPortInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(DestinationPortInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(UdpDestinationPortInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(HttpDestinationPortInputFactory,
+                 Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+class SourceIPInputFactory : public SourceIPInputBaseFactory<MatchingData> {};
+class UdpSourceIPInputFactory : public SourceIPInputBaseFactory<UdpMatchingData> {};
+class HttpSourceIPInputFactory : public SourceIPInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(SourceIPInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(UdpSourceIPInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(HttpSourceIPInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+class SourcePortInputFactory : public SourcePortInputBaseFactory<MatchingData> {};
+class UdpSourcePortInputFactory : public SourcePortInputBaseFactory<UdpMatchingData> {};
+class HttpSourcePortInputFactory : public SourcePortInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(SourcePortInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(UdpSourcePortInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(HttpSourcePortInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+class DirectSourceIPInputFactory : public DirectSourceIPInputBaseFactory<MatchingData> {};
+class HttpDirectSourceIPInputFactory
+    : public DirectSourceIPInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(DirectSourceIPInputFactory, Matcher::DataInputFactory<MatchingData>);
-REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(HttpDirectSourceIPInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+class ServerNameInputFactory : public ServerNameInputBaseFactory<MatchingData> {};
+class HttpServerNameInputFactory : public ServerNameInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(ServerNameInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(HttpServerNameInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 

@@ -1,5 +1,6 @@
 #include "envoy/http/filter.h"
 
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/network/matching/inputs.h"
@@ -31,6 +32,59 @@ TEST(MatchingData, DestinationIPInput) {
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(MatchingData, HttpDestinationIPInput) {
+  ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080),
+      std::make_shared<Address::Ipv4Instance>("10.0.0.1", 9090));
+  connection_info_provider.setDirectRemoteAddressForTest(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 8081));
+  auto host = "example.com";
+  connection_info_provider.setRequestedServerName(host);
+  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
+  {
+    DestinationIPInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "127.0.0.1");
+  }
+  {
+    DestinationPortInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "8080");
+  }
+  {
+    SourceIPInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "10.0.0.1");
+  }
+  {
+    SourcePortInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "9090");
+  }
+  {
+    DirectSourceIPInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "127.0.0.2");
+  }
+  {
+    ServerNameInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, host);
   }
 }
 
@@ -107,7 +161,7 @@ TEST(MatchingData, SourcePortInput) {
 }
 
 TEST(MatchingData, DirectSourceIPInput) {
-  DirectSourceIPInput input;
+  DirectSourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -155,12 +209,11 @@ TEST(MatchingData, SourceTypeInput) {
 }
 
 TEST(MatchingData, ServerNameInput) {
-  ServerNameInput input;
+  ServerNameInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
   {
-    EXPECT_CALL(socket, requestedServerName).WillOnce(testing::Return(""));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -169,7 +222,7 @@ TEST(MatchingData, ServerNameInput) {
 
   {
     const auto host = "example.com";
-    EXPECT_CALL(socket, requestedServerName).WillOnce(testing::Return(host));
+    socket.connection_info_provider_->setRequestedServerName(host);
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);

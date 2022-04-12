@@ -787,26 +787,31 @@ envoy.matching.inputs.response_trailers:
   status: alpha
 envoy.matching.inputs.destination_ip:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
 envoy.matching.inputs.destination_port:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
 envoy.matching.inputs.source_ip:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
 envoy.matching.inputs.source_port:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
 envoy.matching.inputs.direct_source_ip:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
@@ -817,6 +822,7 @@ envoy.matching.inputs.source_type:
   status: alpha
 envoy.matching.inputs.server_name:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
