@@ -38,6 +38,8 @@ static_resources:
                   response_handle:headers():add("response-body-size", tostring(body_size))
                 end
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
   - name: web_service

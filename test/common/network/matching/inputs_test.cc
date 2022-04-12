@@ -11,7 +11,7 @@ namespace Network {
 namespace Matching {
 
 TEST(MatchingData, DestinationIPInput) {
-  DestinationIPInput input;
+  DestinationIPInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -35,7 +35,7 @@ TEST(MatchingData, DestinationIPInput) {
 }
 
 TEST(MatchingData, DestinationPortInput) {
-  DestinationPortInput input;
+  DestinationPortInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -59,7 +59,7 @@ TEST(MatchingData, DestinationPortInput) {
 }
 
 TEST(MatchingData, SourceIPInput) {
-  SourceIPInput input;
+  SourceIPInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -83,7 +83,7 @@ TEST(MatchingData, SourceIPInput) {
 }
 
 TEST(MatchingData, SourcePortInput) {
-  SourcePortInput input;
+  SourcePortInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -230,6 +230,94 @@ TEST(MatchingData, ApplicationProtocolInput) {
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "'h2','http/1.1'");
+  }
+}
+
+TEST(UdpMatchingData, UdpDestinationIPInput) {
+  DestinationIPInput<UdpMatchingData> input;
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "127.0.0.1");
+  }
+
+  {
+    UdpMatchingDataImpl data(pipe, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(UdpMatchingData, UdpDestinationPortInput) {
+  DestinationPortInput<UdpMatchingData> input;
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "8080");
+  }
+
+  {
+    UdpMatchingDataImpl data(pipe, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(UdpMatchingData, UdpSourceIPInput) {
+  SourceIPInput<UdpMatchingData> input;
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "127.0.0.1");
+  }
+
+  {
+    UdpMatchingDataImpl data(ip, pipe);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+}
+
+TEST(UdpMatchingData, UdpSourcePortInput) {
+  SourcePortInput<UdpMatchingData> input;
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
+  const Address::PipeInstance pipe("/pipe/path");
+
+  {
+    UdpMatchingDataImpl data(ip, ip);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "8080");
+  }
+
+  {
+    UdpMatchingDataImpl data(ip, pipe);
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
 

@@ -120,6 +120,7 @@ proto_library(
         "//envoy/extensions/access_loggers/open_telemetry/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
+        "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
@@ -132,6 +133,8 @@ proto_library(
         "//envoy/extensions/compression/brotli/decompressor/v3:pkg",
         "//envoy/extensions/compression/gzip/compressor/v3:pkg",
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
+        "//envoy/extensions/compression/zstd/compressor/v3:pkg",
+        "//envoy/extensions/compression/zstd/decompressor/v3:pkg",
         "//envoy/extensions/config/validators/minimum_clusters/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
@@ -286,11 +289,22 @@ proto_library(
 )
 
 proto_library(
+    name = "xds_protos",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_cncf_udpa//xds/core/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/v3:pkg",
+    ],
+)
+
+proto_library(
     name = "all_protos",
     visibility = ["//visibility:public"],
     deps = [
         ":v2_protos",
         ":v3_protos",
+        ":xds_protos",
     ],
 )
 

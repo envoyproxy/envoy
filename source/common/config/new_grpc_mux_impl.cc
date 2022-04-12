@@ -100,12 +100,12 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
 
-  if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
-    sub->second->control_plane_identifier_ = message->control_plane().identifier();
-    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
-              sub->second->control_plane_identifier_);
+    if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
+      sub->second->control_plane_identifier_ = message->control_plane().identifier();
+      ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
+                sub->second->control_plane_identifier_);
+    }
   }
 
   kickOffAck(sub->second->sub_state_.handleResponse(*message));

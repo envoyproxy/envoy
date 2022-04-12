@@ -52,7 +52,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_logging_impl_lib",
+    name = "quiche_logging_impl_lib",
     srcs = [
         "quiche_bug_tracker_impl.cc",
         "quiche_logging_impl.cc",
@@ -70,7 +70,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quic_platform_base_impl_lib",
+    name = "quic_base_impl_lib",
     hdrs = [
         "quic_flags_impl.h",
     ],
@@ -112,26 +112,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_hostname_utils_impl_lib",
-    srcs = [
-        "quiche_hostname_utils_impl.cc",
-    ],
-    hdrs = [
-        "quiche_hostname_utils_impl.h",
-    ],
-    external_deps = [
-        "abseil_str_format",
-        "quiche_quic_platform_base",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/http:utility_lib",
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_error_code_wrappers_impl_lib",
+    name = "quiche_error_code_wrappers_impl_lib",
     hdrs = [
         "quiche_error_code_wrappers_impl.h",
     ],
@@ -142,7 +123,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_stack_trace_impl_lib",
+    name = "quiche_stack_trace_impl_lib",
     hdrs = [
         "quiche_stack_trace_impl.h",
     ],
@@ -153,7 +134,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_server_stats_impl_lib",
+    name = "quiche_server_stats_impl_lib",
     hdrs = [
         "quiche_server_stats_impl.h",
     ],
@@ -164,7 +145,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_platform_udp_socket_platform_impl_lib",
+    name = "quiche_udp_socket_platform_impl_lib",
     hdrs = select({
         "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],
         "//conditions:default": [],
@@ -173,7 +154,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_mem_slice_impl_lib",
+    name = "quiche_mem_slice_impl_lib",
     srcs = [
         "quiche_mem_slice_impl.cc",
     ],
@@ -186,7 +167,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_flags_impl_lib",
-        ":quiche_platform_logging_impl_lib",
+        ":quiche_logging_impl_lib",
         "//source/common/buffer:buffer_lib",
         "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
     ],
