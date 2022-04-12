@@ -116,7 +116,7 @@ organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, please tag it
-   `option (udpa.annotations.file_status).work_in_progress = true;` and
+   `option (xds.annotations.v3.file_status).work_in_progress = true;` and
    optionally hide it from the docs (`[#not-implemented-hide:]`.
 1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
    `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
@@ -130,9 +130,9 @@ To add an extension config to the API, the steps below should be followed:
    )
    ```
 1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml)
-   with the category, security posture, and status. The category field will have to match an
+   with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture). The category field will have to match an
    annotation of the form `// [#extension-category: your.extension.category]`
-   in one of the proto files for the docs build to pass.
+   in a message in one of the proto files for the docs build to pass. You may also need `// [#extension: your.extension.category.extension]`.
 1. Update
    [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl)
    to include the new extension.
@@ -141,12 +141,11 @@ To add an extension config to the API, the steps below should be followed:
    (and to not break the docs build).
    See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.
 1. Make sure your proto imports the v3 extension config proto (`import "udpa/annotations/status.proto";`)
-1. Make sure your proto is either tracked as a work in progress
-   (`option (udpa.annotations.file_status).work_in_progress = true;`)
-   or ready to be used
+1. Make sure your proto is tracked as ready to be used
    (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
-   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
-1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD), and without it `proto_format.sh` will delete the proto file.
+1. Add a reference to the v3 extension config in (2) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+1. Add a reference to the v3 extension config in (2) in [api/BUILD](BUILD) under `v3_protos`. Without this, `proto_format.sh` will erase any imports of your proto file from other proto files.
 1. If you introduce a new extension category, you'll also need to add its name
    under `EXTENSION_CATEGORIES` in: [tools/extensions/extensions_check.py](../tools/extensions/extensions_check.py).
 1. Run `./tools/proto_format/proto_format.sh fix`. Before running the script, you will need to commit your local changes to make them effective,
