@@ -1,0 +1,58 @@
+name: Check release branch
+
+on:
+  # TESTING: move this to daily/weekly schedule
+  pull_request:
+
+jobs:
+  trivy-scan-release:
+    strategy:
+      matrix:
+        image:
+        - envoy
+        - envoy-distroless
+        tag:
+        - v1.22-latest
+        - v1.21-latest
+        - v1.20-latest
+        - v1.19-latest
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'envoyproxy'
+    continue-on-error: true
+    steps:
+      - name: Run Trivy vulnerability scanner ${{ matrix.image }}:${{ matrix.tag }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: envoyproxy/${{ matrix.image }}:${{ matrix.tag }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+      - name: "CVE issues found with Docker image"
+        if: failure()
+        run: |
+          echo "::warning:: CVE issues found with ${{ matrix.image }}:${{ matrix.tag }}"
+  trivy-scan-dev:
+    strategy:
+      matrix:
+        tag:
+        - latest
+        image:
+        - envoy-dev
+        - envoy-distroless-dev
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'envoyproxy'
+    steps:
+      - name: Run Trivy vulnerability scanner ${{ matrix.image }}:${{ matrix.tag }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: envoyproxy/${{ matrix.image }}:${{ matrix.tag }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+      - name: Log warning
+        run: |
+          echo "::warning::This is a warning message"
