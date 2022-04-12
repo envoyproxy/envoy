@@ -154,6 +154,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
     connection_socket->close();
   }
+  connection_socket->connectionInfoProvider().maybeSetInterfaceName(connection_socket->ioHandle());
   return connection_socket;
 }
 
