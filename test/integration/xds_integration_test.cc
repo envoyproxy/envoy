@@ -3,6 +3,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -140,8 +141,7 @@ public:
 
   void initialize() override {
     config_helper_.renameListener("tcp");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
 
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -168,6 +168,7 @@ public:
                                                                 const std::string& request,
                                                                 std::string& response) {
     Buffer::OwnedImpl buffer(request);
+    TestListenerFilter::setAlpn(alpn);
     return std::make_unique<RawConnectionDriver>(
         lookupPort("tcp"), buffer,
         [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
@@ -220,7 +221,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -266,7 +267,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_2->write("world2"));
   while (response_2.find("world2") == std::string::npos) {
-    client_conn_2->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_2->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_2->close();
   while (!client_conn_2->closed()) {
@@ -279,7 +280,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -298,8 +299,7 @@ public:
     setUpstreamCount(2);
 
     config_helper_.renameListener("http");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -361,6 +361,7 @@ public:
   }
 
   IntegrationCodecClientPtr createHttpCodec(const std::string& alpn) {
+    TestListenerFilter::setAlpn(alpn);
     auto ssl_conn = dispatcher_->createClientConnection(
         address_, Network::Address::InstanceConstSharedPtr(),
         context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -550,6 +551,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
+  config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   initialize();
   // Given we're using LDS in this test, initialize() will not complete until
@@ -669,7 +671,7 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {

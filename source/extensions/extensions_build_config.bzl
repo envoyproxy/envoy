@@ -28,6 +28,8 @@ EXTENSIONS = {
     "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
     "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
     "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
+    "envoy.compression.zstd.compressor":                "//source/extensions/compression/zstd/compressor:config",
+    "envoy.compression.zstd.decompressor":              "//source/extensions/compression/zstd/decompressor:config",
 
     #
     # Config validators
@@ -268,6 +270,7 @@ EXTENSIONS = {
     #
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+    "envoy.bootstrap.internal_listener":                "//source/extensions/bootstrap/internal_listener:config",
 
     #
     # TLS peer certification validators
@@ -329,10 +332,16 @@ EXTENSIONS = {
 
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
+
+    #
+    # Custom matchers
+    #
+
+    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
-EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
-EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:examples_library"]
+EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:examples_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]

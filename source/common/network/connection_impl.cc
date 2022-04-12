@@ -562,7 +562,8 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   ScopeTrackerScopeState scope(this, this->dispatcher_);
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (immediate_error_event_ != ConnectionEvent::Connected) {
+  if (immediate_error_event_ == ConnectionEvent::LocalClose ||
+      immediate_error_event_ == ConnectionEvent::RemoteClose) {
     if (bind_error_) {
       ENVOY_CONN_LOG(debug, "raising bind error", *this);
       // Update stats here, rather than on bind failure, to give the caller a chance to
@@ -831,6 +832,9 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
 
 void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   switch (event) {
+  case ConnectionEvent::ConnectedZeroRtt:
+    // The transport socket is still connecting, so skip changing connect state.
+    break;
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
   case ConnectionEvent::LocalClose:

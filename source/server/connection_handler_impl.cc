@@ -42,6 +42,14 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   auto details = std::make_shared<ActiveListenerDetails>();
   if (config.internalListenerConfig().has_value()) {
+    // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
+    // should be done only once. However, an extra phase and interface is overkill.
+    Network::InternalListenerRegistry& internal_listener_registry =
+        config.internalListenerConfig()->internalListenerRegistry();
+    Network::LocalInternalListenerRegistry* local_registry =
+        internal_listener_registry.getLocalRegistry();
+    RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry.");
+    local_registry->setInternalListenerManager(*this);
     if (overridden_listener.has_value()) {
       if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
           iter != listener_map_by_tag_.end()) {

@@ -134,6 +134,7 @@ FREEBIND
 FUZZER
 FUZZERS
 dereferencing
+differentially
 dnsresolvers
 guarddog
 GC
@@ -343,6 +344,7 @@ STDSTRING
 STL
 STRLEN
 STS
+SUBCOMMAND
 SVG
 SVID
 SXG
@@ -1099,6 +1101,7 @@ rver
 rxhash
 sandboxed
 sanitization
+sanitizations
 sanitizer
 satisfiable
 scalability
@@ -1261,6 +1264,7 @@ underflowing
 unfreed
 unicast
 unicode
+unicodes
 unindexed
 uninstantiated
 uniq
@@ -1327,6 +1331,7 @@ zag
 zig
 zipkin
 zlib
+zstd
 OBQ
 SemVer
 SCM

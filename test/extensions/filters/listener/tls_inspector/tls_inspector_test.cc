@@ -128,6 +128,8 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -152,6 +154,8 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -187,6 +191,7 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
     got_continue = true;
   }));
@@ -213,6 +218,8 @@ TEST_P(TlsInspectorTest, NoExtensions) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -237,6 +244,8 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
             memcpy(buffer, client_hello.data(), length);
             return Api::SysCallSizeResult{ssize_t(length), 0};
           }));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
@@ -261,6 +270,8 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
 }
@@ -292,6 +303,8 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(cb_, continueFilterChain(true));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
 }
 
@@ -360,7 +373,6 @@ TEST_P(TlsInspectorTest, NotSsl) {
 
   // Use 100 bytes of zeroes. This is not valid as a ClientHello.
   data.resize(100);
-
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
           Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {

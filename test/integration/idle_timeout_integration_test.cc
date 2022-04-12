@@ -12,6 +12,7 @@ namespace {
 class IdleTimeoutIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    config_helper_.disableDelayClose();
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

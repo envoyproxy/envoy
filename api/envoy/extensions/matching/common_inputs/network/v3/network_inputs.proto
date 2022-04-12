@@ -13,18 +13,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Common Network Matching Inputs]
 
 // Specifies that matching should be performed by the destination IP address.
+// [#extension: envoy.matching.inputs.destination_ip]
 message DestinationIPInput {
 }
 
 // Specifies that matching should be performed by the destination port.
+// [#extension: envoy.matching.inputs.destination_port]
 message DestinationPortInput {
 }
 
 // Specifies that matching should be performed by the source IP address.
+// [#extension: envoy.matching.inputs.source_ip]
 message SourceIPInput {
 }
 
 // Specifies that matching should be performed by the source port.
+// [#extension: envoy.matching.inputs.source_port]
 message SourcePortInput {
 }
 
@@ -32,6 +36,7 @@ message SourcePortInput {
 // will only be different from the source IP address when using a listener
 // filter that overrides the source address, such as the :ref:`Proxy Protocol
 // listener filter <config_listener_filters_proxy_protocol>`).
+// [#extension: envoy.matching.inputs.direct_source_ip]
 message DirectSourceIPInput {
 }
 
@@ -39,6 +44,7 @@ message DirectSourceIPInput {
 // Specifies the source IP match type. The values include:
 //
 // * ``local`` - matches a connection originating from the same host,
+// [#extension: envoy.matching.inputs.source_type]
 message SourceTypeInput {
 }
 
@@ -46,6 +52,7 @@ message SourceTypeInput {
 //
 // :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides the requested server name based on SNI,
 // when TLS protocol is detected.
+// [#extension: envoy.matching.inputs.server_name]
 message ServerNameInput {
 }
 
@@ -56,6 +63,7 @@ message ServerNameInput {
 // * ``raw_buffer`` - default, used when no transport protocol is detected,
 // * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
 //   when TLS protocol is detected.
+// [#extension: envoy.matching.inputs.transport_protocol]
 message TransportProtocolInput {
 }
 
@@ -84,5 +92,6 @@ message TransportProtocolInput {
 //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
 //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
 //   unless all connecting clients are known to use ALPN.
+// [#extension: envoy.matching.inputs.application_protocol]
 message ApplicationProtocolInput {
 }
