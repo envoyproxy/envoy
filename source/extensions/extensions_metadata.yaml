@@ -825,3 +825,8 @@ envoy.matching.custom_matchers.trie_matcher:
   - envoy.matching.network.custom_matchers
   security_posture: unknown
   status: alpha
+envoy.common.support.async_files:
+  categories:
+  - envoy.common.support
+  security_posture: unknown
+  status: alpha
