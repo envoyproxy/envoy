@@ -45,7 +45,7 @@ public:
     }
 
     // The alternate protocols supported if available.
-    absl::optional<std::vector<AlternateProtocol>> protocols{};
+    absl::optional<std::vector<AlternateProtocol>> protocols;
     // The last smoothed round trip time, if available else 0.
     std::chrono::microseconds srtt;
     // The last connectivity status of HTTP/3, if available else nullptr.
