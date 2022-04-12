@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/transport_sockets/internal/v3/internal_upstream.pb.h"
+#include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace Internal {
+namespace InternalUpstream {
 
 #define ALL_INTERNAL_UPSTREAM_STATS(COUNTER)                                                       \
   COUNTER(no_metadata)                                                                             \
@@ -26,9 +26,10 @@ struct InternalUpstreamStats {
 
 class Config {
 public:
-  Config(const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
-             config_proto,
-         Stats::Scope& scope);
+  Config(
+      const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
+          config_proto,
+      Stats::Scope& scope);
   std::unique_ptr<envoy::config::core::v3::Metadata>
   extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) const;
   std::unique_ptr<IoSocket::UserSpace::FilterStateObjects>
@@ -52,7 +53,7 @@ class InternalSocketFactory : public PassthroughFactory {
 public:
   InternalSocketFactory(
       Server::Configuration::TransportSocketFactoryContext& context,
-      const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
+      const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
           config_proto,
       Network::TransportSocketFactoryPtr&& inner_factory);
 
@@ -65,7 +66,7 @@ private:
   const Config config_;
 };
 
-} // namespace Internal
+} // namespace InternalUpstream
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

@@ -1126,6 +1126,7 @@ if __name__ == "__main__":
     def check_visibility(error_messages):
         # https://github.com/envoyproxy/envoy/issues/20589
         # https://github.com/envoyproxy/envoy/issues/9953
+        # https://github.com/envoyproxy/envoy/issues/20798
         # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
         exclude_list = (
             "':(exclude)source/extensions/filters/http/buffer/BUILD' "

@@ -10,13 +10,13 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "internal",
-    srcs = ["internal.cc"],
-    hdrs = ["internal.h"],
+    name = "internal_upstream",
+    srcs = ["internal_upstream.cc"],
+    hdrs = ["internal_upstream.h"],
     deps = [
         "//source/extensions/io_socket/user_space:io_handle_lib",
         "//source/extensions/transport_sockets/common:passthrough_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/internal/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
     ],
 )
 
@@ -25,7 +25,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":internal",
+        ":internal_upstream",
         "//envoy/common:hashable_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
@@ -34,6 +34,6 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/extensions/io_socket/user_space:io_handle_lib",
         "//source/extensions/transport_sockets/common:passthrough_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/internal/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
     ],
 )

@@ -1,17 +1,17 @@
-#include "source/extensions/transport_sockets/internal/config.h"
+#include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "envoy/common/hashable.h"
-#include "envoy/extensions/transport_sockets/internal/v3/internal_upstream.pb.validate.h"
+#include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/config/utility.h"
-#include "source/extensions/transport_sockets/internal/internal.h"
+#include "source/extensions/transport_sockets/internal_upstream/internal_upstream.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace Internal {
+namespace InternalUpstream {
 
 namespace {
 
@@ -21,14 +21,15 @@ public:
   std::string name() const override { return "envoy.transport_sockets.internal_upstream"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport>();
+        envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport>();
   }
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
-    const auto& outer_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&>(
-        config, context.messageValidationVisitor());
+    const auto& outer_config =
+        MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::
+                                             internal_upstream::v3::InternalUpstreamTransport&>(
+            config, context.messageValidationVisitor());
     auto& inner_config_factory = Envoy::Config::Utility::getAndCheckFactory<
         Server::Configuration::UpstreamTransportSocketConfigFactory>(
         outer_config.transport_socket());
@@ -45,9 +46,10 @@ public:
 
 } // namespace
 
-Config::Config(const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
-                   config_proto,
-               Stats::Scope& scope)
+Config::Config(
+    const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
+        config_proto,
+    Stats::Scope& scope)
     : stats_{ALL_INTERNAL_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, "internal_upstream."))} {
   for (const auto& metadata : config_proto.passthrough_metadata()) {
     MetadataKind kind;
@@ -135,7 +137,7 @@ void Config::hashKey(std::vector<uint8_t>& key,
 
 InternalSocketFactory::InternalSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
-    const envoy::extensions::transport_sockets::internal::v3::InternalUpstreamTransport&
+    const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
         config_proto,
     Network::TransportSocketFactoryPtr&& inner_factory)
     : PassthroughFactory(std::move(inner_factory)), config_(config_proto, context.scope()) {}
@@ -170,7 +172,7 @@ void InternalSocketFactory::hashKey(std::vector<uint8_t>& key,
 REGISTER_FACTORY(InternalUpstreamConfigFactory,
                  Server::Configuration::UpstreamTransportSocketConfigFactory);
 
-} // namespace Internal
+} // namespace InternalUpstream
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

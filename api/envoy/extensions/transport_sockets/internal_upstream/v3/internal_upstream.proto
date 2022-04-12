@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.transport_sockets.internal.v3;
+package envoy.extensions.transport_sockets.internal_upstream.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/metadata/v3/metadata.proto";
@@ -8,10 +8,10 @@ import "envoy/type/metadata/v3/metadata.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.internal.v3";
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.internal_upstream.v3";
 option java_outer_classname = "InternalUpstreamProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/internal/v3;internalv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/internal_upstream/v3;internal_upstreamv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Internal Upstream]
@@ -25,15 +25,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // connections.
 //
 // Because the passthrough state is transferred once per the upstream
-// connection, the passthrough filter state is included in the hash key used to
-// select an upstream connection if it provides a hashing interface.
+// connection before the bytes payload, every passthrough filter state object
+// is included in the hash key used to select an upstream connection if it
+// implements a hashing interface.
 //
 // .. note::
 //
 //  Using internal upstream transport affects load balancing decisions if the
 //  passthrough state is derived from the downstream connection attributes. As
-//  an example, using source IP in the passthrough state will prevent sharing
-//  of an upstream internal connection between different source IPs.
+//  an example, using the downstream source IP in the passthrough state will
+//  prevent sharing of an upstream internal connection between different source
+//  IPs.
 message InternalUpstreamTransport {
   // Describes the location of the imported metadata value.
   message MetadataValueSource {
@@ -54,9 +56,11 @@ message InternalUpstreamTransport {
   // internal connection dynamic metadata when an internal address is used as a host.
   repeated MetadataValueSource passthrough_metadata = 1;
 
-  // Specifies the list of filter state object names to insert into the downstream
-  // internal connection when an internal address is used as a host. The filter state
-  // objects must be mutable. These objects participate in the connection hashing decisions.
+  // Specifies the list of the filter state object names to insert into the
+  // server internal connection from the downstream connection when an internal
+  // address is used as a host. The filter state objects must be mutable. These
+  // objects participate in the connection hashing decisions if they implement a
+  // hashing function.
   repeated FilterStateSource passthrough_filter_state_objects = 2;
 
   // The underlying transport socket being wrapped.

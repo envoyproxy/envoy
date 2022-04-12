@@ -346,7 +346,7 @@ Host::CreateConnectionData HostImpl::createConnection(
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
                 dispatcher, address_list, cluster.sourceAddress(), socket_factory,
-                host_transport_socket_options, connection_options)
+                std::move(host_transport_socket_options), connection_options)
           : dispatcher.createClientConnection(
                 address, cluster.sourceAddress(),
                 socket_factory.createTransportSocket(std::move(host_transport_socket_options)),

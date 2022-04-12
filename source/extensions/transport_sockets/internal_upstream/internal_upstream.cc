@@ -1,9 +1,9 @@
-#include "source/extensions/transport_sockets/internal/internal.h"
+#include "source/extensions/transport_sockets/internal_upstream/internal_upstream.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
-namespace Internal {
+namespace InternalUpstream {
 
 InternalSocket::InternalSocket(
     Network::TransportSocketPtr inner_socket,
@@ -18,12 +18,12 @@ void InternalSocket::setTransportSocketCallbacks(Network::TransportSocketCallbac
   if (io_handle != nullptr && io_handle->passthroughState()) {
     io_handle->passthroughState()->initialize(std::move(metadata_),
                                               std::move(filter_state_objects_));
-    metadata_ = nullptr;
-    filter_state_objects_ = nullptr;
   }
+  metadata_ = nullptr;
+  filter_state_objects_ = nullptr;
 }
 
-} // namespace Internal
+} // namespace InternalUpstream
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
