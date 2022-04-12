@@ -95,7 +95,7 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
 
 void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
   under_iterate_ = true;
-  absl::Cleanup verify_store_is_not_modified = [this] { under_iterate_ = false; };
+  absl::Cleanup restore_under_iterate = [this] { under_iterate_ = false; };
 
   for (const auto& [key, value] : store_) {
     Iterate ret = cb(key, value);
