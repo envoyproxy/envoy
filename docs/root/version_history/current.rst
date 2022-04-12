@@ -12,7 +12,6 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* access_log: add GRPC_STATUS_NUMBER format command operator.
 * access_log: log all header values in the grpc access log.
 * build: ``VERSION`` and ``API_VERSION`` have been renamed to ``VERSION.txt`` and ``API_VERSION.txt`` respectively to avoid conflicts with the C++ ``<version>`` header.
 * config: type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
@@ -100,6 +99,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* access_log: added new access_log command operator ``%GRPC_STATUS_NUMBER%``.
 * access_log: added new access_log command operator ``%ENVIRONMENT(X):Z%``.
 * access_log: added TCP proxy upstream and downstream byte logging. This can be accessed through the ``%DOWNSTREAM_WIRE_BYTES_SENT%``, ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``, ``%UPSTREAM_WIRE_BYTES_SENT%``, and ``%UPSTREAM_WIRE_BYTES_RECEIVED%`` access_log command operatrors.
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.

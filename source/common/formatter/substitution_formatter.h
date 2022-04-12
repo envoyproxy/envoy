@@ -413,7 +413,7 @@ public:
                                  absl::string_view) const override;
 
 private:
-  bool format_as_number_;
+  const bool format_as_number_;
 };
 
 /**
