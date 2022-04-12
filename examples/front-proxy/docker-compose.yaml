@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 services:
 
   # base images
@@ -7,12 +7,16 @@ services:
       context: ../shared/flask
     image: flask_service:python-3.10-slim-bullseye
     restart: "no"
+    deploy:
+      replicas: 0
 
   tracing:
     build:
       context: ../shared/tracing
     image: envoyproxy:tracing
     restart: "no"
+    deploy:
+      replicas: 0
 
   # front-proxy
   front-envoy:
