@@ -78,6 +78,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
                                                           : Http::Utility::AlpnNames::get().Http2);
   }
   EXPECT_CALL(*connection, nextProtocol()).WillOnce(Return(next_protocol));
+  EXPECT_EQ(536870912, state_.connecting_and_connected_stream_capacity_);
 
   connection->raiseEvent(Network::ConnectionEvent::Connected);
   if (!protocol.has_value()) {

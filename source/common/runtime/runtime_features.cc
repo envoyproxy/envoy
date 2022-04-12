@@ -30,6 +30,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_replies);
+RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
