@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.language",
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
@@ -172,6 +173,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
@@ -369,6 +371,14 @@ def _com_github_google_libsxg():
     native.bind(
         name = "libsxg",
         actual = "@envoy//bazel/foreign_cc:libsxg",
+    )
+
+def _com_github_unicode_org_icu():
+    external_http_archive(
+        name = "com_github_unicode_org_icu",
+        patches = ["@envoy//bazel/foreign_cc:icu.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_intel_ipp_crypto_crypto_mb():
