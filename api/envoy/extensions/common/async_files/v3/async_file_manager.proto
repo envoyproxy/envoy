@@ -15,6 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: AsyncFileManager configuration]
+// [#extension-category: envoy.common.support.async_files]
 
 // Configuration to instantiate or select a singleton `AsyncFileManager`.
 message AsyncFileManagerConfig {
