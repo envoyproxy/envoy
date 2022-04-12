@@ -1,5 +1,3 @@
-#include <bits/stdint-uintn.h>
-
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
