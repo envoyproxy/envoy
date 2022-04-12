@@ -1,0 +1,10 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index b0b9016..c45bce1 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -11,4 +11,5 @@ cc_library(
+     includes = ["include"],
+     hdrs = glob(["include/**/*.h"]),
+     srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
++    copts = ["-Dyaml_cpp_EXPORTS"], # CMake added definition.
+ )
