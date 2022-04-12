@@ -187,6 +187,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
+# Google Cloud Platform Authentication Filter
+/*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
