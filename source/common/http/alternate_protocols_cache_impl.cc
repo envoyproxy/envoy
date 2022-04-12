@@ -153,11 +153,6 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
 }
 
 void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
-  setSrttImpl(origin, srtt);
-}
-
-void AlternateProtocolsCacheImpl::setSrttImpl(const Origin& origin,
-                                              std::chrono::microseconds srtt) {
   OriginDataWithOptRef data;
   data.srtt = srtt;
   auto it = setAlternativesImpl(origin, data);
@@ -172,15 +167,6 @@ std::chrono::microseconds AlternateProtocolsCacheImpl::getSrtt(const Origin& ori
     return std::chrono::microseconds(0);
   }
   return entry_it->second.srtt;
-}
-
-AlternateProtocolsCacheImpl::ProtocolsMap::iterator
-AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
-                                                 OptRef<std::vector<AlternateProtocol>> protocols,
-                                                 std::chrono::microseconds srtt,
-                                                 Http3StatusTrackerPtr&& tracker) {
-  OriginDataWithOptRef data{protocols, srtt, std::move(tracker)};
-  return setAlternativesImpl(origin, data);
 }
 
 AlternateProtocolsCacheImpl::ProtocolsMap::iterator
@@ -264,8 +250,10 @@ AlternateProtocolsCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origin)
     }
     return *entry_it->second.h3_status_tracker;
   }
-  auto it =
-      setAlternativesImpl(origin, {}, {}, std::make_unique<Http3StatusTrackerImpl>(dispatcher_));
+
+  OriginDataWithOptRef data;
+  data.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
+  auto it = setAlternativesImpl(origin, data);
   return *it->second.h3_status_tracker;
 }
 

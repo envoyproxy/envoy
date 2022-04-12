@@ -38,11 +38,7 @@ public:
     OriginData() = default;
     OriginData(OptRef<std::vector<AlternateProtocol>> new_protocols,
                std::chrono::microseconds new_srtt, Http3StatusTrackerPtr&& new_tracker)
-        : srtt(new_srtt), h3_status_tracker(std::move(new_tracker)) {
-      if (new_protocols.has_value()) {
-        protocols = new_protocols.value().get();
-      }
-    }
+        : protocols(new_protocols), srtt(new_srtt), h3_status_tracker(std::move(new_tracker)) {}
 
     // The alternate protocols supported if available.
     absl::optional<std::vector<AlternateProtocol>> protocols;
@@ -91,8 +87,6 @@ public:
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
-  void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
-
   // Time source used to check expiration of entries.
   Event::Dispatcher& dispatcher_;
 
@@ -115,9 +109,9 @@ private:
   struct OriginDataWithOptRef {
     OriginDataWithOptRef()
         : protocols{}, srtt(std::chrono::milliseconds(0)), h3_status_tracker(nullptr) {}
-    OriginDataWithOptRef(OptRef<std::vector<AlternateProtocol>> p, std::chrono::microseconds s,
-                         Http3StatusTrackerPtr&& t)
-        : protocols(p), srtt(s), h3_status_tracker(std::move(t)) {}
+    OriginDataWithOptRef(OptRef<std::vector<AlternateProtocol>> protocols,
+                         std::chrono::microseconds s, Http3StatusTrackerPtr&& t)
+        : protocols(protocols), srtt(s), h3_status_tracker(std::move(t)) {}
     // The alternate protocols supported if available.
     OptRef<std::vector<AlternateProtocol>> protocols;
     // The last smoothed round trip time, if available else 0.
@@ -126,10 +120,6 @@ private:
     Http3StatusTrackerPtr h3_status_tracker;
   };
 
-  ProtocolsMap::iterator setAlternativesImpl(const Origin& origin,
-                                             OptRef<std::vector<AlternateProtocol>> protocols,
-                                             std::chrono::microseconds srtt,
-                                             Http3StatusTrackerPtr&& tracker);
   ProtocolsMap::iterator setAlternativesImpl(const Origin& origin,
                                              OriginDataWithOptRef& origin_data);
 
