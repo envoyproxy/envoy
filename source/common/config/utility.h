@@ -293,7 +293,8 @@ public:
   template <class Factory, class ProtoMessage>
   static Factory* getFactory(const ProtoMessage& message) {
     Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
+    if (factory != nullptr ||
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
       return factory;
     }
 
@@ -310,7 +311,14 @@ public:
   template <class Factory, class ProtoMessage>
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
     Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
+      if (factory == nullptr && !is_optional) {
+        ExceptionUtil::throwEnvoyException(
+            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                        message.name(), getFactoryType(message.typed_config())));
+      }
+      return factory;
+    } else if (factory != nullptr) {
       return factory;
     }
 
