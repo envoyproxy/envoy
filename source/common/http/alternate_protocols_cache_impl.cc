@@ -127,7 +127,8 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
         if (origin_data.value().protocols.has_value()) {
           protocols = origin_data.value().protocols.value();
         }
-        setAlternativesImpl(origin.value(), protocols, origin_data.value().srtt, {});
+        OriginDataWithOptRef data{protocols, origin_data.value().srtt, nullptr};
+        setAlternativesImpl(origin.value(), data);
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
@@ -143,7 +144,9 @@ AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   std::vector<AlternateProtocol>& protocols) {
-  auto it = setAlternativesImpl(origin, protocols, std::chrono::milliseconds(0), {});
+  OriginDataWithOptRef data;
+  data.protocols = protocols;
+  auto it = setAlternativesImpl(origin, data);
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
   }
@@ -155,7 +158,9 @@ void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::mic
 
 void AlternateProtocolsCacheImpl::setSrttImpl(const Origin& origin,
                                               std::chrono::microseconds srtt) {
-  auto it = setAlternativesImpl(origin, {}, srtt, {});
+  OriginDataWithOptRef data;
+  data.srtt = srtt;
+  auto it = setAlternativesImpl(origin, data);
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
   }
@@ -174,8 +179,15 @@ AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
                                                  OptRef<std::vector<AlternateProtocol>> protocols,
                                                  std::chrono::microseconds srtt,
                                                  Http3StatusTrackerPtr&& tracker) {
-  if (protocols.has_value()) {
-    std::vector<AlternateProtocol>& p = protocols.value().get();
+  OriginDataWithOptRef data{protocols, srtt, std::move(tracker)};
+  return setAlternativesImpl(origin, data);
+}
+
+AlternateProtocolsCacheImpl::ProtocolsMap::iterator
+AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
+                                                 OriginDataWithOptRef& origin_data) {
+  if (origin_data.protocols.has_value()) {
+    std::vector<AlternateProtocol>& p = origin_data.protocols.value().get();
     static const size_t max_protocols = 10;
     if (p.size() > max_protocols) {
       ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", p.size());
@@ -184,19 +196,20 @@ AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
   }
   auto entry_it = protocols_.find(origin);
   if (entry_it != protocols_.end()) {
-    if (protocols.has_value()) {
-      entry_it->second.protocols = protocols.value().get();
+    if (origin_data.protocols.has_value()) {
+      entry_it->second.protocols = origin_data.protocols.value().get();
     }
-    if (srtt.count()) {
-      entry_it->second.srtt = srtt;
+    if (origin_data.srtt.count()) {
+      entry_it->second.srtt = origin_data.srtt;
     }
-    if (tracker) {
-      entry_it->second.h3_status_tracker = std::move(tracker);
+    if (origin_data.h3_status_tracker) {
+      entry_it->second.h3_status_tracker = std::move(origin_data.h3_status_tracker);
     }
 
     return entry_it;
   }
-  return addOriginData(origin, OriginData{protocols, srtt, std::move(tracker)});
+  return addOriginData(origin, OriginData{origin_data.protocols, origin_data.srtt,
+                                          std::move(origin_data.h3_status_tracker)});
 }
 
 AlternateProtocolsCacheImpl::ProtocolsMap::iterator

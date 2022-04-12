@@ -45,7 +45,7 @@ public:
     }
 
     // The alternate protocols supported if available.
-    absl::optional<std::vector<AlternateProtocol>> protocols;
+    absl::optional<std::vector<AlternateProtocol>> protocols{};
     // The last smoothed round trip time, if available else 0.
     std::chrono::microseconds srtt;
     // The last connectivity status of HTTP/3, if available else nullptr.
@@ -110,10 +110,29 @@ private:
   // Map from origin to list of alternate protocols.
   ProtocolsMap protocols_;
 
+  // This allows calling setAlternativesImpl without creating an additional copy
+  // of the protocols vector.
+  struct OriginDataWithOptRef {
+    OriginDataWithOptRef()
+        : protocols{}, srtt(std::chrono::milliseconds(0)), h3_status_tracker(nullptr) {}
+    OriginDataWithOptRef(OptRef<std::vector<AlternateProtocol>> p, std::chrono::microseconds s,
+                         Http3StatusTrackerPtr&& t)
+        : protocols(p), srtt(s), h3_status_tracker(std::move(t)) {}
+    // The alternate protocols supported if available.
+    OptRef<std::vector<AlternateProtocol>> protocols;
+    // The last smoothed round trip time, if available else 0.
+    std::chrono::microseconds srtt;
+    // The last connectivity status of HTTP/3, if available else nullptr.
+    Http3StatusTrackerPtr h3_status_tracker;
+  };
+
   ProtocolsMap::iterator setAlternativesImpl(const Origin& origin,
                                              OptRef<std::vector<AlternateProtocol>> protocols,
                                              std::chrono::microseconds srtt,
                                              Http3StatusTrackerPtr&& tracker);
+  ProtocolsMap::iterator setAlternativesImpl(const Origin& origin,
+                                             OriginDataWithOptRef& origin_data);
+
   ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 
   // The key value store, if flushing to persistent storage.
