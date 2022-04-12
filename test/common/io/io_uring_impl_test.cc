@@ -12,12 +12,27 @@ namespace {
 
 class IoUringBaseTest : public ::testing::Test {
 public:
-  IoUringBaseTest() : api_(Api::createApiForTest()), factory_(2, false, context_.threadLocal()) {
-    factory_.onServerInitialized();
+  IoUringBaseTest() : api_(Api::createApiForTest()) {
+    if (isIoUringSupported()) {
+      factory_ = std::make_unique<IoUringFactoryImpl>(2, false, context_.threadLocal());
+      factory_->onServerInitialized();
+    } else {
+      should_skip_ = true;
+    }
+  }
+
+  void SetUp() override {
+    if (should_skip_) {
+      GTEST_SKIP();
+    }
   }
 
   void TearDown() override {
-    auto& uring = factory_.getOrCreate();
+    if (should_skip_) {
+      return;
+    }
+
+    auto& uring = factory_->getOrCreate();
     if (uring.isEventfdRegistered()) {
       uring.unregisterEventfd();
     }
@@ -25,7 +40,8 @@ public:
 
   Api::ApiPtr api_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  IoUringFactoryImpl factory_;
+  std::unique_ptr<IoUringFactoryImpl> factory_{};
+  bool should_skip_{};
 };
 
 class IoUringImplParamTest
@@ -58,7 +74,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   SET_SOCKET_INVALID(fd);
   auto dispatcher = api_->allocateDispatcher("test_thread");
 
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -91,7 +107,10 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
 
 class IoUringImplTest : public IoUringBaseTest {
 protected:
-  void SetUp() override { test_dir_ = TestEnvironment::temporaryDirectory(); }
+  void SetUp() override {
+    IoUringBaseTest::SetUp();
+    test_dir_ = TestEnvironment::temporaryDirectory();
+  }
 
   void TearDown() override {
     TestEnvironment::removePath(test_dir_);
@@ -102,13 +121,13 @@ protected:
 };
 
 TEST_F(IoUringImplTest, Instantiate) {
-  auto& uring1 = factory_.getOrCreate();
-  auto& uring2 = factory_.getOrCreate();
+  auto& uring1 = factory_->getOrCreate();
+  auto& uring2 = factory_->getOrCreate();
   EXPECT_EQ(&uring1, &uring2);
 }
 
 TEST_F(IoUringImplTest, RegisterEventfd) {
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
 
   EXPECT_FALSE(uring.isEventfdRegistered());
   uring.registerEventfd();
@@ -131,7 +150,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   iov.iov_base = buffer;
   iov.iov_len = 4096;
 
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
   os_fd_t event_fd = uring.registerEventfd();
 
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -180,7 +199,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   iov3.iov_base = buffer3;
   iov3.iov_len = 2;
 
-  auto& uring = factory_.getOrCreate();
+  auto& uring = factory_->getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
