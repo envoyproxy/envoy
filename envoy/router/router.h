@@ -732,6 +732,8 @@ enum class PathMatchType {
 
 /**
  * Criterion that a route entry uses for matching a particular path.
+ * Extensions can use this to gain better insights of chosen route paths,
+ * see: https://github.com/envoyproxy/envoy/pull/2531.
  */
 class PathMatchCriterion {
 public:
