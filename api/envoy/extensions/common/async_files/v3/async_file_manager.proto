@@ -8,7 +8,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.common.async_files.v3";
 option java_outer_classname = "AsyncFileManagerProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/common/async_files/v3;asyncfilesv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/common/async_files/v3;async_filesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: AsyncFileManager configuration]
