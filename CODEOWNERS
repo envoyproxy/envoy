@@ -145,7 +145,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
-# Compression
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
 # Core upstream code
@@ -203,6 +202,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/compression/gzip/decompressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/compressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/common @rojkov @kbaichoo
+/*/extensions/compression/zstd @rojkov @rainingmaster
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
 # health cehck

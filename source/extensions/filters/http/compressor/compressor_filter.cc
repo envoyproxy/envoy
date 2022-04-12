@@ -540,6 +540,7 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMa
                                  Http::Headers::get().TransferEncodingValues.Deflate) ||
           absl::EqualsIgnoreCase(trimmed_value,
                                  Http::Headers::get().TransferEncodingValues.Compress) ||
+          absl::EqualsIgnoreCase(trimmed_value, Http::Headers::get().TransferEncodingValues.Zstd) ||
           // or with a custom non-standard compression provided by an external
           // compression library.
           absl::EqualsIgnoreCase(trimmed_value, config_->contentEncoding())) {

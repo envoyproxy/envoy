@@ -51,7 +51,8 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/", "./test/integration/load_balancers/")
+    "./test/integration/filters/", "./test/integration/load_balancers/",
+    "./test/extensions/transport_sockets/tls/integration/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
@@ -87,7 +88,8 @@ STD_REGEX_ALLOWLIST = (
     "./contrib/squash/filters/http/source/squash_filter.h",
     "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
-    "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/stats_handler.cc", "./source/server/admin/stats_request.cc",
+    "./source/server/admin/stats_request.h", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
 

@@ -156,6 +156,7 @@ def envoy_dependencies(skip_targets = []):
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
+    _com_github_axboe_liburing()
     _com_github_c_ares_c_ares()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
@@ -202,6 +203,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
+    _com_github_facebook_zstd()
     _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
@@ -270,6 +272,16 @@ def _com_github_circonus_labs_libcircllhist():
     native.bind(
         name = "libcircllhist",
         actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
+    )
+
+def _com_github_axboe_liburing():
+    external_http_archive(
+        name = "com_github_axboe_liburing",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "uring",
+        actual = "@envoy//bazel/foreign_cc:liburing",
     )
 
 def _com_github_c_ares_c_ares():
@@ -453,6 +465,17 @@ def _org_brotli():
     native.bind(
         name = "brotlidec",
         actual = "@org_brotli//:brotlidec",
+    )
+
+def _com_github_facebook_zstd():
+    external_http_archive(
+        name = "com_github_facebook_zstd",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "zstd",
+        actual = "@envoy//bazel/foreign_cc:zstd",
     )
 
 def _com_google_cel_cpp():
@@ -850,9 +873,8 @@ def _com_googlesource_chromium_zlib():
     )
 
 def _com_github_google_quiche():
-    external_genrule_repository(
+    external_http_archive(
         name = "com_github_google_quiche",
-        genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(

@@ -85,5 +85,6 @@ envoy_cc_test(
         "//test/mocks/server:tracer_factory_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )

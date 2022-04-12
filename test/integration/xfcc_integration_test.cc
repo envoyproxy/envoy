@@ -50,6 +50,9 @@ common_tls_context:
     - san_type: URI
       matcher:
         exact: "spiffe://lyft.com/backend-team"
+    - san_type: URI
+      matcher:
+        exact: "http://backend.lyft.com"
     - san_type: DNS
       matcher:
         exact: "lyft.com"
@@ -67,6 +70,9 @@ common_tls_context:
     - san_type: URI
       matcher:
         exact: "spiffe://lyft.com/backend-team"
+    - san_type: URI
+      matcher:
+        exact: "http://backend.lyft.com"
     - san_type: DNS
       matcher:
         exact: "lyft.com"

@@ -26,4 +26,7 @@ resource:
                   resource_api_version: V3
                   path_config_source:
                     path: "{{ rds_json_path }}"
-              http_filters: [{name: envoy.filters.http.router}]
+              http_filters:
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
