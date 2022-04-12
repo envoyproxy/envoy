@@ -104,7 +104,7 @@ private:
   // Map from origin to list of alternate protocols.
   ProtocolsMap protocols_;
 
-  // This allows calling setAlternativesImpl without creating an additional copy
+  // This allows calling setPropertiesImpl without creating an additional copy
   // of the protocols vector.
   struct OriginDataWithOptRef {
     OriginDataWithOptRef()
@@ -120,8 +120,7 @@ private:
     Http3StatusTrackerPtr h3_status_tracker;
   };
 
-  ProtocolsMap::iterator setAlternativesImpl(const Origin& origin,
-                                             OriginDataWithOptRef& origin_data);
+  ProtocolsMap::iterator setPropertiesImpl(const Origin& origin, OriginDataWithOptRef& origin_data);
 
   ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 

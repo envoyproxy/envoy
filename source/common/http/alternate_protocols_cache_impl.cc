@@ -128,7 +128,7 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
           protocols = origin_data.value().protocols.value();
         }
         OriginDataWithOptRef data{protocols, origin_data.value().srtt, nullptr};
-        setAlternativesImpl(origin.value(), data);
+        setPropertiesImpl(origin.value(), data);
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
@@ -146,7 +146,7 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   std::vector<AlternateProtocol>& protocols) {
   OriginDataWithOptRef data;
   data.protocols = protocols;
-  auto it = setAlternativesImpl(origin, data);
+  auto it = setPropertiesImpl(origin, data);
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
   }
@@ -155,7 +155,7 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
 void AlternateProtocolsCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
   OriginDataWithOptRef data;
   data.srtt = srtt;
-  auto it = setAlternativesImpl(origin, data);
+  auto it = setPropertiesImpl(origin, data);
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
   }
@@ -170,8 +170,8 @@ std::chrono::microseconds AlternateProtocolsCacheImpl::getSrtt(const Origin& ori
 }
 
 AlternateProtocolsCacheImpl::ProtocolsMap::iterator
-AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
-                                                 OriginDataWithOptRef& origin_data) {
+AlternateProtocolsCacheImpl::setPropertiesImpl(const Origin& origin,
+                                               OriginDataWithOptRef& origin_data) {
   if (origin_data.protocols.has_value()) {
     std::vector<AlternateProtocol>& p = origin_data.protocols.value().get();
     static const size_t max_protocols = 10;
@@ -253,7 +253,7 @@ AlternateProtocolsCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origin)
 
   OriginDataWithOptRef data;
   data.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
-  auto it = setAlternativesImpl(origin, data);
+  auto it = setPropertiesImpl(origin, data);
   return *it->second.h3_status_tracker;
 }
 
