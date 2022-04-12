@@ -18,8 +18,16 @@
 namespace Envoy {
 namespace {
 
-const std::string& config() {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
+class OdCdsIntegrationHelper {
+public:
+  using OnDemandConfig = envoy::extensions::filters::http::on_demand::v3::OnDemand;
+  using PerRouteConfig = envoy::extensions::filters::http::on_demand::v3::PerRouteConfig
+;
+
+  // Get the base config, without any listeners. Similar to ConfigHelper::baseConfig(), but there's
+  // no lds_config nor any listeners configured, and no tls certificate stuff.
+  static std::string baseBootstrapConfig() {
+    return fmt::format(R"EOF(
 admin:
   access_log:
   - name: envoy.access_loggers.file
@@ -32,15 +40,9 @@ admin:
       port_value: 0
 static_resources:
   clusters:
-  - name: xds_cluster
-    type: STATIC
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
+    name: cluster_0
     load_assignment:
-      cluster_name: xds_cluster
+      cluster_name: cluster_0
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -48,52 +50,208 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
-  listeners:
-  - name: http
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-    - filters:
-      - name: http
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: config_test
-          http_filters:
-          - name: envoy.filters.http.on_demand
-          - name: envoy.filters.http.router
-          codec_type: HTTP2
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              typed_per_filter_config:
-                envoy.filters.http.on_demand:
-                  "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-                  odcds_config:
-                    resource_api_version: V3
-                    api_config_source:
-                      api_type: DELTA_GRPC
-                      transport_api_version: V3
-                      grpc_services:
-                        envoy_grpc:
-                          cluster_name: xds_cluster
-              routes:
-              - match: {{ prefix: "/" }}
-                route:
-                  cluster_header: "Pick-This-Cluster"
 )EOF",
-                                                  Platform::null_device_path));
-}
+                     Platform::null_device_path);
+  }
+
+  // Get the listener configuration. Listener comes with the on_demand HTTP filter enabled, but with
+  // empty config (so ODCDS is disabled). Comes with "integration" vhost, which has "odcds_route"
+  // with cluster_header action looking for cluster name in "Pick-This-Cluster" HTTP header.
+  static std::string listenerConfig(absl::string_view address = "127.0.0.1") {
+    return ConfigHelper::buildBaseListener("listener_0", address, fmt::format(R"EOF(
+        filters:
+          name: http
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            stat_prefix: config_test
+            delayed_close_timeout:
+              nanos: 10000000
+            http_filters:
+              name: envoy.filters.http.on_demand
+              name: envoy.filters.http.router
+            codec_type: HTTP2
+            access_log:
+              name: accesslog
+              filter:
+                not_health_check_filter:  {{}}
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+                path: {}
+            route_config:
+              virtual_hosts:
+                name: integration
+                routes:
+                  name: odcds_route
+                  route:
+                    cluster_header: "Pick-This-Cluster"
+                  match:
+                    prefix: "/"
+                domains: "*"
+              name: route_config_0
+    )EOF", Platform::null_device_path));
+  }
+
+  // Get the config, with a static listener. Similar to ConfigHelper::baseConfig(), but there's no
+  // lds_config and no tls certificate stuff. Listener is configured with listenerConfig.
+  static std::string bootstrapConfig() {
+    return absl::StrCat(baseBootstrapConfig(), listenerConfig());
+  }
+
+  static envoy::config::core::v3::ConfigSource createODCDSConfigSource(absl::string_view cluster_name = "cluster_0") {
+    envoy::config::core::v3::ConfigSource source;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+      resource_api_version: V3
+      api_config_source:
+        api_type: DELTA_GRPC
+        transport_api_version: V3
+        grpc_services:
+          envoy_grpc:
+            cluster_name: {}
+)EOF",
+                                          cluster_name),
+                              source);
+    return source;
+  }
+
+  static envoy::config::core::v3::ConfigSource createADSODCDSConfigSource() {
+    envoy::config::core::v3::ConfigSource source;
+    TestUtility::loadFromYaml(R"EOF(
+      resource_api_version: V3
+      ads: {}
+)EOF",
+                              source);
+    return source;
+  }
+
+  template <typename OnDemandConfigType>
+  static OnDemandConfigType createConfig(envoy::config::core::v3::ConfigSource config_source, int timeout_millis) {
+    OnDemandConfigType on_demand;
+    *on_demand.mutable_odcds_config() = std::move (config_source);
+    *on_demand_mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    return on_demand;
+  }
+
+  static OnDemandConfig createOnDemandConfig(envoy::config::core::v3::ConfigSource config_source, int timeout_millis) {
+    return createConfig<OnDemandConfig>(std::move(config_source), timeout_millis);
+  }
+
+  static PerRouteConfig createPerRouteConfig(envoy::config::core::v3::ConfigSource config_source, int timeout_millis) {
+    return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis);
+  }
+
+  static OptRef<ProtobufWkt::Map<std::string, ProtobufWkt::Any>> findPerRouteConfigMap(ConfigHelper::HttpConnectionManager& mgr, absl::string_view vhost_name, absl::string_view route_name) {
+    auto* route_config = mgr.mutable_route_config();
+    auto* vhosts = route_config->mutable_virtual_hosts();
+    for (int i = 0; i < route_config->virtual_hosts_size(); ++i) {
+      auto& vhost = vhosts->Get(i);
+      if (vhost.name() == vhost_name) {
+        if (route_name.empty()) {
+          return *vhost.mutable_typed_per_filter_config();
+        } else {
+          auto* routes = vhost.mutable_routes();
+          for (int j = 0; j < vhost.routes_size(); ++j) {
+            auto& route = routes->Get(j);
+            if (route.name() == route_name) {
+              return *route.mutable_typed_per_filter_config();
+            }
+          }
+        }
+      }
+    }
+    return absl::nullopt;
+  }
+
+  static void clearOnDemandConfig(ConfigHelper::HttpConnectionManager& mgr) {
+    auto* filters = hcm_config.mutable_http_filters();
+    for (int i = 0; i < mgr.http_filters.size(); ++i) {
+      auto& filter = filters->Get(i);
+      if (filter.name() == HttpFilterNames::get().OnDemand) {
+        filter.clear_typed_config();
+        break;
+      }
+    }
+  }
+
+  static void clearPerRouteConfig(ConfigHelper::HttpConnectionManager& mgr, std::string vhost_name = "integration", std::string route_name = "odcds_route") {
+    auto maybe_map = findPerRouteConfigMap(mgr, vhost_name, route_name);
+    if (maybe_map.has_value()) {
+      maybe_map.value().erase(HttpFilterNames::get().OnDemand);
+    }
+  }
+
+  static void addOnDemandConfig(ConfigHelper::HttpConnectionManager& mgr, OnDemandConfig config) {
+    auto* filters = mgr.mutable_http_filters();
+    for (int i = 0; i < mgr.http_filters.size(); ++i) {
+      auto& filter = filters->Get(i);
+      if (filter.name() == HttpFilterNames::get().OnDemand) {
+        filter.clear_typed_config();
+        filter.mutable_typed_config()->PackFrom(std::move(config));
+        break;
+      }
+    }
+  }
+
+  static void addPerRouteConfig(ConfigHelper::HttpConnectionManager& mgr, PerRouteConfig config, std::string vhost_name = "integration", std::string route_name = "odcds_route") {
+    auto maybe_map = findPerRouteConfigMap(mgr, vhost_name, route_name);
+    if (maybe_map.has_value()) {
+      maybe_map.value()[HttpFilterNames::get().OnDemand].PackFrom(std::move(config));
+    }
+  }
+};
+
+class OdCdsListenerBuilder {
+public:
+  OdCdsListenerBuilder(absl::string_view address) {
+    TestUtility::loadFromYaml(OdCdsIntegrationHelper::listenerConfig(address), listener_);
+    ASSERT_EQ(hl.listener.filter_chains_size(), 1);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    ASSERT_EQ(filter_chain->filters_size(), 1);
+    auto* filter = filter_chain->mutable_filters(0);
+    ASSERT_EQ(filter->name(), "http");
+    hcm_any_ = filter->mutable_typed_config();
+    hcm_ = MessageUtil::anyConvert<ConfigHelper::HttpConnectionManager>(*hcm_any_);
+  }
+
+  ConfigHelper::HttpConnectionManager& hcm() { return hcm_; }
+  envoy::config::listener::Listener listener() {
+    hcm_any_->PackFrom(hcm_);
+    return listener_;
+  }
+
+private:
+  envoy::config::listener::Listener listener_;
+  ProtobufWkt::Any* hcm_any_;
+  ConfigHelper::HttpConnectionManager hcm_;
+};
 
 class OdCdsIntegrationTestBase : public HttpIntegrationTest,
                                  public Grpc::GrpcClientIntegrationParamTest {
 public:
-  OdCdsIntegrationTestBase(const std::string& config)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
-    use_lds_ = false;
+  OdCdsIntegrationTestBase()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), OdCdsIntegrationHelper::bootstrapConfig()) {}
+
+  void clearOnDemandConfig() {
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& mgr) {
+      OdCdsIntegrationHelper::clearOnDemandConfig(mgr);
+    });
+  }
+
+  void clearPerRouteConfig(std::string vhost_name = "integration", std::string route_name = "odcds_route") {
+    config_helper_.addConfigModifier([vhost_name = std::move(vhost_name), route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& mgr) {
+      OdCdsIntegrationHelper::clearPerRouteConfig(mgr, vhost_name, route_name);
+    });
+  }
+
+  void addOnDemandConfig(OnDemandConfig config) {
+    config_helper_.addConfigModifier([config = std::move(source)](ConfigHelper::HttpConnectionManager& mgr) {
+      OdCdsIntegrationHelper::addOnDemandConfig(mgr, std::move(config));
+    });
+  }
+
+  void addPerRouteConfig(PerRouteConfig config, std::string vhost_name = "integration", std::string route_name = "odcds_route") {
+    config_helper_.addConfigModifier([config = std::move(config), vhost_name = std::move(vhost_name), route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& mgr) {
+      OdCdsIntegrationHelper::addPerRouteConfig(mgr, std::move(config), vhost_name, route_name);
+    });
   }
 
   void TearDown() override {
@@ -134,10 +292,7 @@ public:
   bool doCleanUpXdsConnection_ = true;
 };
 
-class OdCdsIntegrationTest : public OdCdsIntegrationTestBase {
-public:
-  OdCdsIntegrationTest() : OdCdsIntegrationTestBase(config()) {}
-};
+using OdCdsIntegrationTest = OdCdsIntegrationTestBase;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -148,6 +303,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
 //  - a response contains the cluster
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(OdCdsIntegrationHelper::createODCDSConfigSource(), 2500, "integration", {}));
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -180,96 +336,15 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   cleanupUpstreamAndDownstream();
 }
 
-const std::string& configODCDSVhostEnabledRouteDisabled() {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
-admin:
-  access_log:
-  - name: envoy.access_loggers.file
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: "{}"
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-static_resources:
-  clusters:
-  - name: xds_cluster
-    type: STATIC
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
-    load_assignment:
-      cluster_name: xds_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-  listeners:
-  - name: http
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-    - filters:
-      - name: http
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: config_test
-          http_filters:
-          - name: envoy.filters.http.on_demand
-          - name: envoy.filters.http.router
-          codec_type: HTTP2
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              typed_per_filter_config:
-                envoy.filters.http.on_demand:
-                  "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-                  odcds_config:
-                    resource_api_version: V3
-                    api_config_source:
-                      api_type: DELTA_GRPC
-                      transport_api_version: V3
-                      grpc_services:
-                        envoy_grpc:
-                          cluster_name: xds_cluster
-              routes:
-              - match: {{ prefix: "/" }}
-                route:
-                  cluster_header: "Pick-This-Cluster"
-                typed_per_filter_config:
-                  envoy.filters.http.on_demand:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-)EOF",
-                                                  Platform::null_device_path));
-}
-
-class OdCdsIntegrationTestDisabled : public OdCdsIntegrationTestBase {
-public:
-  OdCdsIntegrationTestDisabled()
-      : OdCdsIntegrationTestBase(configODCDSVhostEnabledRouteDisabled()) {
-    doCleanUpXdsConnection_ = false;
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTestDisabled,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
-
 // tests a scenario when:
 //  - ODCDS is enabled at a virtual host level
 //  - ODCDS is disabled at a route level
 //  - making a request to an unknown cluster
 //  - request fails
-TEST_P(OdCdsIntegrationTestDisabled, DisablingODCDSAtRouteLevelWorks) {
+TEST_P(OdCdsIntegrationTest, DisablingODCDSAtRouteLevelWorks) {
+  doCleanUpXdsConnection_ = false;
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(OdCdsIntegrationHelper::createODCDSConfigSource(), 2500), "integration", {});
+  addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", "odcds_route");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -288,45 +363,6 @@ TEST_P(OdCdsIntegrationTestDisabled, DisablingODCDSAtRouteLevelWorks) {
   cleanupUpstreamAndDownstream();
 }
 
-envoy::config::listener::v3::Listener buildOdCdsListener(const std::string& address) {
-  envoy::config::listener::v3::Listener listener;
-  TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: http
-      address:
-        socket_address:
-          address: {}
-          port_value: 0
-      filter_chains:
-      - filters:
-        - name: http
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-            stat_prefix: config_test
-            http_filters:
-            - name: envoy.filters.http.on_demand
-            - name: envoy.filters.http.router
-            codec_type: HTTP2
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: local_service
-                domains: ["*"]
-                typed_per_filter_config:
-                  envoy.filters.http.on_demand:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-                    odcds_config:
-                      resource_api_version: V3
-                      ads: {{}}
-                routes:
-                - match: {{ prefix: "/" }}
-                  route:
-                    cluster_header: "Pick-This-Cluster"
-)EOF",
-                                        address),
-                            listener);
-  return listener;
-}
-
 class OdCdsAdsIntegrationTest : public AdsIntegrationTest {
 public:
   void initialize() override {
@@ -338,6 +374,14 @@ public:
     new_cluster_ =
         ConfigHelper::buildStaticCluster("new_cluster", upstream.localAddress()->ip()->port(),
                                          Network::Test::getLoopbackAddressString(ipVersion()));
+  }
+
+  envoy::config::listener::v3::Listener buildListener() {
+    OdCdsListenerBuilder builder(Network::Test::getLoopbackAddressString(ipVersion()));
+    auto ads_config_source = OdCdsIntegrationHelper::createADSODCDSConfigSource();
+    auto per_route_config = OdCdsIntegrationHelper::createPerRouteConfig(std::move(ads_config_source), 2500);
+    OdCdsIntegrationHelper::addPerRouteConfig(builder.hcm(), std::move(per_route_config), "integration", {});
+    return builder.listener();
   }
 
   std::size_t fake_upstream_idx_;
@@ -377,7 +421,7 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) 
 
   // initial listener query
   EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
-  auto odcds_listener = buildOdCdsListener(Network::Test::getLoopbackAddressString(ipVersion()));
+  auto odcds_listener = buildListener();
   sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
                                                                     {odcds_listener}, {}, "2");
 
