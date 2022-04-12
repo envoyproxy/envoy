@@ -47,6 +47,8 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
   return convertToQuicWriteResult(result);
 }
 
+absl::optional<int> EnvoyQuicPacketWriter::MessageTooBigErrorCode() const { return EMSGSIZE; }
+
 quic::QuicByteCount
 EnvoyQuicPacketWriter::GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const {
   Network::Address::InstanceConstSharedPtr remote_addr =

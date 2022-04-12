@@ -70,3 +70,18 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "cert_validator_integration_test",
+    srcs = [
+        "default_validator_integration_test.cc",
+        "default_validator_integration_test.h",
+    ],
+    data = [
+        "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    deps = [
+        "//test/integration:http_integration_lib",
+    ],
+)

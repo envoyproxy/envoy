@@ -103,14 +103,11 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
     return false;
   }
 
-  if (!policy.runtimeKey().empty()) {
-    // The default is 0/100, which means that the default for a key set but no default value
-    // explicitly set is 0% mirrored.
-    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
-                                             stable_random);
-  }
-
-  return true;
+  // The policy's default value is set correctly regardless of whether there is a runtime key
+  // or not, thus this call is sufficient for all cases (100% if no runtime set, otherwise
+  // using the default value within the runtime fractional percent setting).
+  return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
+                                           stable_random);
 }
 
 FilterUtility::TimeoutData
@@ -651,9 +648,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     };
   }
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
-
-  // Inject the active span's tracing context into the request headers.
-  callbacks_->activeSpan().injectContext(headers);
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
@@ -1467,6 +1461,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   for (const auto& header_value : downstream_set_cookies_) {
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
+
+  callbacks_->streamInfo().setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to

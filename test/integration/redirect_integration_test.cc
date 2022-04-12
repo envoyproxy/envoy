@@ -256,8 +256,10 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectUpstreamBytesCount) {
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85),
-                                     BytesCountExpectation(137, 64, 137, 64),
+  BytesCountExpectation http2_expected = (GetParam().http2_implementation == Http2Impl::Oghttp2)
+                                             ? BytesCountExpectation(137, 59, 137, 59)
+                                             : BytesCountExpectation(137, 64, 137, 64);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85), http2_expected,
                                      BytesCountExpectation(137, 64, 137, 64), 0);
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(244, 38, 219, 18),
                                      BytesCountExpectation(85, 10, 85, 10),
@@ -611,8 +613,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
              hcm) { hcm.set_via("via_value"); });
   config_helper_.prependFilter(R"EOF(
   name: pause-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 

@@ -45,7 +45,6 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   absl::string_view header = "";
   // Default is route
   HeaderType type = HeaderType::Route;
-  absl::string_view domain = "";
 
   if (domain_.empty()) {
     return nullptr;
@@ -85,7 +84,7 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
     return clusterEntry(metadata);
   }
 
-  domain = metadata.getDomainFromHeaderParameter(header, parameter_);
+  auto domain = metadata.getDomainFromHeaderParameter(header, parameter_);
 
   if (domain_ == domain) {
     ENVOY_LOG(trace, "Route matched with header: {}, parameter: {} and domain: {}", header_,
@@ -638,7 +637,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "upstream local close");
     break;
   default:
-    // Connected is consumed by the connection pool.
+    // Connected and ConnectedZeroRtt is consumed by the connection pool.
     return;
   }
 

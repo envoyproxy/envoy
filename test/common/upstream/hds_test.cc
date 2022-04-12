@@ -211,6 +211,8 @@ transport_socket_matches:
     %s: "true"
   transport_socket:
     name: "envoy.transport_sockets.raw_buffer"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
 )EOF",
         match);
     cluster_health_check->MergeFrom(

@@ -53,7 +53,9 @@ public:
 class TestConfig : public Config {
 public:
   TestConfig() = default;
-  TestConfig(const envoy::config::route::v3::RouteConfiguration& rc) : rc_(rc) {}
+  TestConfig(const envoy::config::route::v3::RouteConfiguration& rc,
+             Server::Configuration::ServerFactoryContext&, bool)
+      : rc_(rc) {}
   const std::string* route(const std::string& name) const {
     for (const auto& virtual_host_config : rc_.virtual_hosts()) {
       if (virtual_host_config.name() == name) {
