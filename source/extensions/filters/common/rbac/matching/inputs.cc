@@ -12,7 +12,7 @@ template <>
 Matcher::DataInputGetResult
 Network::Matching::DestinationIPInput<Extensions::Filters::Common::RBAC::Matching::MatchingData>::
     get(const Extensions::Filters::Common::RBAC::Matching::MatchingData& data) const {
-  const auto& address = data.connection().connectionInfoProvider().localAddress();
+  const auto& address = data.streamInfo().downstreamAddressProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -24,7 +24,7 @@ template <>
 Matcher::DataInputGetResult
 Network::Matching::DestinationPortInput<Extensions::Filters::Common::RBAC::Matching::MatchingData>::
     get(const Extensions::Filters::Common::RBAC::Matching::MatchingData& data) const {
-  const auto& address = data.connection().connectionInfoProvider().localAddress();
+  const auto& address = data.streamInfo().downstreamAddressProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -36,7 +36,7 @@ template <>
 Matcher::DataInputGetResult
 Network::Matching::SourceIPInput<Extensions::Filters::Common::RBAC::Matching::MatchingData>::get(
     const Extensions::Filters::Common::RBAC::Matching::MatchingData& data) const {
-  const auto& address = data.connection().connectionInfoProvider().remoteAddress();
+  const auto& address = data.streamInfo().downstreamAddressProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -48,7 +48,7 @@ template <>
 Matcher::DataInputGetResult
 Network::Matching::SourcePortInput<Extensions::Filters::Common::RBAC::Matching::MatchingData>::get(
     const Extensions::Filters::Common::RBAC::Matching::MatchingData& data) const {
-  const auto& address = data.connection().connectionInfoProvider().remoteAddress();
+  const auto& address = data.streamInfo().downstreamAddressProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -60,7 +60,7 @@ template <>
 Matcher::DataInputGetResult
 DirectSourceIPInput<Extensions::Filters::Common::RBAC::Matching::MatchingData>::get(
     const Extensions::Filters::Common::RBAC::Matching::MatchingData& data) const {
-  const auto& address = data.connection().connectionInfoProvider().directRemoteAddress();
+  const auto& address = data.streamInfo().downstreamAddressProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
