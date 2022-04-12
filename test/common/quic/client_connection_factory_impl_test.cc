@@ -1,10 +1,11 @@
 #include <chrono>
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "source/common/api/os_sys_calls_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/alternate_protocols_cache.h"
@@ -15,12 +16,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/mocks/api/mocks.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
-using testing::Return;
 using testing::AnyNumber;
+using testing::Return;
 
 namespace Envoy {
 namespace Quic {
