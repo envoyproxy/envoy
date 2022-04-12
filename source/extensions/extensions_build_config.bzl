@@ -21,10 +21,12 @@ EXTENSIONS = {
     #
     # Compression
     #
-    "envoy.compression.gzip.compressor": "//source/extensions/compression/gzip/compressor:config",
-    "envoy.compression.gzip.decompressor": "//source/extensions/compression/gzip/decompressor:config",
-    "envoy.compression.brotli.compressor": "//source/extensions/compression/brotli/compressor:config",
-    "envoy.compression.brotli.decompressor": "//source/extensions/compression/brotli/decompressor:config",
+    "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
+    "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+    "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
+    "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
+    "envoy.compression.zstd.compressor":                "//source/extensions/compression/zstd/compressor:config",
+    "envoy.compression.zstd.decompressor":              "//source/extensions/compression/zstd/decompressor:config",
 
     #
     # Config validators

@@ -102,6 +102,7 @@ public:
   struct {
     const std::string Brotli{"br"};
     const std::string Gzip{"gzip"};
+    const std::string Zstd{"zstd"};
   } ContentEncodingValues;
 
   struct {
@@ -319,6 +320,7 @@ public:
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
     const std::string Identity{"identity"};
+    const std::string Zstd{"zstd"};
   } TransferEncodingValues;
 
   struct {
