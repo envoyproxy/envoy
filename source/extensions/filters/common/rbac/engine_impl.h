@@ -33,16 +33,14 @@ struct ActionContext {};
 
 class Action : public Envoy::Matcher::ActionBase<envoy::config::rbac::v3::Action> {
 public:
-  Action(const std::string& name, bool allow, bool log) : name_(name), allow_(allow), log_(log) {}
+  Action(const std::string& name, bool allow) : name_(name), allow_(allow) {}
 
   const std::string& name() const { return name_; }
   bool allow() const { return allow_; }
-  bool log() const { return log_; }
 
 private:
   const std::string name_;
   const bool allow_;
-  const bool log_;
 };
 
 class ActionFactory : public Envoy::Matcher::ActionFactory<ActionContext> {
@@ -116,8 +114,6 @@ public:
                     std::string* effective_policy_id) const override;
 
 private:
-  const EnforcementMode mode_;
-
   Envoy::Matcher::MatchTreeSharedPtr<Matching::MatchingData> matcher_;
 };
 

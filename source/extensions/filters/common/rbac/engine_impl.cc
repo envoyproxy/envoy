@@ -21,9 +21,8 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionCont
                                                                                validation_visitor);
   const auto& name = action_config.name();
   const auto allow = action_config.allow();
-  const auto log = action_config.log();
 
-  return [name, allow, log]() { return std::make_unique<Action>(name, allow, log); };
+  return [name, allow]() { return std::make_unique<Action>(name, allow); };
 }
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
@@ -135,8 +134,7 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
 RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl(
     const xds::type::matcher::v3::Matcher& matcher,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ActionValidationVisitor& validation_visitor, const EnforcementMode mode)
-    : mode_(mode) {
+    ActionValidationVisitor& validation_visitor, const EnforcementMode) {
   ActionContext context{};
   Envoy::Matcher::MatchTreeFactory<Matching::MatchingData, ActionContext> factory(
       context, factory_context, validation_visitor);
@@ -166,16 +164,6 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
     auto action = result.result_()->getTyped<Action>();
     if (effective_policy_id != nullptr) {
       *effective_policy_id = action.name();
-    }
-
-    if (action.log()) {
-      // If not shadow enforcement, set shared log metadata
-      if (mode_ != EnforcementMode::Shadow) {
-        ProtobufWkt::Struct log_metadata;
-        auto& log_fields = *log_metadata.mutable_fields();
-        log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(true);
-        info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
-      }
     }
 
     return action.allow();

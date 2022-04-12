@@ -318,8 +318,4 @@ message Action {
 
   // Allows the request if the request matches the matcher.
   bool allow = 2;
-
-  // Sets the `access_log_hint` dynamic metadata key to the value `true` under the shared key
-  // namespace 'envoy.common'.
-  bool log = 3;
 }
