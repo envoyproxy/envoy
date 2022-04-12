@@ -21,7 +21,19 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     gazelle_dependencies()
     apple_rules_dependencies()
     rules_rust_dependencies()
-    rust_register_toolchains(include_rustc_srcs = True)
+    rust_register_toolchains(
+        include_rustc_srcs = True,
+        extra_target_triples = [
+            "aarch64-apple-ios",
+            "aarch64-linux-android",
+            "armv7-linux-androideabi",
+            "i686-linux-android",
+            "wasm32-unknown-unknown",
+            "wasm32-wasi",
+            "x86_64-apple-ios",
+            "x86_64-linux-android",
+        ],
+    )
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
