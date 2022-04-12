@@ -40,11 +40,11 @@ AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
 }
 
 std::string AlternateProtocolsCacheImpl::originDataToStringForCache(const OriginData& data) {
-  if (!data.protocols.has_value() || data.protocols.value().empty()) {
+  if (!data.protocols.has_value() || data.protocols->empty()) {
     return absl::StrCat("clear|", data.srtt.count());
   }
   std::string value;
-  for (auto& protocol : data.protocols.value()) {
+  for (auto& protocol : *data.protocols) {
     if (!value.empty()) {
       value.push_back(',');
     }
@@ -124,11 +124,11 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
         // that we won't end up doing redundant updates to the store while
         // iterating.
         OptRef<std::vector<AlternateProtocol>> protocols;
-        if (origin_data.value().protocols.has_value()) {
-          protocols = origin_data.value().protocols.value();
+        if (origin_data->protocols.has_value()) {
+          protocols = *origin_data->protocols;
         }
-        OriginDataWithOptRef data{protocols, origin_data.value().srtt, nullptr};
-        setPropertiesImpl(origin.value(), data);
+        OriginDataWithOptRef data{protocols, origin_data->srtt, nullptr};
+        setPropertiesImpl(*origin, data);
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
@@ -173,17 +173,17 @@ AlternateProtocolsCacheImpl::ProtocolsMap::iterator
 AlternateProtocolsCacheImpl::setPropertiesImpl(const Origin& origin,
                                                OriginDataWithOptRef& origin_data) {
   if (origin_data.protocols.has_value()) {
-    std::vector<AlternateProtocol>& p = origin_data.protocols.value().get();
+    std::vector<AlternateProtocol>& protocols = *origin_data.protocols;
     static const size_t max_protocols = 10;
-    if (p.size() > max_protocols) {
-      ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", p.size());
-      p.erase(p.begin() + max_protocols, p.end());
+    if (protocols.size() > max_protocols) {
+      ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
+      protocols.erase(protocols.begin() + max_protocols, protocols.end());
     }
   }
   auto entry_it = protocols_.find(origin);
   if (entry_it != protocols_.end()) {
     if (origin_data.protocols.has_value()) {
-      entry_it->second.protocols = origin_data.protocols.value().get();
+      entry_it->second.protocols = *origin_data.protocols;
     }
     if (origin_data.srtt.count()) {
       entry_it->second.srtt = origin_data.srtt;
@@ -194,8 +194,8 @@ AlternateProtocolsCacheImpl::setPropertiesImpl(const Origin& origin,
 
     return entry_it;
   }
-  return addOriginData(origin, OriginData{origin_data.protocols, origin_data.srtt,
-                                          std::move(origin_data.h3_status_tracker)});
+  return addOriginData(
+      origin, {origin_data.protocols, origin_data.srtt, std::move(origin_data.h3_status_tracker)});
 }
 
 AlternateProtocolsCacheImpl::ProtocolsMap::iterator
@@ -216,7 +216,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   if (entry_it == protocols_.end() || !entry_it->second.protocols.has_value()) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
-  std::vector<AlternateProtocol>& protocols = entry_it->second.protocols.value();
+  std::vector<AlternateProtocol>& protocols = *entry_it->second.protocols;
 
   auto original_size = protocols.size();
   const MonotonicTime now = dispatcher_.timeSource().monotonicTime();

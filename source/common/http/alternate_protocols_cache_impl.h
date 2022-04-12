@@ -36,9 +36,9 @@ public:
   // Captures the data tracked per origin;,
   struct OriginData {
     OriginData() = default;
-    OriginData(OptRef<std::vector<AlternateProtocol>> new_protocols,
-               std::chrono::microseconds new_srtt, Http3StatusTrackerPtr&& new_tracker)
-        : protocols(new_protocols), srtt(new_srtt), h3_status_tracker(std::move(new_tracker)) {}
+    OriginData(OptRef<std::vector<AlternateProtocol>> protocols, std::chrono::microseconds srtt,
+               Http3StatusTrackerPtr&& tracker)
+        : protocols(protocols), srtt(srtt), h3_status_tracker(std::move(tracker)) {}
 
     // The alternate protocols supported if available.
     absl::optional<std::vector<AlternateProtocol>> protocols;
@@ -107,8 +107,7 @@ private:
   // This allows calling setPropertiesImpl without creating an additional copy
   // of the protocols vector.
   struct OriginDataWithOptRef {
-    OriginDataWithOptRef()
-        : protocols{}, srtt(std::chrono::milliseconds(0)), h3_status_tracker(nullptr) {}
+    OriginDataWithOptRef() : srtt(std::chrono::milliseconds(0)) {}
     OriginDataWithOptRef(OptRef<std::vector<AlternateProtocol>> protocols,
                          std::chrono::microseconds s, Http3StatusTrackerPtr&& t)
         : protocols(protocols), srtt(s), h3_status_tracker(std::move(t)) {}
