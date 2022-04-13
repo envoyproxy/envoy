@@ -56,13 +56,6 @@ public:
 
 using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Matching::MatchingData>;
 
-class NetworkActionValidationVisitor : public ActionValidationVisitor {
-public:
-  absl::Status performDataInputValidation(
-      const Envoy::Matcher::DataInputFactory<Matching::MatchingData>& data_input,
-      absl::string_view type_url) override;
-};
-
 class HttpActionValidationVisitor : public ActionValidationVisitor {
 public:
   absl::Status performDataInputValidation(
