@@ -101,6 +101,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* access_log: added new access_log command operator ``%GRPC_STATUS_NUMBER%``.
 * access_log: added new access_log command operator ``%ENVIRONMENT(X):Z%``.
 * access_log: added TCP proxy upstream and downstream byte logging. This can be accessed through the ``%DOWNSTREAM_WIRE_BYTES_SENT%``, ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``, ``%UPSTREAM_WIRE_BYTES_SENT%``, and ``%UPSTREAM_WIRE_BYTES_RECEIVED%`` access_log command operatrors.
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
