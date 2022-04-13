@@ -72,7 +72,7 @@ TEST_F(AlternateProtocolsCacheImplTest, Init) {
   EXPECT_EQ(0, protocols_->size());
 }
 
-TEST_F(AlternateProtocolsCacheImplTest, SetAlternativesAndSrtt) {
+TEST_F(AlternateProtocolsCacheImplTest, SetAlternativesThenSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_));
@@ -81,6 +81,18 @@ TEST_F(AlternateProtocolsCacheImplTest, SetAlternativesAndSrtt) {
   EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5"));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+}
+
+TEST_F(AlternateProtocolsCacheImplTest, SetSrttThenAlternatives) {
+  initialize();
+  EXPECT_EQ(0, protocols_->size());
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "clear|5"));
+  protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
+  EXPECT_EQ(1, protocols_->size());
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5"));
+  protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
@@ -226,7 +238,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
                                                           dispatcher_.timeSource(), true);
     ASSERT(origin_data.has_value());
     std::vector<AlternateProtocolsCache::AlternateProtocol>& protocols =
-        origin_data.value().protocols;
+        origin_data.value().protocols.value();
     ASSERT_GE(protocols.size(), 1);
     AlternateProtocolsCache::AlternateProtocol& protocol = protocols[0];
     EXPECT_EQ("h3-29", protocol.alpn_);
@@ -245,8 +257,8 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
       EXPECT_EQ(60, duration.count());
     }
 
-    std::string alt_svc = AlternateProtocolsCacheImpl::originDataToStringForCache(
-        protocols, origin_data.value().srtt);
+    std::string alt_svc =
+        AlternateProtocolsCacheImpl::originDataToStringForCache(origin_data.value());
     EXPECT_EQ(expected_alt_svc, alt_svc);
   };
 
@@ -299,6 +311,17 @@ TEST_F(AlternateProtocolsCacheImplTest, CacheLoad) {
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
   EXPECT_EQ(protocols1_, protocols.ref());
+}
+
+TEST_F(AlternateProtocolsCacheImplTest, CacheLoadSrttOnly) {
+  EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+    fn("https://hostname1:1", "clear|5");
+  }));
+  initialize();
+
+  EXPECT_CALL(*store_, addOrUpdate(_, _)).Times(0);
+  ASSERT_FALSE(protocols_->findAlternatives(origin1_).has_value());
+  EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
