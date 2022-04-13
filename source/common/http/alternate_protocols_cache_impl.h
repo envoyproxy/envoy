@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -11,6 +12,7 @@
 #include "envoy/http/alternate_protocols_cache.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http3_status_tracker_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "quiche/common/quiche_linked_hash_map.h"
@@ -18,24 +20,32 @@
 namespace Envoy {
 namespace Http {
 
-// An implementation of AlternateProtocolsCache.
-// See: source/docs/http3_upstream.md
-//
-// The primary purpose of this cache is to cache alternate protocols entries.
-// Secondarily, it maps origins to srtt information, useful for
-// tuning 0-rtt timeouts if the alternate protocol is HTTP/3.
+// A cache of HTTP server properties.
+// This caches
+//   - alternate protocol entries as documented here: source/docs/http3_upstream.md
+//   - QUIC SRTT, used for TCP failover
+//   - The last connectivity status of HTTP/3, if available.
+// TODO(alyssawilk) move and rename.
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
-  AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store,
+  AlternateProtocolsCacheImpl(Event::Dispatcher& dispatcher, std::unique_ptr<KeyValueStore>&& store,
                               size_t max_entries);
   ~AlternateProtocolsCacheImpl() override;
 
-  // Captures the data tracked per origin; the alternate protocols supported,
-  // and last smoothed round trip time, if available.
+  // Captures the data tracked per origin;,
   struct OriginData {
-    std::vector<AlternateProtocol> protocols;
+    OriginData() = default;
+    OriginData(OptRef<std::vector<AlternateProtocol>> protocols, std::chrono::microseconds srtt,
+               Http3StatusTrackerPtr&& tracker)
+        : protocols(protocols), srtt(srtt), h3_status_tracker(std::move(tracker)) {}
+
+    // The alternate protocols supported if available.
+    absl::optional<std::vector<AlternateProtocol>> protocols;
+    // The last smoothed round trip time, if available else 0.
     std::chrono::microseconds srtt;
+    // The last connectivity status of HTTP/3, if available else nullptr.
+    Http3StatusTrackerPtr h3_status_tracker;
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
@@ -51,16 +61,21 @@ public:
   // normalization will simply not be read from cache.
   // The string format is:
   // protocols|rtt
-  static std::string originDataToStringForCache(const std::vector<AlternateProtocol>& protocols,
-                                                std::chrono::microseconds srtt);
+  static std::string originDataToStringForCache(const OriginData& data);
   // Parse an origin data into structured data, or absl::nullopt
   // if it is empty or invalid.
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
   // rather than relative time.
   static absl::optional<OriginData> originDataFromString(absl::string_view origin_data,
-                                                         TimeSource& time_source,
-                                                         bool from_cache = false);
+                                                         TimeSource& time_source, bool from_cache);
+  // Parse an alt-svc string into a vector of structured data.
+  // If from_cache is true, it is assumed the string was serialized using
+  // protocolsToStringForCache and the the ma fields will be parsed as absolute times
+  // rather than relative time.
+  static std::vector<Http::AlternateProtocolsCache::AlternateProtocol>
+  alternateProtocolsFromString(absl::string_view altsvc_str, TimeSource& time_source,
+                               bool from_cache);
 
   // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
@@ -68,12 +83,12 @@ public:
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
+  AlternateProtocolsCache::Http3StatusTracker&
+  getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
-  void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
-  void setSrttImpl(const Origin& origin, std::chrono::microseconds srtt);
   // Time source used to check expiration of entries.
-  TimeSource& time_source_;
+  Event::Dispatcher& dispatcher_;
 
   struct OriginHash {
     size_t operator()(const Origin& origin) const {
@@ -85,8 +100,28 @@ private:
     }
   };
 
+  using ProtocolsMap = quiche::QuicheLinkedHashMap<Origin, OriginData, OriginHash>;
   // Map from origin to list of alternate protocols.
-  quiche::QuicheLinkedHashMap<Origin, OriginData, OriginHash> protocols_;
+  ProtocolsMap protocols_;
+
+  // This allows calling setPropertiesImpl without creating an additional copy
+  // of the protocols vector.
+  struct OriginDataWithOptRef {
+    OriginDataWithOptRef() : srtt(std::chrono::milliseconds(0)) {}
+    OriginDataWithOptRef(OptRef<std::vector<AlternateProtocol>> protocols,
+                         std::chrono::microseconds s, Http3StatusTrackerPtr&& t)
+        : protocols(protocols), srtt(s), h3_status_tracker(std::move(t)) {}
+    // The alternate protocols supported if available.
+    OptRef<std::vector<AlternateProtocol>> protocols;
+    // The last smoothed round trip time, if available else 0.
+    std::chrono::microseconds srtt;
+    // The last connectivity status of HTTP/3, if available else nullptr.
+    Http3StatusTrackerPtr h3_status_tracker;
+  };
+
+  ProtocolsMap::iterator setPropertiesImpl(const Origin& origin, OriginDataWithOptRef& origin_data);
+
+  ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;

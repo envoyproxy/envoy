@@ -82,6 +82,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_lib",
+    deps = [
+        ":connection_impl",
+        ":default_client_connection_factory",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_impl",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
     external_deps = ["abseil_optional"],
@@ -114,6 +122,25 @@ envoy_cc_library(
     deps = [
         ":connection_base_lib",
         ":connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_client_connection_factory",
+    srcs = [
+        "default_client_connection_factory.cc",
+    ],
+    hdrs = [
+        "default_client_connection_factory.h",
+    ],
+    deps = [
+        ":address_lib",
+        ":connection_base_lib",
+        ":connection_impl",
+        "//envoy/network:client_connection_factory",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/registry",
     ],
 )
 

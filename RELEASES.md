@@ -56,6 +56,7 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    |
 
 ## Release schedule
 

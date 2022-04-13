@@ -40,7 +40,8 @@ std::vector<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType>
 getProtocolTypes() {
   std::vector<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType> v;
   int protocol = envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_MIN;
-  while (protocol <= envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_MAX) {
+  // Note: ProtocolType_MAX is TTwitter, which is deprecated.
+  while (protocol < envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType_MAX) {
     v.push_back(
         static_cast<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType>(protocol));
     protocol++;
@@ -141,6 +142,8 @@ route_config:
       cluster_header: A
 thrift_filters:
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
@@ -160,6 +163,8 @@ route_config:
   name: local_route
 thrift_filters:
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
@@ -176,6 +181,8 @@ route_config:
 thrift_filters:
   - name: no_such_filter
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
@@ -198,6 +205,8 @@ thrift_filters:
       value:
         key: value
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   ThriftFilters::MockFilterConfigFactory factory;
@@ -221,6 +230,8 @@ route_config:
   name: local_route
 thrift_filters:
   - name: envoy.filters.thrift.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =

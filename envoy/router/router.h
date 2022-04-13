@@ -506,7 +506,7 @@ public:
   virtual bool traceSampled() const PURE;
 };
 
-using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
 
 /**
  * All virtual cluster stats. @see stats_macro.h
@@ -727,10 +727,13 @@ enum class PathMatchType {
   Prefix,
   Exact,
   Regex,
+  PathSeparatedPrefix,
 };
 
 /**
  * Criterion that a route entry uses for matching a particular path.
+ * Extensions can use this to gain better insights of chosen route paths,
+ * see: https://github.com/envoyproxy/envoy/pull/2531.
  */
 class PathMatchCriterion {
 public:
