@@ -376,7 +376,7 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynFilterCfg,
+template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynamicFilterConfig,
           const absl::string_view& StatPrefix>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
@@ -479,7 +479,7 @@ private:
       const absl::flat_hash_set<std::string>& require_type_urls, FactoryCtx& factory_context,
       ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type, absl::string_view stat_prefix) {
-    return std::make_unique<ListenerDynFilterCfg>(
+    return std::make_unique<ListenerDynamicFilterConfig>(
         subscription, require_type_urls, factory_context, std::move(default_config),
         last_filter_in_filter_chain, filter_chain_type, stat_prefix);
   }

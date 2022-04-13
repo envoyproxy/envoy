@@ -40,7 +40,7 @@ namespace Envoy {
 namespace Filter {
 namespace {
 
-class FilterConfigDiscoveryTestBase : public testing::Test {
+class FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryTestBase() {
     // For server_factory_context
@@ -49,9 +49,9 @@ public:
         .WillByDefault(ReturnRef(validation_context_));
     ON_CALL(factory_context_.server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
-    EXPECT_CALL(validation_context_, dynamicValidationVisitor())
-        .WillRepeatedly(ReturnRef(validation_visitor_));
-    EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
+    ON_CALL(validation_context_, dynamicValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor_));
+    ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
@@ -64,6 +64,7 @@ public:
     ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
   }
 
+  virtual ~FilterConfigDiscoveryTestBase() {}
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
@@ -84,7 +85,7 @@ public:
   FilterConfigDiscoveryImplTest() {
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
   }
-  ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
+  ~FilterConfigDiscoveryImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
   // Create listener filter config provider callbacks.
   DynamicFilterConfigProviderPtr<FactoryCb> createProvider(std::string name, bool warm,
@@ -130,12 +131,7 @@ public:
     return response;
   }
 
-  virtual const std::string getTypeUrl() const PURE;
-  virtual const std::string getFilterType() const PURE;
-  virtual const std::string getConfigReloadCounter() const PURE;
-  virtual const std::string getConfigFailCounter() const PURE;
-
-  // Add a listener filter configuration by send a extension discovery response. Then removes it.
+  // Add a filter configuration by send a extension discovery response. Then removes it.
   void incrementalTest() {
     const auto response = createResponse("1", "foo");
     const auto decoded_resources =
@@ -155,191 +151,10 @@ public:
     EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
   }
 
-  // Test functions will be called by all three filter types.
-  void testDestroyReady() {
-    setup();
-    EXPECT_CALL(init_watcher_, ready());
-  }
-
-  void testBasic() {
-    InSequence s;
-    setup();
-    EXPECT_EQ("foo", provider_->name());
-    EXPECT_EQ(absl::nullopt, provider_->config());
-
-    // Initial request.
-    {
-      auto response = createResponse("1", "foo");
-      const auto decoded_resources =
-          TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-
-      EXPECT_CALL(init_watcher_, ready());
-      callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-      EXPECT_NE(absl::nullopt, provider_->config());
-      EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
-      EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
-    }
-
-    // 2nd request with same response. Based on hash should not reload config.
-    {
-      const auto response = createResponse("2", "foo");
-      const auto decoded_resources =
-          TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-      callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-
-      EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
-      EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
-    }
-  }
-
-  void testBasicDeprecatedStatPrefix() {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.top_level_ecds_stats", "false"}});
-
-    InSequence s;
-    setup();
-    EXPECT_EQ("foo", provider_->name());
-    EXPECT_EQ(absl::nullopt, provider_->config());
-
-    const auto response = createResponse("1", "foo");
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-
-    EXPECT_CALL(init_watcher_, ready());
-    callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-    EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
-    EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
-  }
-
-  void testConfigFailed() {
-    InSequence s;
-    setup();
-    EXPECT_CALL(init_watcher_, ready());
-    callbacks_->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::FetchTimedout, {});
-    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(1UL, scope_.counter(getConfigFailCounter()).value());
-  }
-
-  void testTooManyResources() {
-    InSequence s;
-    setup();
-    auto response = createResponse("1", "foo");
-    envoy::config::core::v3::TypedExtensionConfig extension_config;
-    extension_config.set_name("foo");
-    extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" + getTypeUrl());
-    response.add_resources()->PackFrom(extension_config);
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-    EXPECT_CALL(init_watcher_, ready());
-    EXPECT_THROW_WITH_MESSAGE(
-        callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
-        EnvoyException, "Unexpected number of resources in ExtensionConfigDS response: 2");
-    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
-  }
-
-  void testWrongName() {
-    InSequence s;
-    setup();
-    const auto response = createResponse("1", "bar");
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-    EXPECT_CALL(init_watcher_, ready());
-    EXPECT_THROW_WITH_MESSAGE(
-        callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
-        EnvoyException, "Unexpected resource name in ExtensionConfigDS response: bar");
-    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
-  }
-
-  // Without default config.
-  // First adding a listener filter configuration by send a extension discovery response, then
-  // removes it.
-  void testIncrementalWithOutDefault() {
-    InSequence s;
-    setup();
-    incrementalTest();
-    // Verify the provider config is empty.
-    EXPECT_EQ(absl::nullopt, provider_->config());
-  }
-
-  // With default config.
-  // First adding a listener filter configuration by send a extension discovery response, then
-  // removes it.
-  void testIncrementalWithDefault() {
-    InSequence s;
-    setup(true, true);
-    incrementalTest();
-    // Verify the provider config is not empty since default config is there.
-    EXPECT_NE(absl::nullopt, provider_->config());
-  }
-
-  void testApplyWithoutWarming() {
-    InSequence s;
-    setup(false);
-    EXPECT_EQ("foo", provider_->name());
-    EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
-    EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
-  }
-
-  void testDualProviders() {
-    InSequence s;
-    setup();
-    auto provider2 = createProvider("foo", true, false);
-    EXPECT_EQ("foo", provider2->name());
-    EXPECT_EQ(absl::nullopt, provider2->config());
-    const auto response = createResponse("1", "foo");
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-    EXPECT_CALL(init_watcher_, ready());
-    callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-    EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_NE(absl::nullopt, provider2->config());
-    EXPECT_EQ(1UL, scope_.counter(getConfigReloadCounter()).value());
-  }
-
-  void testDualProvidersInvalid() {
-    InSequence s;
-    setup();
-    auto provider2 = createProvider("foo", true, false);
-
-    // Create a response with a random type AddBodyFilterConfig not matching with providers.
-    auto add_body_filter_config = test::integration::filters::AddBodyFilterConfig();
-    add_body_filter_config.set_body_size(10);
-    envoy::config::core::v3::TypedExtensionConfig extension_config;
-    extension_config.set_name("foo");
-    extension_config.mutable_typed_config()->PackFrom(add_body_filter_config);
-    envoy::service::discovery::v3::DiscoveryResponse response;
-    response.set_version_info("1");
-    response.add_resources()->PackFrom(extension_config);
-
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-    EXPECT_CALL(init_watcher_, ready());
-    EXPECT_THROW_WITH_MESSAGE(
-        callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
-        EnvoyException,
-        "Error: filter config has type URL test.integration.filters.AddBodyFilterConfig but "
-        "expect " +
-            getTypeUrl() + ".");
-    EXPECT_EQ(0UL, scope_.counter(getConfigReloadCounter()).value());
-  }
-
-  // Throw Envoy exception when default config is wrong.
-  void testWrongDefaultConfig() {
-    InSequence s;
-    envoy::config::core::v3::ExtensionConfigSource config_source;
-    // Set up the default config with a bogus type url.
-    config_source.mutable_default_config()->set_type_url(
-        "type.googleapis.com/test.integration.filters.Bogus");
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config_provider_manager_->createDynamicFilterConfigProvider(
-            config_source, "foo", factory_context_, "xds.", true, getFilterType()),
-        EnvoyException,
-        "Error: cannot find filter factory foo for default filter "
-        "configuration with type URL "
-        "type.googleapis.com/test.integration.filters.Bogus.");
-  }
+  virtual const std::string getTypeUrl() const PURE;
+  virtual const std::string getFilterType() const PURE;
+  virtual const std::string getConfigReloadCounter() const PURE;
+  virtual const std::string getConfigFailCounter() const PURE;
 
   std::unique_ptr<FilterConfigProviderManager<FactoryCb, FactoryCtx>>
       filter_config_provider_manager_;
@@ -366,68 +181,7 @@ public:
   }
 };
 
-TEST_F(HttpFilterConfigDiscoveryImplTest, DestroyReady) { testDestroyReady(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, Basic) { testBasic(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
-  testBasicDeprecatedStatPrefix();
-}
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, ConfigFailed) { testConfigFailed(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, TooManyResources) { testTooManyResources(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, WrongName) { testWrongName(); }
-
-// Without default config.
-// First adding a listener filter configuration by send a extension discovery response, then removes
-// it.
-TEST_F(HttpFilterConfigDiscoveryImplTest, IncrementalWithOutDefault) {
-  testIncrementalWithOutDefault();
-}
-
-// With default config.
-// First adding a listener filter configuration by send a extension discovery response, then removes
-// it.
-TEST_F(HttpFilterConfigDiscoveryImplTest, IncrementalWithDefault) { testIncrementalWithDefault(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, ApplyWithoutWarming) { testApplyWithoutWarming(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, DualProviders) { testDualProviders(); }
-
-TEST_F(HttpFilterConfigDiscoveryImplTest, DualProvidersInvalid) { testDualProvidersInvalid(); }
-
-// Throw Envoy exception when default config is wrong.
-TEST_F(HttpFilterConfigDiscoveryImplTest, WrongDefaultConfig) { testWrongDefaultConfig(); }
-
-// Raise exception when filter is not the last filter in filter chain, but the filter is terminal
-// filter. This test is HTTP filter specific.
-TEST_F(HttpFilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
-  InSequence s;
-  setup(true, false, false);
-  const std::string response_yaml = R"EOF(
-  version_info: "1"
-  resources:
-  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-    name: foo
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  )EOF";
-  const auto response =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
-  const auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(
-      callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
-      EnvoyException,
-      "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
-      "in a http filter chain.");
-  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
-}
-
-// TCP listener test
+// TCP listener filter test
 class TcpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
@@ -443,46 +197,7 @@ public:
   }
 };
 
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DestroyReady) { testDestroyReady(); }
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, Basic) { testBasic(); }
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
-  testBasicDeprecatedStatPrefix();
-}
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, ConfigFailed) { testConfigFailed(); }
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, TooManyResources) { testTooManyResources(); }
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, WrongName) { testWrongName(); }
-
-// Without default config.
-// First adding a listener filter configuration by send a extension discovery response, then removes
-// it.
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, IncrementalWithOutDefault) {
-  testIncrementalWithOutDefault();
-}
-
-// With default config.
-// First adding a listener filter configuration by send a extension discovery response, then removes
-// it.
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, IncrementalWithDefault) {
-  testIncrementalWithDefault();
-}
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) { testApplyWithoutWarming(); }
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DualProviders) { testDualProviders(); }
-
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, DualProvidersInvalid) {
-  testDualProvidersInvalid();
-}
-
-// Throw Envoy exception when default config is wrong.
-TEST_F(TcpListenerFilterConfigDiscoveryImplTest, WrongDefaultConfig) { testWrongDefaultConfig(); }
-
-// UDP listener test
+// UDP listener filter test
 class UdpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
@@ -501,44 +216,290 @@ public:
   }
 };
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DestroyReady) { testDestroyReady(); }
+/***************************************************************************************
+ *                  Parameterized test for                                             *
+ *     HTTP filter,  TCP listener filter And UDP listener filter                       *
+ *                                                                                     *
+ ***************************************************************************************/
+template <typename FilterConfigDiscoveryTestType>
+class FilterConfigDiscoveryImplTestParameter : public testing::Test {
+public:
+  FilterConfigDiscoveryTestType config_discovery_test_;
+};
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, Basic) { testBasic(); }
+// The test filter types.
+using FilterConfigDiscoveryTestTypes =
+    ::testing::Types<HttpFilterConfigDiscoveryImplTest, TcpListenerFilterConfigDiscoveryImplTest,
+                     UdpListenerFilterConfigDiscoveryImplTest>;
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, BasicDeprecatedStatPrefix) {
-  testBasicDeprecatedStatPrefix();
+TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTestTypes);
+
+// TYPED_TEST will run the same test for each of the above filter type.
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DestroyReady) {
+  this->config_discovery_test_.setup();
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
 }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, ConfigFailed) { testConfigFailed(); }
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
+  InSequence s;
+  this->config_discovery_test_.setup();
+  EXPECT_EQ("foo", this->config_discovery_test_.provider_->name());
+  EXPECT_EQ(absl::nullopt, this->config_discovery_test_.provider_->config());
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, TooManyResources) { testTooManyResources(); }
+  // Initial request.
+  {
+    auto response = this->config_discovery_test_.createResponse("1", "foo");
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, WrongName) { testWrongName(); }
+    EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+    this->config_discovery_test_.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                            response.version_info());
+    EXPECT_NE(absl::nullopt, this->config_discovery_test_.provider_->config());
+    EXPECT_EQ(1UL, this->config_discovery_test_.scope_
+                       .counter(this->config_discovery_test_.getConfigReloadCounter())
+                       .value());
+    EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                       .counter(this->config_discovery_test_.getConfigFailCounter())
+                       .value());
+  }
+
+  // 2nd request with same response. Based on hash should not reload config.
+  {
+    const auto response = this->config_discovery_test_.createResponse("2", "foo");
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+    this->config_discovery_test_.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                            response.version_info());
+
+    EXPECT_EQ(1UL, this->config_discovery_test_.scope_
+                       .counter(this->config_discovery_test_.getConfigReloadCounter())
+                       .value());
+    EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                       .counter(this->config_discovery_test_.getConfigFailCounter())
+                       .value());
+  }
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, BasicDeprecatedStatPrefix) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.top_level_ecds_stats", "false"}});
+
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  EXPECT_EQ("foo", this->config_discovery_test_.provider_->name());
+  EXPECT_EQ(absl::nullopt, this->config_discovery_test_.provider_->config());
+
+  const auto response = this->config_discovery_test_.createResponse("1", "foo");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  this->config_discovery_test_.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                          response.version_info());
+  EXPECT_NE(absl::nullopt, this->config_discovery_test_.provider_->config());
+  EXPECT_EQ(1UL, this->config_discovery_test_.scope_
+                     .counter("xds.extension_config_discovery.foo.config_reload")
+                     .value());
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter("xds.extension_config_discovery.foo.config_fail")
+                     .value());
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  this->config_discovery_test_.callbacks_->onConfigUpdateFailed(
+      Config::ConfigUpdateFailureReason::FetchTimedout, {});
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigReloadCounter())
+                     .value());
+  EXPECT_EQ(1UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigFailCounter())
+                     .value());
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  auto response = this->config_discovery_test_.createResponse("1", "foo");
+  envoy::config::core::v3::TypedExtensionConfig extension_config;
+  extension_config.set_name("foo");
+  extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" +
+                                                        this->config_discovery_test_.getTypeUrl());
+  response.add_resources()->PackFrom(extension_config);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(this->config_discovery_test_.callbacks_->onConfigUpdate(
+                                decoded_resources.refvec_, response.version_info()),
+                            EnvoyException,
+                            "Unexpected number of resources in ExtensionConfigDS response: 2");
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigReloadCounter())
+                     .value());
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  const auto response = this->config_discovery_test_.createResponse("1", "bar");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(this->config_discovery_test_.callbacks_->onConfigUpdate(
+                                decoded_resources.refvec_, response.version_info()),
+                            EnvoyException,
+                            "Unexpected resource name in ExtensionConfigDS response: bar");
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigReloadCounter())
+                     .value());
+}
 
 // Without default config.
-// First adding a listener filter configuration by send a extension discovery response, then removes
-// it.
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, IncrementalWithOutDefault) {
-  testIncrementalWithOutDefault();
+// First adding a filter configuration by send a extension discovery response, then removes it.
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithOutDefault) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  this->config_discovery_test_.incrementalTest();
+  // Verify the provider config is empty.
+  EXPECT_EQ(absl::nullopt, this->config_discovery_test_.provider_->config());
 }
 
 // With default config.
-// First adding a listener filter configuration by send a extension discovery response, then removes
-// it.
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, IncrementalWithDefault) {
-  testIncrementalWithDefault();
+// First adding a filter configuration by send a extension discovery response, then removes it.
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithDefault) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup(true, true);
+  this->config_discovery_test_.incrementalTest();
+  // Verify the provider config is not empty since the default config is there.
+  EXPECT_NE(absl::nullopt, this->config_discovery_test_.provider_->config());
 }
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, ApplyWithoutWarming) { testApplyWithoutWarming(); }
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup(false);
+  EXPECT_EQ("foo", this->config_discovery_test_.provider_->name());
+  EXPECT_NE(absl::nullopt, this->config_discovery_test_.provider_->config());
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigReloadCounter())
+                     .value());
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigFailCounter())
+                     .value());
+}
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DualProviders) { testDualProviders(); }
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  auto provider2 = this->config_discovery_test_.createProvider("foo", true, false);
+  EXPECT_EQ("foo", provider2->name());
+  EXPECT_EQ(absl::nullopt, provider2->config());
+  const auto response = this->config_discovery_test_.createResponse("1", "foo");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  this->config_discovery_test_.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                          response.version_info());
+  EXPECT_NE(absl::nullopt, this->config_discovery_test_.provider_->config());
+  EXPECT_NE(absl::nullopt, provider2->config());
+  EXPECT_EQ(1UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigReloadCounter())
+                     .value());
+}
 
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, DualProvidersInvalid) {
-  testDualProvidersInvalid();
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  this->config_discovery_test_.setup();
+  auto provider2 = this->config_discovery_test_.createProvider("foo", true, false);
+
+  // Create a response with a random type AddBodyFilterConfig not matching with providers.
+  auto add_body_filter_config = test::integration::filters::AddBodyFilterConfig();
+  add_body_filter_config.set_body_size(10);
+  envoy::config::core::v3::TypedExtensionConfig extension_config;
+  extension_config.set_name("foo");
+  extension_config.mutable_typed_config()->PackFrom(add_body_filter_config);
+  envoy::service::discovery::v3::DiscoveryResponse response;
+  response.set_version_info("1");
+  response.add_resources()->PackFrom(extension_config);
+
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(
+      this->config_discovery_test_.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                              response.version_info()),
+      EnvoyException,
+      "Error: filter config has type URL test.integration.filters.AddBodyFilterConfig but "
+      "expect " +
+          this->config_discovery_test_.getTypeUrl() + ".");
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter(this->config_discovery_test_.getConfigReloadCounter())
+                     .value());
 }
 
 // Throw Envoy exception when default config is wrong.
-TEST_F(UdpListenerFilterConfigDiscoveryImplTest, WrongDefaultConfig) { testWrongDefaultConfig(); }
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  envoy::config::core::v3::ExtensionConfigSource config_source;
+  // Set up the default config with a bogus type url.
+  config_source.mutable_default_config()->set_type_url(
+      "type.googleapis.com/test.integration.filters.Bogus");
+  EXPECT_THROW_WITH_MESSAGE(
+      this->config_discovery_test_.filter_config_provider_manager_
+          ->createDynamicFilterConfigProvider(config_source, "foo",
+                                              this->config_discovery_test_.factory_context_, "xds.",
+                                              true, this->config_discovery_test_.getFilterType()),
+      EnvoyException,
+      "Error: cannot find filter factory foo for default filter "
+      "configuration with type URL "
+      "type.googleapis.com/test.integration.filters.Bogus.");
+}
+
+// Raise exception when filter is not the last filter in filter chain, but the filter is terminal
+// filter. This test is HTTP filter specific.
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
+  InSequence s;
+  TypeParam config_discovery_test;
+  if (this->config_discovery_test_.getFilterType() != "http") {
+    return;
+  }
+
+  this->config_discovery_test_.setup(true, false, false);
+  const std::string response_yaml = R"EOF(
+  version_info: "1"
+  resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+  const auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(this->config_discovery_test_.init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(
+      this->config_discovery_test_.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                              response.version_info()),
+      EnvoyException,
+      "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
+      "in a http filter chain.");
+  EXPECT_EQ(0UL, this->config_discovery_test_.scope_
+                     .counter("xds.extension_config_discovery.foo.config_reload")
+                     .value());
+}
 
 } // namespace
 } // namespace Filter
