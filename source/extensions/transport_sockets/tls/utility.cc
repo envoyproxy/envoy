@@ -45,8 +45,10 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
       std::make_unique<envoy::admin::v3::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(
-      Utility::getDaysUntilExpiration(cert, time_source).value());
+  const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).has_value()
+                                     ? Utility::getDaysUntilExpiration(cert, time_source).value()
+                                     : -1;
+  certificate_details->set_days_until_expiration(days_until_expiry);
 
   ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
