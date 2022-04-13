@@ -61,7 +61,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
-        "//source/extensions/filters/common/rbac/matching:data_lib",
+        "//source/extensions/filters/common/rbac/matching:data_impl_lib",
         "//source/extensions/filters/common/rbac/matching:inputs_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
     ],

@@ -36,11 +36,13 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
     ],
 )
 

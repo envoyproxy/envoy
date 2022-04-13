@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "data_interface",
+    name = "data_lib",
     hdrs = ["data.h"],
     deps = [
         "//envoy/http:header_map_interface",
@@ -19,10 +19,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "data_lib",
+    name = "data_impl_lib",
     hdrs = ["data_impl.h"],
     deps = [
-        ":data_interface",
+        ":data_lib",
     ],
 )
 
@@ -31,7 +31,7 @@ envoy_cc_library(
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
     deps = [
-        ":data_interface",
+        ":data_lib",
         "//source/common/http/matching:inputs_lib",
         "//source/common/network/matching:inputs_lib",
     ],
