@@ -2,9 +2,12 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
+#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/ads_integration.h"
@@ -25,7 +28,7 @@ public:
 ;
 
   // Get the base config, without any listeners. Similar to ConfigHelper::baseConfig(), but there's
-  // no lds_config nor any listeners configured, and no tls certificate stuff.
+  // no lds_config nor any listeners configured, and no TLS certificate stuff.
   static std::string baseBootstrapConfig() {
     return fmt::format(R"EOF(
 admin:
@@ -54,50 +57,61 @@ static_resources:
                      Platform::null_device_path);
   }
 
-  // Get the listener configuration. Listener comes with the on_demand HTTP filter enabled, but with
-  // empty config (so ODCDS is disabled). Comes with "integration" vhost, which has "odcds_route"
-  // with cluster_header action looking for cluster name in "Pick-This-Cluster" HTTP header.
-  static std::string listenerConfig(absl::string_view address = "127.0.0.1") {
-    return ConfigHelper::buildBaseListener("listener_0", address, fmt::format(R"EOF(
-        filters:
-          name: http
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-            stat_prefix: config_test
-            delayed_close_timeout:
-              nanos: 10000000
-            http_filters:
-              name: envoy.filters.http.on_demand
-              name: envoy.filters.http.router
-            codec_type: HTTP2
-            access_log:
-              name: accesslog
-              filter:
-                not_health_check_filter:  {{}}
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-                path: {}
-            route_config:
-              virtual_hosts:
-                name: integration
-                routes:
-                  name: odcds_route
-                  route:
-                    cluster_header: "Pick-This-Cluster"
-                  match:
-                    prefix: "/"
-                domains: "*"
-              name: route_config_0
-    )EOF", Platform::null_device_path));
+  // Get the listener configuration. Listener named "listener_0" comes with the on_demand HTTP
+  // filter enabled, but with an empty config (so ODCDS is disabled), comes with "integration"
+  // vhost, which has "odcds_route" with cluster_header action looking for cluster name in the
+  // "Pick-This-Cluster" HTTP header.
+  static std::string listenerConfig(absl::string_view address) {
+    // Can't use ConfigHelper::buildBaseListener, because it returns a proto object, not a config as
+    // a string.
+    return fmt::format(R"EOF(
+    name: listener_0
+    address:
+      socket_address:
+        address: {}
+        port_value: 0
+    filter_chains:
+      filters:
+        name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: config_test
+          delayed_close_timeout:
+            nanos: 10000000
+          http_filters:
+            name: envoy.filters.http.on_demand
+            name: envoy.filters.http.router
+          codec_type: HTTP2
+          access_log:
+            name: accesslog
+            filter:
+              not_health_check_filter:  {{}}
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              path: {}
+          route_config:
+            virtual_hosts:
+              name: integration
+              routes:
+                name: odcds_route
+                route:
+                  cluster_header: "Pick-This-Cluster"
+                match:
+                  prefix: "/"
+              domains: "*"
+            name: route_config_0
+)EOF", address, Platform::null_device_path);
   }
 
   // Get the config, with a static listener. Similar to ConfigHelper::baseConfig(), but there's no
-  // lds_config and no tls certificate stuff. Listener is configured with listenerConfig.
+  // lds_config and no TLS certificate stuff. Listener is configured with listenerConfig.
   static std::string bootstrapConfig() {
-    return absl::StrCat(baseBootstrapConfig(), listenerConfig());
+    std::string config = absl::StrCat(baseBootstrapConfig(), "  listeners:", listenerConfig("127.0.0.1"));
+    ENVOY_LOG_MISC(critical, "{}", config);
+    return config;
   }
 
-  static envoy::config::core::v3::ConfigSource createODCDSConfigSource(absl::string_view cluster_name = "cluster_0") {
+  static envoy::config::core::v3::ConfigSource createODCDSConfigSource(absl::string_view cluster_name) {
     envoy::config::core::v3::ConfigSource source;
     TestUtility::loadFromYaml(fmt::format(R"EOF(
       resource_api_version: V3
@@ -127,7 +141,7 @@ static_resources:
   static OnDemandConfigType createConfig(envoy::config::core::v3::ConfigSource config_source, int timeout_millis) {
     OnDemandConfigType on_demand;
     *on_demand.mutable_odcds_config() = std::move (config_source);
-    *on_demand_mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    *on_demand.mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
     return on_demand;
   }
 
@@ -139,20 +153,20 @@ static_resources:
     return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis);
   }
 
-  static OptRef<ProtobufWkt::Map<std::string, ProtobufWkt::Any>> findPerRouteConfigMap(ConfigHelper::HttpConnectionManager& mgr, absl::string_view vhost_name, absl::string_view route_name) {
-    auto* route_config = mgr.mutable_route_config();
+  static OptRef<ProtobufWkt::Map<std::string, ProtobufWkt::Any>> findPerRouteConfigMap(ConfigHelper::HttpConnectionManager& hcm, absl::string_view vhost_name, absl::string_view route_name) {
+    auto* route_config = hcm.mutable_route_config();
     auto* vhosts = route_config->mutable_virtual_hosts();
     for (int i = 0; i < route_config->virtual_hosts_size(); ++i) {
-      auto& vhost = vhosts->Get(i);
-      if (vhost.name() == vhost_name) {
+      auto* vhost = vhosts->Mutable(i);
+      if (vhost->name() == vhost_name) {
         if (route_name.empty()) {
-          return *vhost.mutable_typed_per_filter_config();
+          return *vhost->mutable_typed_per_filter_config();
         } else {
-          auto* routes = vhost.mutable_routes();
-          for (int j = 0; j < vhost.routes_size(); ++j) {
-            auto& route = routes->Get(j);
-            if (route.name() == route_name) {
-              return *route.mutable_typed_per_filter_config();
+          auto* routes = vhost->mutable_routes();
+          for (int j = 0; j < vhost->routes_size(); ++j) {
+            auto* route = routes->Mutable(j);
+            if (route->name() == route_name) {
+              return *route->mutable_typed_per_filter_config();
             }
           }
         }
@@ -161,40 +175,40 @@ static_resources:
     return absl::nullopt;
   }
 
-  static void clearOnDemandConfig(ConfigHelper::HttpConnectionManager& mgr) {
-    auto* filters = hcm_config.mutable_http_filters();
-    for (int i = 0; i < mgr.http_filters.size(); ++i) {
-      auto& filter = filters->Get(i);
-      if (filter.name() == HttpFilterNames::get().OnDemand) {
-        filter.clear_typed_config();
+  static void clearOnDemandConfig(ConfigHelper::HttpConnectionManager& hcm) {
+    auto* filters = hcm.mutable_http_filters();
+    for (int i = 0; i < hcm.http_filters_size(); ++i) {
+      auto* filter = filters->Mutable(i);
+      if (filter->name() == Extensions::HttpFilters::HttpFilterNames::get().OnDemand) {
+        filter->clear_typed_config();
         break;
       }
     }
   }
 
-  static void clearPerRouteConfig(ConfigHelper::HttpConnectionManager& mgr, std::string vhost_name = "integration", std::string route_name = "odcds_route") {
-    auto maybe_map = findPerRouteConfigMap(mgr, vhost_name, route_name);
+  static void clearPerRouteConfig(ConfigHelper::HttpConnectionManager& hcm, std::string vhost_name, std::string route_name) {
+    auto maybe_map = findPerRouteConfigMap(hcm, vhost_name, route_name);
     if (maybe_map.has_value()) {
-      maybe_map.value().erase(HttpFilterNames::get().OnDemand);
+      maybe_map->erase(Extensions::HttpFilters::HttpFilterNames::get().OnDemand);
     }
   }
 
-  static void addOnDemandConfig(ConfigHelper::HttpConnectionManager& mgr, OnDemandConfig config) {
-    auto* filters = mgr.mutable_http_filters();
-    for (int i = 0; i < mgr.http_filters.size(); ++i) {
-      auto& filter = filters->Get(i);
-      if (filter.name() == HttpFilterNames::get().OnDemand) {
-        filter.clear_typed_config();
-        filter.mutable_typed_config()->PackFrom(std::move(config));
+  static void addOnDemandConfig(ConfigHelper::HttpConnectionManager& hcm, OnDemandConfig config) {
+    auto* filters = hcm.mutable_http_filters();
+    for (int i = 0; i < hcm.http_filters_size(); ++i) {
+      auto* filter = filters->Mutable(i);
+      if (filter->name() == Extensions::HttpFilters::HttpFilterNames::get().OnDemand) {
+        filter->clear_typed_config();
+        filter->mutable_typed_config()->PackFrom(std::move(config));
         break;
       }
     }
   }
 
-  static void addPerRouteConfig(ConfigHelper::HttpConnectionManager& mgr, PerRouteConfig config, std::string vhost_name = "integration", std::string route_name = "odcds_route") {
-    auto maybe_map = findPerRouteConfigMap(mgr, vhost_name, route_name);
+  static void addPerRouteConfig(ConfigHelper::HttpConnectionManager& hcm, PerRouteConfig config, std::string vhost_name, std::string route_name) {
+    auto maybe_map = findPerRouteConfigMap(hcm, vhost_name, route_name);
     if (maybe_map.has_value()) {
-      maybe_map.value()[HttpFilterNames::get().OnDemand].PackFrom(std::move(config));
+      maybe_map.ref()[Extensions::HttpFilters::HttpFilterNames::get().OnDemand].PackFrom(std::move(config));
     }
   }
 };
@@ -203,23 +217,20 @@ class OdCdsListenerBuilder {
 public:
   OdCdsListenerBuilder(absl::string_view address) {
     TestUtility::loadFromYaml(OdCdsIntegrationHelper::listenerConfig(address), listener_);
-    ASSERT_EQ(hl.listener.filter_chains_size(), 1);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    ASSERT_EQ(filter_chain->filters_size(), 1);
+    auto* filter_chain = listener_.mutable_filter_chains(0);
     auto* filter = filter_chain->mutable_filters(0);
-    ASSERT_EQ(filter->name(), "http");
     hcm_any_ = filter->mutable_typed_config();
     hcm_ = MessageUtil::anyConvert<ConfigHelper::HttpConnectionManager>(*hcm_any_);
   }
 
   ConfigHelper::HttpConnectionManager& hcm() { return hcm_; }
-  envoy::config::listener::Listener listener() {
+  envoy::config::listener::v3::Listener listener() {
     hcm_any_->PackFrom(hcm_);
     return listener_;
   }
 
 private:
-  envoy::config::listener::Listener listener_;
+  envoy::config::listener::v3::Listener listener_;
   ProtobufWkt::Any* hcm_any_;
   ConfigHelper::HttpConnectionManager hcm_;
 };
@@ -231,26 +242,26 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), OdCdsIntegrationHelper::bootstrapConfig()) {}
 
   void clearOnDemandConfig() {
-    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& mgr) {
-      OdCdsIntegrationHelper::clearOnDemandConfig(mgr);
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+      OdCdsIntegrationHelper::clearOnDemandConfig(hcm);
     });
   }
 
-  void clearPerRouteConfig(std::string vhost_name = "integration", std::string route_name = "odcds_route") {
-    config_helper_.addConfigModifier([vhost_name = std::move(vhost_name), route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& mgr) {
-      OdCdsIntegrationHelper::clearPerRouteConfig(mgr, vhost_name, route_name);
+  void clearPerRouteConfig(std::string vhost_name, std::string route_name) {
+    config_helper_.addConfigModifier([vhost_name = std::move(vhost_name), route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& hcm) {
+      OdCdsIntegrationHelper::clearPerRouteConfig(hcm, vhost_name, route_name);
     });
   }
 
-  void addOnDemandConfig(OnDemandConfig config) {
-    config_helper_.addConfigModifier([config = std::move(source)](ConfigHelper::HttpConnectionManager& mgr) {
-      OdCdsIntegrationHelper::addOnDemandConfig(mgr, std::move(config));
+  void addOnDemandConfig(OdCdsIntegrationHelper::OnDemandConfig config) {
+    config_helper_.addConfigModifier([config = std::move(config)](ConfigHelper::HttpConnectionManager& hcm) {
+      OdCdsIntegrationHelper::addOnDemandConfig(hcm, std::move(config));
     });
   }
 
-  void addPerRouteConfig(PerRouteConfig config, std::string vhost_name = "integration", std::string route_name = "odcds_route") {
-    config_helper_.addConfigModifier([config = std::move(config), vhost_name = std::move(vhost_name), route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& mgr) {
-      OdCdsIntegrationHelper::addPerRouteConfig(mgr, std::move(config), vhost_name, route_name);
+  void addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig config, std::string vhost_name, std::string route_name) {
+    config_helper_.addConfigModifier([config = std::move(config), vhost_name = std::move(vhost_name), route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& hcm) {
+      OdCdsIntegrationHelper::addPerRouteConfig(hcm, std::move(config), vhost_name, route_name);
     });
   }
 
@@ -303,7 +314,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
 //  - a response contains the cluster
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
-  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(OdCdsIntegrationHelper::createODCDSConfigSource(), 2500, "integration", {}));
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500), "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -343,7 +354,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
 //  - request fails
 TEST_P(OdCdsIntegrationTest, DisablingODCDSAtRouteLevelWorks) {
   doCleanUpXdsConnection_ = false;
-  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(OdCdsIntegrationHelper::createODCDSConfigSource(), 2500), "integration", {});
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500), "integration", {});
   addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", "odcds_route");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
