@@ -23,6 +23,10 @@ public:
   virtual const Network::Connection& connection() const PURE;
   virtual const Envoy::Http::RequestHeaderMap& headers() const PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  const Network::ConnectionInfoProvider& connectionInfoProvider() const {
+    return connection().connectionInfoProvider();
+  }
 };
 
 } // namespace Matching

@@ -3,6 +3,7 @@
 #include "envoy/config/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
@@ -532,13 +533,16 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
+  Network::ConnectionInfoSetterImpl provider(std::make_shared<Network::Address::Ipv4Instance>(80),
+                                             std::make_shared<Network::Address::Ipv4Instance>(80));
+  EXPECT_CALL(conn, connectionInfoProvider()).WillRepeatedly(ReturnRef(provider));
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  provider.setLocalAddress(addr);
   checkMatcherEngine(engine, true, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  provider.setLocalAddress(addr);
   checkMatcherEngine(engine, false, info, conn, headers);
 }
 
@@ -574,13 +578,16 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
   NiceMock<StreamInfo::MockStreamInfo> info;
+  Network::ConnectionInfoSetterImpl provider(std::make_shared<Network::Address::Ipv4Instance>(80),
+                                             std::make_shared<Network::Address::Ipv4Instance>(80));
+  EXPECT_CALL(conn, connectionInfoProvider()).WillRepeatedly(ReturnRef(provider));
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  provider.setLocalAddress(addr);
   checkMatcherEngine(engine, false, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  provider.setLocalAddress(addr);
   checkMatcherEngine(engine, true, info, conn, headers);
 }
 
