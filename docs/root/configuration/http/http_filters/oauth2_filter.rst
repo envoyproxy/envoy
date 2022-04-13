@@ -188,8 +188,11 @@ Below is a complete code example of how we employ the filter as one of
                 socket_address:
                   address: auth.example.com
                   port_value: 443
-      tls_context:
-        sni: auth.example.com
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          sni: auth.example.com
 
 Finally, the following code block illustrates sample contents inside a yaml file containing both credential secrets.
 Both the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`
