@@ -517,7 +517,7 @@ using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
-enum class HttpVersion { Http1, Http2Nghttp2, Http2Oghttp2 };
+enum class HttpVersion { Http1, Http2Nghttp2, Http2WrappedNghttp2, Http2Oghttp2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
@@ -544,15 +544,26 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   Http2::CodecStats::AtomicPtr http2_stats;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
-  const bool http2 =
-      http_version == HttpVersion::Http2Nghttp2 || http_version == HttpVersion::Http2Oghttp2;
+  bool http2 = false;
 
-  if (http_version == HttpVersion::Http2Nghttp2) {
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-  } else if (http_version == HttpVersion::Http2Oghttp2) {
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+  switch (http_version) {
+    case HttpVersion::Http1:
+      break;
+    case HttpVersion::Http2Nghttp2:
+      http2 = true;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      break;
+    case HttpVersion::Http2WrappedNghttp2:
+      http2 = true;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+      break;
+    case HttpVersion::Http2Oghttp2:
+      http2 = true;
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+      break;
   }
 
   if (http2) {
@@ -754,6 +765,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     TestUtility::validate(input);
     codecFuzz(input, HttpVersion::Http1);
     codecFuzz(input, HttpVersion::Http2Nghttp2);
+    codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
     codecFuzz(input, HttpVersion::Http2Oghttp2);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());

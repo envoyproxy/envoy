@@ -126,6 +126,18 @@ void ProdNghttp2SessionFactory::initOld(
 
 std::unique_ptr<http2::adapter::Http2Adapter>
 ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
+                                  ConnectionImpl* connection,
+                                  const http2::adapter::OgHttp2Adapter::Options& options) {
+  auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
+      http2::adapter::Perspective::kClient, *callbacks, connection);
+  std::unique_ptr<http2::adapter::Http2Adapter> adapter =
+      http2::adapter::OgHttp2Adapter::Create(*visitor, options);
+  connection->setVisitor(std::move(visitor));
+  return adapter;
+}
+
+std::unique_ptr<http2::adapter::Http2Adapter>
+ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
                                   ConnectionImpl* connection, const nghttp2_option* options) {
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
       http2::adapter::Perspective::kClient, *callbacks, connection);

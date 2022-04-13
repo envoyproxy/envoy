@@ -6,12 +6,6 @@
 
 namespace Envoy {
 
-enum class Http2Impl {
-  Bare,
-  Wrapped,
-  Oghttp2,
-};
-
 struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
