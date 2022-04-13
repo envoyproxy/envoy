@@ -21,7 +21,9 @@ message PreserveCaseFormatterConfig {
     // Use LowerCase on unknown headers.
     DEFAULT = 0;
 
-    // Use ProperCaseHeaderKeyFormatter on unknown headers.
+    // Use ProperCaseHeaderKeyFormatter on unknown headers that upper cases the first character
+    // in each word: The first character as well as any alpha character following a special
+    // character is upper cased.
     PROPER_CASE = 1;
   }
 

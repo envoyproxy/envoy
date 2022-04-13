@@ -24,7 +24,7 @@ public:
   void processKey(absl::string_view key) override;
   void setReasonPhrase(absl::string_view reason_phrase) override;
   absl::string_view getReasonPhrase() const override;
-  Envoy::Http::HeaderKeyFormatterOptConstRef formatter_on_unknown_headers() const;
+  Envoy::Http::HeaderKeyFormatterOptConstRef formatterOnUnknownHeaders() const;
 
 private:
   StringUtil::CaseUnorderedSet original_header_keys_;
