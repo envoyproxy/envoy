@@ -110,28 +110,28 @@ public:
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
   }
 
-  void initializeRouter(ShadowWriter& shadow_writer, bool keep_downstream) {
+  void initializeRouter(ShadowWriter& shadow_writer, bool close_downstream_on_error) {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
     router_ = std::make_unique<Router>(context_.clusterManager(), *stats_, context_.runtime(),
-                                       shadow_writer, keep_downstream);
+                                       shadow_writer, close_downstream_on_error);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
     router_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  void initializeRouter(bool keep_downstream = false) {
+  void initializeRouter(bool close_downstream_on_error = true) {
     stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
-    initializeRouter(shadow_writer_, keep_downstream);
+    initializeRouter(shadow_writer_, close_downstream_on_error);
   }
 
   void initializeRouterWithShadowWriter() {
     stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
     shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), *stats_,
                                                              dispatcher_, context_.threadLocal());
-    initializeRouter(*shadow_writer_impl_, false);
+    initializeRouter(*shadow_writer_impl_, true);
   }
 
   void initializeMetadata(MessageType msg_type, std::string method = "method",
@@ -705,7 +705,7 @@ INSTANTIATE_TEST_SUITE_P(DownstreamUpstreamTypes, ThriftRouterPassthroughTest,
 class ThriftRouterRainidayTest : public testing::TestWithParam<bool>,
                                  public ThriftRouterTestBase {};
 
-INSTANTIATE_TEST_SUITE_P(KeepDownstream, ThriftRouterRainidayTest, Bool());
+INSTANTIATE_TEST_SUITE_P(CloseDownstreamOnError, ThriftRouterRainidayTest, Bool());
 
 TEST_P(ThriftRouterRainidayTest, PoolRemoteConnectionFailure) {
   initializeRouter(GetParam());
@@ -721,9 +721,9 @@ TEST_P(ThriftRouterRainidayTest, PoolRemoteConnectionFailure) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
-  EXPECT_CALL(callbacks_, continueDecoding()).Times(GetParam() ? 1 : 0);
+  EXPECT_CALL(callbacks_, continueDecoding()).Times(GetParam() ? 0 : 1);
   EXPECT_CALL(
       context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
@@ -772,7 +772,7 @@ TEST_P(ThriftRouterRainidayTest, PoolTimeout) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(
       context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
@@ -827,7 +827,7 @@ TEST_P(ThriftRouterRainidayTest, PoolConnectionFailureWithOnewayMessage) {
                      .counterFromString("thrift.upstream_rq_oneway")
                      .value());
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_, Eq(!GetParam())));
+  EXPECT_CALL(callbacks_, sendLocalReply(_, Eq(GetParam())));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
@@ -850,7 +850,7 @@ TEST_P(ThriftRouterRainidayTest, NoRoute) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
@@ -870,7 +870,7 @@ TEST_P(ThriftRouterRainidayTest, NoCluster) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
@@ -927,7 +927,7 @@ TEST_P(ThriftRouterRainidayTest, ClusterMaintenanceMode) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
@@ -951,7 +951,7 @@ TEST_P(ThriftRouterRainidayTest, NoHealthyHosts) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
@@ -1030,7 +1030,7 @@ TEST_P(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteClose) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_EQ(!GetParam(), end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(callbacks_, onReset()).Times(0);
   EXPECT_CALL(
@@ -1040,7 +1040,7 @@ TEST_P(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteClose) {
 }
 
 TEST_F(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteCloseCompletedRequest) {
-  initializeRouter(true);
+  initializeRouter(false);
   startRequest(MessageType::Call);
   connectUpstream();
   completeRequest();

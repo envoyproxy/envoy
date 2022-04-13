@@ -10,12 +10,12 @@ namespace Router {
 
 UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                                  MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                                 ProtocolType protocol_type, bool keep_downstream)
+                                 ProtocolType protocol_type, bool close_downstream_on_error)
     : parent_(parent), stats_(parent.stats()), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false),
-      keep_downstream_(keep_downstream) {}
+      close_downstream_on_error_(close_downstream_on_error) {}
 
 UpstreamRequest::~UpstreamRequest() {
   if (conn_pool_handle_) {
@@ -269,7 +269,7 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
 }
 
 bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
-  bool end_downstream = true;
+  bool close_downstream = true;
 
   chargeResponseTiming();
 
@@ -279,7 +279,7 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            false /* Don't close the downstream connection. */);
-    end_downstream = false;
+    close_downstream = false;
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_host_->outlierDetector().putResult(
@@ -303,17 +303,17 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       // Error occurred after a partial response, propagate the reset to the downstream.
       parent_.resetDownstreamConnection();
     } else {
-      end_downstream = !keep_downstream_;
+      close_downstream = close_downstream_on_error_;
       parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                           fmt::format("connection failure '{}'",
                                                       (upstream_host_ != nullptr)
                                                           ? upstream_host_->address()->asString()
                                                           : "to upstream")),
-                             end_downstream);
+                             close_downstream);
     }
     break;
   }
-  return end_downstream;
+  return close_downstream;
 }
 
 void UpstreamRequest::chargeResponseTiming() {

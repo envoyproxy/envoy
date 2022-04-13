@@ -57,7 +57,7 @@ bool ShadowRouterImpl::createUpstreamRequest() {
 
   upstream_request_ = std::make_unique<UpstreamRequest>(*this, *upstream_req_info.conn_pool_data,
                                                         metadata_, upstream_req_info.transport,
-                                                        upstream_req_info.protocol, false);
+                                                        upstream_req_info.protocol, true);
   upstream_request_->start();
   return true;
 }

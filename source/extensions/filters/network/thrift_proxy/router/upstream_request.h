@@ -30,7 +30,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                          Logger::Loggable<Logger::Id::thrift> {
   UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                   MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                  ProtocolType protocol_type, bool keep_downstream);
+                  ProtocolType protocol_type, bool close_downstream_on_error);
   ~UpstreamRequest() override;
 
   FilterStatus start();
@@ -79,7 +79,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   MonotonicTime downstream_request_complete_time_;
   uint64_t response_size_{};
 
-  bool keep_downstream_;
+  bool close_downstream_on_error_;
 };
 
 } // namespace Router

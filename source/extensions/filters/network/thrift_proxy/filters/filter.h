@@ -116,7 +116,7 @@ public:
   virtual bool responseSuccess() PURE;
 
   /**
-   * Called when upstream connection of the rpc reset.
+   * Called when upstream connection gets reset.
    */
   virtual void onReset() PURE;
 };

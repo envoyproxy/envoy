@@ -217,9 +217,9 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public ThriftFilters::DecoderFilter {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
-         Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool keep_downstream)
+         Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool close_downstream_on_error)
       : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
-        shadow_writer_(shadow_writer), keep_downstream_(keep_downstream) {}
+        shadow_writer_(shadow_writer), close_downstream_on_error_(close_downstream_on_error) {}
 
   ~Router() override = default;
 
@@ -313,7 +313,7 @@ private:
   ShadowWriter& shadow_writer_;
   std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_{};
 
-  bool keep_downstream_;
+  bool close_downstream_on_error_;
 };
 
 } // namespace Router
