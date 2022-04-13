@@ -17,7 +17,7 @@ namespace {
 
 class RDSDecodeHeadersBehavior : public DecodeHeadersBehavior {
 public:
-  virtual void decodeHeaders(OnDemandRouteUpdate& filter) override { filter.handleMissingRoute(); }
+  void decodeHeaders(OnDemandRouteUpdate& filter) override { filter.handleMissingRoute(); }
 };
 
 class RDSCDSDecodeHeadersBehavior : public DecodeHeadersBehavior {
@@ -25,7 +25,7 @@ public:
   RDSCDSDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout)
       : odcds_(std::move(odcds)), timeout_(timeout) {}
 
-  virtual void decodeHeaders(OnDemandRouteUpdate& filter) override {
+  void decodeHeaders(OnDemandRouteUpdate& filter) override {
     auto route = filter.handleMissingRoute();
     if (!route.has_value()) {
       return;
