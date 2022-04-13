@@ -556,8 +556,8 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
 
-  // Expect all the sockets are closed include the sockets in the active listener and
-  // the sockets in the filter chain draining listener. The connection should be reset.
+  // All the listen socket are closed. include the sockets in the active listener and
+  // the sockets in the filter chain draining listener. The new connection should be reset.
   auto codec =
       makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
   EXPECT_FALSE(codec->connected());
@@ -642,8 +642,8 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
 
-  // Expect all the sockets are closed include the sockets in the active listener and
-  // the sockets in the filter chain draining listener. The connection should be reset.
+  // All the listen socket are closed. include the sockets in the active listener and
+  // the sockets in the filter chain draining listener. The new connection should be reset.
   auto codec =
       makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
   EXPECT_FALSE(codec->connected());

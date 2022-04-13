@@ -1057,7 +1057,7 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
     // procedure, so close the sockets for the previous draining listener.
     for (auto& manager : draining_filter_chains_manager_) {
       // A listener can be in-place updated multiple times, so there may
-      // have multiple drainning listeners with same tag.
+      // have multiple draining listeners with same tag.
       if (manager.getDrainingListenerTag() == listener.listenerTag()) {
         manager.getDrainingListener().listenSocketFactory().closeAllSockets();
       }
