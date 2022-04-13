@@ -38,6 +38,8 @@ A minimal fully static bootstrap config is provided below:
                   route: { cluster: some_service }
             http_filters:
             - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -90,6 +92,8 @@ on 127.0.0.1:5678 is provided below:
                   route: { cluster: some_service }
             http_filters:
             - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -250,6 +254,8 @@ The management server could respond to LDS requests with:
                       cluster_name: xds_cluster
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
 The management server could respond to RDS requests with:
 
