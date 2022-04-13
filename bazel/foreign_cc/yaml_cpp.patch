@@ -8,3 +8,29 @@ index b0b9016..c45bce1 100644
      srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
 +    copts = ["-Dyaml_cpp_EXPORTS"], # CMake added definition.
  )
+diff --git a/include/yaml-cpp/emitter.h b/include/yaml-cpp/emitter.h
+index 210b1ec..25cd09e 100644
+--- a/include/yaml-cpp/emitter.h
++++ b/include/yaml-cpp/emitter.h
+@@ -32,7 +32,7 @@ class EmitterState;
+
+ class YAML_CPP_API Emitter {
+  public:
+-  Emitter();
++  Emitter() : m_pState(new EmitterState), m_stream{} {}
+   explicit Emitter(std::ostream& stream);
+   Emitter(const Emitter&) = delete;
+   Emitter& operator=(const Emitter&) = delete;
+diff --git a/src/emitter.cpp b/src/emitter.cpp
+index 644b312..0b4e5c8 100644
+--- a/src/emitter.cpp
++++ b/src/emitter.cpp
+@@ -11,8 +11,6 @@ namespace YAML {
+ class Binary;
+ struct _Null;
+
+-Emitter::Emitter() : m_pState(new EmitterState), m_stream{} {}
+-
+ Emitter::Emitter(std::ostream& stream)
+     : m_pState(new EmitterState), m_stream(stream) {}
+
