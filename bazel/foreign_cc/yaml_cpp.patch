@@ -1,12 +1,11 @@
 diff --git a/BUILD.bazel b/BUILD.bazel
-index b0b9016..f329ad0 100644
+index b0b9016..fb4c930 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -11,4 +11,7 @@ cc_library(
+@@ -11,4 +11,6 @@ cc_library(
      includes = ["include"],
      hdrs = glob(["include/**/*.h"]),
      srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
 +    # Define yaml_cpp_EXPORTS, as CMake does.
-+    copts = ["-Dyaml_cpp_EXPORTS"],
-+    linkshared = 1,
++    copts = ["-DYAML_CPP_STATIC_DEFINE"],
  )
