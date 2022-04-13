@@ -990,6 +990,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                                                                {":path", "/new_endpoint/foo"},
                                                                {":method", "GET"},
                                                                {"x-forwarded-proto", "http"}};
+        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
         EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_req_headers),
                   delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_req_headers));
 
@@ -1052,7 +1054,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
         EXPECT_EQ(
             default_route->routeEntry()->virtualCluster(test_req_headers, stream_info),
             delegating_route_foo->routeEntry()->virtualCluster(test_req_headers, stream_info));
@@ -1099,7 +1100,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->routeName());
 
         // Coverage for finalizeRequestHeaders
-        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
         delegating_route_foo->routeEntry()->finalizeRequestHeaders(test_req_headers, stream_info,
                                                                    true);
         EXPECT_EQ("/new_endpoint/foo", test_req_headers.get_(Http::Headers::get().Path));
