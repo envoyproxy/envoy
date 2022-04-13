@@ -14,15 +14,15 @@ namespace Matching {
 /**
  * Common base class for all the header/trailer DataInputs.
  */
-template <class HeaderType>
-class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
+template <class MatchingDataType, class HeaderType>
+class HttpHeadersDataInputBase : public Matcher::DataInput<MatchingDataType> {
 public:
   explicit HttpHeadersDataInputBase(const std::string& name) : name_(name) {}
 
   virtual absl::optional<std::reference_wrapper<const HeaderType>>
-  headerMap(const HttpMatchingData& data) const PURE;
+  headerMap(const MatchingDataType& data) const PURE;
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
@@ -46,14 +46,14 @@ private:
 /**
  * Common base class for all the header/trailer DataInputsFactory.
  */
-template <class DataInputType, class ProtoType>
-class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<HttpMatchingData> {
+template <class MatchingDataType, class DataInputType, class ProtoType>
+class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<MatchingDataType> {
 public:
   explicit HttpHeadersDataInputFactoryBase(const std::string& name) : name_(name) {}
 
   std::string name() const override { return "envoy.matching.inputs." + name_; }
 
-  Matcher::DataInputFactoryCb<HttpMatchingData>
+  Matcher::DataInputFactoryCb<MatchingDataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& typed_config =
@@ -71,73 +71,108 @@ private:
   const std::string name_;
 };
 
-class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase<RequestHeaderMap> {
+template <class MatchingDataType>
+class HttpRequestHeadersDataInput
+    : public HttpHeadersDataInputBase<MatchingDataType, RequestHeaderMap> {
 public:
-  explicit HttpRequestHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
+  explicit HttpRequestHeadersDataInput(const std::string& name)
+      : HttpHeadersDataInputBase<MatchingDataType, RequestHeaderMap>(name) {}
 
   absl::optional<std::reference_wrapper<const RequestHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  headerMap(const MatchingDataType& data) const override {
     return data.requestHeaders();
   }
 };
 
-class HttpRequestHeadersDataInputFactory
+template <class MatchingDataType>
+class HttpRequestHeadersDataInputFactoryBase
     : public HttpHeadersDataInputFactoryBase<
-          HttpRequestHeadersDataInput, envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
+          MatchingDataType, HttpRequestHeadersDataInput<MatchingDataType>,
+          envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
 public:
-  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_headers") {}
+  HttpRequestHeadersDataInputFactoryBase()
+      : HttpHeadersDataInputFactoryBase<MatchingDataType,
+                                        HttpRequestHeadersDataInput<MatchingDataType>,
+                                        envoy::type::matcher::v3::HttpRequestHeaderMatchInput>(
+            "request_headers") {}
 };
 
-class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
+template <class MatchingDataType>
+class HttpResponseHeadersDataInput
+    : public HttpHeadersDataInputBase<MatchingDataType, ResponseHeaderMap> {
 public:
-  explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
+  explicit HttpResponseHeadersDataInput(const std::string& name)
+      : HttpHeadersDataInputBase<MatchingDataType, ResponseHeaderMap>(name) {}
 
   absl::optional<std::reference_wrapper<const ResponseHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  headerMap(const MatchingDataType& data) const override {
     return data.responseHeaders();
   }
 };
 
-class HttpResponseHeadersDataInputFactory
+template <class MatchingDataType>
+class HttpResponseHeadersDataInputFactoryBase
     : public HttpHeadersDataInputFactoryBase<
-          HttpResponseHeadersDataInput, envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
+          MatchingDataType, HttpResponseHeadersDataInput<MatchingDataType>,
+          envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
 public:
-  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_headers") {}
+  HttpResponseHeadersDataInputFactoryBase()
+      : HttpHeadersDataInputFactoryBase<MatchingDataType,
+                                        HttpResponseHeadersDataInput<MatchingDataType>,
+                                        envoy::type::matcher::v3::HttpResponseHeaderMatchInput>(
+            "response_headers") {}
 };
 
-class HttpRequestTrailersDataInput : public HttpHeadersDataInputBase<RequestTrailerMap> {
+template <class MatchingDataType>
+class HttpRequestTrailersDataInput
+    : public HttpHeadersDataInputBase<MatchingDataType, RequestTrailerMap> {
 public:
-  explicit HttpRequestTrailersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
+  explicit HttpRequestTrailersDataInput(const std::string& name)
+      : HttpHeadersDataInputBase<MatchingDataType, RequestTrailerMap>(name) {}
 
   absl::optional<std::reference_wrapper<const RequestTrailerMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  headerMap(const MatchingDataType& data) const override {
     return data.requestTrailers();
   }
 };
 
-class HttpRequestTrailersDataInputFactory
+template <class MatchingDataType>
+class HttpRequestTrailersDataInputFactoryBase
     : public HttpHeadersDataInputFactoryBase<
-          HttpRequestTrailersDataInput, envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
+          MatchingDataType, HttpRequestTrailersDataInput<MatchingDataType>,
+          envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
 public:
-  HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_trailers") {}
+  HttpRequestTrailersDataInputFactoryBase()
+      : HttpHeadersDataInputFactoryBase<MatchingDataType,
+                                        HttpRequestTrailersDataInput<MatchingDataType>,
+                                        envoy::type::matcher::v3::HttpRequestTrailerMatchInput>(
+            "request_trailers") {}
 };
 
-class HttpResponseTrailersDataInput : public HttpHeadersDataInputBase<ResponseTrailerMap> {
+template <class MatchingDataType>
+class HttpResponseTrailersDataInput
+    : public HttpHeadersDataInputBase<MatchingDataType, ResponseTrailerMap> {
 public:
   explicit HttpResponseTrailersDataInput(const std::string& name)
-      : HttpHeadersDataInputBase(name) {}
+      : HttpHeadersDataInputBase<MatchingDataType, ResponseTrailerMap>(name) {}
 
   absl::optional<std::reference_wrapper<const ResponseTrailerMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  headerMap(const MatchingDataType& data) const override {
     return data.responseTrailers();
   }
 };
 
-class HttpResponseTrailersDataInputFactory
+template <class MatchingDataType>
+class HttpResponseTrailersDataInputFactoryBase
     : public HttpHeadersDataInputFactoryBase<
-          HttpRequestTrailersDataInput, envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
+          MatchingDataType, HttpRequestTrailersDataInput<MatchingDataType>,
+          envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
 public:
-  HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
+  HttpResponseTrailersDataInputFactoryBase()
+      : HttpHeadersDataInputFactoryBase<MatchingDataType,
+                                        HttpRequestTrailersDataInput<MatchingDataType>,
+                                        envoy::type::matcher::v3::HttpRequestTrailerMatchInput>(
+            "response_trailers") {}
 };
 } // namespace Matching
 } // namespace Http

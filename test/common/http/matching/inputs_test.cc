@@ -10,7 +10,7 @@ namespace Http {
 namespace Matching {
 
 TEST(HttpHeadersDataInputBase, ReturnValueNotPersistedBetweenCalls) {
-  HttpRequestHeadersDataInput input("header");
+  HttpRequestHeadersDataInput<HttpMatchingData> input("header");
   HttpMatchingDataImpl data;
 
   {
