@@ -89,7 +89,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
     }
     const auto maybe_interface_name = connection_socket.connectionInfoProvider().interfaceName();
     if (maybe_interface_name.has_value()) {
-      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
+      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "registered with local interface '{}'", *this,
                            maybe_interface_name.value());
     }
   }

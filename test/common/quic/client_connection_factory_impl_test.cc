@@ -104,14 +104,6 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
-
-  const int port = 30;
-  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
-
-  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
       .WillRepeatedly(
@@ -121,6 +113,15 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+
+  const int port = 30;
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      info, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
+
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+
   EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();
   client_connection->connect();
