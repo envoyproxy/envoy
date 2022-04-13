@@ -262,7 +262,6 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
                            envoy::RouterCheckToolSchema::ValidationFailure&)>;
     CheckerFunc checkers[] = {
         [this](auto&... params) -> bool { return this->compareCluster(params...); },
-        [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); },
         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
@@ -282,6 +281,9 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
       if (!test(tool_config, validate, validation_failure)) {
         test_failed = true;
       }
+    }
+    if (!compareVirtualCluster(stream_info, tool_config, validate, validation_failure)) {
+      test_failed = true;
     }
     test_result.set_test_passed(!test_failed);
     if (test_failed) {
@@ -319,7 +321,8 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
 }
 
 bool RouterCheckTool::compareVirtualCluster(
-    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+    const Envoy::StreamInfo::StreamInfoImpl stream_info, ToolConfig& tool_config,
+    const envoy::RouterCheckToolSchema::ValidationAssert& expected,
     envoy::RouterCheckToolSchema::ValidationFailure& failure) {
   if (!expected.has_virtual_cluster_name()) {
     return true;
@@ -327,8 +330,8 @@ bool RouterCheckTool::compareVirtualCluster(
   const bool has_route_entry =
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   const bool has_virtual_cluster =
-      has_route_entry &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr;
+      has_route_entry && tool_config.route_->routeEntry()->virtualCluster(
+                             *tool_config.request_headers_, stream_info) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
     Stats::StatName stat_name =

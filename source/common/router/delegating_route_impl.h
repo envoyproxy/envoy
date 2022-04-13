@@ -95,7 +95,8 @@ public:
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override;
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override;
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override;
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers,
+                                       const StreamInfo::StreamInfo& stream_info) const override;
   const VirtualHost& virtualHost() const override;
   bool autoHostRewrite() const override;
   bool appendXfh() const override;

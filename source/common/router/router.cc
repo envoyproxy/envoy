@@ -462,9 +462,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
-                                       !config_.suppress_envoy_headers_);
-  request_vcluster_ = route_entry_->virtualCluster(headers);
+  request_vcluster_ = route_entry_->virtualCluster(headers, callbacks_->streamInfo());
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -651,6 +649,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+                                       !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
 

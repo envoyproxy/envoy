@@ -120,8 +120,10 @@ absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutOffse
   return base_route_->routeEntry()->grpcTimeoutOffset();
 }
 
-const VirtualCluster* DelegatingRouteEntry::virtualCluster(const Http::HeaderMap& headers) const {
-  return base_route_->routeEntry()->virtualCluster(headers);
+const VirtualCluster*
+DelegatingRouteEntry::virtualCluster(const Http::HeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_->routeEntry()->virtualCluster(headers, stream_info);
 }
 
 const VirtualHost& DelegatingRouteEntry::virtualHost() const {

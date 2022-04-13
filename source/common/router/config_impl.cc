@@ -720,6 +720,23 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 }
 
+const VirtualCluster*
+RouteEntryImplBase::virtualCluster(const Http::HeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  const VirtualCluster* virtual_cluster = vhost_.virtualClusterFromEntries(headers);
+  if (virtual_cluster != nullptr && !virtual_cluster->name().has_value()) {
+    // This means virtual cluster has been configured but there is no match in the downstream
+    // headers. Let us check if there is a match in virtual host headers.
+    const auto fake_request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({});
+    for (const HeaderParser* header_parser :
+         getRequestHeaderParsers(vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
+      header_parser->evaluateHeaders(*fake_request_headers, stream_info);
+    }
+    virtual_cluster = vhost_.virtualClusterFromEntries(*fake_request_headers);
+  }
+  return virtual_cluster;
+}
+
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(

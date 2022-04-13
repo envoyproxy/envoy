@@ -176,7 +176,8 @@ protected:
   }
 
   std::string virtualClusterName(const RouteEntry* route, Http::TestRequestHeaderMapImpl& headers) {
-    Stats::StatName name = route->virtualCluster(headers)->statName();
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    Stats::StatName name = route->virtualCluster(headers, stream_info)->statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
@@ -3111,7 +3112,7 @@ virtual_hosts:
     route->routeEntry()->rateLimitPolicy();
     route->routeEntry()->retryPolicy();
     route->routeEntry()->shadowPolicies();
-    route->routeEntry()->virtualCluster(headers);
+    route->routeEntry()->virtualCluster(headers, stream_info);
     route->routeEntry()->virtualHost();
     route->routeEntry()->virtualHost().rateLimitPolicy();
     route->routeEntry()->pathMatchCriterion();

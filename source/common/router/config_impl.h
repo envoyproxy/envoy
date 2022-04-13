@@ -23,6 +23,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
@@ -533,6 +534,8 @@ public:
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers,
+                                       const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -557,9 +560,6 @@ public:
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-    return vhost_.virtualClusterFromEntries(headers);
-  }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
@@ -729,8 +729,9 @@ private:
       return parent_->tlsContextMatchCriteria();
     }
 
-    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-      return parent_->virtualCluster(headers);
+    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers,
+                                         const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->virtualCluster(headers, stream_info);
     }
 
     const std::multimap<std::string, std::string>& opaqueConfig() const override {

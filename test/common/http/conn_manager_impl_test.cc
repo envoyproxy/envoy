@@ -1052,8 +1052,10 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        EXPECT_EQ(default_route->routeEntry()->virtualCluster(test_req_headers),
-                  delegating_route_foo->routeEntry()->virtualCluster(test_req_headers));
+        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+        EXPECT_EQ(
+            default_route->routeEntry()->virtualCluster(test_req_headers, stream_info),
+            delegating_route_foo->routeEntry()->virtualCluster(test_req_headers, stream_info));
 
         EXPECT_EQ(default_route->routeEntry()->virtualHost().corsPolicy(),
                   delegating_route_foo->routeEntry()->virtualHost().corsPolicy());

@@ -908,9 +908,12 @@ public:
   /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
+   * @param stream_info holds additional information about the request.
    * @return the virtual cluster or nullptr if there is no match.
    */
-  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
+  virtual const VirtualCluster*
+  virtualCluster(const Http::HeaderMap& headers,
+                 const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * @return const VirtualHost& the virtual host that owns the route.

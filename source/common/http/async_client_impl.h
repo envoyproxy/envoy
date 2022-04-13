@@ -257,7 +257,8 @@ private:
     absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
       return absl::nullopt;
     }
-    const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+    const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&,
+                                                 const StreamInfo::StreamInfo&) const override {
       return nullptr;
     }
     const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {

@@ -104,7 +104,7 @@ MockRouteEntry::MockRouteEntry() {
       .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
-  ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
+  ON_CALL(*this, virtualCluster(_, _)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));

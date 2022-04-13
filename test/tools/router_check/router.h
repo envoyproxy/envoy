@@ -120,7 +120,8 @@ private:
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                       envoy::RouterCheckToolSchema::ValidationFailure& failure);
-  bool compareVirtualCluster(ToolConfig& tool_config,
+  bool compareVirtualCluster(const Envoy::StreamInfo::StreamInfoImpl stream_info,
+                             ToolConfig& tool_config,
                              const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                              envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareVirtualHost(ToolConfig& tool_config,
