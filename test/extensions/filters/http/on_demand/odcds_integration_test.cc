@@ -106,10 +106,7 @@ static_resources:
   // Get the config, with a static listener. Similar to ConfigHelper::baseConfig(), but there's no
   // lds_config and no TLS certificate stuff. Listener is configured with listenerConfig.
   static std::string bootstrapConfig() {
-    std::string config =
-        absl::StrCat(baseBootstrapConfig(), "  listeners:", listenerConfig("127.0.0.1"));
-    ENVOY_LOG_MISC(critical, "{}", config);
-    return config;
+    return absl::StrCat(baseBootstrapConfig(), "  listeners:", listenerConfig("127.0.0.1"));
   }
 
   static envoy::config::core::v3::ConfigSource
@@ -360,8 +357,80 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - no response happens, timeout is triggered
+//  - request is resumed
+TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 500),
+                    "integration", {});
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  auto result = // xds_connection_ is filled with the new FakeHttpConnection.
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_));
+  // not sending a response to trigger the timeout
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - a response says the there is no such cluster
+//  - request is resumed
+TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500),
+                    "integration", {});
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  auto result = // xds_connection_ is filled with the new FakeHttpConnection.
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {}, {"new_cluster"}, "1", odcds_stream_);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
 
   cleanupUpstreamAndDownstream();
 }
@@ -389,8 +458,36 @@ TEST_P(OdCdsIntegrationTest, DisablingODCDSAtRouteLevelWorks) {
   EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_,
                                                          std::chrono::milliseconds(1000)));
 
-  response->waitForHeaders();
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - ODCDS is enabled in http connection manager
+//  - ODCDS is disabled at a virtual host level
+//  - making a request to an unknown cluster
+//  - request fails
+TEST_P(OdCdsIntegrationTest, DisablingODCDSAtVHostLevelWorks) {
+  doCleanUpXdsConnection_ = false;
+  addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
+                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500));
+  addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", {});
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_,
+                                                         std::chrono::milliseconds(1000)));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
 
   cleanupUpstreamAndDownstream();
 }
@@ -418,6 +515,36 @@ public:
     return builder.listener();
   }
 
+  bool compareRequest(const std::string& type_url,
+                      const std::vector<std::string>& expected_resource_subscriptions,
+                      const std::vector<std::string>& expected_resource_unsubscriptions,
+                      bool expect_node = false) {
+    return compareDeltaDiscoveryRequest(type_url, expected_resource_subscriptions,
+                                        expected_resource_unsubscriptions,
+                                        Grpc::Status::WellKnownGrpcStatus::Ok, "", expect_node);
+  };
+
+  void doInitialCommunications() {
+    // initial cluster query
+    EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}, true));
+    sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                                    {}, {}, "1");
+
+    // initial listener query
+    EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
+    auto odcds_listener = buildListener();
+    sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
+                                                                      {odcds_listener}, {}, "2");
+
+    // acks
+    EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
+    EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
+
+    // listener got acked, so register the http port now.
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
   std::size_t fake_upstream_idx_;
   envoy::config::cluster::v3::Cluster new_cluster_;
 };
@@ -438,34 +565,7 @@ INSTANTIATE_TEST_SUITE_P(
 //  - request is resumed
 TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   initialize();
-
-  auto compareRequest = [this](const std::string& type_url,
-                               const std::vector<std::string>& expected_resource_subscriptions,
-                               const std::vector<std::string>& expected_resource_unsubscriptions,
-                               bool expect_node = false) {
-    return compareDeltaDiscoveryRequest(type_url, expected_resource_subscriptions,
-                                        expected_resource_unsubscriptions,
-                                        Grpc::Status::WellKnownGrpcStatus::Ok, "", expect_node);
-  };
-
-  // initial cluster query
-  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}, true));
-  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
-                                                                  {}, {}, "1");
-
-  // initial listener query
-  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
-  auto odcds_listener = buildListener();
-  sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
-                                                                    {odcds_listener}, {}, "2");
-
-  // acks
-  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
-
-  // listener got acked, so register the http port now.
-  test_server_->waitUntilListenersReady();
-  registerTestServerPorts({"http"});
+  doInitialCommunications();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/"},
@@ -483,8 +583,60 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) 
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - waiting for response times out
+//  - request is resumed
+TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
+  initialize();
+  doInitialCommunications();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {}));
+  // not sending a response
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - a response says that there is no such cluster
+//  - request is resumed
+TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluster) {
+  initialize();
+  doInitialCommunications();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {}));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                                  {}, {"new_cluster"}, "3");
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
 
   cleanupUpstreamAndDownstream();
 }
