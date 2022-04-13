@@ -161,35 +161,35 @@ Below is a complete code example of how we employ the filter as one of
                     cluster: service
                     timeout: 5s
 
-  clusters:
-  - name: service
-    connect_timeout: 5s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8080
-  - name: oauth
-    connect_timeout: 5s
-    type: LOGICAL_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: oauth
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: auth.example.com
-                port_value: 443
-    tls_context:
-      sni: auth.example.com
+    clusters:
+    - name: service
+      connect_timeout: 5s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: service
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8080
+    - name: oauth
+      connect_timeout: 5s
+      type: LOGICAL_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: oauth
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: auth.example.com
+                  port_value: 443
+      tls_context:
+        sni: auth.example.com
 
 Finally, the following code block illustrates sample contents inside a yaml file containing both credential secrets.
 Both the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`
