@@ -33,7 +33,7 @@ public:
     return fmt::format(R"EOF(
 admin:
   access_log:
-  - name: envoy.access_loggers.file
+    name: envoy.access_loggers.file
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
       path: "{}"
@@ -47,8 +47,8 @@ static_resources:
     load_assignment:
       cluster_name: cluster_0
       endpoints:
-      - lb_endpoints:
-        - endpoint:
+        lb_endpoints:
+          endpoint:
             address:
               socket_address:
                 address: 127.0.0.1
@@ -79,8 +79,8 @@ static_resources:
           delayed_close_timeout:
             nanos: 10000000
           http_filters:
-            name: envoy.filters.http.on_demand
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.on_demand
+          - name: envoy.filters.http.router
           codec_type: HTTP2
           access_log:
             name: accesslog
