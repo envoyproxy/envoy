@@ -62,10 +62,10 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
   switch (config.shadow_rules_specifier_case()) {
   case ConfigType::kShadowRules:
     return std::make_unique<RoleBasedAccessControlEngineImpl>(
-        config.shadow_rules(), validation_visitor, EnforcementMode::Enforced);
+        config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
   case ConfigType::kShadowMatcher:
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
-        config.shadow_matcher(), context, action_validation_visitor, EnforcementMode::Enforced);
+        config.shadow_matcher(), context, action_validation_visitor, EnforcementMode::Shadow);
   case ConfigType::SHADOW_RULES_SPECIFIER_NOT_SET:
     return nullptr;
   }
