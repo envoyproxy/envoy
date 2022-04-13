@@ -51,6 +51,14 @@ cc_library(
     alwayslink = True,
 )
 
+config_setting(
+    name = "android_armeabi",
+    constraint_values = [
+        "@platforms//cpu:arm",
+        "@platforms//os:android",
+    ],
+)
+
 # Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
@@ -60,6 +68,10 @@ cc_binary(
         "-llog",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }) + select({
+        # TODO(keith): https://github.com/rust-lang/compiler-builtins/issues/353
+        ":android_armeabi": ["-Wl,--allow-multiple-definition"],
         "//conditions:default": [],
     }),
     linkshared = True,
