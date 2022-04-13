@@ -11,11 +11,16 @@ namespace HttpFilters {
 namespace OnDemand {
 
 class OnDemandRouteUpdate;
+class DecodeHeadersBehavior;
+using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 
 // DecodeHeadersBehavior implementations are used by OnDemandRouteUpdate in its decodeHeaders
 // method.
 class DecodeHeadersBehavior {
 public:
+  static DecodeHeadersBehaviorPtr rds();
+  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout);
+
   virtual ~DecodeHeadersBehavior() = default;
 
   virtual void decodeHeaders(OnDemandRouteUpdate& filter) PURE;
@@ -47,7 +52,7 @@ using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
 
 class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
-  OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config) : config_(std::move(config)) {}
+  OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config);
 
   // Callback invoked when route config update is finished.
   void onRouteConfigUpdateCompletion(bool route_exists);

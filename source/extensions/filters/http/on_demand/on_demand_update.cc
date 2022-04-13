@@ -38,13 +38,25 @@ private:
   std::chrono::milliseconds timeout_;
 };
 
+} // namespace
+
+DecodeHeadersBehaviorPtr DecodeHeadersBehavior::rds() {
+  return std::make_unique<RDSDecodeHeadersBehavior>();
+}
+
+DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout) {
+  return std::make_unique<RDSCDSDecodeHeadersBehavior>(std::move(odcds), timeout);
+}
+
+namespace {
+
 DecodeHeadersBehaviorPtr
 createDecodeHeadersBehavior(OptRef<const envoy::config::core::v3::ConfigSource> odcds_config,
                             const std::string& resources_locator, std::chrono::milliseconds timeout,
                             Upstream::ClusterManager& cm,
                             ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!odcds_config.has_value()) {
-    return std::make_unique<RDSDecodeHeadersBehavior>();
+    return DecodeHeadersBehavior::rds();
   }
   Upstream::OdCdsApiHandlePtr odcds;
   if (resources_locator.empty()) {
@@ -53,7 +65,7 @@ createDecodeHeadersBehavior(OptRef<const envoy::config::core::v3::ConfigSource> 
     auto locator = Config::XdsResourceIdentifier::decodeUrl(resources_locator);
     odcds = cm.allocateOdCdsApi(odcds_config.value(), locator, validation_visitor);
   }
-  return std::make_unique<RDSCDSDecodeHeadersBehavior>(std::move(odcds), timeout);
+  return DecodeHeadersBehavior::cdsRds(std::move(odcds), timeout);
 }
 
 template <typename ProtoConfig>
@@ -89,6 +101,15 @@ OnDemandFilterConfig::OnDemandFilterConfig(
     : OnDemandFilterConfig(createDecodeHeadersBehavior(
           getODCDSConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
           cm, validation_visitor)) {}
+
+OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
+    : config_(std::move(config)) {
+  if (config_ == nullptr) {
+    // if config is nil, fall back to rds only
+    config_ = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds());
+  }
+}
+
 
 OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   if (auto route = callbacks_->route(); route != nullptr) {

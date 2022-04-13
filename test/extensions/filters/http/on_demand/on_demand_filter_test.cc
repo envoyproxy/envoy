@@ -23,7 +23,7 @@ namespace OnDemand {
 class OnDemandFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    auto config = std::make_shared<OnDemandFilterConfig>(nullptr);
+    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds());
     odcds_ = nullptr;
     setupWithConfig(std::move(config));
   }
@@ -31,7 +31,7 @@ public:
   void setupWithCDS() {
     auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
     odcds_ = mock_odcds.get();
-    auto config = std::make_shared<OnDemandFilterConfig>(std::move(mock_odcds));
+    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
     setupWithConfig(std::move(config));
   }
 
@@ -90,7 +90,7 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEm
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
