@@ -163,7 +163,9 @@ Network::TransportSocketPtr InternalSocketFactory::createTransportSocket(
 void InternalSocketFactory::hashKey(std::vector<uint8_t>& key,
                                     Network::TransportSocketOptionsConstSharedPtr options) const {
   PassthroughFactory::hashKey(key, options);
-  // Filter state should be included in the hash since it is imported per an internal connection.
+  // Filter state should be included in the hash since it can originate from
+  // the downstream request but is only applied once per upstream connection to
+  // the internal listener.
   if (options && options->filterState()) {
     config_.hashKey(key, options->filterState());
   }
