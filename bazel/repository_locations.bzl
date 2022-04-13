@@ -535,7 +535,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-04-03",
+        release_date = "2022-04-03",
         cpe = "cpe:2.3:a:yaml-cpp_project:yaml-cpp:*",
     ),
     com_github_msgpack_msgpack_c = dict(
