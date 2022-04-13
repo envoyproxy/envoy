@@ -11,16 +11,6 @@ namespace Network {
 namespace Matching {
 
 template <>
-Matcher::DataInputGetResult DestinationIPInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().localAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          address->ip()->addressAsString()};
-}
-
-template <>
 Matcher::DataInputGetResult
 DestinationIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
   const auto& address = data.localAddress();
@@ -29,17 +19,6 @@ DestinationIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
           address.ip()->addressAsString()};
-}
-
-template <>
-Matcher::DataInputGetResult
-DestinationPortInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().localAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          absl::StrCat(address->ip()->port())};
 }
 
 template <>
@@ -54,16 +33,6 @@ DestinationPortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
 }
 
 template <>
-Matcher::DataInputGetResult SourceIPInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().remoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          address->ip()->addressAsString()};
-}
-
-template <>
 Matcher::DataInputGetResult SourceIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
   const auto& address = data.remoteAddress();
   if (address.type() != Network::Address::Type::Ip) {
@@ -71,16 +40,6 @@ Matcher::DataInputGetResult SourceIPInput<UdpMatchingData>::get(const UdpMatchin
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
           address.ip()->addressAsString()};
-}
-
-template <>
-Matcher::DataInputGetResult SourcePortInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().remoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          absl::StrCat(address->ip()->port())};
 }
 
 template <>
@@ -94,18 +53,7 @@ SourcePortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
           absl::StrCat(address.ip()->port())};
 }
 
-template <>
-Matcher::DataInputGetResult DirectSourceIPInput<MatchingData>::get(const MatchingData& data) const {
-  const auto& address = data.socket().connectionInfoProvider().directRemoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          address->ip()->addressAsString()};
-}
-
-template <>
-Matcher::DataInputGetResult SourceTypeInput<MatchingData>::get(const MatchingData& data) const {
+Matcher::DataInputGetResult SourceTypeInput::get(const MatchingData& data) const {
   const bool is_local_connection = Network::Utility::isSameIpOrLoopback(data.socket());
   if (is_local_connection) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
@@ -113,19 +61,7 @@ Matcher::DataInputGetResult SourceTypeInput<MatchingData>::get(const MatchingDat
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-template <>
-Matcher::DataInputGetResult ServerNameInput<MatchingData>::get(const MatchingData& data) const {
-  const auto server_name = data.socket().requestedServerName();
-  if (!server_name.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(server_name)};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-}
-
-template <>
-Matcher::DataInputGetResult
-TransportProtocolInput<MatchingData>::get(const MatchingData& data) const {
+Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
   const auto transport_protocol = data.socket().detectedTransportProtocol();
   if (!transport_protocol.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -134,9 +70,7 @@ TransportProtocolInput<MatchingData>::get(const MatchingData& data) const {
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
-template <>
-Matcher::DataInputGetResult
-ApplicationProtocolInput<MatchingData>::get(const MatchingData& data) const {
+Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
   const auto& protocols = data.socket().requestedApplicationProtocols();
   if (!protocols.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -144,6 +78,17 @@ ApplicationProtocolInput<MatchingData>::get(const MatchingData& data) const {
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
+
+using DestinationIPInputFactory = DestinationIPInputBaseFactory<MatchingData>;
+using UdpDestinationIPInputFactory = DestinationIPInputBaseFactory<UdpMatchingData>;
+using DestinationPortInputFactory = DestinationPortInputBaseFactory<MatchingData>;
+using UdpDestinationPortInputFactory = DestinationPortInputBaseFactory<UdpMatchingData>;
+using SourceIPInputFactory = SourceIPInputBaseFactory<MatchingData>;
+using UdpSourceIPInputFactory = SourceIPInputBaseFactory<UdpMatchingData>;
+using SourcePortInputFactory = SourcePortInputBaseFactory<MatchingData>;
+using UdpSourcePortInputFactory = SourcePortInputBaseFactory<UdpMatchingData>;
+using DirectSourceIPInputFactory = DirectSourceIPInputBaseFactory<MatchingData>;
+using ServerNameInputFactory = ServerNameBaseFactory<MatchingData>;
 
 REGISTER_FACTORY(DestinationIPInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(UdpDestinationIPInputFactory, Matcher::DataInputFactory<UdpMatchingData>);

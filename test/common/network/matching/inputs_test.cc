@@ -131,7 +131,7 @@ TEST(MatchingData, DirectSourceIPInput) {
 }
 
 TEST(MatchingData, SourceTypeInput) {
-  SourceTypeInput<MatchingData> input;
+  SourceTypeInput input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -160,7 +160,6 @@ TEST(MatchingData, ServerNameInput) {
   MatchingDataImpl data(socket);
 
   {
-    EXPECT_CALL(socket, requestedServerName).WillOnce(testing::Return(""));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -169,7 +168,7 @@ TEST(MatchingData, ServerNameInput) {
 
   {
     const auto host = "example.com";
-    EXPECT_CALL(socket, requestedServerName).WillOnce(testing::Return(host));
+    socket.connection_info_provider_->setRequestedServerName(host);
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -178,7 +177,7 @@ TEST(MatchingData, ServerNameInput) {
 }
 
 TEST(MatchingData, TransportProtocolInput) {
-  TransportProtocolInput<MatchingData> input;
+  TransportProtocolInput input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
@@ -201,7 +200,7 @@ TEST(MatchingData, TransportProtocolInput) {
 }
 
 TEST(MatchingData, ApplicationProtocolInput) {
-  ApplicationProtocolInput<MatchingData> input;
+  ApplicationProtocolInput input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 
