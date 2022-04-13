@@ -59,6 +59,7 @@ public:
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
+
   std::string domain_;
   std::vector<RateLimit::Descriptor> original_descriptors_;
   std::vector<std::unique_ptr<Formatter::FormatterImpl>> substitution_formatters_;
@@ -108,6 +109,7 @@ public:
 
 private:
   enum class Status { NotStarted, Calling, Complete };
+
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};

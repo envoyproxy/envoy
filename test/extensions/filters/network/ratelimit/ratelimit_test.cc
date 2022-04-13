@@ -179,17 +179,7 @@ TEST_F(RateLimitFilterTest, SubstitutionFormatterTest1) {
             request_callbacks_ = &callbacks;
           })));
 
-  for (auto it_expected = expected_descriptors.begin(), it_actual = actual_descriptors.begin();
-       it_expected != expected_descriptors.end() && it_actual != actual_descriptors.end();
-       ++it_expected, ++it_actual) {
-    std::vector<RateLimit::DescriptorEntry> de1 = it_expected->entries_;
-    std::vector<RateLimit::DescriptorEntry> de2 = it_actual->entries_;
-    for (auto de_expected = de1.begin(), de_actual = de2.begin();
-         de_expected != de1.end() && de_actual != de2.end(); ++de_expected, ++de_actual) {
-      EXPECT_EQ(de_actual->key_, de_expected->key_);
-      EXPECT_EQ(de_actual->value_, de_expected->value_);
-    }
-  }
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(actual_descriptors));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -239,6 +229,8 @@ TEST_F(RateLimitFilterTest, SubstitutionFormatterTest2) {
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
+
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(actual_descriptors));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
