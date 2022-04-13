@@ -92,7 +92,8 @@ Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   static_resources:
     listeners:
@@ -140,6 +141,8 @@ Below is a complete code example of how we employ the filter as one of
                 - oauth2-resource
                 - http://example.com
           - name: envoy.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           tracing: {}
           codec_type: "AUTO"
           stat_prefix: ingress_http
