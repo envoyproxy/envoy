@@ -8,3 +8,16 @@ index b0b9016..9cacac7 100644
      srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
 +    local_defines = ["yaml_cpp_EXPORTS"],
  )
+diff --git a/include/yaml-cpp/emitter.h b/include/yaml-cpp/emitter.h
+index 210b1ec..f9b043b 100644
+--- a/include/yaml-cpp/emitter.h
++++ b/include/yaml-cpp/emitter.h
+@@ -32,7 +32,7 @@ class EmitterState;
+ 
+ class YAML_CPP_API Emitter {
+  public:
+-  Emitter();
++  YAML_CPP_API Emitter();
+   explicit Emitter(std::ostream& stream);
+   Emitter(const Emitter&) = delete;
+   Emitter& operator=(const Emitter&) = delete;
