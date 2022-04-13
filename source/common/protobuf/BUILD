@@ -68,6 +68,7 @@ envoy_cc_library(
         "protobuf",
         "yaml_cpp",
     ],
+    copts = ["-Uyaml_cpp_EXPORTS"],
     deps = [
         ":message_validator_lib",
         ":protobuf",
