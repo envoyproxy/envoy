@@ -1,11 +1,11 @@
 diff --git a/BUILD.bazel b/BUILD.bazel
-index b0b9016..6f93e94 100644
+index b0b9016..37e1d7f 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -1,3 +1,10 @@
-+yaml_cpp_copts = select({
++yaml_cpp_linkopts = select({
 +    # Ignore linker warning
-+    "@envoy//bazel:windows_x86_64": ["/ignore:4217"],
++    "@envoy//bazel:windows_x86_64": ["-ignore:4217"],
 +    # Remove these after upstream fix.
 +    "//conditions:default": [""],
 +})
@@ -18,5 +18,5 @@ index b0b9016..6f93e94 100644
      hdrs = glob(["include/**/*.h"]),
      srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
 +    local_defines = ["yaml_cpp_EXPORTS"],
-+    copts = yaml_cpp_copts,
++    linkopts = yaml_cpp_linkopts,
  )
