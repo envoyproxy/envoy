@@ -86,6 +86,16 @@ TEST(MatchingData, HttpDestinationIPInput) {
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, host);
   }
+
+  connection_info_provider.setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8081));
+  {
+    SourceTypeInput<Http::HttpMatchingData> input;
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "local");
+  }
 }
 
 TEST(MatchingData, DestinationPortInput) {
@@ -185,7 +195,7 @@ TEST(MatchingData, DirectSourceIPInput) {
 }
 
 TEST(MatchingData, SourceTypeInput) {
-  SourceTypeInput input;
+  SourceTypeInput<MatchingData> input;
   MockConnectionSocket socket;
   MatchingDataImpl data(socket);
 

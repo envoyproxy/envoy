@@ -706,7 +706,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
   // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
       (!filter_chain_local.first.empty() || !filter_chain_external.first.empty())
-          ? Network::Utility::isSameIpOrLoopback(socket)
+          ? Network::Utility::isSameIpOrLoopback(socket.connectionInfoProvider())
           : false;
 
   if (is_local_connection) {

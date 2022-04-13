@@ -50,11 +50,11 @@ These input functions are available for matching TCP connections, UDP datagrams,
 These input functions are available for matching TCP connections and HTTP requests:
 
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
+* :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
 
 These input functions are available for matching TCP connections:
 
-* :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Transport protocol <extension_envoy.matching.inputs.transport_protocol>`.
 * :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
 

@@ -122,17 +122,22 @@ public:
                     MatchingDataType>("direct_source_ip") {}
 };
 
-class SourceTypeInput : public Matcher::DataInput<MatchingData> {
+template <class MatchingDataType>
+class SourceTypeInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override;
 };
 
-class SourceTypeInputFactory
-    : public BaseFactory<SourceTypeInput,
+template <class MatchingDataType>
+class SourceTypeInputBaseFactory
+    : public BaseFactory<SourceTypeInput<MatchingDataType>,
                          envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
-                         MatchingData> {
+                         MatchingDataType> {
 public:
-  SourceTypeInputFactory() : BaseFactory("source_type") {}
+  SourceTypeInputBaseFactory()
+      : BaseFactory<SourceTypeInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
+                    MatchingDataType>("source_type") {}
 };
 
 template <class MatchingDataType>

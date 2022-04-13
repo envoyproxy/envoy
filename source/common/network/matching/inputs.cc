@@ -109,8 +109,11 @@ DirectSourceIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
           address->ip()->addressAsString()};
 }
 
-Matcher::DataInputGetResult SourceTypeInput::get(const MatchingData& data) const {
-  const bool is_local_connection = Network::Utility::isSameIpOrLoopback(data.socket());
+template <class MatchingDataType>
+Matcher::DataInputGetResult
+SourceTypeInput<MatchingDataType>::get(const MatchingDataType& data) const {
+  const bool is_local_connection =
+      Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
   if (is_local_connection) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
   }
@@ -188,7 +191,11 @@ class HttpServerNameInputFactory : public ServerNameInputBaseFactory<Http::HttpM
 REGISTER_FACTORY(ServerNameInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(HttpServerNameInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
+class SourceTypeInputFactory : public SourceTypeInputBaseFactory<MatchingData> {};
+class HttpSourceTypeInputFactory : public SourceTypeInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(HttpSourceTypeInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
 

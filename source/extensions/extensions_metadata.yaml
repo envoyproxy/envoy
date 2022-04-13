@@ -817,6 +817,7 @@ envoy.matching.inputs.direct_source_ip:
   status: alpha
 envoy.matching.inputs.source_type:
   categories:
+  - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
