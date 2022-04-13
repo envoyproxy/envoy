@@ -472,7 +472,7 @@ TEST_P(OdCdsIntegrationTest, DisablingODCDSAtRouteLevelWorks) {
 TEST_P(OdCdsIntegrationTest, DisablingODCDSAtVHostLevelWorks) {
   doCleanUpXdsConnection_ = false;
   addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
-                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500));
+      OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500));
   addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -533,8 +533,8 @@ public:
     // initial listener query
     EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
     auto odcds_listener = buildListener();
-    sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
-                                                                      {odcds_listener}, {}, "2");
+    sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(
+        Config::TypeUrl::get().Listener, {odcds_listener}, {}, "2");
 
     // acks
     EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
