@@ -14,9 +14,9 @@ namespace AsyncFiles {
 
 TEST(StatusAfterFileErrorTest, AllErrnosReturnErrors) {
   std::vector<int> errors = {
-      EACCES,       EPERM,  EROFS,     EBADF,  EBUSY,  EISDIR, ELOOP,  ENOTDIR,    ETXTBSY,
-      EWOULDBLOCK,  EDQUOT, EMFILE,    ENFILE, ENOMEM, ENOSPC, EEXIST, EFAULT,     EINVAL,
-      ENAMETOOLONG, EFBIG,  EOVERFLOW, EINTR,  ENODEV, ENOENT, ENXIO,  EOPNOTSUPP,
+      EACCES,      EPERM,     EROFS,  EBADF,  EBUSY,  EISDIR, ELOOP,      ENOTDIR, ETXTBSY,
+      EWOULDBLOCK, EMFILE,    ENFILE, ENOMEM, ENOSPC, EEXIST, EFAULT,     EINVAL,  ENAMETOOLONG,
+      EFBIG,       EOVERFLOW, EINTR,  ENODEV, ENOENT, ENXIO,  EOPNOTSUPP, EDQUOT,
   };
   for (const int error : errors) {
     auto status = statusAfterFileError(error);
