@@ -64,11 +64,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
+    copts = ["-Uyaml_cpp_EXPORTS"],
     external_deps = [
         "protobuf",
         "yaml_cpp",
     ],
-    copts = ["-Uyaml_cpp_EXPORTS"],
     deps = [
         ":message_validator_lib",
         ":protobuf",
