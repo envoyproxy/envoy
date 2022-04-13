@@ -44,7 +44,8 @@ DecodeHeadersBehaviorPtr DecodeHeadersBehavior::rds() {
   return std::make_unique<RDSDecodeHeadersBehavior>();
 }
 
-DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout) {
+DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds,
+                                                       std::chrono::milliseconds timeout) {
   return std::make_unique<RDSCDSDecodeHeadersBehavior>(std::move(odcds), timeout);
 }
 
@@ -109,7 +110,6 @@ OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
     config_ = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds());
   }
 }
-
 
 OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   if (auto route = callbacks_->route(); route != nullptr) {

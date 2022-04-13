@@ -19,7 +19,8 @@ using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 class DecodeHeadersBehavior {
 public:
   static DecodeHeadersBehaviorPtr rds();
-  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout);
+  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds,
+                                         std::chrono::milliseconds timeout);
 
   virtual ~DecodeHeadersBehavior() = default;
 

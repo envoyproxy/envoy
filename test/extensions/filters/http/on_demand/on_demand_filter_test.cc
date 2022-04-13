@@ -31,7 +31,8 @@ public:
   void setupWithCDS() {
     auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
     odcds_ = mock_odcds.get();
-    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
+    auto config = std::make_shared<OnDemandFilterConfig>(
+        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
     setupWithConfig(std::move(config));
   }
 
