@@ -18,6 +18,7 @@ build --incompatible_strict_action_env
 build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
+build --platform_mappings=bazel/platform_mappings
 
 build --enable_platform_specific_config
 
