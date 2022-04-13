@@ -27,6 +27,8 @@ public:
   const Network::ConnectionInfoProvider& connectionInfoProvider() const {
     return connection().connectionInfoProvider();
   }
+
+  Http::RequestHeaderMapOptConstRef requestHeaders() const { return headers(); }
 };
 
 } // namespace Matching

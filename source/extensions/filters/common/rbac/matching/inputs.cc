@@ -24,6 +24,11 @@ REGISTER_FACTORY(SourcePortInputFactory, Matcher::DataInputFactory<MatchingData>
 REGISTER_FACTORY(DirectSourceIPInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(ServerNameInputFactory, Matcher::DataInputFactory<MatchingData>);
 
+using HttpRequestHeadersDataInputFactory =
+    Http::Matching::HttpRequestHeadersDataInputFactoryBase<MatchingData>;
+
+REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<MatchingData>);
+
 } // namespace Matching
 } // namespace RBAC
 } // namespace Common
