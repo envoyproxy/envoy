@@ -29,9 +29,12 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
+namespace {
 constexpr absl::string_view HttpStatPrefix = "http_filter.";
 constexpr absl::string_view TcpListenerStatPrefix = "tcp_listener_filter.";
 constexpr absl::string_view UdpListenerStatPrefix = "udp_listener_filter.";
+
+} // namespace
 
 // These helper functions throw exceptions. Thus can not be defined in .h files.
 void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
