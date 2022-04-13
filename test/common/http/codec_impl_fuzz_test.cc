@@ -547,23 +547,23 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   bool http2 = false;
 
   switch (http_version) {
-    case HttpVersion::Http1:
-      break;
-    case HttpVersion::Http2Nghttp2:
-      http2 = true;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-      break;
-    case HttpVersion::Http2WrappedNghttp2:
-      http2 = true;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-      break;
-    case HttpVersion::Http2Oghttp2:
-      http2 = true;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
-      break;
+  case HttpVersion::Http1:
+    break;
+  case HttpVersion::Http2Nghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+    break;
+  case HttpVersion::Http2WrappedNghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+    break;
+  case HttpVersion::Http2Oghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+    break;
   }
 
   if (http2) {
