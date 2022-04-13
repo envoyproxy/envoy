@@ -109,6 +109,7 @@ MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;
 MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
+MockListenerFilter::MockListenerFilter() = default;
 MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
 MockListenerFilterCallbacks::MockListenerFilterCallbacks() {

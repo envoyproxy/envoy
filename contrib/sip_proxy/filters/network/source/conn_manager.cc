@@ -14,7 +14,7 @@ namespace NetworkFilters {
 namespace SipProxy {
 
 TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
-    ConnectionManager& parent,
+    ConnectionManager& parent, Event::Dispatcher& dispatcher,
     const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
     Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
     : parent_(parent),
@@ -24,7 +24,8 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
   if (config.has_grpc_service()) {
     const std::chrono::milliseconds timeout =
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, timeout, 2000));
-    tra_client_ = TrafficRoutingAssistant::traClient(context, config.grpc_service(), timeout);
+    tra_client_ =
+        TrafficRoutingAssistant::traClient(dispatcher, context, config.grpc_service(), timeout);
     tra_client_->setRequestCallbacks(*this);
   }
 }
@@ -291,7 +292,8 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
   auto stream_info = StreamInfo::StreamInfoImpl(
       time_source_, read_callbacks_->connection().connectionInfoProviderSharedPtr());
   tra_handler_ = std::make_shared<TrafficRoutingAssistantHandler>(
-      *this, config_.settings()->traServiceConfig(), context_, stream_info);
+      *this, read_callbacks_->connection().dispatcher(), config_.settings()->traServiceConfig(),
+      context_, stream_info);
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
