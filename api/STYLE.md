@@ -188,7 +188,7 @@ metadata. We describe these annotations below by category.
 * `option (udpa.annotations.file_migrate).move_to_package = "<package name>";`
   to denote that in the next major version of the API, the file will be moved to
   the given package. This is consumed by `protoxform`.
-* `option (udpa.annotations.file_status).work_in_progress = true;` to denote a
+* `option (xds.annotations.v3.file_status).work_in_progress = true;` to denote a
   file that is still work-in-progress and subject to breaking changes.
 
 ## Principles
