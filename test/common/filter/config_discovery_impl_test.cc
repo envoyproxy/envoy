@@ -64,7 +64,7 @@ public:
     ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
   }
 
-  virtual ~FilterConfigDiscoveryTestBase() {}
+  virtual ~FilterConfigDiscoveryTestBase() = default;
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
@@ -85,7 +85,7 @@ public:
   FilterConfigDiscoveryImplTest() {
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
   }
-  ~FilterConfigDiscoveryImplTest() { factory_context_.thread_local_.shutdownThread(); }
+  ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
   // Create listener filter config provider callbacks.
   DynamicFilterConfigProviderPtr<FactoryCb> createProvider(std::string name, bool warm,
