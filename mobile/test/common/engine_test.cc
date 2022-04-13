@@ -47,12 +47,13 @@ layered_runtime:
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
 struct TestEngineHandle {
+  envoy_engine_t handle_;
   TestEngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
-    init_engine(callbacks, {}, {});
-    run_engine(0, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
+    handle_ = init_engine(callbacks, {}, {});
+    run_engine(handle_, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
   }
 
-  ~TestEngineHandle() { terminate_engine(0); }
+  ~TestEngineHandle() { terminate_engine(handle_); }
 };
 
 class EngineTest : public testing::Test {
@@ -81,12 +82,13 @@ TEST_F(EngineTest, EarlyExit) {
                                    &test_context /*context*/};
 
   engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
+  envoy_engine_t handle = engine_->handle_;
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   engine_.reset();
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  start_stream(0, {}, false);
+  start_stream(handle, 0, {}, false);
 }
 
 TEST_F(EngineTest, AccessEngineAfterInitialization) {
@@ -101,12 +103,13 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
                                    [](void*) -> void {} /*on_exit*/, &test_context /*context*/};
 
   engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
+  envoy_engine_t handle = engine_->handle_;
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   absl::Notification getClusterManagerInvoked;
   // Scheduling on the dispatcher should work, the engine is running.
   EXPECT_EQ(ENVOY_SUCCESS, EngineHandle::runOnEngineDispatcher(
-                               1, [&getClusterManagerInvoked](Envoy::Engine& engine) {
+                               handle, [&getClusterManagerInvoked](Envoy::Engine& engine) {
                                  engine.getClusterManager();
                                  getClusterManagerInvoked.Notify();
                                }));
@@ -118,7 +121,7 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
   EXPECT_EQ(ENVOY_FAILURE, EngineHandle::runOnEngineDispatcher(
-                               1, [](Envoy::Engine& engine) { engine.getClusterManager(); }));
+                               handle, [](Envoy::Engine& engine) { engine.getClusterManager(); }));
 }
 
 } // namespace Envoy

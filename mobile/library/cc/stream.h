@@ -15,7 +15,7 @@ using EngineSharedPtr = std::shared_ptr<Engine>;
 
 class Stream {
 public:
-  Stream(envoy_stream_t handle);
+  Stream(envoy_engine_t engine_handle, envoy_stream_t handle);
 
   Stream& sendHeaders(RequestHeadersSharedPtr headers, bool end_stream);
   Stream& sendData(envoy_data data);
@@ -24,6 +24,7 @@ public:
   void cancel();
 
 private:
+  envoy_engine_t engine_handle_;
   envoy_stream_t handle_;
 };
 

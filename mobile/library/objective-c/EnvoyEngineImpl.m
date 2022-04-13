@@ -405,6 +405,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
+  EnvoyNetworkMonitor *_networkMonitor;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
@@ -439,11 +440,12 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 
   _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
+  _networkMonitor = [[EnvoyNetworkMonitor alloc] initWithEngine:_engineHandle];
 
   if (enableNetworkPathMonitor) {
-    [EnvoyNetworkMonitor startPathMonitorIfNeeded];
+    [_networkMonitor startPathMonitor];
   } else {
-    [EnvoyNetworkMonitor startReachabilityIfNeeded];
+    [_networkMonitor startReachability];
   }
 
   return self;
@@ -532,6 +534,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
                             explicitFlowControl:(BOOL)explicitFlowControl {
   return [[EnvoyHTTPStreamImpl alloc] initWithHandle:init_stream(_engineHandle)
+                                              engine:_engineHandle
                                            callbacks:callbacks
                                  explicitFlowControl:explicitFlowControl];
 }

@@ -243,10 +243,12 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
  Open an underlying HTTP stream.
 
  @param handle Underlying handle of the HTTP stream owned by an Envoy engine.
+ @param engine Underlying handle of the Envoy engine.
  @param callbacks The callbacks for the stream.
  @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
  */
 - (instancetype)initWithHandle:(intptr_t)handle
+                        engine:(intptr_t)engineHandle
                      callbacks:(EnvoyHTTPCallbacks *)callbacks
            explicitFlowControl:(BOOL)explicitFlowControl;
 
@@ -567,15 +569,20 @@ extern const int kEnvoyFailure;
 // Monitors network changes in order to update Envoy network cluster preferences.
 @interface EnvoyNetworkMonitor : NSObject
 
+/**
+ Create a new instance of the network monitor.
+ */
+- (instancetype)initWithEngine:(envoy_engine_t)engineHandle;
+
 // Start monitoring reachability using `SCNetworkReachability`, updating the
 // preferred Envoy network cluster on changes.
 // This is typically called by `EnvoyEngine` automatically on startup.
-+ (void)startReachabilityIfNeeded;
+- (void)startReachability;
 
 // Start monitoring reachability using `NWPathMonitor`, updating the
 // preferred Envoy network cluster on changes.
 // This is typically called by `EnvoyEngine` automatically on startup.
-+ (void)startPathMonitorIfNeeded;
+- (void)startPathMonitor;
 
 @end
 
