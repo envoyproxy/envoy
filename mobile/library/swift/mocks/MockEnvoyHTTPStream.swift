@@ -7,7 +7,7 @@ final class MockEnvoyHTTPStream: EnvoyHTTPStream {
   let callbacks: EnvoyHTTPCallbacks
   let explicitFlowControl: Bool
 
-  init(handle: Int, callbacks: EnvoyHTTPCallbacks, explicitFlowControl: Bool) {
+  init(handle: Int, engine: Int, callbacks: EnvoyHTTPCallbacks, explicitFlowControl: Bool) {
     self.callbacks = callbacks
     self.explicitFlowControl = explicitFlowControl
   }

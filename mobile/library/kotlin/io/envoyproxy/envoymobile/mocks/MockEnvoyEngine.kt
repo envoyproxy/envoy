@@ -4,6 +4,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
+import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 
 /**
@@ -46,4 +47,6 @@ internal class MockEnvoyEngine : EnvoyEngine {
   override fun dumpStats(): String = ""
 
   override fun drainConnections() = Unit
+
+  override fun setPreferredNetwork(network: EnvoyNetworkType) = Unit
 }

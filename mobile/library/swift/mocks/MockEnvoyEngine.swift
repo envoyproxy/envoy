@@ -51,7 +51,7 @@ extension MockEnvoyEngine: EnvoyEngine {
     with callbacks: EnvoyHTTPCallbacks,
     explicitFlowControl: Bool
   ) -> EnvoyHTTPStream {
-    return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks,
+    return MockEnvoyHTTPStream(handle: 0, engine: 0, callbacks: callbacks,
                                explicitFlowControl: explicitFlowControl)
   }
 

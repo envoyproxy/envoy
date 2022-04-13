@@ -44,13 +44,4 @@ public class AndroidJniLibrary {
    * @return The resulting status of the initialization.
    */
   protected static native int initialize(ConnectivityManager connectivityManager);
-
-  /**
-   * Update the network interface to the preferred network for opening new
-   * streams. Note that this state is shared by all engines.
-   *
-   * @param network, the network to be preferred for new streams.
-   * @return The resulting status of the operation.
-   */
-  protected static native int setPreferredNetwork(int network);
 }

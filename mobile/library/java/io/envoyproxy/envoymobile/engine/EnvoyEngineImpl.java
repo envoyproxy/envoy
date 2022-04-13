@@ -4,6 +4,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
+import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import java.util.Map;
@@ -13,6 +14,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   // TODO(goaway): enforce agreement values in /library/common/types/c_types.h.
   private static final int ENVOY_SUCCESS = 0;
   private static final int ENVOY_FAILURE = 1;
+
+  private static final int ENVOY_NET_GENERIC = 0;
+  private static final int ENVOY_NET_WWAN = 1;
+  private static final int ENVOY_NET_WLAN = 2;
 
   private final long engineHandle;
 
@@ -37,7 +42,8 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    EnvoyHTTPStream stream = new EnvoyHTTPStream(streamHandle, callbacks, explicitFlowControl);
+    EnvoyHTTPStream stream =
+        new EnvoyHTTPStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
     stream.start();
     return stream;
   }
@@ -198,5 +204,23 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public void drainConnections() {
     JniLibrary.drainConnections(engineHandle);
+  }
+
+  @Override
+  public void setPreferredNetwork(EnvoyNetworkType network) {
+    switch (network) {
+    case ENVOY_NETWORK_TYPE_WWAN:
+      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WWAN);
+      return;
+    case ENVOY_NETWORK_TYPE_WLAN:
+      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WLAN);
+      return;
+    case ENVOY_NETWORK_TYPE_GENERIC:
+      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
+      return;
+    default:
+      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
+      return;
+    }
   }
 }
