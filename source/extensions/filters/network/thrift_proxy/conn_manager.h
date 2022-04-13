@@ -83,19 +83,10 @@ private:
     bool onData(Buffer::Instance& data);
 
     // ProtocolConverter
+    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus transportEnd() override;
     FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
-      filter_context_ = metadata;
-      parent_.filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
-        MessageMetadataSharedPtr metadata =
-            absl::any_cast<MessageMetadataSharedPtr>(filter_context_);
-        return filter->transportBegin(metadata);
-      };
-
-      return parent_.applyEncoderFilters(nullptr);
-    }
-    FilterStatus transportEnd() override;
 
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
@@ -105,7 +96,6 @@ private:
     DecoderPtr decoder_;
     Buffer::OwnedImpl upstream_buffer_;
     MessageMetadataSharedPtr metadata_;
-    absl::any filter_context_;
     absl::optional<bool> success_;
     bool complete_ : 1;
     bool passthrough_ : 1;
@@ -223,6 +213,30 @@ private:
     FilterStatus listEnd() override;
     FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
     FilterStatus setEnd() override;
+
+    // Helper to setup filter_action_ and filter_context_
+    void transportBeginSetup(MessageMetadataSharedPtr metadata);
+    void transportEndSetup();
+    void passthroughDataSetup(Buffer::Instance& data);
+    void messageBeginSetup(MessageMetadataSharedPtr metadata);
+    void messageEndSetup();
+    void structBeginSetup(absl::string_view name);
+    void structEndSetup();
+    void fieldBeginSetup(absl::string_view name, FieldType& field_type, int16_t& field_id);
+    void fieldEndSetup();
+    void boolValueSetup(bool& value);
+    void byteValueSetup(uint8_t& value);
+    void int16ValueSetup(int16_t& value);
+    void int32ValueSetup(int32_t& value);
+    void int64ValueSetup(int64_t& value);
+    void doubleValueSetup(double& value);
+    void stringValueSetup(absl::string_view value);
+    void mapBeginSetup(FieldType& key_type, FieldType& value_type, uint32_t& size);
+    void mapEndSetup();
+    void listBeginSetup(FieldType& elem_type, uint32_t& size);
+    void listEndSetup();
+    void setBeginSetup(FieldType& elem_type, uint32_t& size);
+    void setEndSetup();
 
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
