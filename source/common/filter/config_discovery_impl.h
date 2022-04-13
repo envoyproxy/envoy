@@ -29,12 +29,9 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
-namespace {
-constexpr absl::string_view HttpStatPrefix = "http_filter.";
-constexpr absl::string_view TcpListenerStatPrefix = "tcp_listener_filter.";
-constexpr absl::string_view UdpListenerStatPrefix = "udp_listener_filter.";
-
-} // namespace
+extern const absl::string_view HttpStatPrefix;
+extern const absl::string_view TcpListenerStatPrefix;
+extern const absl::string_view UdpListenerStatPrefix;
 
 // These helper functions throw exceptions. Thus can not be defined in .h files.
 void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
@@ -490,10 +487,10 @@ private:
 
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
-    : public FilterConfigProviderManagerImpl<Server::Configuration::NamedHttpFilterConfigFactory,
-                                             Http::FilterFactoryCb,
-                                             Server::Configuration::FactoryContext,
-                                             HttpDynamicFilterConfigProviderImpl, HttpStatPrefix> {
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb,
+          Server::Configuration::FactoryContext, HttpDynamicFilterConfigProviderImpl,
+          Filter::HttpStatPrefix> {
 protected:
   bool isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
                         Protobuf::Message& message,
@@ -513,14 +510,14 @@ class TcpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedListenerFilterConfigFactory, Network::ListenerFilterFactoryCb,
           Server::Configuration::ListenerFactoryContext, TcpListenerDynamicFilterConfigProviderImpl,
-          TcpListenerStatPrefix> {};
+          Filter::TcpListenerStatPrefix> {};
 
 // UDP listener filter
 class UdpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUdpListenerFilterConfigFactory,
           Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          UdpListenerDynamicFilterConfigProviderImpl, UdpListenerStatPrefix> {};
+          UdpListenerDynamicFilterConfigProviderImpl, Filter::UdpListenerStatPrefix> {};
 
 } // namespace Filter
 } // namespace Envoy
