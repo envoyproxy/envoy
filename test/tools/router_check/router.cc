@@ -334,8 +334,9 @@ bool RouterCheckTool::compareVirtualCluster(
                              *tool_config.request_headers_, stream_info) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
-    Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_, stream_info)->statName();
+    Stats::StatName stat_name = tool_config.route_->routeEntry()
+                                    ->virtualCluster(*tool_config.request_headers_, stream_info)
+                                    ->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
