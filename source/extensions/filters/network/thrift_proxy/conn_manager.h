@@ -75,8 +75,9 @@ private:
 
   struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
-        : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          complete_(false), passthrough_{false} {
+        : parent_(parent),
+          decoder_(std::make_unique<Decoder>(transport, protocol, *this)), complete_{false},
+          passthrough_{false}, pending_transport_end_{false} {
       initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
     }
 
@@ -87,10 +88,31 @@ private:
     FilterStatus transportEnd() override;
     FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus messageEnd() override;
+    FilterStatus structBegin(absl::string_view name) override;
+    FilterStatus structEnd() override;
+    FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                            int16_t& field_id) override;
+    FilterStatus fieldEnd() override;
+    FilterStatus boolValue(bool& value) override;
+    FilterStatus byteValue(uint8_t& value) override;
+    FilterStatus int16Value(int16_t& value) override;
+    FilterStatus int32Value(int32_t& value) override;
+    FilterStatus int64Value(int64_t& value) override;
+    FilterStatus doubleValue(double& value) override;
+    FilterStatus stringValue(absl::string_view value) override;
+    FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) override;
+    FilterStatus mapEnd() override;
+    FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
+    FilterStatus listEnd() override;
+    FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
+    FilterStatus setEnd() override;
 
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
+
+    void finalizeResponse();
 
     ActiveRpc& parent_;
     DecoderPtr decoder_;
@@ -99,6 +121,7 @@ private:
     absl::optional<bool> success_;
     bool complete_ : 1;
     bool passthrough_ : 1;
+    bool pending_transport_end_ : 1;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -284,17 +307,23 @@ private:
           std::make_unique<ActiveRpcDecoderFilter>(*this, wrapper->decoder_filter_);
       filter->setDecoderFilterCallbacks(*decoder_wrapper);
       LinkedList::moveIntoListBack(std::move(decoder_wrapper), decoder_filters_);
+
       ActiveRpcEncoderFilterPtr encoder_wrapper =
           std::make_unique<ActiveRpcEncoderFilter>(*this, wrapper->encoder_filter_);
       filter->setEncoderFilterCallbacks(*encoder_wrapper);
-      LinkedList::moveIntoListBack(std::move(encoder_wrapper), encoder_filters_);
+      LinkedList::moveIntoList(std::move(encoder_wrapper), encoder_filters_);
 
       base_filters_.emplace_back(wrapper);
     }
 
     bool passthroughSupported() const;
-    FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
-    FilterStatus applyEncoderFilters(ActiveRpcEncoderFilter* filter);
+
+    // apply filters to the decoder_event.
+    // @param filter    the last filter which is already applied to the decoder_event.
+    //                  nullptr indicates none is applied and the decoder_event is applied from the
+    //                  first filter.
+    FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter = nullptr);
+    FilterStatus applyEncoderFilters(ActiveRpcEncoderFilter* filter = nullptr);
     template <typename FilterType>
     FilterStatus applyFilters(FilterType* filter,
                               std::list<std::unique_ptr<FilterType>>& filter_list);

@@ -192,6 +192,10 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
   return **rpcs_.begin();
 }
 
+bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
+  return parent_.parent_.passthroughEnabled();
+}
+
 bool ConnectionManager::passthroughEnabled() const {
   if (!config_.payloadPassthrough()) {
     return false;
@@ -218,56 +222,26 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   return complete_;
 }
 
-FilterStatus ConnectionManager::ResponseDecoder::passthroughData(Buffer::Instance& data) {
-  passthrough_ = true;
-  return ProtocolConverter::passthroughData(data);
-}
-
-FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
-  metadata_ = metadata;
-  metadata_->setSequenceId(parent_.original_sequence_id_);
-
-  if (metadata->hasReplyType()) {
-    success_ = metadata->replyType() == ReplyType::Success;
-  }
-
-  // Check if the upstream host is draining.
-  //
-  // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
-  // that we can support the header in TTwitter protocol, which reads/adds response headers to
-  // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
-  // should happen here.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
-    metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
-    metadata->headers().remove(Headers::get().Drain);
-
-    // Check if this host itself is draining.
-    //
-    // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
-    // should be set before the encodeFrame() call. It should be set at or after the messageBegin
-    // call so that the header is added after all upstream headers passed, due to messageBegin
-    // possibly not getting headers in transportBegin.
-    ConnectionManager& cm = parent_.parent_;
-    if (cm.drain_decision_.drainClose()) {
-      // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
-      // over)?
-      metadata->headers().addReferenceKey(Headers::get().Drain, "true");
-      parent_.parent_.stats_.downstream_response_drain_close_.inc();
-    }
-  }
-
-  return ProtocolConverter::messageBegin(metadata);
-}
-
 FilterStatus ConnectionManager::ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
   parent_.transportBeginSetup(metadata);
-
-  return parent_.applyEncoderFilters(nullptr);
+  return parent_.applyEncoderFilters();
 }
 
 FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
+  parent_.transportEndSetup();
+  if (parent_.applyEncoderFilters() == FilterStatus::StopIteration) {
+    pending_transport_end_ = true;
+    return FilterStatus::StopIteration;
+  }
+
+  finalizeResponse();
+  return FilterStatus::Continue;
+}
+
+void ConnectionManager::ResponseDecoder::finalizeResponse() {
+  pending_transport_end_ = false;
   ConnectionManager& cm = parent_.parent_;
 
   if (cm.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
@@ -315,12 +289,164 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
     cm.stats_.response_invalid_type_.inc();
     break;
   }
-
-  return FilterStatus::Continue;
 }
 
-bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
-  return parent_.parent_.passthroughEnabled();
+FilterStatus ConnectionManager::ResponseDecoder::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
+
+  ProtocolConverter::passthroughData(data);
+  parent_.passthroughDataSetup(data);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
+  metadata_ = metadata;
+  metadata_->setSequenceId(parent_.original_sequence_id_);
+
+  if (metadata->hasReplyType()) {
+    // TODO: the status of success could be altered by filters
+    success_ = metadata->replyType() == ReplyType::Success;
+  }
+
+  // Check if the upstream host is draining.
+  //
+  // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
+  // that we can support the header in TTwitter protocol, which reads/adds response headers to
+  // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
+  // should happen here.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
+    metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
+    metadata->headers().remove(Headers::get().Drain);
+
+    // Check if this host itself is draining.
+    //
+    // Note: Similarly as above, the response is buffered until transportEnd. Therefore metadata
+    // should be set before the encodeFrame() call. It should be set at or after the messageBegin
+    // call so that the header is added after all upstream headers passed, due to messageBegin
+    // possibly not getting headers in transportBegin.
+    ConnectionManager& cm = parent_.parent_;
+    if (cm.drain_decision_.drainClose()) {
+      // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
+      // over)?
+      metadata->headers().addReferenceKey(Headers::get().Drain, "true");
+      parent_.parent_.stats_.downstream_response_drain_close_.inc();
+    }
+  }
+
+  ProtocolConverter::messageBegin(metadata);
+  parent_.messageBeginSetup(metadata);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::messageEnd() {
+  ProtocolConverter::messageEnd();
+  parent_.messageEndSetup();
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::structBegin(absl::string_view name) {
+  ProtocolConverter::structBegin(name);
+  parent_.structBeginSetup(name);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::structEnd() {
+  ProtocolConverter::structEnd();
+  parent_.structEndSetup();
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view name,
+                                                            FieldType& field_type,
+                                                            int16_t& field_id) {
+  ProtocolConverter::fieldBegin(name, field_type, field_id);
+  parent_.fieldBeginSetup(name, field_type, field_id);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::fieldEnd() {
+  ProtocolConverter::fieldEnd();
+  parent_.fieldEndSetup();
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::boolValue(bool& value) {
+  ProtocolConverter::boolValue(value);
+  parent_.boolValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::byteValue(uint8_t& value) {
+  ProtocolConverter::byteValue(value);
+  parent_.byteValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::int16Value(int16_t& value) {
+  ProtocolConverter::int16Value(value);
+  parent_.int16ValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::int32Value(int32_t& value) {
+  ProtocolConverter::int32Value(value);
+  parent_.int32ValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::int64Value(int64_t& value) {
+  ProtocolConverter::int64Value(value);
+  parent_.int64ValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::doubleValue(double& value) {
+  ProtocolConverter::doubleValue(value);
+  parent_.doubleValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::stringValue(absl::string_view value) {
+  ProtocolConverter::stringValue(value);
+  parent_.stringValueSetup(value);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::mapBegin(FieldType& key_type,
+                                                          FieldType& value_type, uint32_t& size) {
+  ProtocolConverter::mapBegin(key_type, value_type, size);
+  parent_.mapBeginSetup(key_type, value_type, size);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::mapEnd() {
+  ProtocolConverter::mapEnd();
+  parent_.mapEndSetup();
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::listBegin(FieldType& elem_type, uint32_t& size) {
+  ProtocolConverter::listBegin(elem_type, size);
+  parent_.listBeginSetup(elem_type, size);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::listEnd() {
+  ProtocolConverter::listEnd();
+  parent_.listEndSetup();
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::setBegin(FieldType& elem_type, uint32_t& size) {
+  ProtocolConverter::setBegin(elem_type, size);
+  parent_.setBeginSetup(elem_type, size);
+  return parent_.applyEncoderFilters();
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::setEnd() {
+  ProtocolConverter::setEnd();
+  parent_.setEndSetup();
+  return parent_.applyEncoderFilters();
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
@@ -339,6 +465,11 @@ void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
 void ConnectionManager::ActiveRpcEncoderFilter::continueEncoding() {
   const FilterStatus status = parent_.applyEncoderFilters(this);
   if (status == FilterStatus::Continue) {
+    // All filters have been executed for the current encoder state.
+    if (parent_.response_decoder_->pending_transport_end_) {
+      // If the filter stack was paused during transportEnd, handle end-of-request details.
+      parent_.response_decoder_->finalizeResponse();
+    }
     parent_.continueEncoding();
   }
 }
@@ -415,7 +546,7 @@ void ConnectionManager::ActiveRpc::transportBeginSetup(MessageMetadataSharedPtr 
 
 FilterStatus ConnectionManager::ActiveRpc::transportBegin(MessageMetadataSharedPtr metadata) {
   transportBeginSetup(metadata);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::transportEndSetup() {
@@ -440,7 +571,7 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
   } else {
     transportEndSetup();
 
-    status = applyDecoderFilters(nullptr);
+    status = applyDecoderFilters();
     if (status == FilterStatus::StopIteration) {
       pending_transport_end_ = true;
       return status;
@@ -524,7 +655,7 @@ FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& dat
   passthrough_ = true;
   passthroughDataSetup(data);
 
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::messageBeginSetup(MessageMetadataSharedPtr metadata) {
@@ -554,7 +685,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
 
   messageBeginSetup(metadata);
 
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::messageEndSetup() {
@@ -563,7 +694,7 @@ void ConnectionManager::ActiveRpc::messageEndSetup() {
 
 FilterStatus ConnectionManager::ActiveRpc::messageEnd() {
   messageEndSetup();
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::structBeginSetup(absl::string_view name) {
@@ -576,7 +707,7 @@ void ConnectionManager::ActiveRpc::structBeginSetup(absl::string_view name) {
 
 FilterStatus ConnectionManager::ActiveRpc::structBegin(absl::string_view name) {
   structBeginSetup(name);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::structEndSetup() {
@@ -585,12 +716,11 @@ void ConnectionManager::ActiveRpc::structEndSetup() {
 
 FilterStatus ConnectionManager::ActiveRpc::structEnd() {
   structEndSetup();
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::fieldBeginSetup(absl::string_view name, FieldType& field_type,
                                                    int16_t& field_id) {
-
   filter_context_ =
       std::tuple<std::string, FieldType, int16_t>(std::string(name), field_type, field_id);
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
@@ -606,7 +736,7 @@ void ConnectionManager::ActiveRpc::fieldBeginSetup(absl::string_view name, Field
 FilterStatus ConnectionManager::ActiveRpc::fieldBegin(absl::string_view name, FieldType& field_type,
                                                       int16_t& field_id) {
   fieldBeginSetup(name, field_type, field_id);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::fieldEndSetup() {
@@ -615,7 +745,7 @@ void ConnectionManager::ActiveRpc::fieldEndSetup() {
 
 FilterStatus ConnectionManager::ActiveRpc::fieldEnd() {
   fieldEndSetup();
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::boolValueSetup(bool& value) {
@@ -627,8 +757,7 @@ void ConnectionManager::ActiveRpc::boolValueSetup(bool& value) {
 }
 FilterStatus ConnectionManager::ActiveRpc::boolValue(bool& value) {
   boolValueSetup(value);
-
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::byteValueSetup(uint8_t& value) {
@@ -642,7 +771,7 @@ void ConnectionManager::ActiveRpc::byteValueSetup(uint8_t& value) {
 
 FilterStatus ConnectionManager::ActiveRpc::byteValue(uint8_t& value) {
   byteValueSetup(value);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::int16ValueSetup(int16_t& value) {
@@ -655,7 +784,7 @@ void ConnectionManager::ActiveRpc::int16ValueSetup(int16_t& value) {
 
 FilterStatus ConnectionManager::ActiveRpc::int16Value(int16_t& value) {
   int16ValueSetup(value);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::int32ValueSetup(int32_t& value) {
@@ -668,7 +797,7 @@ void ConnectionManager::ActiveRpc::int32ValueSetup(int32_t& value) {
 
 FilterStatus ConnectionManager::ActiveRpc::int32Value(int32_t& value) {
   int32ValueSetup(value);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::int64ValueSetup(int64_t& value) {
@@ -680,7 +809,7 @@ void ConnectionManager::ActiveRpc::int64ValueSetup(int64_t& value) {
 }
 FilterStatus ConnectionManager::ActiveRpc::int64Value(int64_t& value) {
   int64ValueSetup(value);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::doubleValueSetup(double& value) {
@@ -693,7 +822,7 @@ void ConnectionManager::ActiveRpc::doubleValueSetup(double& value) {
 
 FilterStatus ConnectionManager::ActiveRpc::doubleValue(double& value) {
   doubleValueSetup(value);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::stringValueSetup(absl::string_view value) {
@@ -707,7 +836,7 @@ void ConnectionManager::ActiveRpc::stringValueSetup(absl::string_view value) {
 
 FilterStatus ConnectionManager::ActiveRpc::stringValue(absl::string_view value) {
   stringValueSetup(value);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::mapBeginSetup(FieldType& key_type, FieldType& value_type,
@@ -727,7 +856,7 @@ void ConnectionManager::ActiveRpc::mapBeginSetup(FieldType& key_type, FieldType&
 FilterStatus ConnectionManager::ActiveRpc::mapBegin(FieldType& key_type, FieldType& value_type,
                                                     uint32_t& size) {
   mapBeginSetup(key_type, value_type, size);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::mapEndSetup() {
@@ -736,7 +865,7 @@ void ConnectionManager::ActiveRpc::mapEndSetup() {
 
 FilterStatus ConnectionManager::ActiveRpc::mapEnd() {
   mapEndSetup();
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::listBeginSetup(FieldType& value_type, uint32_t& size) {
@@ -753,7 +882,7 @@ void ConnectionManager::ActiveRpc::listBeginSetup(FieldType& value_type, uint32_
 
 FilterStatus ConnectionManager::ActiveRpc::listBegin(FieldType& value_type, uint32_t& size) {
   listBeginSetup(value_type, size);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::listEndSetup() {
@@ -762,7 +891,7 @@ void ConnectionManager::ActiveRpc::listEndSetup() {
 
 FilterStatus ConnectionManager::ActiveRpc::listEnd() {
   listEndSetup();
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::setBeginSetup(FieldType& value_type, uint32_t& size) {
@@ -779,7 +908,7 @@ void ConnectionManager::ActiveRpc::setBeginSetup(FieldType& value_type, uint32_t
 
 FilterStatus ConnectionManager::ActiveRpc::setBegin(FieldType& value_type, uint32_t& size) {
   setBeginSetup(value_type, size);
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::setEndSetup() {
@@ -788,7 +917,7 @@ void ConnectionManager::ActiveRpc::setEndSetup() {
 
 FilterStatus ConnectionManager::ActiveRpc::setEnd() {
   setEndSetup();
-  return applyDecoderFilters(nullptr);
+  return applyDecoderFilters();
 }
 
 void ConnectionManager::ActiveRpc::createFilterChain() {

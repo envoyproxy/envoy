@@ -380,14 +380,13 @@ public:
     initializeFilter();
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
+    expectCallFilterComplexMessage(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
+
     ThriftFilters::DecoderFilterCallbacks* callbacks{};
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
         .WillOnce(
             Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
-    EXPECT_CALL(*decoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
-    EXPECT_CALL(*bidirection_filter_, decodeTransportBegin(_))
-        .WillOnce(Return(FilterStatus::Continue));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
@@ -397,18 +396,6 @@ public:
     BinaryProtocolImpl proto;
     callbacks->startUpstreamResponse(transport, proto);
 
-    EXPECT_CALL(*encoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
-    EXPECT_CALL(*bidirection_filter_, encodeTransportBegin(_))
-        .WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, messageBegin(_, _)).WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, structBegin(_, _)).WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, fieldBegin(_, _, _, _))
-    //     .WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, fieldEnd(_, _)).WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, structEnd(_)).WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, messageEnd(_)).WillOnce(Return(FilterStatus::Continue));
-    // EXPECT_CALL(*encoder_filter_, transportEnd(_)).WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
@@ -438,6 +425,145 @@ public:
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
   }
+
+  void expectCallFilterComplexMessage(MessageType req_msg_type, int32_t req_seq_id,
+                                      MessageType resp_msg_type, int32_t resp_seq_id) {
+    bool one = true;
+    uint8_t two = 2;
+    double three = 3.0;
+    int16_t four = 4;
+    int32_t five = 5;
+    int64_t six = 6;
+    int32_t eight = 8;
+    EXPECT_CALL(*decoder_filter_, messageBegin(_))
+        .WillOnce(
+            Invoke([req_msg_type, req_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(req_msg_type, metadata->messageType());
+              EXPECT_EQ(req_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*decoder_filter_, messageEnd());
+    EXPECT_CALL(*decoder_filter_, structBegin(_)).Times(2);
+    EXPECT_CALL(*decoder_filter_, structEnd()).Times(2);
+    EXPECT_CALL(*decoder_filter_, fieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*decoder_filter_, fieldEnd()).Times(11);
+    EXPECT_CALL(*decoder_filter_, boolValue(one));
+    EXPECT_CALL(*decoder_filter_, byteValue(two));
+    EXPECT_CALL(*decoder_filter_, doubleValue(three));
+    EXPECT_CALL(*decoder_filter_, int16Value(four));
+    EXPECT_CALL(*decoder_filter_, int32Value(five));
+    EXPECT_CALL(*decoder_filter_, int64Value(six));
+    EXPECT_CALL(*decoder_filter_, stringValue("seven"));
+    EXPECT_CALL(*decoder_filter_, mapBegin(_, _, _));
+    EXPECT_CALL(*decoder_filter_, int32Value(eight)).Times(4);
+    EXPECT_CALL(*decoder_filter_, mapEnd());
+    EXPECT_CALL(*decoder_filter_, listBegin(_, _));
+    EXPECT_CALL(*decoder_filter_, listEnd());
+    EXPECT_CALL(*decoder_filter_, setBegin(_, _));
+    EXPECT_CALL(*decoder_filter_, setEnd());
+
+    EXPECT_CALL(*encoder_filter_, transportBegin(_));
+    EXPECT_CALL(*encoder_filter_, transportEnd());
+    EXPECT_CALL(*encoder_filter_, messageBegin(_))
+        .WillOnce(
+            Invoke([resp_msg_type, resp_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(resp_msg_type, metadata->messageType());
+              EXPECT_EQ(resp_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*encoder_filter_, messageEnd());
+    EXPECT_CALL(*encoder_filter_, structBegin(_)).Times(2);
+    EXPECT_CALL(*encoder_filter_, structEnd()).Times(2);
+    EXPECT_CALL(*encoder_filter_, fieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*encoder_filter_, fieldEnd()).Times(11);
+    EXPECT_CALL(*encoder_filter_, boolValue(one));
+    EXPECT_CALL(*encoder_filter_, byteValue(two));
+    EXPECT_CALL(*encoder_filter_, doubleValue(three));
+    EXPECT_CALL(*encoder_filter_, int16Value(four));
+    EXPECT_CALL(*encoder_filter_, int32Value(five));
+    EXPECT_CALL(*encoder_filter_, int64Value(six));
+    EXPECT_CALL(*encoder_filter_, stringValue("seven"));
+    EXPECT_CALL(*encoder_filter_, mapBegin(_, _, _));
+    EXPECT_CALL(*encoder_filter_, int32Value(eight)).Times(4);
+    EXPECT_CALL(*encoder_filter_, mapEnd());
+    EXPECT_CALL(*encoder_filter_, listBegin(_, _));
+    EXPECT_CALL(*encoder_filter_, listEnd());
+    EXPECT_CALL(*encoder_filter_, setBegin(_, _));
+    EXPECT_CALL(*encoder_filter_, setEnd());
+
+    EXPECT_CALL(*bidirection_filter_, decodeMessageBegin(_))
+        .WillOnce(
+            Invoke([req_msg_type, req_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(req_msg_type, metadata->messageType());
+              EXPECT_EQ(req_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*bidirection_filter_, decodeMessageEnd());
+    EXPECT_CALL(*bidirection_filter_, decodeStructBegin(_)).Times(2);
+    EXPECT_CALL(*bidirection_filter_, decodeStructEnd()).Times(2);
+    EXPECT_CALL(*bidirection_filter_, decodeFieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*bidirection_filter_, decodeFieldEnd()).Times(11);
+    EXPECT_CALL(*bidirection_filter_, decodeBoolValue(one));
+    EXPECT_CALL(*bidirection_filter_, decodeByteValue(two));
+    EXPECT_CALL(*bidirection_filter_, decodeDoubleValue(three));
+    EXPECT_CALL(*bidirection_filter_, decodeInt16Value(four));
+    EXPECT_CALL(*bidirection_filter_, decodeInt32Value(five));
+    EXPECT_CALL(*bidirection_filter_, decodeInt64Value(six));
+    EXPECT_CALL(*bidirection_filter_, decodeStringValue("seven"));
+    EXPECT_CALL(*bidirection_filter_, decodeMapBegin(_, _, _));
+    EXPECT_CALL(*bidirection_filter_, decodeInt32Value(eight)).Times(4);
+    EXPECT_CALL(*bidirection_filter_, decodeMapEnd());
+    EXPECT_CALL(*bidirection_filter_, decodeListBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, decodeListEnd());
+    EXPECT_CALL(*bidirection_filter_, decodeSetBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, decodeSetEnd());
+
+    EXPECT_CALL(*bidirection_filter_, encodeTransportBegin(_));
+    EXPECT_CALL(*bidirection_filter_, encodeTransportEnd());
+    EXPECT_CALL(*bidirection_filter_, encodeMessageBegin(_))
+        .WillOnce(
+            Invoke([resp_msg_type, resp_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(resp_msg_type, metadata->messageType());
+              EXPECT_EQ(resp_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*bidirection_filter_, encodeMessageEnd());
+    EXPECT_CALL(*bidirection_filter_, encodeStructBegin(_)).Times(2);
+    EXPECT_CALL(*bidirection_filter_, encodeStructEnd()).Times(2);
+    EXPECT_CALL(*bidirection_filter_, encodeFieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*bidirection_filter_, encodeFieldEnd()).Times(11);
+    EXPECT_CALL(*bidirection_filter_, encodeBoolValue(one));
+    EXPECT_CALL(*bidirection_filter_, encodeByteValue(two));
+    EXPECT_CALL(*bidirection_filter_, encodeDoubleValue(three));
+    EXPECT_CALL(*bidirection_filter_, encodeInt16Value(four));
+    EXPECT_CALL(*bidirection_filter_, encodeInt32Value(five));
+    EXPECT_CALL(*bidirection_filter_, encodeInt64Value(six));
+    EXPECT_CALL(*bidirection_filter_, encodeStringValue("seven"));
+    EXPECT_CALL(*bidirection_filter_, encodeMapBegin(_, _, _));
+    EXPECT_CALL(*bidirection_filter_, encodeInt32Value(eight)).Times(4);
+    EXPECT_CALL(*bidirection_filter_, encodeMapEnd());
+    EXPECT_CALL(*bidirection_filter_, encodeListBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, encodeListEnd());
+    EXPECT_CALL(*bidirection_filter_, encodeSetBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, encodeSetEnd());
+  }
+
   void expectCallPassthroughSupported(int times = -1) {
     EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
     EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
@@ -450,6 +576,7 @@ public:
       EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(times);
     }
   }
+
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
