@@ -14,7 +14,7 @@ namespace GcpAuthn {
 using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
 
-Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
   Envoy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
     // Nothing to do if no route, continue the filter chain iteration.
@@ -43,6 +43,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&,
   }
 
   if (!audience_str.empty()) {
+    // Save the pointer to the request headers for header manipulation based on http response later.
+    request_header_map_ = &hdrs;
     // Audience is URL of receiving service that will perform authentication.
     // The URL format is
     // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
@@ -67,13 +69,20 @@ void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallback
   decoder_callbacks_ = &callbacks;
 }
 
-void GcpAuthnFilter::onComplete(const Http::ResponseMessage*) {
+void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
   state_ = State::Complete;
   if (!initiating_call_) {
+    if (request_header_map_ == nullptr) {
+      ENVOY_LOG(debug, "No request header to be modified.");
+    } else {
+      // Modify the request header to include the ID token in an `Authorization: Bearer ID_TOKEN`
+      // header.
+      std::string id_token = absl::StrCat("Bearer ", response->bodyAsString());
+      request_header_map_->addCopy(Envoy::Http::LowerCaseString(AuthorizationHeaderKey()),
+                                   id_token);
+    }
     decoder_callbacks_->continueDecoding();
   }
-  // TODO(tyxia) Decode jwt token from the response (e.g., get the exp time for cache.)
-  // Integration test already hit this path, so add test coverage once decode path is added.
 }
 
 void GcpAuthnFilter::onDestroy() {

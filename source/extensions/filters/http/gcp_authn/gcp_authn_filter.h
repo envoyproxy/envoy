@@ -17,6 +17,9 @@ namespace GcpAuthn {
 
 inline constexpr absl::string_view FilterName = "envoy.filters.http.gcp_authn";
 inline constexpr absl::string_view AudienceKey = "audience_key";
+inline const std::string& AuthorizationHeaderKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "Authorization");
+}
 /**
  * All stats for the gcp authentication filter. @see stats_macros.h
  */
@@ -70,6 +73,8 @@ private:
   Server::Configuration::FactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  // The pointer to request headers for header manipulation later.
+  Envoy::Http::RequestHeaderMap* request_header_map_ = nullptr;
 
   bool initiating_call_{};
   State state_{State::NotStarted};
