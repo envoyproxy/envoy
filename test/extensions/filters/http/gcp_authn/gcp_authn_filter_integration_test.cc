@@ -20,7 +20,7 @@ namespace {
 constexpr absl::string_view AudienceValue = "http://test.com";
 constexpr absl::string_view Url = "http://metadata.google.internal/computeMetadata/v1/instance/"
                                   "service-accounts/default/identity?audience=[AUDIENCE]";
-constexpr absl::string_view MockedTokenString =
+constexpr absl::string_view MockTokenString =
     "eyJhbGciOiJSUzI1NiIsImtpZCI6ImYxMzM4Y2EyNjgzNTg2M2Y2NzE0MDhmNDE3MzhhN2I0OWU3NDBmYzAiLCJ0eXAiO";
 
 class GcpAuthnFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -101,13 +101,13 @@ public:
     // Send response headers with end_stream false because we want to add response body next.
     request_->encodeHeaders(default_response_headers_, false);
     // Send response data with end_stream true.
-    request_->encodeData(MockedTokenString, true);
+    request_->encodeData(MockTokenString, true);
     result = request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
   }
 
   // First cluster (i.e., cluster_0) is destination upstream cluster
-  void sendRequestToFirstClusterAndValidateResponse(bool with_audience = true) {
+  void sendRequestToFirstClusterAndValidateResponse(bool with_audience) {
     // Send the request to cluster `cluster_0`;
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -130,9 +130,9 @@ public:
                        .get(Envoy::Http::LowerCaseString(AuthorizationHeaderKey()))
                        .empty());
       // The expected ID token is in format of `Bearer ID_TOKEN`
-      std::string id_token = absl::StrCat("Bearer ", MockedTokenString);
-      // Verify the request header modification that the token returned from authentication server
-      // has been added to the request sent to destination upstream.
+      std::string id_token = absl::StrCat("Bearer ", MockTokenString);
+      // Verify the request header modification: the token returned from authentication server
+      // has been added to the request header that is sent to destination upstream.
       EXPECT_EQ(upstream_request_->headers()
                     .get(Envoy::Http::LowerCaseString(AuthorizationHeaderKey()))[0]
                     ->value()
@@ -174,7 +174,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   waitForGcpAuthnServerResponse();
 
   // Send the request to cluster `cluster_0` and validate the response.
-  sendRequestToFirstClusterAndValidateResponse();
+  sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/true);
 
   // Verify request has been routed to both upstream clusters.
   EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
