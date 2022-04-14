@@ -29,10 +29,6 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
-extern const absl::string_view HttpStatPrefix;
-extern const absl::string_view TcpListenerStatPrefix;
-extern const absl::string_view UdpListenerStatPrefix;
-
 // These helper functions throw exceptions. Thus can not be defined in .h files.
 void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
                                              const std::string& filter_config_name,
@@ -376,8 +372,7 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynamicFilterConfig,
-          const absl::string_view& StatPrefix>
+template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynamicFilterConfig>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
@@ -438,6 +433,8 @@ public:
     return std::make_unique<StaticFilterConfigProviderImpl<FactoryCb>>(config, filter_config_name);
   }
 
+  absl::string_view statPrefix() const override PURE;
+
   std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
              Server::Configuration::ServerFactoryContext& factory_context) const override {
@@ -447,8 +444,6 @@ public:
         factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
     return {std::move(message), factory.name()};
   }
-
-  const absl::string_view& statPrefix() const override { return StatPrefix; }
 
 protected:
   virtual void validateFilters(const std::string&, const std::string&, const std::string&, bool,
@@ -489,8 +484,10 @@ private:
 class HttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb,
-          Server::Configuration::FactoryContext, HttpDynamicFilterConfigProviderImpl,
-          Filter::HttpStatPrefix> {
+          Server::Configuration::FactoryContext, HttpDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "http_filter."; }
+
 protected:
   bool isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
                         Protobuf::Message& message,
@@ -509,15 +506,21 @@ protected:
 class TcpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedListenerFilterConfigFactory, Network::ListenerFilterFactoryCb,
-          Server::Configuration::ListenerFactoryContext, TcpListenerDynamicFilterConfigProviderImpl,
-          Filter::TcpListenerStatPrefix> {};
+          Server::Configuration::ListenerFactoryContext,
+          TcpListenerDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "tcp_listener_filter."; }
+};
 
 // UDP listener filter
 class UdpListenerFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUdpListenerFilterConfigFactory,
           Network::UdpListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          UdpListenerDynamicFilterConfigProviderImpl, Filter::UdpListenerStatPrefix> {};
+          UdpListenerDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "udp_listener_filter."; }
+};
 
 } // namespace Filter
 } // namespace Envoy

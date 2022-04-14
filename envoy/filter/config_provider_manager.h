@@ -56,7 +56,7 @@ public:
   /**
    * Get the stat prefix for the scope of the filter provider manager.
    */
-  virtual const absl::string_view& statPrefix() const PURE;
+  virtual absl::string_view statPrefix() const PURE;
 };
 
 } // namespace Filter

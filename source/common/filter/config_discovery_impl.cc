@@ -16,10 +16,6 @@
 namespace Envoy {
 namespace Filter {
 
-const absl::string_view HttpStatPrefix = "http_filter.";
-const absl::string_view TcpListenerStatPrefix = "tcp_listener_filter.";
-const absl::string_view UdpListenerStatPrefix = "udp_listener_filter.";
-
 void validateProtoConfigDefaultFactoryHelper(bool null_default_factory,
                                              const std::string& filter_config_name,
                                              const std::string& type_url) {
