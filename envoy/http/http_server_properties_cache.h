@@ -17,12 +17,15 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Tracks alternate protocols that can be used to make an HTTP connection to an origin server.
+ * Tracks information used to make an HTTP connection to an origin server.
+ *
+ * This includes Alternate protocols, SRTT, Quic brokenness, etc.
+ *
  * See https://tools.ietf.org/html/rfc7838 for HTTP Alternative Services and
  * https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04 for the
  * "HTTPS" DNS resource record.
  */
-class AlternateProtocolsCache {
+class HttpServerPropertiesCache {
 public:
   /**
    * Represents an HTTP origin to be connected too.
@@ -105,7 +108,7 @@ public:
     virtual void markHttp3FailedRecently() PURE;
   };
 
-  virtual ~AlternateProtocolsCache() = default;
+  virtual ~HttpServerPropertiesCache() = default;
 
   /**
    * Sets the possible alternative protocols which can be used to connect to the
@@ -134,8 +137,8 @@ public:
   /**
    * Returns the possible alternative protocols which can be used to connect to the
    * specified origin, or nullptr if not alternatives are found. The returned reference
-   * is owned by the AlternateProtocolsCache and is valid until the next operation on the
-   * AlternateProtocolsCache.
+   * is owned by the HttpServerPropertiesCache and is valid until the next operation on the
+   * HttpServerPropertiesCache.
    * @param origin The origin to find alternate protocols for.
    * @return An optional list of alternate protocols for the given origin.
    */
@@ -151,19 +154,19 @@ public:
    * @param origin The origin to get HTTP/3 status tracker for.
    * @return the existing status tracker or creating a new one if there is none.
    */
-  virtual AlternateProtocolsCache::Http3StatusTracker&
+  virtual HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) PURE;
 };
 
-using AlternateProtocolsCacheSharedPtr = std::shared_ptr<AlternateProtocolsCache>;
-using Http3StatusTrackerPtr = std::unique_ptr<AlternateProtocolsCache::Http3StatusTracker>;
+using HttpServerPropertiesCacheSharedPtr = std::shared_ptr<HttpServerPropertiesCache>;
+using Http3StatusTrackerPtr = std::unique_ptr<HttpServerPropertiesCache::Http3StatusTracker>;
 
 /**
  * A manager for multiple alternate protocols caches.
  */
-class AlternateProtocolsCacheManager {
+class HttpServerPropertiesCacheManager {
 public:
-  virtual ~AlternateProtocolsCacheManager() = default;
+  virtual ~HttpServerPropertiesCacheManager() = default;
 
   /**
    * Get an alternate protocols cache.
@@ -171,24 +174,24 @@ public:
    *               will be returned, otherwise a new one will be created.
    * @param dispatcher supplies the current thread's dispatcher, for cache creation.
    */
-  virtual AlternateProtocolsCacheSharedPtr
+  virtual HttpServerPropertiesCacheSharedPtr
   getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
            Event::Dispatcher& dispatcher) PURE;
 };
 
-using AlternateProtocolsCacheManagerSharedPtr = std::shared_ptr<AlternateProtocolsCacheManager>;
+using HttpServerPropertiesCacheManagerSharedPtr = std::shared_ptr<HttpServerPropertiesCacheManager>;
 
 /**
  * Factory for getting an alternate protocols cache manager.
  */
-class AlternateProtocolsCacheManagerFactory {
+class HttpServerPropertiesCacheManagerFactory {
 public:
-  virtual ~AlternateProtocolsCacheManagerFactory() = default;
+  virtual ~HttpServerPropertiesCacheManagerFactory() = default;
 
   /**
    * Get the alternate protocols cache manager.
    */
-  virtual AlternateProtocolsCacheManagerSharedPtr get() PURE;
+  virtual HttpServerPropertiesCacheManagerSharedPtr get() PURE;
 };
 
 } // namespace Http

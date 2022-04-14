@@ -1,11 +1,11 @@
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 
 #include "envoy/common/key_value_store.h"
 #include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -15,13 +15,13 @@ namespace Http {
 
 SINGLETON_MANAGER_REGISTRATION(alternate_protocols_cache_manager);
 
-AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(
+HttpServerPropertiesCacheManagerImpl::HttpServerPropertiesCacheManagerImpl(
     AlternateProtocolsData& data, ThreadLocal::SlotAllocator& tls)
     : data_(data), slot_(tls) {
   slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
 }
 
-AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
+HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCache(
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
     Event::Dispatcher& dispatcher) {
   if (options.has_key_value_store_config() && data_.concurrency_ != 1) {
@@ -51,16 +51,16 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
         factory.createStore(kv_config, data_.validation_visitor_, dispatcher, data_.file_system_);
   }
 
-  AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
+  HttpServerPropertiesCacheSharedPtr new_cache = std::make_shared<HttpServerPropertiesCacheImpl>(
       dispatcher, std::move(store), options.max_entries().value());
 
   for (const envoy::config::core::v3::AlternateProtocolsCacheOptions::AlternateProtocolsCacheEntry&
            entry : options.prepopulated_entries()) {
-    const AlternateProtocolsCacheImpl::Origin origin = {"https", entry.hostname(), entry.port()};
-    std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocol = {
+    const HttpServerPropertiesCacheImpl::Origin origin = {"https", entry.hostname(), entry.port()};
+    std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocol = {
         {"h3", entry.hostname(), entry.port(),
          dispatcher.timeSource().monotonicTime() + std::chrono::hours(168)}};
-    OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> existing_protocols =
+    OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> existing_protocols =
         new_cache->findAlternatives(origin);
     if (!existing_protocols.has_value()) {
       new_cache->setAlternatives(origin, protocol);
@@ -71,10 +71,10 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
   return new_cache;
 }
 
-AlternateProtocolsCacheManagerSharedPtr AlternateProtocolsCacheManagerFactoryImpl::get() {
-  return singleton_manager_.getTyped<AlternateProtocolsCacheManager>(
+HttpServerPropertiesCacheManagerSharedPtr HttpServerPropertiesCacheManagerFactoryImpl::get() {
+  return singleton_manager_.getTyped<HttpServerPropertiesCacheManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(alternate_protocols_cache_manager),
-      [this] { return std::make_shared<AlternateProtocolsCacheManagerImpl>(data_, tls_); });
+      [this] { return std::make_shared<HttpServerPropertiesCacheManagerImpl>(data_, tls_); });
 }
 
 } // namespace Http

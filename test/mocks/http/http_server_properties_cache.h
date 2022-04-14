@@ -1,14 +1,14 @@
 #pragma once
-#include "envoy/http/alternate_protocols_cache.h"
+#include "envoy/http/http_server_properties_cache.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Http {
 
-class MockAlternateProtocolsCache : public AlternateProtocolsCache {
+class MockHttpServerPropertiesCache : public HttpServerPropertiesCache {
 public:
-  ~MockAlternateProtocolsCache() override;
+  ~MockHttpServerPropertiesCache() override;
 
   MOCK_METHOD(void, setAlternatives,
               (const Origin& origin, std::vector<AlternateProtocol>& protocols));
@@ -17,24 +17,24 @@ public:
   MOCK_METHOD(OptRef<const std::vector<AlternateProtocol>>, findAlternatives,
               (const Origin& origin));
   MOCK_METHOD(size_t, size, (), (const));
-  MOCK_METHOD(AlternateProtocolsCache::Http3StatusTracker&, getOrCreateHttp3StatusTracker,
+  MOCK_METHOD(HttpServerPropertiesCache::Http3StatusTracker&, getOrCreateHttp3StatusTracker,
               (const Origin& origin));
 };
 
-class MockAlternateProtocolsCacheManager : public AlternateProtocolsCacheManager {
+class MockHttpServerPropertiesCacheManager : public HttpServerPropertiesCacheManager {
 public:
-  ~MockAlternateProtocolsCacheManager() override;
+  ~MockHttpServerPropertiesCacheManager() override;
 
-  MOCK_METHOD(AlternateProtocolsCacheSharedPtr, getCache,
+  MOCK_METHOD(HttpServerPropertiesCacheSharedPtr, getCache,
               (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
                Event::Dispatcher& dispatcher));
 };
 
-class MockAlternateProtocolsCacheManagerFactory : public AlternateProtocolsCacheManagerFactory {
+class MockHttpServerPropertiesCacheManagerFactory : public HttpServerPropertiesCacheManagerFactory {
 public:
-  ~MockAlternateProtocolsCacheManagerFactory() override;
+  ~MockHttpServerPropertiesCacheManagerFactory() override;
 
-  MOCK_METHOD(AlternateProtocolsCacheManagerSharedPtr, get, ());
+  MOCK_METHOD(HttpServerPropertiesCacheManagerSharedPtr, get, ());
 };
 
 } // namespace Http
