@@ -397,8 +397,8 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
                            StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
-  metadata_.release();
-  filter_state_objects_.release();
+  metadata_ = nullptr;
+  filter_state_objects_ = nullptr;
   state_ = State::Done;
 }
 } // namespace UserSpace
