@@ -201,6 +201,8 @@ public:
   ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD(void, addDecoderFilter, (DecoderFilterSharedPtr));
+  MOCK_METHOD(void, addEncoderFilter, (EncoderFilterSharedPtr));
+  MOCK_METHOD(void, addBidirectionFilter, (BidirectionFilterSharedPtr));
 };
 
 class MockDecoderFilter : public DecoderFilter {
