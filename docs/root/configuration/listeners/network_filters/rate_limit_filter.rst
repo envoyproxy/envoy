@@ -52,3 +52,27 @@ The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struc
 *only* when the gRPC ratelimit service returns a :ref:`CheckResponse
 <envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse>` with a filled :ref:`dynamic_metadata
 <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field.
+
+Substitution Formatting
+-----------------------
+
+.. _config_network_filters_ratelimit_substitution_formatter:
+
+The network rate limit filter also supports substitution formatting based on stream info populated at request time for its descriptors.
+The value field for :ref:`rate_limit_descriptor <envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.descriptors>`
+accepts runtime substitution.
+The format for the substitution formatting can be found in the :ref:`access logging <config_access_log>` documentation
+
+Example usage:
+
+.. code-block:: yaml
+
+  name: envoy.filters.network.ratelimit
+  domain: foo
+  descriptors:
+  - entries:
+   - key: remote_address
+     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+   - key: foo
+     value: bar
+  stat_prefix: name
