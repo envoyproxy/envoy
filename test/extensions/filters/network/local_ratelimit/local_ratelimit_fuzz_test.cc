@@ -42,12 +42,19 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
     return;
   }
-  if (input.config().token_bucket().fill_interval().nanos() < 0) {
+  try {
+    if (PROTOBUF_GET_MS_REQUIRED(input.config().token_bucket(), fill_interval) < 50) {
+      ENVOY_LOG_MISC(debug, "In fill_interval, msecs must be greater than 50ms!");
+      return;
+    }
+  } catch (const DurationUtil::OutOfRangeException& e) {
     // TODO:
     // protoc-gen-validate has an issue on type "Duration" which may generate interval with seconds
     // > 0 while "nanos" < 0. And negative "nanos" will cause validation inside the filter to fail.
     // see https://github.com/envoyproxy/protoc-gen-validate/issues/348 for detail.
-    ENVOY_LOG_MISC(debug, "In fill_interval, nanos should not be negative!");
+    ENVOY_LOG_MISC(debug,
+                   "In fill_interval, seconds or nanos should not be negative! Exception: {}",
+                   e.what());
     return;
   }
   static NiceMock<Event::MockDispatcher> dispatcher;
