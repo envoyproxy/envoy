@@ -3,24 +3,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/network/utility.h"
-
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Network {
 namespace Matching {
-
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-DestinationIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const auto& address = data.connectionInfoProvider().localAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          address->ip()->addressAsString()};
-}
 
 template <>
 Matcher::DataInputGetResult
@@ -31,17 +18,6 @@ DestinationIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
           address.ip()->addressAsString()};
-}
-
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-DestinationPortInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const auto& address = data.connectionInfoProvider().localAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          absl::StrCat(address->ip()->port())};
 }
 
 template <>
@@ -55,17 +31,6 @@ DestinationPortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
           absl::StrCat(address.ip()->port())};
 }
 
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-SourceIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const auto& address = data.connectionInfoProvider().remoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          address->ip()->addressAsString()};
-}
-
 template <>
 Matcher::DataInputGetResult SourceIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
   const auto& address = data.remoteAddress();
@@ -74,17 +39,6 @@ Matcher::DataInputGetResult SourceIPInput<UdpMatchingData>::get(const UdpMatchin
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
           address.ip()->addressAsString()};
-}
-
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-SourcePortInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const auto& address = data.connectionInfoProvider().remoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          absl::StrCat(address->ip()->port())};
 }
 
 template <>
@@ -96,39 +50,6 @@ SourcePortInput<UdpMatchingData>::get(const UdpMatchingData& data) const {
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
           absl::StrCat(address.ip()->port())};
-}
-
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-DirectSourceIPInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const auto& address = data.connectionInfoProvider().directRemoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-          address->ip()->addressAsString()};
-}
-
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-SourceTypeInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const bool is_local_connection =
-      Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
-  if (is_local_connection) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-}
-
-template <class MatchingDataType>
-Matcher::DataInputGetResult
-ServerNameInput<MatchingDataType>::get(const MatchingDataType& data) const {
-  const auto server_name = data.connectionInfoProvider().requestedServerName();
-  if (!server_name.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(server_name)};
-  }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
 }
 
 Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
