@@ -31,10 +31,10 @@ using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscripti
 
 // These helper functions throw exceptions. Thus can not be defined in .h files.
 void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
-                                             const std::string& filter_config_name,
-                                             const std::string& type_url);
-void validateProtoConfigTypeUrlHelper(const std::string& type_url,
-                                      const absl::flat_hash_set<std::string> require_type_urls);
+                                             absl::string_view filter_config_name,
+                                             absl::string_view type_url);
+void validateProtoConfigTypeUrlHelper(absl::string_view type_url,
+                                      const absl::flat_hash_set<std::string>& require_type_urls);
 
 /**
  * Base class for a filter config provider using discovery subscriptions.
