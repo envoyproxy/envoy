@@ -69,7 +69,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   disabled_ = src.disabled_;
   processing_mode_ = src.processing_mode_;
-  if (src.grpcService()) {
+  if (src.grpcService().has_value()) {
     grpc_service_ = src.grpcService();
   }
 }

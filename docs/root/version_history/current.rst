@@ -115,6 +115,7 @@ New Features
 * dns: added :ref:`dns_min_refresh_rate <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>`
   to the DNS cache implementation to configure the minimum DNS refresh rate, regardless of returned
   TTL. This was previously hard coded to 5s and defaults to 5s if unset.
+* ext_proc: added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
 * http: added random_value_specifier in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow random value to be specified from configuration proto.
 * http: added request_mirror_policies to higher levels (i.e., :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies>` in :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` and  :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.VirtualHost.request_mirror_policies>` in :ref:`VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`) which applies to :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` in all routes underneath without configured mirror policies.
 * http: added support for :ref:`cidr_ranges <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.InternalAddressConfig.cidr_ranges>` for configuring list of CIDR ranges that are considered internal.
