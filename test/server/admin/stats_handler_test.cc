@@ -1026,6 +1026,24 @@ TEST_P(AdminStatsTest, SortedCountersAndGauges) {
   }
 }
 
+TEST_P(AdminStatsTest, SortedScopes) {
+  // Check counters and gauges are co-mingled in sorted order in the admin output.
+  store_->counterFromString("a");
+  store_->counterFromString("z");
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
+  scope->counterFromString("r");
+  scope->counterFromString("s");
+  scope->counterFromString("t");
+  Stats::ScopeSharedPtr subscope = scope->createScope("subscope");
+  subscope->counterFromString("x");
+  for (absl::string_view url : {"/stats", "/stats?format=json"}) {
+    CodeResponse code_response = handlerStats(url);
+    ASSERT_EQ(Http::Code::OK, code_response.first);
+    checkOrder(code_response.second,
+               {"a", "scope.r", "scope.s", "scope.subscope.x", "scope.t", "z"});
+  }
+}
+
 TEST_P(AdminStatsTest, SortedTextReadouts) {
   // Check counters and gauges are co-mingled in sorted order in the admin output.
   store_->textReadoutFromString("t4");
