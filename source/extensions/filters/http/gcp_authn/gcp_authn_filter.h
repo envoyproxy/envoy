@@ -16,7 +16,6 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 inline constexpr absl::string_view FilterName = "envoy.filters.http.gcp_authn";
-inline constexpr absl::string_view AudienceKey = "audience_key";
 /**
  * All stats for the gcp authentication filter. @see stats_macros.h
  */
