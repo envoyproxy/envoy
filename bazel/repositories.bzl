@@ -127,7 +127,10 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
-    external_http_archive("rules_rust")
+    external_http_archive(
+        "rules_rust",
+        patches = ["@envoy//bazel:rules_rust.patch"],
+    )
 
 def envoy_dependencies(skip_targets = []):
     # Add a binding for repository variables.
