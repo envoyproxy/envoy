@@ -39,29 +39,63 @@ MATCHER_P(StatusIs, expected_code, "") {
   return true;
 }
 
-class IsOkMatcher {
+class StatusMatcher {
 public:
-  template <typename StatusT>
+  StatusMatcher(::testing::Matcher<absl::Status> matcher) : matcher_(matcher) {}
+
   // NOLINTNEXTLINE(readability-identifier-naming)
-  bool MatchAndExplain(StatusT status, ::testing::MatchResultListener* listener) const {
-    if (status.ok()) {
-      return true;
-    }
-    *listener << "status is " << status;
-    return false;
+  bool MatchAndExplain(absl::Status status, ::testing::MatchResultListener* listener) const {
+    return matcher_.MatchAndExplain(status, listener);
   }
 
   template <typename T>
   // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(absl::StatusOr<T> status_or,
                        ::testing::MatchResultListener* listener) const {
-    return MatchAndExplain(status_or.status(), listener);
+    return ::testing::ExplainMatchResult(
+        ::testing::Property("status", &absl::StatusOr<T>::status, matcher_), status_or, listener);
   }
   // NOLINTNEXTLINE(readability-identifier-naming)
-  void DescribeTo(::std::ostream* os) const { *os << "is OK"; }
+  void DescribeTo(::std::ostream* os) const { matcher_.DescribeTo(os); }
   // NOLINTNEXTLINE(readability-identifier-naming)
-  void DescribeNegationTo(::std::ostream* os) const { *os << "is not OK"; }
+  void DescribeNegationTo(::std::ostream* os) const {
+    *os << "not ";
+    matcher_.DescribeTo(os);
+  }
+
+private:
+  ::testing::Matcher<absl::Status> matcher_;
 };
+
+template <typename InnerMatcher>
+// NOLINTNEXTLINE(readability-identifier-naming)
+::testing::PolymorphicMatcher<StatusMatcher> HasStatusCode(InnerMatcher m) {
+  return ::testing::MakePolymorphicMatcher(StatusMatcher(::testing::SafeMatcherCast<absl::Status>(
+      ::testing::Property("code", &absl::Status::code, m))));
+}
+
+template <typename InnerMatcher>
+// NOLINTNEXTLINE(readability-identifier-naming)
+::testing::PolymorphicMatcher<StatusMatcher> HasStatusMessage(InnerMatcher m) {
+  return ::testing::MakePolymorphicMatcher(StatusMatcher(::testing::SafeMatcherCast<absl::Status>(
+      ::testing::Property("message", &absl::Status::message, m))));
+}
+
+template <typename InnerMatcher>
+// NOLINTNEXTLINE(readability-identifier-naming)
+::testing::PolymorphicMatcher<StatusMatcher> HasStatus(InnerMatcher m) {
+  return ::testing::MakePolymorphicMatcher(
+      StatusMatcher(::testing::SafeMatcherCast<absl::Status>(m)));
+}
+
+template <typename InnerMatcherCode, typename InnerMatcherMessage>
+// NOLINTNEXTLINE(readability-identifier-naming)
+::testing::PolymorphicMatcher<StatusMatcher> HasStatus(InnerMatcherCode code_matcher,
+                                                       InnerMatcherMessage message_matcher) {
+  return ::testing::MakePolymorphicMatcher(StatusMatcher(::testing::SafeMatcherCast<absl::Status>(
+      AllOf(::testing::Property("code", &absl::Status::code, code_matcher),
+            ::testing::Property("message", &absl::Status::message, message_matcher)))));
+}
 
 // Check that an absl::Status or absl::StatusOr is OK.
 //
@@ -71,8 +105,8 @@ public:
 // EXPECT_THAT(status_or, IsOk());  // fails!
 //
 // NOLINTNEXTLINE(readability-identifier-naming)
-inline ::testing::PolymorphicMatcher<IsOkMatcher> IsOk() {
-  return ::testing::MakePolymorphicMatcher(IsOkMatcher());
+inline ::testing::PolymorphicMatcher<StatusMatcher> IsOk() {
+  return HasStatusCode(absl::StatusCode::kOk);
 }
 
 #ifndef EXPECT_OK
