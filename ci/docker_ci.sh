@@ -152,7 +152,7 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     build_images "${BUILD_TYPE}" "$image_tag"
 
     if ! is_windows; then
-        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-contrib" || "$BUILD_TYPE" == "-alpine" || "$BUILD_TYPE" == "-distroless" ]]; then
+        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-contrib" || "$BUILD_TYPE" == "-alpine" || "$BUILD_TYPE" == "-distroless" || "$BUILD_TYPE" == "-google-vrp" ]]; then
             # verify_examples expects the base and alpine images, and for them to be named `-dev`
             dev_image="envoyproxy/envoy${BUILD_TYPE}-dev:latest"
             docker tag "$image_tag" "$dev_image"
