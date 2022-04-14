@@ -1,12 +1,12 @@
 diff --git a/BUILD.bazel b/BUILD.bazel
-index b0b9016..648acd0 100644
+index b0b9016..e0ebfd9 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -1,3 +1,9 @@
 +yaml_cpp_defines = select({
 +    # On Windows, ensure static linking is used.
 +    "@envoy//bazel:windows_x86_64": ["YAML_CPP_STATIC_DEFINE", "YAML_CPP_NO_CONTRIB"],
-+    "//conditions:default": [""],
++    "//conditions:default": [],
 +})
 +
  cc_library(
