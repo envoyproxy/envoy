@@ -206,9 +206,11 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
       addGrpcRequestTags(span, *request_headers);
     }
   }
+
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
 
   CustomTagContext ctx{request_headers, stream_info};
+
   const CustomTagMap* custom_tag_map = tracing_config.customTags();
   if (custom_tag_map) {
     for (const auto& it : *custom_tag_map) {
