@@ -16,10 +16,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: AsyncFileManager configuration]
 
-// [#extension: envoy.common.support.async_files]
 // Configuration to instantiate or select a singleton `AsyncFileManager`.
 message AsyncFileManagerConfig {
-  // [#extension-category: envoy.common.support]
   message ThreadPool {
     // The number of threads to use. If unset or zero, will default to the number
     // of concurrent threads the hardware supports. This default is subject to

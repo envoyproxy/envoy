@@ -63,36 +63,35 @@ EXTENSIONS = {
     #
     # HTTP filters
     #
-
-    "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
-    "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
-    "envoy.filters.http.alternate_protocols_cache":     "//source/extensions/filters/http/alternate_protocols_cache:config",
-    "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
-    "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
-    "envoy.filters.http.bandwidth_limit":               "//source/extensions/filters/http/bandwidth_limit:config",
-    "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
-    "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
-    "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
-    "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
-    "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
-    "envoy.filters.http.composite":                     "//source/extensions/filters/http/composite:config",
-    "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
-    "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
-    "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
-    "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
-    "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
-    "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
-    "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
-    "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
-    "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
-    "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
-    "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
-    "envoy.filters.http.grpc_stats":                    "//source/extensions/filters/http/grpc_stats:config",
-    "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
-    "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
-    "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
-    "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
-    "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    "envoy.filters.http.adaptive_concurrency": "//source/extensions/filters/http/adaptive_concurrency:config",
+    "envoy.filters.http.admission_control": "//source/extensions/filters/http/admission_control:config",
+    "envoy.filters.http.alternate_protocols_cache": "//source/extensions/filters/http/alternate_protocols_cache:config",
+    "envoy.filters.http.aws_lambda": "//source/extensions/filters/http/aws_lambda:config",
+    "envoy.filters.http.aws_request_signing": "//source/extensions/filters/http/aws_request_signing:config",
+    "envoy.filters.http.bandwidth_limit": "//source/extensions/filters/http/bandwidth_limit:config",
+    "envoy.filters.http.buffer": "//source/extensions/filters/http/buffer:config",
+    "envoy.filters.http.cache": "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.cdn_loop": "//source/extensions/filters/http/cdn_loop:config",
+    "envoy.filters.http.compressor": "//source/extensions/filters/http/compressor:config",
+    "envoy.filters.http.cors": "//source/extensions/filters/http/cors:config",
+    "envoy.filters.http.composite": "//source/extensions/filters/http/composite:config",
+    "envoy.filters.http.csrf": "//source/extensions/filters/http/csrf:config",
+    "envoy.filters.http.decompressor": "//source/extensions/filters/http/decompressor:config",
+    "envoy.filters.http.dynamic_forward_proxy": "//source/extensions/filters/http/dynamic_forward_proxy:config",
+    "envoy.filters.http.dynamo": "//source/extensions/filters/http/dynamo:config",
+    "envoy.filters.http.ext_authz": "//source/extensions/filters/http/ext_authz:config",
+    "envoy.filters.http.ext_proc": "//source/extensions/filters/http/ext_proc:config",
+    "envoy.filters.http.fault": "//source/extensions/filters/http/fault:config",
+    "envoy.filters.http.gcp_authn": "//source/extensions/filters/http/gcp_authn:config",
+    "envoy.filters.http.grpc_http1_bridge": "//source/extensions/filters/http/grpc_http1_bridge:config",
+    "envoy.filters.http.grpc_http1_reverse_bridge": "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
+    "envoy.filters.http.grpc_json_transcoder": "//source/extensions/filters/http/grpc_json_transcoder:config",
+    "envoy.filters.http.grpc_stats": "//source/extensions/filters/http/grpc_stats:config",
+    "envoy.filters.http.grpc_web": "//source/extensions/filters/http/grpc_web:config",
+    "envoy.filters.http.header_to_metadata": "//source/extensions/filters/http/header_to_metadata:config",
+    "envoy.filters.http.health_check": "//source/extensions/filters/http/health_check:config",
+    "envoy.filters.http.ip_tagging": "//source/extensions/filters/http/ip_tagging:config",
+    "envoy.filters.http.jwt_authn": "//source/extensions/filters/http/jwt_authn:config",
     # Disabled by default
     "envoy.filters.http.kill_request": "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit": "//source/extensions/filters/http/local_ratelimit:config",
@@ -305,11 +304,6 @@ EXTENSIONS = {
     # Custom matchers
     #
     "envoy.matching.custom_matchers.trie_matcher": "//source/extensions/common/matcher:trie_matcher_lib",
-
-    #
-    # Support extensions
-    #
-    "envoy.common.support.async_files": "//source/extensions/common/async_files:async_files",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
