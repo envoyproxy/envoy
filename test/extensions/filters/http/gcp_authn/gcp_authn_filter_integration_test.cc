@@ -127,14 +127,14 @@ public:
     // field).
     if (with_audience) {
       ASSERT_FALSE(upstream_request_->headers()
-                       .get(Envoy::Http::LowerCaseString(AuthorizationHeaderKey()))
+                       .get(Envoy::Http::LowerCaseString(authorizationHeaderKey()))
                        .empty());
       // The expected ID token is in format of `Bearer ID_TOKEN`
       std::string id_token = absl::StrCat("Bearer ", MockTokenString);
       // Verify the request header modification: the token returned from authentication server
       // has been added to the request header that is sent to destination upstream.
       EXPECT_EQ(upstream_request_->headers()
-                    .get(Envoy::Http::LowerCaseString(AuthorizationHeaderKey()))[0]
+                    .get(Envoy::Http::LowerCaseString(authorizationHeaderKey()))[0]
                     ->value()
                     .getStringView(),
                 id_token);

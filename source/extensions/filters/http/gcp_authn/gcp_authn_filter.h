@@ -17,7 +17,7 @@ namespace GcpAuthn {
 
 inline constexpr absl::string_view FilterName = "envoy.filters.http.gcp_authn";
 inline constexpr absl::string_view AudienceKey = "audience_key";
-inline const std::string& AuthorizationHeaderKey() {
+inline const std::string& authorizationHeaderKey() {
   CONSTRUCT_ON_FIRST_USE(std::string, "Authorization");
 }
 /**
