@@ -12,13 +12,13 @@ std::string expectThatOutput(const T& value, MatcherT matcher) {
     return "";
   }
   ::std::stringstream ss;
-  ss << "Value of: [variable_name]\n";
+  ss << "Value of: [variable_name]" << std::endl;
   ss << "Expected: ";
   m.DescribeTo(&ss);
-  ss << "\nActual: " << ::testing::PrintToString(value);
+  ss << std::endl << "Actual: " << ::testing::PrintToString(value);
   ::testing::StringMatchResultListener listener;
   ::testing::ExplainMatchResult(matcher, value, &listener);
-  ss << "\n" << listener.str();
+  ss << std::endl << listener.str();
   return ss.str();
 }
 
@@ -28,17 +28,20 @@ TEST(StatusUtilityTest, ExpectOkForStatusOr) { EXPECT_OK(absl::StatusOr<int>{5})
 
 TEST(StatusUtilityTest, IsOkFailureForStatus) {
   auto err = expectThatOutput(absl::FailedPreconditionError("whatever"), IsOk());
-  EXPECT_THAT(err, HasSubstr(R"(
-Expected: is an object whose property `code` is equal to OK
-Actual: FAILED_PRECONDITION: whatever
-whose property `code` is FAILED_PRECONDITION (of type absl::StatusCode))"));
+  EXPECT_THAT(
+      err,
+      AllOf(HasSubstr("Expected: is an object whose property `code` is equal to OK"),
+            HasSubstr("Actual: FAILED_PRECONDITION: whatever"),
+            HasSubstr("whose property `code` is FAILED_PRECONDITION (of type absl::StatusCode)")));
 }
 
 TEST(StatusUtilityTest, IsOkFailureForStatusOr) {
   auto err =
       expectThatOutput(absl::StatusOr<int>{absl::FailedPreconditionError("whatever")}, IsOk());
-  EXPECT_THAT(err, HasSubstr(R"(
-whose property `status` is FAILED_PRECONDITION: whatever (of type absl::Status), whose property `code` is FAILED_PRECONDITION (of type absl::StatusCode))"));
+  EXPECT_THAT(
+      err,
+      HasSubstr("whose property `status` is FAILED_PRECONDITION: whatever (of type absl::Status), "
+                "whose property `code` is FAILED_PRECONDITION (of type absl::StatusCode)"));
 }
 
 TEST(StatusUtilityTest, HasStatusCodeSuccessForStatus) {
@@ -70,15 +73,15 @@ TEST(StatusUtilityTest, HasStatusFailureForStatusOr) {
   auto err = expectThatOutput(absl::StatusOr<int>{absl::InvalidArgumentError("oh no")},
                               HasStatus(absl::OkStatus()));
   EXPECT_THAT(
-      err, AllOf(HasSubstr("Expected: is equal to OK\n"),
+      err, AllOf(HasSubstr("Expected: is equal to OK"),
                  HasSubstr(
                      "whose property `status` is INVALID_ARGUMENT: oh no (of type absl::Status)")));
 }
 
 TEST(StatusUtilityTest, HasStatusFailureForStatus) {
   auto err = expectThatOutput(absl::InvalidArgumentError("oh no"), HasStatus(absl::OkStatus()));
-  EXPECT_THAT(err, HasSubstr("Expected: is equal to OK\n"
-                             "Actual: INVALID_ARGUMENT: oh no\n"));
+  EXPECT_THAT(err, AllOf(HasSubstr("Expected: is equal to OK"),
+                         HasSubstr("Actual: INVALID_ARGUMENT: oh no")));
 }
 
 TEST(StatusUtilityTest, HasStatusSuccessForStatusOr) {
