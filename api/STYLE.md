@@ -132,7 +132,7 @@ To add an extension config to the API, the steps below should be followed:
 1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml)
    with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture). The category field will have to match an
    annotation of the form `// [#extension-category: your.extension.category]`
-   in a message in one of the proto files for the docs build to pass. You may also need `// [#extension: your.extension.category.extension]`.
+   in a message in one of the proto files for the docs build to pass. You may also need `// [#extension: your.extension.category.extension_name]`.
 1. Update
    [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl)
    to include the new extension.
