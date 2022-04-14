@@ -126,18 +126,14 @@ public:
     // The authorization header is only added when the configuration is valid (e.g., with audience
     // field).
     if (with_audience) {
-      ASSERT_FALSE(upstream_request_->headers()
-                       .get(Envoy::Http::LowerCaseString(authorizationHeaderKey()))
-                       .empty());
+      ASSERT_FALSE(upstream_request_->headers().get(authorizationHeaderKey()).empty());
       // The expected ID token is in format of `Bearer ID_TOKEN`
       std::string id_token = absl::StrCat("Bearer ", MockTokenString);
       // Verify the request header modification: the token returned from authentication server
       // has been added to the request header that is sent to destination upstream.
-      EXPECT_EQ(upstream_request_->headers()
-                    .get(Envoy::Http::LowerCaseString(authorizationHeaderKey()))[0]
-                    ->value()
-                    .getStringView(),
-                id_token);
+      EXPECT_EQ(
+          upstream_request_->headers().get(authorizationHeaderKey())[0]->value().getStringView(),
+          id_token);
     }
 
     EXPECT_EQ(0U, upstream_request_->bodyLength());

@@ -78,8 +78,7 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
       // Modify the request header to include the ID token in an `Authorization: Bearer ID_TOKEN`
       // header.
       std::string id_token = absl::StrCat("Bearer ", response->bodyAsString());
-      request_header_map_->addCopy(Envoy::Http::LowerCaseString(authorizationHeaderKey()),
-                                   id_token);
+      request_header_map_->addCopy(authorizationHeaderKey(), id_token);
     }
     decoder_callbacks_->continueDecoding();
   }
