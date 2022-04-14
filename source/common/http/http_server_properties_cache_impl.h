@@ -9,7 +9,7 @@
 #include "envoy/common/key_value_store.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
-#include "envoy/http/alternate_protocols_cache.h"
+#include "envoy/http/http_server_properties_cache.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http3_status_tracker_impl.h"
@@ -26,12 +26,12 @@ namespace Http {
 //   - QUIC SRTT, used for TCP failover
 //   - The last connectivity status of HTTP/3, if available.
 // TODO(alyssawilk) move and rename.
-class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
-                                    Logger::Loggable<Logger::Id::alternate_protocols_cache> {
+class HttpServerPropertiesCacheImpl : public HttpServerPropertiesCache,
+                                      Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
-  AlternateProtocolsCacheImpl(Event::Dispatcher& dispatcher, std::unique_ptr<KeyValueStore>&& store,
-                              size_t max_entries);
-  ~AlternateProtocolsCacheImpl() override;
+  HttpServerPropertiesCacheImpl(Event::Dispatcher& dispatcher,
+                                std::unique_ptr<KeyValueStore>&& store, size_t max_entries);
+  ~HttpServerPropertiesCacheImpl() override;
 
   // Captures the data tracked per origin;,
   struct OriginData {
@@ -49,9 +49,9 @@ public:
   };
 
   // Converts an Origin to a string which can be parsed by stringToOrigin.
-  static std::string originToString(const AlternateProtocolsCache::Origin& origin);
+  static std::string originToString(const HttpServerPropertiesCache::Origin& origin);
   // Converts a string from originToString back to structured format.
-  static absl::optional<AlternateProtocolsCache::Origin> stringToOrigin(const std::string& str);
+  static absl::optional<HttpServerPropertiesCache::Origin> stringToOrigin(const std::string& str);
 
   // Convert origin data to a string to cache to the key value
   // store. Note that in order to determine the lifetime of entries, this
@@ -73,17 +73,17 @@ public:
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
   // rather than relative time.
-  static std::vector<Http::AlternateProtocolsCache::AlternateProtocol>
+  static std::vector<Http::HttpServerPropertiesCache::AlternateProtocol>
   alternateProtocolsFromString(absl::string_view altsvc_str, TimeSource& time_source,
                                bool from_cache);
 
-  // AlternateProtocolsCache
+  // HttpServerPropertiesCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
   void setSrtt(const Origin& origin, std::chrono::microseconds srtt) override;
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
-  AlternateProtocolsCache::Http3StatusTracker&
+  HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
 
 private:
