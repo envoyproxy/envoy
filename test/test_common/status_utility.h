@@ -39,6 +39,9 @@ MATCHER_P(StatusIs, expected_code, "") {
   return true;
 }
 
+// A polymorphic matcher class for matching absl::Status or absl::StatusOr.
+// Not intended for direct use, see HasStatus, HasStatusCode, HasStatusMessage and IsOk
+// below.
 class StatusMatcher {
 public:
   StatusMatcher(::testing::Matcher<absl::Status> matcher) : matcher_(matcher) {}
@@ -67,6 +70,10 @@ private:
   ::testing::Matcher<absl::Status> matcher_;
 };
 
+// Match status code in an absl::StatusOr or absl::Status, allowing arbitrary matchers,
+// e.g.
+// EXPECT_THAT(some_status_or, HasStatusCode(AnyOf(absl::StatusCode::kOk,
+//                                                 absl::StatusCode::kInvalidArgument)));
 template <typename InnerMatcher>
 // NOLINTNEXTLINE(readability-identifier-naming)
 ::testing::PolymorphicMatcher<StatusMatcher> HasStatusCode(InnerMatcher m) {
@@ -74,6 +81,9 @@ template <typename InnerMatcher>
       ::testing::Property("code", &absl::Status::code, m))));
 }
 
+// Match status message in an absl::StatusOr or absl::Status, allowing arbitrary matchers,
+// e.g.
+// EXPECT_THAT(some_status_or, HasStatusMessage(HasSubstr("cheese")));
 template <typename InnerMatcher>
 // NOLINTNEXTLINE(readability-identifier-naming)
 ::testing::PolymorphicMatcher<StatusMatcher> HasStatusMessage(InnerMatcher m) {
@@ -81,6 +91,10 @@ template <typename InnerMatcher>
       ::testing::Property("message", &absl::Status::message, m))));
 }
 
+// Match the status of an absl::StatusOr or absl::Status, e.g.
+// EXPECT_THAT(some_status_or, HasStatus(absl::InvalidArgumentError("oh no")));
+// One may also use a Status matcher, but see the other HasStatus below for a
+// more readable version of that.
 template <typename InnerMatcher>
 // NOLINTNEXTLINE(readability-identifier-naming)
 ::testing::PolymorphicMatcher<StatusMatcher> HasStatus(InnerMatcher m) {
@@ -88,6 +102,8 @@ template <typename InnerMatcher>
       StatusMatcher(::testing::SafeMatcherCast<absl::Status>(m)));
 }
 
+// Match the code and message of an absl::StatusOr or absl::Status, e.g.
+// EXPECT_THAT(some_status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("cheese")));
 template <typename InnerMatcherCode, typename InnerMatcherMessage>
 // NOLINTNEXTLINE(readability-identifier-naming)
 ::testing::PolymorphicMatcher<StatusMatcher> HasStatus(InnerMatcherCode code_matcher,
