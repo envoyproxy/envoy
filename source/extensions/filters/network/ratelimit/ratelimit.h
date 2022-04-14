@@ -66,6 +66,9 @@ private:
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
+  // These are needed because Envoy doesn't have substitution formatters independent of HTTP
+  // components yet An issue has been created to resolve this:
+  // https://github.com/envoyproxy/envoy/issues/20818
   const Http::RequestHeaderMapPtr request_headers_;
   const Http::ResponseHeaderMapPtr response_headers_;
   const Http::ResponseTrailerMapPtr response_trailers_;
