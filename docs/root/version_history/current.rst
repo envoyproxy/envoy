@@ -101,6 +101,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* access_log: added new access_log command operator ``%GRPC_STATUS_NUMBER%``.
 * access_log: added new access_log command operator ``%ENVIRONMENT(X):Z%``.
 * access_log: added TCP proxy upstream and downstream byte logging. This can be accessed through the ``%DOWNSTREAM_WIRE_BYTES_SENT%``, ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``, ``%UPSTREAM_WIRE_BYTES_SENT%``, and ``%UPSTREAM_WIRE_BYTES_RECEIVED%`` access_log command operatrors.
 * access_log: make consistent access_log format fields ``%(DOWN|DIRECT_DOWN|UP)STREAM_(LOCAL|REMOTE)_*%`` to provide all combinations of local & remote addresses for upstream & downstream connections.
@@ -118,6 +119,7 @@ New Features
 * dns: added :ref:`dns_min_refresh_rate <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>`
   to the DNS cache implementation to configure the minimum DNS refresh rate, regardless of returned
   TTL. This was previously hard coded to 5s and defaults to 5s if unset.
+* gcp authentication http filter: added :ref:`gcp authentication http filter <config_http_filters_gcp_authn>`.
 * http: added random_value_specifier in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow random value to be specified from configuration proto.
 * http: added request_mirror_policies to higher levels (i.e., :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies>` in :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` and  :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.VirtualHost.request_mirror_policies>` in :ref:`VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`) which applies to :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` in all routes underneath without configured mirror policies.
 * http: added support for :ref:`cidr_ranges <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.InternalAddressConfig.cidr_ranges>` for configuring list of CIDR ranges that are considered internal.
@@ -128,11 +130,13 @@ New Features
 * http3: add :ref:`enable_early_data <envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.enable_early_data>` to turn on/off downstream early data support.
 * http3: downstream HTTP/3 support is now GA! Upstream HTTP/3 also GA for specific deployments. See :ref:`here <arch_overview_http3>` for details.
 * http3: supports upstream HTTP/3 retries. Automatically retry `0-RTT safe requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ if they are rejected because they are sent `too early <https://datatracker.ietf.org/doc/html/rfc8470#section-5.2>`_. And automatically retry 0-RTT safe requests if connect attempt fails later on and the cluster is configured with TCP fallback. And add retry on ``http3-post-connect-failure`` policy which allows retry of failed HTTP/3 requests with TCP fallback even after handshake if the cluster is configured with TCP fallback. This feature is guarded by ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3``.
+* listener: implement :ref:`matching API <arch_overview_matching_listener>` for selecting filter chains.
 * local_ratelimit: added support for sharing the rate limiter between multiple network filter chains or listeners via :ref:`share_key <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.share_key>`.
 * local_ratelimit: added support for X-RateLimit-* headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 * matching: the matching API can now express a match tree that will always match by omitting a matcher at the top level.
 * outlier_detection: :ref:`max_ejection_time_jitter<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` configuration added to allow adding a random value to the ejection time to prevent 'thundering herd' scenarios. Defaults to 0 so as to not break or change the behavior of existing deployments.
 * ratelimit: added :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>` to support return a custom HTTP response status code to the downstream client when the request has been rate limited.
+* ratelimit: network rate limiter supports runtime value substitution using stream info and substitution formatting via :ref:` Network Rate Limiter <config_network_filters_ratelimit_substitution_formatter>`.
 * redis: support for hostnames returned in ``cluster_slots`` response is now available.
 * router: added a path-separated prefix matcher, to make route creation more efficient. :ref:`path_separated_prefix <envoy_v3_api_field_config.route.v3.RouteMatch.path_separated_prefix>`.
 * schema_validator_tool: added ``bootstrap`` checking to the

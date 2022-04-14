@@ -497,6 +497,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Matchable,
                            public DirectResponseEntry,
                            public Route,
+                           public PathMatchCriterion,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
 public:
@@ -586,6 +587,7 @@ public:
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCountInRequest() const override {
     return vhost_.includeAttemptCountInRequest();
   }
@@ -746,6 +748,9 @@ private:
     }
     const Envoy::Config::TypedMetadata& typedMetadata() const override {
       return parent_->typedMetadata();
+    }
+    const PathMatchCriterion& pathMatchCriterion() const override {
+      return parent_->pathMatchCriterion();
     }
 
     bool includeAttemptCountInRequest() const override {
@@ -983,6 +988,10 @@ public:
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator);
 
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return prefix_; }
+  PathMatchType matchType() const override { return PathMatchType::Prefix; }
+
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
@@ -1010,6 +1019,10 @@ public:
                      const OptionalHttpFilters& optional_http_filters,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return path_; }
+  PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
@@ -1039,6 +1052,10 @@ public:
                       Server::Configuration::ServerFactoryContext& factory_context,
                       ProtobufMessage::ValidationVisitor& validator);
 
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return regex_str_; }
+  PathMatchType matchType() const override { return PathMatchType::Regex; }
+
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
@@ -1067,6 +1084,10 @@ public:
                         Server::Configuration::ServerFactoryContext& factory_context,
                         ProtobufMessage::ValidationVisitor& validator);
 
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return EMPTY_STRING; }
+  PathMatchType matchType() const override { return PathMatchType::None; }
+
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
@@ -1092,6 +1113,10 @@ public:
                                     const OptionalHttpFilters& optional_http_filters,
                                     Server::Configuration::ServerFactoryContext& factory_context,
                                     ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return prefix_; }
+  PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,

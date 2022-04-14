@@ -1801,11 +1801,15 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
 
-  // Start the third request and adjust the max concurrent streams of one connection created
-  // above to 2.
+  // Adjust the max concurrent streams of one connection created above to 2.
+  auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
   const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
-  ASSERT_TRUE(fake_upstream_connection1->write(std::string(settings_frame2)));
+  std::string settings_data(settings_frame2);
+  ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 bytes_read + settings_data.size());
+  // Now create another request.
   sendFrame(Http2Frame::makePostRequest(5, "host", "/path/to/long/url"));
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
