@@ -889,7 +889,7 @@ TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
   {
     // ensure our setTag(..., "override_component") happens later, taking precedence
     InSequence s;
-    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "proxy"));
+    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "override_component"));
   }
 
