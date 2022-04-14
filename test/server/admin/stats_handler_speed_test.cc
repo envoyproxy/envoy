@@ -6,6 +6,8 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
+#include "test/mocks/server/admin_stream.h"
+
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -17,7 +19,7 @@ public:
     // Benchmark will be 10k clusters each with 100 counters, with 100+
     // character names. The first counter in each scope will be given a value so
     // it will be included in 'usedonly'.
-    const std::string prefix(100, 'a');
+    std::string prefix(100, 'a');
     for (uint32_t s = 0; s < 10000; ++s) {
       Stats::ScopeSharedPtr scope = store_.createScope(absl::StrCat("scope_", s));
       scopes_.emplace_back(scope);
@@ -33,20 +35,14 @@ public:
   /**
    * Issues an admin request against the stats saved in store_.
    */
-  uint64_t handlerStats(bool used_only, bool json, const absl::optional<std::regex>& filter) {
-    Admin::RequestPtr request = StatsHandler::makeRequest(
-        store_, used_only, json, Utility::HistogramBucketsMode::NoBuckets, filter);
-    auto response_headers = Http::ResponseHeaderMapImpl::create();
-    request->start(*response_headers);
+  uint64_t handlerStats(bool used_only, bool json, const absl::optional<std::regex>& filter,
+                        Utility::HistogramBucketsMode histogram_buckets_mode =
+                            Utility::HistogramBucketsMode::NoBuckets) {
     Buffer::OwnedImpl data;
-    uint64_t count = 0;
-    bool more = true;
-    do {
-      more = request->nextChunk(data);
-      count += data.length();
-      data.drain(data.length());
-    } while (more);
-    return count;
+    auto response_headers = Http::ResponseHeaderMapImpl::create();
+    StatsHandler::handlerStats(store_, used_only, json, filter, histogram_buckets_mode,
+                               *response_headers, data);
+    return data.length();
   }
 
   Stats::SymbolTableImpl symbol_table_;
