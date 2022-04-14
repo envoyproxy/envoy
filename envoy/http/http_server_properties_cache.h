@@ -121,8 +121,7 @@ public:
                                std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
-   * Sets the srtt estimate for an origin, assuming the origin exists in the cache.
-   * Otherwise this is a no-op.
+   * Sets the srtt estimate for an origin.
    * @param origin The origin to set network characteristics for.
    * @param srtt The smothed round trip time for the origin.
    */
@@ -133,6 +132,22 @@ public:
    * @param origin The origin to get network characteristics for.
    */
   virtual std::chrono::microseconds getSrtt(const Origin& origin) const PURE;
+
+  /**
+   * Sets the number of concurrent streams allowed by the last connection to this endpoint.
+   * @param origin The origin to set network characteristics for.
+   * @param srtt The number of concurrent streams allowed.
+   */
+  void setConcurrentStreams(const Origin& origin, uint32_t concurrent_streams);
+
+  /**
+   * Returns the number of concurrent streams allowed by the last connection to this endpoint,
+   * or zero if none was set.
+   * Note that different servers serving a given host may have different
+   * characteristics, so this is a best guess estimate not a guarantee.
+   * @param origin The origin to get network characteristics for.
+   */
+  void getConcurrentStreams(const Origin& origin, uint32_t concurrent_streams);
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the
