@@ -140,6 +140,8 @@ def get_runtime_and_pr():
     found_test_feature_true = False
 
     # Walk the blame of runtime_features and look for true runtime features older than 6 months.
+    # Ignore #19880, the PR where we migrated from old style to new style flags as it
+    # shouldn't change deprecation dates or ownership.
     for commit, lines in repo.blame(rev='HEAD', file='source/common/runtime/runtime_features.cc',
                                     **{"ignore-rev": "93cd7c7835a"}):
         for line in lines:
