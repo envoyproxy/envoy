@@ -33,7 +33,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
-    OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope) {
+    OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope) {
   // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
   // and call maybeSetInterfaceName based on that upon acquiring a local socket.
   // Similar to what is done in ClientConnectionImpl::onConnected().
@@ -49,7 +49,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   quic::QuicConfig config = info_impl->quic_config_;
   // Update config with latest srtt, if available.
   if (rtt_cache.has_value()) {
-    Http::AlternateProtocolsCache::Origin origin("https", server_id.host(), server_id.port());
+    Http::HttpServerPropertiesCache::Origin origin("https", server_id.host(), server_id.port());
     std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
     if (rtt.count() != 0) {
       config.SetInitialRoundTripTimeUsToSend(rtt.count());
