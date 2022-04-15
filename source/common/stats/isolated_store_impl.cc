@@ -34,8 +34,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)),
-      default_scope_(new ScopePrefixer("", *this)) {}
+      null_gauge_(new NullGaugeImpl(symbol_table)), default_scope_(new ScopePrefixer("", *this)) {}
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 

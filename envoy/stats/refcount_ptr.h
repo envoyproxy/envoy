@@ -160,12 +160,12 @@ struct RefcountHelper {
 };
 
 class RefcountImpl {
- public:
+public:
   void incRefCount() const { refcount_.incRefCount(); }
   bool decRefCount() const { return refcount_.decRefCount(); }
   uint32_t use_count() const { return refcount_.use_count(); }
 
- private:
+private:
   mutable RefcountHelper refcount_;
 };
 

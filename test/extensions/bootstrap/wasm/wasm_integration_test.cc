@@ -16,9 +16,7 @@ public:
   WasmIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
 
-  ~WasmIntegrationTest() {
-    Common::Wasm::clearCodeCacheForTesting();
-  }
+  ~WasmIntegrationTest() { Common::Wasm::clearCodeCacheForTesting(); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();

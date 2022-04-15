@@ -82,13 +82,9 @@ public:
 
 class WasmCommonTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  WasmCommonTest() {
-    Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug);
-  }
+  WasmCommonTest() { Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug); }
 
-  ~WasmCommonTest() override {
-    clearCodeCacheForTesting();
-  }
+  ~WasmCommonTest() override { clearCodeCacheForTesting(); }
 
   Stats::IsolatedStoreImpl stats_store_;
 };
@@ -644,12 +640,12 @@ TEST_P(WasmCommonTest, VmCache) {
 
   ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
   EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
-          .WillRepeatedly(
-              Invoke([&](ServerLifecycleNotifier::Stage,
-                         StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
-                lifecycle_callback = callback;
-                return nullptr;
-              }));
+      .WillRepeatedly(
+          Invoke([&](ServerLifecycleNotifier::Stage,
+                     StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
+            lifecycle_callback = callback;
+            return nullptr;
+          }));
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
@@ -1288,10 +1284,7 @@ class WasmCommonContextTest : public Common::Wasm::WasmTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmCommonContextTest() = default;
-  ~WasmCommonContextTest() override {
-    clearCodeCacheForTesting();
-  }
-
+  ~WasmCommonContextTest() override { clearCodeCacheForTesting(); }
 
   void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
     setRootId(root_id);

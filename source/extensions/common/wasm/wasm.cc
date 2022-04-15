@@ -17,8 +17,6 @@ using proxy_wasm::Word;
 
 namespace Envoy {
 
-//using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
-
 namespace Extensions {
 namespace Common {
 namespace Wasm {
@@ -329,7 +327,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     if (!code_cache) {
       code_cache = new std::remove_reference<decltype(*code_cache)>::type;
     }
-    Stats::ScopeSharedPtr create_wasm_stats_scope = stats_handler.lockAndCreateStats(scope);
+    stats_handler.lockAndCreateStats(scope);
     // Remove entries older than CODE_CACHE_SECONDS_CACHING_TTL except for our target.
     for (auto it = code_cache->begin(); it != code_cache->end();) {
       if (now - it->second.use_time > std::chrono::seconds(CODE_CACHE_SECONDS_CACHING_TTL) &&
@@ -394,7 +392,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         getWasmHandleFactory(config, scope, api, cluster_manager, dispatcher, lifecycle_notifier),
         getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
         config.config().vm_config().allow_precompiled());
-    Stats::ScopeSharedPtr create_wasm_stats_scope = stats_handler.lockAndCreateStats(scope);
+    stats_handler.lockAndCreateStats(scope);
     stats_handler.onEvent(toWasmEvent(wasm));
     if (!wasm || wasm->wasm()->isFailed()) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), trace,
@@ -415,7 +413,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         auto& e = (*code_cache)[vm_config.code().remote().sha256()];
         e.in_progress = false;
         e.code = code;
-        Stats::ScopeSharedPtr create_wasm_stats_scope = stats_handler.lockAndCreateStats(scope);
+        stats_handler.lockAndCreateStats(scope);
         if (code.empty()) {
           stats_handler.onEvent(WasmEvent::RemoteLoadCacheFetchFailure);
         } else {

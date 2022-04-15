@@ -9,18 +9,13 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-Stats::ScopeSharedPtr CreateStatsHandler::lockAndCreateStats(const Stats::ScopeSharedPtr& scope) {
+void CreateStatsHandler::lockAndCreateStats(const Stats::ScopeSharedPtr& scope) {
   absl::MutexLock l(&mutex_);
-  Stats::ScopeSharedPtr lock = scope_;
-  //if (!(lock = scope_.lock())) {
   if (scope_ == nullptr) {
     resetStats();
-    createStats(scope);
-    scope_ = scope; //ScopeWeakPtr(scope);
-    return scope;
+    scope_ = scope;
   }
   createStats(scope);
-  return lock;
 }
 
 void CreateStatsHandler::resetStatsForTesting() {

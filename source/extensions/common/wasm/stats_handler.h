@@ -39,8 +39,6 @@ struct LifecycleStats {
   LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-//using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
-
 enum class WasmEvent : int {
   Ok,
   RemoteLoadCacheHit,
@@ -75,13 +73,12 @@ public:
   // happens the stats must be recreated. This hook verifies the Scope of any existing stats and if
   // necessary recreates the stats with the newly provided scope.
   // This call takes out the mutex_ and calls createStats and possibly resetStats().
-  Stats::ScopeSharedPtr lockAndCreateStats(const Stats::ScopeSharedPtr& scope);
+  void lockAndCreateStats(const Stats::ScopeSharedPtr& scope);
 
   void resetStatsForTesting();
 
 protected:
   absl::Mutex mutex_;
-  //ScopeWeakPtr scope_;
   Stats::ScopeSharedPtr scope_ ABSL_GUARDED_BY(mutex_);
   std::unique_ptr<CreateWasmStats> create_wasm_stats_;
 };

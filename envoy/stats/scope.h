@@ -25,9 +25,7 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-//using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ConstScopeSharedPtr = RefcountPtr<const Scope>;
-//using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 using ScopeSharedPtr = RefcountPtr<Scope>;
 
@@ -66,10 +64,8 @@ public:
   virtual ~Scope() = default;
 
   /** @return a shared_ptr for this */
-  //ScopeSharedPtr getShared() { return shared_from_this(); }
   ScopeSharedPtr getShared() { return ScopeSharedPtr(this); }
   /** @return a const shared_ptr for this */
-  //ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
   ConstScopeSharedPtr getConstShared() const { return ConstScopeSharedPtr(this); }
 
   /**
