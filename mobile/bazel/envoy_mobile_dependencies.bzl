@@ -64,6 +64,8 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "com.google.flatbuffers:flatbuffers-java:2.0.3",
             # Kotlin
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.11",
+            "org.jetbrains.kotlin:kotlin-stdlib-common:1.3.11",
+            "org.jetbrains.kotlin:kotlin-stdlib:1.3.11",
             "androidx.recyclerview:recyclerview:1.1.0",
             "androidx.core:core:1.3.2",
             # Dokka
@@ -88,6 +90,7 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "org.hamcrest:hamcrest:2.2",
             "com.google.truth:truth:1.1",
         ] + extra_maven_dependencies,
+        version_conflict_policy = "pinned",
         repositories = [
             "https://repo1.maven.org/maven2",
             "https://jcenter.bintray.com/",
