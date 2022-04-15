@@ -35,7 +35,7 @@ Minor Behavior Changes
 * listener: the :ref:`ipv4_compat <envoy_api_field_core.SocketAddress.ipv4_compat>` flag can only be set on Ipv6 address and Ipv4-mapped Ipv6 address. A runtime guard is added ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and the default is true.
 * network: add a new ConnectionEvent ``ConnectedZeroRtt`` which may be raised by QUIC connections to allow early data to be sent before the handshake finishes. This event is ignored at callsites which is only reachable for TCP connections in the Envoy core code. Any extensions which depend on ConnectionEvent enum value should audit their usage of it to make sure this new event is handled appropriately.
 * oauth2: disable chunked transfer encoding in the token request to be compatible with Azure AD (login.microsoftonline.com).
-* perf: TLS contexts are now tracked without scan based garbage collection greatly improving the performance on secret update.
+* perf: tls contexts are now tracked without scan based garbage collection greatly improving the performance on secret update.
 * ratelimit: the :ref:`header_value_match <envoy_v3_api_msg_config.route.v3.ratelimit.action.HeaderValueMatch>` config now supports custom descriptor keys.
 * router: record upstream request timeouts for all cases and not just for those requests which are awaiting headers. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` to false.
 * runtime: deprecated runtime flags set via configuration files or xDS will now ENVOY_BUG, rather than silently resulting in unexpected behavior on the data plane by no longer applying removed code paths.
