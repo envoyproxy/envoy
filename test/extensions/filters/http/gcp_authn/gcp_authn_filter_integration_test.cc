@@ -20,6 +20,8 @@ namespace {
 constexpr absl::string_view AudienceValue = "http://test.com";
 constexpr absl::string_view Url = "http://metadata.google.internal/computeMetadata/v1/instance/"
                                   "service-accounts/default/identity?audience=[AUDIENCE]";
+constexpr absl::string_view MockTokenString =
+    "eyJhbGciOiJSUzI1NiIsImtpZCI6ImYxMzM4Y2EyNjgzNTg2M2Y2NzE0MDhmNDE3MzhhN2I0OWU3NDBmYzAiLCJ0eXAiO";
 
 class GcpAuthnFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
@@ -96,13 +98,16 @@ public:
     // fake upstream successfully from http async client.
     EXPECT_EQ(request_->headers().Host()->value(), std::string(host));
     EXPECT_EQ(request_->headers().Path()->value(), std::string(path));
+    // Send response headers with end_stream false because we want to add response body next.
+    request_->encodeHeaders(default_response_headers_, false);
+    // Send response data with end_stream true.
+    request_->encodeData(MockTokenString, true);
     result = request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
-    request_->encodeHeaders(default_response_headers_, true);
   }
 
   // First cluster (i.e., cluster_0) is destination upstream cluster
-  void sendRequestToFirstClusterAndValidateResponse() {
+  void sendRequestToFirstClusterAndValidateResponse(bool with_audience) {
     // Send the request to cluster `cluster_0`;
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -118,6 +123,19 @@ public:
 
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(upstream_request_->complete());
+    // The authorization header is only added when the configuration is valid (e.g., with audience
+    // field).
+    if (with_audience) {
+      ASSERT_FALSE(upstream_request_->headers().get(authorizationHeaderKey()).empty());
+      // The expected ID token is in format of `Bearer ID_TOKEN`
+      std::string id_token = absl::StrCat("Bearer ", MockTokenString);
+      // Verify the request header modification: the token returned from authentication server
+      // has been added to the request header that is sent to destination upstream.
+      EXPECT_EQ(
+          upstream_request_->headers().get(authorizationHeaderKey())[0]->value().getStringView(),
+          id_token);
+    }
+
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     // Verify the proxied response was received downstream, as expected.
     EXPECT_TRUE(response_->complete());
@@ -152,7 +170,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   waitForGcpAuthnServerResponse();
 
   // Send the request to cluster `cluster_0` and validate the response.
-  sendRequestToFirstClusterAndValidateResponse();
+  sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/true);
 
   // Verify request has been routed to both upstream clusters.
   EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
@@ -173,7 +191,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
                                                          std::chrono::milliseconds(200)));
 
   // Send the request to cluster `cluster_0` and validate the response.
-  sendRequestToFirstClusterAndValidateResponse();
+  sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/false);
 
   // Verify request has been routed to `cluster_0` but not `gcp_authn` cluster.
   EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 0);

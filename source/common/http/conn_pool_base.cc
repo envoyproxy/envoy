@@ -199,7 +199,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   }
 }
 
-uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
+uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_streams_config) {
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 

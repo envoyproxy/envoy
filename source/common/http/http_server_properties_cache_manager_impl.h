@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/http/alternate_protocols_cache.h"
+#include "envoy/http/http_server_properties_cache.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/singleton/manager.h"
@@ -23,13 +23,14 @@ struct AlternateProtocolsData {
   uint32_t concurrency_;
 };
 
-class AlternateProtocolsCacheManagerImpl : public AlternateProtocolsCacheManager,
-                                           public Singleton::Instance {
+class HttpServerPropertiesCacheManagerImpl : public HttpServerPropertiesCacheManager,
+                                             public Singleton::Instance {
 public:
-  AlternateProtocolsCacheManagerImpl(AlternateProtocolsData& data, ThreadLocal::SlotAllocator& tls);
+  HttpServerPropertiesCacheManagerImpl(AlternateProtocolsData& data,
+                                       ThreadLocal::SlotAllocator& tls);
 
-  // AlternateProtocolsCacheManager
-  AlternateProtocolsCacheSharedPtr
+  // HttpServerPropertiesCacheManager
+  HttpServerPropertiesCacheSharedPtr
   getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
            Event::Dispatcher& dispatcher) override;
 
@@ -37,11 +38,11 @@ private:
   // Contains a cache and the options associated with it.
   struct CacheWithOptions {
     CacheWithOptions(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
-                     AlternateProtocolsCacheSharedPtr cache)
+                     HttpServerPropertiesCacheSharedPtr cache)
         : options_(options), cache_(cache) {}
 
     const envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
-    AlternateProtocolsCacheSharedPtr cache_;
+    HttpServerPropertiesCacheSharedPtr cache_;
   };
 
   // Per-thread state.
@@ -56,14 +57,14 @@ private:
   ThreadLocal::TypedSlot<State> slot_;
 };
 
-class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {
+class HttpServerPropertiesCacheManagerFactoryImpl : public HttpServerPropertiesCacheManagerFactory {
 public:
-  AlternateProtocolsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager,
-                                            ThreadLocal::SlotAllocator& tls,
-                                            AlternateProtocolsData data)
+  HttpServerPropertiesCacheManagerFactoryImpl(Singleton::Manager& singleton_manager,
+                                              ThreadLocal::SlotAllocator& tls,
+                                              AlternateProtocolsData data)
       : singleton_manager_(singleton_manager), tls_(tls), data_(data) {}
 
-  AlternateProtocolsCacheManagerSharedPtr get() override;
+  HttpServerPropertiesCacheManagerSharedPtr get() override;
 
 private:
   Singleton::Manager& singleton_manager_;

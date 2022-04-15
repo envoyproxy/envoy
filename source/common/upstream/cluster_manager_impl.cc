@@ -1839,7 +1839,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
-    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
+    Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache =
         alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
                                                      dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
