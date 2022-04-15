@@ -11,12 +11,11 @@ thread_local! {
     static CALLOUT_ID: Cell<Option<u32>> = Cell::new(None);
 }
 
-#[no_mangle]
-pub fn _start() {
+proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> { Box::new(TestGrpcCallRoot) });
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestGrpcCall) });
-}
+}}
 
 struct TestGrpcCallRoot;
 
