@@ -58,6 +58,11 @@ public:
    */
   virtual TimeSource& timeSource();
 
+  /**
+   * Marks the dispatcher as terminated, preventing any future work from being enqueued.
+   */
+  virtual void terminate();
+
   // Used for testing.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
 
@@ -69,6 +74,7 @@ private:
   std::list<Event::PostCb> init_queue_ GUARDED_BY(state_lock_);
   Event::Dispatcher* event_dispatcher_{};
   Thread::ThreadSynchronizer synchronizer_;
+  bool terminated_ GUARDED_BY(state_lock_){};
 };
 
 using ProvisionalDispatcherPtr = std::unique_ptr<ProvisionalDispatcher>;

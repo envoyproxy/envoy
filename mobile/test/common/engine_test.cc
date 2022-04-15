@@ -53,7 +53,7 @@ struct TestEngineHandle {
     run_engine(handle_, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
   }
 
-  ~TestEngineHandle() { terminate_engine(handle_); }
+  void terminate() { terminate_engine(handle_); }
 };
 
 class EngineTest : public testing::Test {
@@ -85,10 +85,12 @@ TEST_F(EngineTest, EarlyExit) {
   envoy_engine_t handle = engine_->handle_;
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  engine_.reset();
+  engine_->terminate();
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   start_stream(handle, 0, {}, false);
+
+  engine_.reset();
 }
 
 TEST_F(EngineTest, AccessEngineAfterInitialization) {
@@ -117,11 +119,13 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
   // Validate that we actually invoked the function.
   EXPECT_TRUE(getClusterManagerInvoked.WaitForNotificationWithTimeout(absl::Seconds(1)));
 
-  engine_.reset();
+  engine_->terminate();
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
   EXPECT_EQ(ENVOY_FAILURE, EngineHandle::runOnEngineDispatcher(
                                handle, [](Envoy::Engine& engine) { engine.getClusterManager(); }));
+
+  engine_.reset();
 }
 
 } // namespace Envoy
