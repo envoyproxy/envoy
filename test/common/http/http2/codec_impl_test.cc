@@ -488,6 +488,10 @@ protected:
       data.add(emptyDataFrame.data(), emptyDataFrame.size());
     }
   }
+
+  void setHeaderStringUnvalidated(HeaderString& header_string, absl::string_view value) {
+    header_string.setCopyUnvalidated(value);
+  }
 };
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
@@ -3727,9 +3731,9 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
     TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers);
     header_value[2] = static_cast<char>(i);
-    request_headers.addViaMove(HeaderString(absl::string_view("foo")),
-                               HeaderString(absl::string_view("a")));
-    request_headers.setCopyNoValidation(LowerCaseString(absl::string_view("foo")), header_value);
+    HeaderString header_string("a");
+    setHeaderStringUnvalidated(header_string, header_value);
+    request_headers.addViaMove(HeaderString(absl::string_view("foo")), std::move(header_string));
 
     MockResponseDecoder response_decoder;
     RequestEncoder* request_encoder = &client_->newStream(response_decoder);

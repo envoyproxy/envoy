@@ -76,7 +76,7 @@ HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { A
 HeaderString::HeaderString(HeaderString&& move_value) noexcept
     : buffer_(std::move(move_value.buffer_)) {
   move_value.clear();
-  ASSERT(valid());
+  // Move constructor does not validate and relies on the source object validating its mutations.
 }
 
 bool HeaderString::valid() const { return validHeaderString(getStringView()); }
@@ -169,7 +169,7 @@ void HeaderString::setReference(absl::string_view ref_value) {
   ASSERT(valid());
 }
 
-void HeaderString::setCopyForTest(absl::string_view view) {
+void HeaderString::setCopyUnvalidated(absl::string_view view) {
   if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
     // Switching from Type::Reference to Type::Inline
     buffer_ = InlineHeaderVector();
@@ -256,10 +256,6 @@ HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(HeaderString&& key, HeaderString
     : key_(std::move(key)), value_(std::move(value)) {}
 
 void HeaderMapImpl::HeaderEntryImpl::value(absl::string_view value) { value_.setCopy(value); }
-
-void HeaderMapImpl::HeaderEntryImpl::valueForTest(absl::string_view value) {
-  value_.setCopyForTest(value);
-}
 
 void HeaderMapImpl::HeaderEntryImpl::value(uint64_t value) { value_.setInteger(value); }
 
