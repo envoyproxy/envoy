@@ -2,20 +2,12 @@ use log::{debug, error, info, trace, warn};
 use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::*;
 
-extern "C" {
-    fn __wasilibc_initialize_environ();
-}
-
-#[no_mangle]
-pub fn _start() {
-    unsafe {
-        __wasilibc_initialize_environ();
-    }
+proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_http_context(|context_id, _| -> Box<dyn HttpContext> {
         Box::new(TestStream { context_id })
     });
-}
+}}
 
 struct TestStream {
     context_id: u32,
