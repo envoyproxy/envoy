@@ -50,6 +50,7 @@ schedule, initially aiming for the bi-weekly releases.
 
 Major releases are handled by Matt Klein ([mattklein123](https://github.com/mattklein123))
 or Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) and do not involve any backports.
+The details are outlined in the "Cutting a release" section of [GOVERNANCE.md](GOVERNANCE.md).
 Security releases are handled by a Release Manager and a Fix Lead. The Release Manager is
 responsible for approving and merging backports. The Fix Lead is a member of the security
 team and is responsible for coordinating the overall release. This includes identifying
