@@ -32,26 +32,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   try {
     envoy::config::core::v3::Address proto_address;
-    proto_address.mutable_pipe()->set_path(string_buffer);
-    Network::Utility::protobufAddressToAddress(proto_address);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-  }
-
-  try {
-    FuzzedDataProvider provider(buf, len);
-    envoy::config::core::v3::Address proto_address;
-    const auto port_value = provider.ConsumeIntegral<uint16_t>();
-    const std::string address_value = provider.ConsumeRemainingBytesAsString();
-    proto_address.mutable_socket_address()->set_address(address_value);
-    proto_address.mutable_socket_address()->set_port_value(port_value);
-    Network::Utility::protobufAddressToAddress(proto_address);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-  }
-
-  try {
-    envoy::config::core::v3::Address proto_address;
     Network::Address::Ipv4Instance address(string_buffer);
     Network::Utility::addressToProtobufAddress(address, proto_address);
   } catch (const EnvoyException& e) {

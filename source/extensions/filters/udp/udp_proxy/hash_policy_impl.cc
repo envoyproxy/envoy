@@ -1,5 +1,6 @@
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
+#include "envoy/common/exception.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 
@@ -37,24 +38,26 @@ private:
   const uint64_t hash_;
 };
 
-HashPolicyImpl::HashPolicyImpl(
-    const absl::Span<const UdpProxyConfig::HashPolicy* const>& hash_policies) {
-  ASSERT(hash_policies.size() == 1);
-  switch (hash_policies[0]->policy_specifier_case()) {
-  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kSourceIp:
-    hash_impl_ = std::make_unique<SourceIpHashMethod>();
-    break;
-  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kKey:
-    hash_impl_ = std::make_unique<KeyHashMethod>(hash_policies[0]->key());
-    break;
-  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::POLICY_SPECIFIER_NOT_SET:
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
-}
-
 absl::optional<uint64_t>
 HashPolicyImpl::generateHash(const Network::Address::Instance& downstream_addr) const {
   return hash_impl_->evaluate(downstream_addr);
+}
+
+HashPolicyImplPtr 
+HashPolicyImplFactory::create(const google::protobuf::RepeatedPtrField<envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy> hash_policies) {
+  ASSERT(hash_policies.size() == 1);
+  switch (hash_policies[0].policy_specifier_case()) {
+  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kSourceIp:
+    return absl::make_unique<HashPolicyImpl>(HashPolicyImpl(std::make_unique<SourceIpHashMethod>()));
+    break;
+  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kKey:
+    return absl::make_unique<HashPolicyImpl>(HashPolicyImpl(std::make_unique<KeyHashMethod>(hash_policies[0].key())));
+    break;
+  case UdpProxyConfig::HashPolicy::PolicySpecifierCase::POLICY_SPECIFIER_NOT_SET:
+    return nullptr;
+    throw EnvoyException("hash policy specifier not set");
+  }
+  throw EnvoyException(absl::StrCat("unexpected hash policy specifier case: ", hash_policies[0].policy_specifier_case()));
 }
 
 } // namespace UdpProxy

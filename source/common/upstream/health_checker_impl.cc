@@ -123,7 +123,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException("unexpected health checker case");
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
@@ -223,7 +223,7 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   case Http::CodecType::HTTP3:
     return Http::Protocol::Http3;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM
+  throw EnvoyException("unexpected codec client type");
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -450,7 +450,7 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
   case envoy::type::v3::HTTP1:
     return Http::CodecType::HTTP1;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM
+  throw EnvoyException("unexpected code client type");
 }
 
 Http::CodecClient*

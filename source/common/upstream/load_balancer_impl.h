@@ -305,7 +305,7 @@ protected:
   /**
    * Index into priority_set via hosts source descriptor.
    */
-  const HostVector& hostSourceToHosts(HostsSource hosts_source) const;
+  const HostVector* hostSourceToHosts(HostsSource hosts_source) const;
 
   // Cross priority host map for fast cross priority host searching. When the priority update
   // callback is executed, the host map will also be updated.

@@ -10,6 +10,8 @@
 #include "source/extensions/common/matcher/matcher.h"
 #include "source/extensions/common/tap/tap.h"
 
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

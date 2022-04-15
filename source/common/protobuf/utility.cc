@@ -196,7 +196,8 @@ uint64_t fractionalPercentDenominatorToInt(
   case envoy::type::v3::FractionalPercent::MILLION:
     return 1000000;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM
+  IS_ENVOY_BUG("unexpected denominator type enum");
+  return 1; // unexpected fallthrough to one to avoid division by zero.
 }
 
 } // namespace ProtobufPercentHelper

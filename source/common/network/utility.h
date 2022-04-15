@@ -328,9 +328,6 @@ public:
    */
   static absl::uint128 Ip6htonl(const absl::uint128& address);
 
-  static Address::InstanceConstSharedPtr
-  protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address);
-
   /**
    * Copies the address instance into the protobuf representation of an address.
    * @param address is the address to be copied into the protobuf representation of this address.

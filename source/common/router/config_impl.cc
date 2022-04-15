@@ -395,7 +395,10 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
+    const auto custom_tag = Tracing::CustomTagUtility::createCustomTag(tag);
+    if (custom_tag.has_value()) {
+      custom_tags_.emplace(tag.tag(), std::move(custom_tag.value()));
+    }
   }
 }
 
@@ -539,6 +542,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (!route.route().hash_policy().empty()) {
     hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy());
+    //hash_policy_ = HashPolicyFactoryImpl::create(route.route().hash_policy());
   }
 
   if (route.match().has_tls_context()) {

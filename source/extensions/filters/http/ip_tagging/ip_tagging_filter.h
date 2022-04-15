@@ -57,7 +57,7 @@ private:
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::EXTERNAL:
       return FilterRequestType::EXTERNAL;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    throw EnvoyException("Unexpected ip tagging filter request type");
   }
 
   void incCounter(Stats::StatName name);

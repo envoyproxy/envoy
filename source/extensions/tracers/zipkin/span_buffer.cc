@@ -60,7 +60,7 @@ SerializerPtr SpanBuffer::makeSerializer(
   case envoy::config::trace::v3::ZipkinConfig::GRPC:
     PANIC("not handled");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("Unexpected collector endpoint version enum: ", version));
 }
 
 JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)

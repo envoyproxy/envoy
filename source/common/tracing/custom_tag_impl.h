@@ -80,7 +80,7 @@ public:
    * Create a custom tag according to the configuration.
    * @param tag a tracing custom tag configuration.
    */
-  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
+  static absl::optional<CustomTagConstSharedPtr> createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
 };
 
 } // namespace Tracing

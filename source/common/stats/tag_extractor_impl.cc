@@ -76,7 +76,7 @@ TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
   case Regex::Type::StdRegex:
     return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("unexpected regex type", re_type));
 }
 
 bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {

@@ -46,6 +46,7 @@ void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                              Network::ListenerConfig& listener, AddListenerCompletion completion,
                              Runtime::Loader& runtime) {
   dispatcher_->post([this, overridden_listener, &listener, &runtime, completion]() -> void {
+    ENVOY_LOG(info, "[???] OK! Posting listener to worker impl dispatcher");
     handler_->addListener(overridden_listener, listener, runtime);
     hooks_.onWorkerListenerAdded();
     completion();

@@ -33,7 +33,7 @@ http_parser_settings Filter::settings_{
 };
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "http inspector: new connection accepted");
+  ENVOY_LOG(info, "http inspector: new connection accepted");
 
   const Network::ConnectionSocket& socket = cb.socket();
 
@@ -81,7 +81,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM
+  IS_ENVOY_BUG("unexpected parse_state enum");
+  return Network::FilterStatus::StopIteration;
 }
 
 ParseState Filter::onRead() {
@@ -113,7 +114,8 @@ ParseState Filter::onRead() {
     done(true);
     return ParseState::Done;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected parse_state enum");
+  return ParseState::Error;
 }
 
 ParseState Filter::parseHttpHeader(absl::string_view data) {

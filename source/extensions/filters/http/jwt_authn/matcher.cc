@@ -195,9 +195,9 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
   case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
-    break; // Fall through to PANIC.
+    break;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("Unexpected matcher requirement rule", rule.match().path_specifier_case()));
 }
 
 } // namespace JwtAuthn

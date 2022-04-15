@@ -39,7 +39,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x5000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -149,6 +149,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed)) {
     common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::Unknown)) {
+    common_access_log.mutable_response_flags()->set_unknown(true);
   }
 }
 
@@ -295,7 +299,9 @@ void Utility::extractCommonAccessLogProperties(
   Tracing::CustomTagContext ctx{&request_header, stream_info};
   for (const auto& custom_tag : config.custom_tags()) {
     const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
-    tag_applier->applyLog(common_access_log, ctx);
+    if (tag_applier.has_value()) {
+      tag_applier.value()->applyLog(common_access_log, ctx);
+    }
   }
 }
 

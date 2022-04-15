@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/common/exception.h"
+
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 
 #include "source/common/common/hash.h"
@@ -29,7 +31,7 @@ public:
     hash_policy_config_->clear_policy_specifier();
     additionalSetup();
 
-    hash_policy_ = std::make_unique<HashPolicyImpl>(config_.hash_policies());
+    hash_policy_ = HashPolicyImplFactory::create(config_.hash_policies());
   }
 
   virtual void additionalSetup(){
@@ -57,12 +59,12 @@ public:
 
   void additionalSetup() override { hash_policy_config_->set_key(key_); }
 
-  const std::string key_;
+  std::string key_;
 };
 
-// Check invalid policy type
-TEST_F(HashPolicyImplBaseTest, NotSupportedPolicy) {
-  EXPECT_DEATH(setup(), ".*panic: corrupted enum.*");
+TEST_F(HashPolicyImplBaseTest, FooWhat) {
+  setup();
+  EXPECT_EQ(hash_policy_, nullptr);
 }
 
 // Check if generate correct hash

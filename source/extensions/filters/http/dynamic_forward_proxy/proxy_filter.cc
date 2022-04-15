@@ -168,7 +168,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                        absl::nullopt, RcDetails::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected DNS cache result status");
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void ProxyFilter::addHostAddressToFilterState(

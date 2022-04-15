@@ -492,24 +492,6 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
   return result;
 }
 
-Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
-  switch (proto_address.address_case()) {
-  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
-    return Utility::parseInternetAddress(proto_address.socket_address().address(),
-                                         proto_address.socket_address().port_value(),
-                                         !proto_address.socket_address().ipv4_compat());
-  case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
-                                                   proto_address.pipe().mode());
-  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    PANIC("internal address not supported"); // TODO(lambdai) fix.
-  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    PANIC_DUE_TO_PROTO_UNSET;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
 void Utility::addressToProtobufAddress(const Address::Instance& address,
                                        envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
@@ -535,7 +517,7 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
       return Socket::Type::Datagram;
     }
   }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException("unexpected proto address socket type");
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Socket::Type::Stream;
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
@@ -544,7 +526,7 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException("unexpected proto address socket type");
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,

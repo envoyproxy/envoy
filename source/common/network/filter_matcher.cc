@@ -26,7 +26,8 @@ ListenerFilterMatcherPtr ListenerFilterMatcherBuilder::buildListenerFilterMatche
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::RULE_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("unexpected listener filter chain match predicate rule case enum",
+    match_config.rule_case()));
 }
 
 ListenerFilterSetLogicMatcher::ListenerFilterSetLogicMatcher(

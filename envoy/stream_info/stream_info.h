@@ -91,8 +91,10 @@ enum ResponseFlag {
   OverloadManager = 0x2000000,
   // DNS resolution failed.
   DnsResolutionFailed = 0x4000000,
+  // Closed to unknown reasons, likely a bug.
+  Unknown = 0x5000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DnsResolutionFailed,
+  LastFlag = Unknown,
 };
 
 /**

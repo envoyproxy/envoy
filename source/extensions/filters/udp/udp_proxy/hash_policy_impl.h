@@ -17,12 +17,6 @@ using namespace envoy::extensions::filters::udp::udp_proxy::v3;
  */
 class HashPolicyImpl : public Udp::HashPolicy {
 public:
-  explicit HashPolicyImpl(const absl::Span<const UdpProxyConfig::HashPolicy* const>& hash_policies);
-
-  // Udp::HashPolicy
-  absl::optional<uint64_t>
-  generateHash(const Network::Address::Instance& downstream_addr) const override;
-
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
@@ -32,8 +26,23 @@ public:
 
   using HashMethodPtr = std::unique_ptr<HashMethod>;
 
+  HashPolicyImpl(HashMethodPtr hash_impl) : hash_impl_(std::move(hash_impl)) {}
+
+  absl::optional<uint64_t>
+  generateHash(const Network::Address::Instance& downstream_addr) const override;
+
 private:
   HashMethodPtr hash_impl_;
+};
+
+using HashPolicyImplPtr = std::unique_ptr<const HashPolicyImpl>;
+
+/**
+ * Factory to create hash policy implementations from protobuf hash policies.
+ */
+class HashPolicyImplFactory {
+public:
+  static HashPolicyImplPtr create(const google::protobuf::RepeatedPtrField<envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy> hash_policies);
 };
 
 } // namespace UdpProxy

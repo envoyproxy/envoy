@@ -3,6 +3,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/singleton/const_singleton.h"
 
+#include "envoy/common/exception.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -46,7 +48,7 @@ public:
     case TransportType::Auto:
       return AUTO;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    throw EnvoyException(absl::StrCat("unexpected thrift transport type", type));
   }
 };
 
@@ -96,7 +98,7 @@ public:
     case ProtocolType::Auto:
       return AUTO;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    throw EnvoyException(absl::StrCat("unexpected thrift protocol type", type));
   }
 };
 

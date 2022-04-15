@@ -381,7 +381,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
   case ProtocolState::Done:
     PANIC("unexpected");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("unexpected buffer instance state:", state_));
 }
 
 ProtocolState DecoderStateMachine::popReturnState() {

@@ -89,7 +89,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:
     PANIC("not implemented");
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::OUTPUT_SINK_TYPE_NOT_SET:
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    throw EnvoyException("output sink type not set");
   }
 
   envoy::config::common::matcher::v3::MatchPredicate match;
@@ -170,7 +170,8 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     break;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::TRACE_NOT_SET:
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    IS_ENVOY_BUG("unexpected trace case");
+    return;
   }
 }
 

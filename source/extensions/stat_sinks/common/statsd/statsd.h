@@ -86,7 +86,7 @@ private:
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
   template <typename ValueType>
-  const std::string buildMessage(const Stats::Metric& metric, ValueType value,
+  absl::optional<const std::string> buildMessage(const Stats::Metric& metric, ValueType value,
                                  const std::string& type) const;
   const std::string getName(const Stats::Metric& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;

@@ -397,7 +397,8 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
                                               config_.enforcingFailurePercentageLocalOrigin());
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected outlier ejection type");
+  return false;
 }
 
 void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {

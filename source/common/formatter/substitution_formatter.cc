@@ -1543,7 +1543,8 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
   case HeaderType::ResponseTrailers:
     return response_trailers.byteSize();
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected request header type");
+  return 0;
 }
 
 absl::optional<std::string>

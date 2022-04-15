@@ -426,7 +426,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    throw EnvoyException("HTTP route specifier not set");
   }
 
   switch (config.forward_client_cert_details()) {
@@ -499,7 +499,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     Tracing::CustomTagMap custom_tags;
     for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
+      auto custom_tag = Tracing::CustomTagUtility::createCustomTag(tag);
+      if (custom_tag.has_value()) {
+        custom_tags.emplace(tag.tag(), std::move(custom_tag.value()));
+      }
     }
 
     envoy::type::v3::FractionalPercent client_sampling;
@@ -721,7 +724,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected codec type");
+  return nullptr;
 }
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(

@@ -62,15 +62,21 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      const std::string counter_str = buildMessage(counter.counter_.get(), counter.delta_, "|c");
-      writeBuffer(buffer, writer, counter_str);
+      absl::optional<const std::string> counter_str = buildMessage(counter.counter_.get(), counter.delta_, "|c");
+      if (!counter_str) {
+        return;
+      }
+      writeBuffer(buffer, writer, counter_str.value());
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      const std::string gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
-      writeBuffer(buffer, writer, gauge_str);
+      absl::optional<const std::string> gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
+      if (!gauge_str) {
+        return;
+      }
+      writeBuffer(buffer, writer, gauge_str.value());
     }
   }
 
@@ -112,22 +118,35 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
-  std::string message;
+  absl::optional<std::string> message;
   if (histogram.unit() == Stats::Histogram::Unit::Percent) {
     // 32-bit floating point values should have plenty of range for these values, and are faster to
     // operate on than 64-bit doubles.
     constexpr float divisor = Stats::Histogram::PercentScale;
     const float float_value = value;
     const float scaled = float_value / divisor;
-    message = buildMessage(histogram, scaled, "|h");
+    //message = buildMessage(histogram, scaled, "|h");
+    //absl::optional<const std::string> message = buildMessage(histogram, scaled, "|h");
+    auto message_opt = buildMessage(histogram, scaled, "|h");
+    if (!message_opt) {
+      return;
+    }
+    message = message_opt.value();
   } else {
-    message = buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
+    auto message_opt = buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
+    if (!message_opt) {
+      return;
+    }
+    message = message_opt.value();
   }
-  tls_->getTyped<Writer>().write(message);
+
+  if (message) {
+    tls_->getTyped<Writer>().write(message.value());
+  }
 }
 
 template <typename ValueType>
-const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
+absl::optional<const std::string> UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
                                               const std::string& type) const {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
@@ -138,7 +157,7 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
         ":", value, type,
         // tags
         buildTagStr(metric.tags()));
-    return message;
+    return absl::make_optional(std::move(message));
   }
 
   case Statsd::TagPosition::TagAfterName: {
@@ -149,10 +168,11 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
         buildTagStr(metric.tags()),
         // value and type
         ":", value, type);
-    return message;
+    return absl::make_optional(std::move(message));
   }
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected tag format tag position enum");
+  return absl::nullopt;
 }
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {

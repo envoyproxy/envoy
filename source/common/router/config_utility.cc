@@ -62,7 +62,7 @@ ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& pri
   case envoy::config::core::v3::HIGH:
     return Upstream::ResourcePriority::High;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("unexpected routing priority enum: ", priority));
 }
 
 bool ConfigUtility::matchQueryParams(
@@ -77,22 +77,22 @@ bool ConfigUtility::matchQueryParams(
   return true;
 }
 
-Http::Code ConfigUtility::parseRedirectResponseCode(
+absl::optional<Http::Code> ConfigUtility::parseRedirectResponseCode(
     const envoy::config::route::v3::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RedirectAction::MOVED_PERMANENTLY:
-    return Http::Code::MovedPermanently;
+    return absl::make_optional(Http::Code::MovedPermanently);
   case envoy::config::route::v3::RedirectAction::FOUND:
-    return Http::Code::Found;
+    return absl::make_optional(Http::Code::Found);
   case envoy::config::route::v3::RedirectAction::SEE_OTHER:
-    return Http::Code::SeeOther;
+    return absl::make_optional(Http::Code::SeeOther);
   case envoy::config::route::v3::RedirectAction::TEMPORARY_REDIRECT:
-    return Http::Code::TemporaryRedirect;
+    return absl::make_optional(Http::Code::TemporaryRedirect);
   case envoy::config::route::v3::RedirectAction::PERMANENT_REDIRECT:
-    return Http::Code::PermanentRedirect;
+    return absl::make_optional(Http::Code::PermanentRedirect);
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  return absl::nullopt;
 }
 
 absl::optional<Http::Code>
@@ -102,7 +102,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
   } else if (route.has_direct_response()) {
     return static_cast<Http::Code>(route.direct_response().status());
   }
-  return {};
+  return absl::nullopt;
 }
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
@@ -144,7 +144,8 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected cluster not found code");
+  return Http::Code::NotFound;
 }
 
 } // namespace Router

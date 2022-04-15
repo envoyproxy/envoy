@@ -308,6 +308,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
                                               std::move(downstream_stream_account)));
 
   accumulated_requests_++;
+
   if (config_.maxRequestsPerConnection() > 0 &&
       accumulated_requests_ >= config_.maxRequestsPerConnection()) {
     if (codec_->protocol() < Protocol::Http2) {
@@ -349,6 +350,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
   codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
+  ASSERT(codec_);
 
   switch (codec_->protocol()) {
   case Protocol::Http3:
@@ -372,8 +374,10 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     // Http3 codec should have been instantiated by now.
     createCodec(data);
   }
+  ASSERT(codec_);
 
   bool redispatch;
+
   do {
     redispatch = false;
 

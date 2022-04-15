@@ -206,7 +206,7 @@ RouteMatcher::RouteMatcher(
       route_entry = std::make_shared<ServiceNameRouteEntryImpl>(route);
       break;
     case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
-      PANIC_DUE_TO_CORRUPT_ENUM;
+      throw EnvoyException("RouteMatcher route specifier not set");
     }
 
     if (validation_clusters) {

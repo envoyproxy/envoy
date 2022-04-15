@@ -488,7 +488,7 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException(absl::StrCat("Unexpected ocsp staple policy enum: ", policy));
 }
 
 } // namespace Tls

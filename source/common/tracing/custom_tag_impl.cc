@@ -134,21 +134,22 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   }
 }
 
-CustomTagConstSharedPtr
+absl::optional<CustomTagConstSharedPtr>
 CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag) {
   switch (tag.type_case()) {
   case envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral:
-    return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
+    return absl::make_optional(std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal()));
   case envoy::type::tracing::v3::CustomTag::TypeCase::kEnvironment:
-    return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
+    return absl::make_optional(std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment()));
   case envoy::type::tracing::v3::CustomTag::TypeCase::kRequestHeader:
-    return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
+    return absl::make_optional(std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header()));
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
-    return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
+    return absl::make_optional(std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata()));
   case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
-    break; // Panic below.
+    return absl::nullopt;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected custom tag type case");
+  return absl::nullopt;
 }
 
 } // namespace Tracing

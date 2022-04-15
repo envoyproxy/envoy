@@ -1183,7 +1183,7 @@ WasmResult Context::log(uint32_t level, std::string_view message) {
   case spdlog::level::n_levels:
     PANIC("not implemented");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected wasm log level");
 }
 
 uint32_t Context::getLogLevel() {

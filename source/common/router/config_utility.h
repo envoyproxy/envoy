@@ -70,7 +70,7 @@ public:
    * @param code supplies the RedirectResponseCode enum.
    * @return Returns the Http::Code version of the RedirectResponseCode.
    */
-  static Http::Code parseRedirectResponseCode(
+  static absl::optional<Http::Code> parseRedirectResponseCode(
       const envoy::config::route::v3::RedirectAction::RedirectResponseCode& code);
 
   /**

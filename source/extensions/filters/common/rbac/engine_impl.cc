@@ -59,7 +59,8 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
     return true;
   }
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected rbac action");
+  return false;
 }
 
 bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(

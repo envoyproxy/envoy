@@ -75,7 +75,7 @@ ConfigProviderPtr create(
       ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
     PANIC("not implemented");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  throw EnvoyException("Unexpected HTTP connection manager configuration specifier case");
 }
 
 } // namespace ScopedRoutesConfigProviderUtil

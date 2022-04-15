@@ -770,21 +770,22 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   return hosts_source;
 }
 
-const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts_source) const {
+const HostVector* ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts_source) const {
   const HostSet& host_set = *priority_set_.hostSetsPerPriority()[hosts_source.priority_];
   switch (hosts_source.source_type_) {
   case HostsSource::SourceType::AllHosts:
-    return host_set.hosts();
+    return &host_set.hosts();
   case HostsSource::SourceType::HealthyHosts:
-    return host_set.healthyHosts();
+    return &host_set.healthyHosts();
   case HostsSource::SourceType::DegradedHosts:
-    return host_set.degradedHosts();
+    return &host_set.degradedHosts();
   case HostsSource::SourceType::LocalityHealthyHosts:
-    return host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
+    return &host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
   case HostsSource::SourceType::LocalityDegradedHosts:
-    return host_set.degradedHostsPerLocality().get()[hosts_source.locality_index_];
+    return &host_set.degradedHostsPerLocality().get()[hosts_source.locality_index_];
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected hosts_source source type");
+  return nullptr;
 }
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
@@ -948,11 +949,11 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   if (scheduler.edf_ != nullptr) {
     return scheduler.edf_->peekAgain([this](const Host& host) { return hostWeight(host); });
   } else {
-    const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
-    if (hosts_to_use.empty()) {
+    const HostVector* hosts_to_use = hostSourceToHosts(*hosts_source);
+    if (hosts_to_use == nullptr || hosts_to_use->empty()) {
       return nullptr;
     }
-    return unweightedHostPeek(hosts_to_use, *hosts_source);
+    return unweightedHostPeek(*hosts_to_use, *hosts_source);
   }
 }
 
@@ -975,11 +976,11 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
     auto host = scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
     return host;
   } else {
-    const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
-    if (hosts_to_use.empty()) {
+    const HostVector* hosts_to_use = hostSourceToHosts(*hosts_source);
+    if (hosts_to_use == nullptr || hosts_to_use->empty()) {
       return nullptr;
     }
-    return unweightedHostPick(hosts_to_use, *hosts_source);
+    return unweightedHostPick(*hosts_to_use, *hosts_source);
   }
 }
 
@@ -1065,12 +1066,12 @@ HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context
     return nullptr;
   }
 
-  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
-  if (hosts_to_use.empty()) {
+  const HostVector* hosts_to_use = hostSourceToHosts(*hosts_source);
+  if (hosts_to_use == nullptr || hosts_to_use->empty()) {
     return nullptr;
   }
 
-  return hosts_to_use[random_hash % hosts_to_use.size()];
+  return (*hosts_to_use)[random_hash % hosts_to_use->size()];
 }
 
 SubsetSelectorImpl::SubsetSelectorImpl(

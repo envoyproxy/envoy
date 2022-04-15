@@ -49,7 +49,8 @@ uint64_t HistogramCompletableTimespanImpl::tickCount() const {
   case Histogram::Unit::Percent:
     PANIC("not implemented");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected histogram unit enum");
+  return 0;
 }
 
 } // namespace Stats

@@ -57,7 +57,11 @@ void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& matc
         match_config.http_response_generic_body_match(), matchers);
     break;
   case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::RULE_NOT_SET:
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    IS_ENVOY_BUG("matcher predicate rule not set");
+    return;
+  default:
+    IS_ENVOY_BUG("unexpected matcher predicate rule case");
+    return;
   }
 
   // Per above, move the matcher into its position.
@@ -149,7 +153,9 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
       patterns_->push_back(i.string_match());
       break;
     case envoy::config::common::matcher::v3::HttpGenericBodyMatch::GenericTextMatch::RULE_NOT_SET:
-      PANIC_DUE_TO_CORRUPT_ENUM;
+      throw EnvoyException("http generic body match rule not set");
+    default:
+      throw EnvoyException(absl::StrCat("unexpected http generic body match rule type", i.rule_case()));
     }
     // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
     overlap_size_ = std::max(overlap_size_, patterns_->back().length() - 1);

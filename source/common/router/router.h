@@ -321,7 +321,7 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr), downstream_1xx_headers_encoded_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false) {}
+        request_buffer_overflowed_(false) { ENVOY_LOG(info, "[FILTER] Creating filter"); }
 
   ~Filter() override;
 
