@@ -169,7 +169,7 @@ void HeaderString::setReference(absl::string_view ref_value) {
   ASSERT(valid());
 }
 
-void HeaderString::setCopyUnvalidated(absl::string_view view) {
+void HeaderString::setCopyUnvalidatedForTestOnly(absl::string_view view) {
   if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
     // Switching from Type::Reference to Type::Inline
     buffer_ = InlineHeaderVector();

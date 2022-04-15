@@ -108,7 +108,7 @@ using InlineHeaderVector = absl::InlinedVector<char, 128>;
  */
 using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
 
-// Forward declare test classes that have access to HeaderString::setCopyUnvalidated()
+// Forward declare test classes that have access to HeaderString::setCopyUnvalidatedForTestOnly()
 namespace Http2 {
 class Http2CodecImplTest;
 }
@@ -239,7 +239,7 @@ private:
   // Test only method that does not have validation and allows setting arbitrary values.
   // Test code that needs access to it is declared below.
   friend class Http2::Http2CodecImplTest;
-  void setCopyUnvalidated(absl::string_view view);
+  void setCopyUnvalidatedForTestOnly(absl::string_view view);
 
   /**
    * @return the type of backing storage for the string.

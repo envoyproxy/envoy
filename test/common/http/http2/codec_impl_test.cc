@@ -490,7 +490,7 @@ protected:
   }
 
   void setHeaderStringUnvalidated(HeaderString& header_string, absl::string_view value) {
-    header_string.setCopyUnvalidated(value);
+    header_string.setCopyUnvalidatedForTestOnly(value);
   }
 };
 
