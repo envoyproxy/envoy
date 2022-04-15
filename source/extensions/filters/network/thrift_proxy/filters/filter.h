@@ -88,7 +88,7 @@ public:
  */
 class DecoderFilterCallbacks : public virtual FilterCallbacks {
 public:
-  virtual ~DecoderFilterCallbacks() = default;
+  ~DecoderFilterCallbacks() override = default;
 
   /**
    * Indicates the start of an upstream response. May only be called once.
@@ -127,7 +127,7 @@ public:
  */
 class EncoderFilterCallbacks : public virtual FilterCallbacks {
 public:
-  virtual ~EncoderFilterCallbacks() = default;
+  virtual ~EncoderFilterCallbacks() override = default;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
