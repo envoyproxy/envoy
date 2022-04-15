@@ -190,6 +190,8 @@ public:
   MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
                               Stats::Counter& cx_total, Upstream::Host::CreateConnectionData& data);
   ~MultiplexedActiveClientBase() override = default;
+  // Caps max streams per connection below 2^31 to prevent overflow.
+  static uint64_t maxStreamsPerConnection(uint64_t max_streams_config);
 
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;

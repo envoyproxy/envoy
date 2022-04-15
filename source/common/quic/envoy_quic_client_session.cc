@@ -15,7 +15,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-    QuicStatNames& quic_stat_names, OptRef<Http::AlternateProtocolsCache> rtt_cache,
+    QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
     Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit,
@@ -50,7 +50,8 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
   if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     if (stats.srtt_us > 0) {
-      Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+      Http::HttpServerPropertiesCache::Origin origin("https", server_id().host(),
+                                                     server_id().port());
       rtt_cache_->setSrtt(origin, std::chrono::microseconds(stats.srtt_us));
     }
   }

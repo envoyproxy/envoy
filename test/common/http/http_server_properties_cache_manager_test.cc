@@ -1,5 +1,5 @@
-#include "source/common/http/alternate_protocols_cache_impl.h"
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -14,10 +14,10 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-class AlternateProtocolsCacheManagerTest : public testing::Test,
-                                           public Event::TestUsingSimulatedTime {
+class HttpServerPropertiesCacheManagerTest : public testing::Test,
+                                             public Event::TestUsingSimulatedTime {
 public:
-  AlternateProtocolsCacheManagerTest() {
+  HttpServerPropertiesCacheManagerTest() {
     options1_.set_name(name1_);
     options1_.mutable_max_entries()->set_value(max_entries1_);
 
@@ -26,16 +26,16 @@ public:
   }
   void initialize() {
     AlternateProtocolsData data(context_);
-    factory_ = std::make_unique<Http::AlternateProtocolsCacheManagerFactoryImpl>(singleton_manager_,
-                                                                                 tls_, data);
+    factory_ = std::make_unique<Http::HttpServerPropertiesCacheManagerFactoryImpl>(
+        singleton_manager_, tls_, data);
     manager_ = factory_->get();
   }
 
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<Http::AlternateProtocolsCacheManagerFactoryImpl> factory_;
-  AlternateProtocolsCacheManagerSharedPtr manager_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManagerFactoryImpl> factory_;
+  HttpServerPropertiesCacheManagerSharedPtr manager_;
   const std::string name1_ = "name1";
   const std::string name2_ = "name2";
   const int max_entries1_ = 10;
@@ -46,35 +46,35 @@ public:
   envoy::config::core::v3::AlternateProtocolsCacheOptions options2_;
 };
 
-TEST_F(AlternateProtocolsCacheManagerTest, FactoryGet) {
+TEST_F(HttpServerPropertiesCacheManagerTest, FactoryGet) {
   initialize();
 
   EXPECT_NE(nullptr, manager_);
   EXPECT_EQ(manager_, factory_->get());
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCache) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCache) {
   initialize();
-  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
+  HttpServerPropertiesCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
   EXPECT_NE(nullptr, cache);
   EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithEntry) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithEntry) {
   auto* entry = options1_.add_prepopulated_entries();
   entry->set_hostname("foo.com");
   entry->set_port(1);
 
   initialize();
-  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
+  HttpServerPropertiesCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
   EXPECT_NE(nullptr, cache);
   EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
 
-  const AlternateProtocolsCacheImpl::Origin origin = {"https", entry->hostname(), entry->port()};
+  const HttpServerPropertiesCacheImpl::Origin origin = {"https", entry->hostname(), entry->port()};
   EXPECT_TRUE(cache->findAlternatives(origin).has_value());
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
   options1_.mutable_key_value_store_config();
   initialize();
@@ -82,17 +82,17 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
                           "options has key value store but Envoy has concurrency = 5");
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentOptions) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForDifferentOptions) {
   initialize();
-  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
-  AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(options2_, dispatcher_);
+  HttpServerPropertiesCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
+  HttpServerPropertiesCacheSharedPtr cache2 = manager_->getCache(options2_, dispatcher_);
   EXPECT_NE(nullptr, cache2);
   EXPECT_NE(cache1, cache2);
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForConflictingOptions) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForConflictingOptions) {
   initialize();
-  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
+  HttpServerPropertiesCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
   options2_.set_name(options1_.name());
   EXPECT_THROW_WITH_REGEX(
       manager_->getCache(options2_, dispatcher_), EnvoyException,

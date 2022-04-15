@@ -5,7 +5,7 @@
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -237,8 +237,8 @@ protected:
 };
 
 int getSrtt(std::string alt_svc, TimeSource& time_source) {
-  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source,
-                                                                      /*from_cache=*/false);
+  auto data = Http::HttpServerPropertiesCacheImpl::originDataFromString(alt_svc, time_source,
+                                                                        /*from_cache=*/false);
   return data.has_value() ? data.value().srtt.count() : 0;
 }
 
