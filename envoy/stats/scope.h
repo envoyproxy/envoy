@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -24,8 +25,11 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
-using ScopeSharedPtr = std::shared_ptr<Scope>;
+//using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
+using ConstScopeSharedPtr = RefcountPtr<const Scope>;
+//using ScopeSharedPtr = std::shared_ptr<Scope>;
+
+using ScopeSharedPtr = RefcountPtr<Scope>;
 
 // TODO(jmarantz): In the initial transformation to store Scope as shared_ptr,
 // we don't change all the references, as that would result in an unreviewable
@@ -57,14 +61,16 @@ template <class StatType> using IterateFn = std::function<bool(const RefcountPtr
  *  * It's a little less coding to use enable_shared_from_this compared to adding
  *    a ref_count to the scope object, for each of its implementations.
  */
-class Scope : public std::enable_shared_from_this<Scope> {
+class Scope : public RefcountImpl {
 public:
   virtual ~Scope() = default;
 
   /** @return a shared_ptr for this */
-  ScopeSharedPtr getShared() { return shared_from_this(); }
+  //ScopeSharedPtr getShared() { return shared_from_this(); }
+  ScopeSharedPtr getShared() { return ScopeSharedPtr(this); }
   /** @return a const shared_ptr for this */
-  ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
+  //ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
+  ConstScopeSharedPtr getConstShared() const { return ConstScopeSharedPtr(this); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

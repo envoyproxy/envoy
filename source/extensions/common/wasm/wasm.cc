@@ -17,7 +17,7 @@ using proxy_wasm::Word;
 
 namespace Envoy {
 
-using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
+//using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
 
 namespace Extensions {
 namespace Common {

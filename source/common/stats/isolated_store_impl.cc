@@ -35,7 +35,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
       null_gauge_(new NullGaugeImpl(symbol_table)),
-      default_scope_(std::make_shared<ScopePrefixer>("", *this)) {}
+      default_scope_(new ScopePrefixer("", *this)) {}
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
@@ -45,7 +45,7 @@ ScopeSharedPtr IsolatedStoreImpl::createScope(const std::string& name) {
 }
 
 ScopeSharedPtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
-  ScopeSharedPtr scope = std::make_shared<ScopePrefixer>(name, *this);
+  ScopeSharedPtr scope(new ScopePrefixer(name, *this));
   scopes_.push_back(scope);
   return scope;
 }

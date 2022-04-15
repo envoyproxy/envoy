@@ -159,5 +159,15 @@ struct RefcountHelper {
   std::atomic<uint32_t> ref_count_{0};
 };
 
+class RefcountImpl {
+ public:
+  void incRefCount() const { refcount_.incRefCount(); }
+  bool decRefCount() const { return refcount_.decRefCount(); }
+  uint32_t use_count() const { return refcount_.use_count(); }
+
+ private:
+  mutable RefcountHelper refcount_;
+};
+
 } // namespace Stats
 } // namespace Envoy

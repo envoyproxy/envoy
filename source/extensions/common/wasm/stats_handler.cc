@@ -11,11 +11,12 @@ namespace Wasm {
 
 Stats::ScopeSharedPtr CreateStatsHandler::lockAndCreateStats(const Stats::ScopeSharedPtr& scope) {
   absl::MutexLock l(&mutex_);
-  Stats::ScopeSharedPtr lock;
-  if (!(lock = scope_.lock())) {
+  Stats::ScopeSharedPtr lock = scope_;
+  //if (!(lock = scope_.lock())) {
+  if (scope_ == nullptr) {
     resetStats();
     createStats(scope);
-    scope_ = ScopeWeakPtr(scope);
+    scope_ = scope; //ScopeWeakPtr(scope);
     return scope;
   }
   createStats(scope);
@@ -60,7 +61,10 @@ void CreateStatsHandler::createStats(const Stats::ScopeSharedPtr& scope) {
   }
 }
 
-void CreateStatsHandler::resetStats() { create_wasm_stats_.reset(); }
+void CreateStatsHandler::resetStats() {
+  create_wasm_stats_.reset();
+  scope_.reset();
+}
 
 CreateStatsHandler& getCreateStatsHandler() { MUTABLE_CONSTRUCT_ON_FIRST_USE(CreateStatsHandler); }
 

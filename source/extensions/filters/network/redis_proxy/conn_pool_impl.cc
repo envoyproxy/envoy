@@ -40,12 +40,12 @@ InstanceImpl::InstanceImpl(
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
         config,
-    Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
+    Api::Api& api, const Stats::ScopeSharedPtr& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
-      stats_scope_(std::move(stats_scope)),
+      stats_scope_(stats_scope),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
       refresh_manager_(std::move(refresh_manager)) {}

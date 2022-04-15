@@ -39,7 +39,7 @@ struct LifecycleStats {
   LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
+//using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
 
 enum class WasmEvent : int {
   Ok,
@@ -81,7 +81,8 @@ public:
 
 protected:
   absl::Mutex mutex_;
-  ScopeWeakPtr scope_;
+  //ScopeWeakPtr scope_;
+  Stats::ScopeSharedPtr scope_ ABSL_GUARDED_BY(mutex_);
   std::unique_ptr<CreateWasmStats> create_wasm_stats_;
 };
 

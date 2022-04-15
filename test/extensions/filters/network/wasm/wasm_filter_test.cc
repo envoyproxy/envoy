@@ -45,7 +45,9 @@ class WasmNetworkFilterTest : public Extensions::Common::Wasm::WasmNetworkFilter
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmNetworkFilterTest() = default;
-  ~WasmNetworkFilterTest() override = default;
+  ~WasmNetworkFilterTest() override {
+    Common::Wasm::clearCodeCacheForTesting();
+  }
 
   void setupConfig(const std::string& code, std::string root_id = "",
                    std::string vm_configuration = "", bool fail_open = false,

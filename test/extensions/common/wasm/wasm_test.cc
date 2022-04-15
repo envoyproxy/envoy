@@ -82,10 +82,15 @@ public:
 
 class WasmCommonTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  void SetUp() override { // NOLINT(readability-identifier-naming)
+  WasmCommonTest() {
     Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug);
+  }
+
+  ~WasmCommonTest() override {
     clearCodeCacheForTesting();
   }
+
+  Stats::IsolatedStoreImpl stats_store_;
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,
@@ -93,11 +98,10 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmCommonTest, WasmFailState) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
@@ -157,11 +161,10 @@ TEST_P(WasmCommonTest, WasmFailState) {
 }
 
 TEST_P(WasmCommonTest, Logging) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "logging";
   auto plugin_configuration = "configure-test";
@@ -238,11 +241,10 @@ TEST_P(WasmCommonTest, BadSignature) {
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/bad_signature_cpp.wasm"));
@@ -266,11 +268,10 @@ TEST_P(WasmCommonTest, Segv) {
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "segv";
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -309,11 +310,10 @@ TEST_P(WasmCommonTest, DivByZero) {
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "divbyzero";
 
@@ -344,11 +344,10 @@ TEST_P(WasmCommonTest, DivByZero) {
 }
 
 TEST_P(WasmCommonTest, IntrinsicGlobals) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "globals";
 
@@ -386,11 +385,10 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
 }
 
 TEST_P(WasmCommonTest, Utilities) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
 
   auto vm_configuration = "utilities";
@@ -455,11 +453,10 @@ TEST_P(WasmCommonTest, Stats) {
   // We set logger level to critical here to gain more coverage.
   Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::critical);
 
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "stats";
 
@@ -502,11 +499,10 @@ TEST_P(WasmCommonTest, Stats) {
 }
 
 TEST_P(WasmCommonTest, Foreign) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "foreign";
 
@@ -542,11 +538,10 @@ TEST_P(WasmCommonTest, Foreign) {
 }
 
 TEST_P(WasmCommonTest, OnForeign) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "on_foreign";
 
@@ -590,11 +585,10 @@ TEST_P(WasmCommonTest, WASI) {
     // This test has no meaning unless it is invoked by actual Wasm code
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "WASI";
 
@@ -631,14 +625,13 @@ TEST_P(WasmCommonTest, WASI) {
 }
 
 TEST_P(WasmCommonTest, VmCache) {
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Server::MockServerLifecycleNotifier2> lifecycle_notifier;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "vm_cache";
   auto plugin_configuration = "done";
@@ -651,12 +644,12 @@ TEST_P(WasmCommonTest, VmCache) {
 
   ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
   EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
-      .WillRepeatedly(
-          Invoke([&](ServerLifecycleNotifier::Stage,
-                     StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
-            lifecycle_callback = callback;
-            return nullptr;
-          }));
+          .WillRepeatedly(
+              Invoke([&](ServerLifecycleNotifier::Stage,
+                         StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
+                lifecycle_callback = callback;
+                return nullptr;
+              }));
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
@@ -724,21 +717,21 @@ TEST_P(WasmCommonTest, VmCache) {
   dispatcher->clearDeferredDeleteList();
 
   proxy_wasm::clearWasmCachesForTesting();
+  clearCodeCacheForTesting();
 }
 
 TEST_P(WasmCommonTest, RemoteCode) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier;
   Init::ExpectableWatcherImpl init_watcher;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "vm_cache";
   auto plugin_configuration = "done";
@@ -838,21 +831,21 @@ TEST_P(WasmCommonTest, RemoteCode) {
   plugin.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher->clearDeferredDeleteList();
+  clearCodeCacheForTesting();
 }
 
 TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier;
   Init::ExpectableWatcherImpl init_watcher;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "vm_cache";
   auto plugin_configuration = "done";
@@ -966,11 +959,10 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "restrict_all";
 
@@ -1020,11 +1012,10 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "allow_on_vm_start";
 
@@ -1076,11 +1067,10 @@ TEST_P(WasmCommonTest, AllowLog) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "allow_log";
 
@@ -1129,11 +1119,10 @@ TEST_P(WasmCommonTest, AllowWASI) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "allow_wasi";
 
@@ -1182,11 +1171,10 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "allow_on_context_create";
 
@@ -1237,11 +1225,10 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Api::ApiPtr api = Api::createApiForTest(stats_store_);
   Upstream::MockClusterManager cluster_manager;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  auto scope = stats_store_.createScope("wasm.");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "thread_local_copy";
 
@@ -1301,6 +1288,10 @@ class WasmCommonContextTest : public Common::Wasm::WasmTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmCommonContextTest() = default;
+  ~WasmCommonContextTest() override {
+    clearCodeCacheForTesting();
+  }
+
 
   void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
     setRootId(root_id);

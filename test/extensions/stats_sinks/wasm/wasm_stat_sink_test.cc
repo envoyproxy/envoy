@@ -35,6 +35,9 @@ class WasmCommonContextTest : public Common::Wasm::WasmTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmCommonContextTest() = default;
+  ~WasmCommonContextTest() {
+    clearCodeCacheForTesting();
+  }
 
   void setup(const std::string& code, std::string root_id = "") {
     setRootId(root_id);

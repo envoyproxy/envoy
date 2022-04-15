@@ -57,11 +57,8 @@ public:
       cm_.initializeThreadLocalClusters({"fake_cluster"});
     }
 
-    std::unique_ptr<NiceMock<Stats::MockStore>> store =
-        std::make_unique<NiceMock<Stats::MockStore>>();
-
     upstream_cx_drained_.value_ = 0;
-    ON_CALL(*store, counter(Eq("upstream_cx_drained")))
+    ON_CALL(*store_, counter(Eq("upstream_cx_drained")))
         .WillByDefault(ReturnRef(upstream_cx_drained_));
     ON_CALL(upstream_cx_drained_, value()).WillByDefault(Invoke([&]() -> uint64_t {
       return upstream_cx_drained_.value_;
@@ -71,7 +68,7 @@ public:
     }));
 
     max_upstream_unknown_connections_reached_.value_ = 0;
-    ON_CALL(*store, counter(Eq("max_upstream_unknown_connections_reached")))
+    ON_CALL(*store_, counter(Eq("max_upstream_unknown_connections_reached")))
         .WillByDefault(ReturnRef(max_upstream_unknown_connections_reached_));
     ON_CALL(max_upstream_unknown_connections_reached_, value())
         .WillByDefault(
@@ -83,12 +80,12 @@ public:
     cluster_refresh_manager_ =
         std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
     auto redis_command_stats =
-        Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
+        Common::Redis::RedisCommandStats::createRedisCommandStats(store_->symbolTable());
     std::shared_ptr<InstanceImpl> conn_pool_impl = std::make_shared<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_),
-        api_, std::move(store), redis_command_stats, cluster_refresh_manager_);
+        api_, scope_, redis_command_stats, cluster_refresh_manager_);
     conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
@@ -294,6 +291,8 @@ public:
   const std::string cluster_name_{"fake_cluster"};
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Stats::MockStore>* store_{new NiceMock<Stats::MockStore>};
+  Stats::ScopeSharedPtr scope_{Stats::ScopeSharedPtr(store_)};
   std::shared_ptr<InstanceImpl> conn_pool_;
   Upstream::ClusterUpdateCallbacks* update_callbacks_{};
   Common::Redis::Client::MockClient* client_{};
@@ -1222,16 +1221,14 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
 TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   cm_.initializeThreadLocalClusters({"fake_cluster"});
   tls_.defer_delete_ = true;
-  std::unique_ptr<NiceMock<Stats::MockStore>> store =
-      std::make_unique<NiceMock<Stats::MockStore>>();
   cluster_refresh_manager_ =
       std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
   auto redis_command_stats =
-      Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
+      Common::Redis::RedisCommandStats::createRedisCommandStats(store_->symbolTable());
   conn_pool_ = std::make_shared<InstanceImpl>(
       cluster_name_, cm_, *this, tls_,
       Common::Redis::Client::createConnPoolSettings(20, true, true, 100, read_policy_), api_,
-      std::move(store), redis_command_stats, cluster_refresh_manager_);
+      scope_, redis_command_stats, cluster_refresh_manager_);
   conn_pool_->init();
 
   auto& local_pool = threadLocalPool();

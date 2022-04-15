@@ -56,7 +56,9 @@ class WasmHttpFilterTest : public Common::Wasm::WasmHttpFilterTestBase<
                                testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmHttpFilterTest() = default;
-  ~WasmHttpFilterTest() override = default;
+  ~WasmHttpFilterTest() override {
+    Common::Wasm::clearCodeCacheForTesting();
+  }
 
   CreateContextFn createContextFn() {
     return [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
