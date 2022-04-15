@@ -16,6 +16,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
@@ -97,22 +98,12 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
 }
 
 TEST_P(QuicNetworkConnectionTest, Srtt) {
-  Api::MockOsSysCalls os_sys_calls;
   initialize();
 
   Http::MockAlternateProtocolsCache rtt_cache;
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
-  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
-      .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
-  EXPECT_CALL(os_sys_calls, getifaddrs(_))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
-        return os_sys_calls_actual_.getifaddrs(vector);
-      }));
 
   const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
@@ -126,6 +117,30 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   session->Initialize();
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+TEST_P(QuicNetworkConnectionTest, GetIntfName) {
+  Api::MockOsSysCalls os_sys_calls;
+  initialize();
+
+  const int port = 30;
+
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
+
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
