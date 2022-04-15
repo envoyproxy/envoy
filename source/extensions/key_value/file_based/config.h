@@ -18,7 +18,8 @@ namespace KeyValue {
 class FileBasedKeyValueStore : public KeyValueStoreBase {
 public:
   FileBasedKeyValueStore(Event::Dispatcher& dispatcher, std::chrono::milliseconds flush_interval,
-                         Filesystem::Instance& file_system, const std::string& filename);
+                         Filesystem::Instance& file_system, const std::string& filename,
+                         uint32_t max_entries);
   // KeyValueStore
   void flush() override;
 

@@ -101,117 +101,57 @@ private:
   std::string raw_string_;
 };
 
-// Test tests command tokenize utility.
-TEST(SubstitutionFormatParser, tokenizer) {
-  std::vector<absl::string_view> tokens;
-  absl::optional<size_t> max_length;
-
-  std::string command = "COMMAND(item1)";
-
-  // The second parameter indicates where command name and opening bracket ends.
-  // In this case "COMMAND(" ends at index 8 (counting from zero).
-  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
-  ASSERT_EQ(tokens.size(), 1);
-  ASSERT_EQ(tokens.at(0), "item1");
-  ASSERT_EQ(max_length, absl::nullopt);
-
-  command = "COMMAND(item1:item2:item3)";
-  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
-  ASSERT_EQ(tokens.size(), 3);
-  ASSERT_EQ(tokens.at(0), "item1");
-  ASSERT_EQ(tokens.at(1), "item2");
-  ASSERT_EQ(tokens.at(2), "item3");
-  ASSERT_EQ(max_length, absl::nullopt);
-
-  command = "COMMAND(item1:item2:item3:item4):234";
-  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
-  ASSERT_EQ(tokens.size(), 4);
-  ASSERT_EQ(tokens.at(0), "item1");
-  ASSERT_EQ(tokens.at(1), "item2");
-  ASSERT_EQ(tokens.at(2), "item3");
-  ASSERT_EQ(tokens.at(3), "item4");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 234);
-
-  // Tokenizing the following commands should fail.
-  std::vector<std::string> wrong_commands = {
-      "COMMAND(item1:item2",           // Missing closing bracket.
-      "COMMAND(item1:item2))",         // Unexpected second closing bracket.
-      "COMMAND(item1:item2):",         // Missing length field.
-      "COMMAND(item1:item2):LENGTH",   // Length field must be integer.
-      "COMMAND(item1:item2):100:23",   // Length field must be integer.
-      "COMMAND(item1:item2):100):23"}; // Extra fields after length.
-
-  for (const auto& test_command : wrong_commands) {
-    EXPECT_THROW(
-        SubstitutionFormatParser::tokenizeCommand(test_command, 8, ':', tokens, max_length),
-        EnvoyException)
-        << test_command;
-  }
-}
-
-// Test tests multiple versions of variadic template method parseCommand
+// Test tests multiple versions of variadic template method parseSubcommand
 // extracting tokens.
 TEST(SubstitutionFormatParser, commandParser) {
   std::vector<absl::string_view> tokens;
-  absl::optional<size_t> max_length;
   std::string token1;
 
-  std::string command = "COMMAND(item1)";
-  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1);
+  std::string command = "item1";
+  SubstitutionFormatParser::parseSubcommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
-  ASSERT_EQ(max_length, absl::nullopt);
 
   std::string token2;
-  command = "COMMAND(item1:item2)";
-  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1, token2);
+  command = "item1:item2";
+  SubstitutionFormatParser::parseSubcommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
-  ASSERT_EQ(max_length, absl::nullopt);
 
-  // Three tokens with optional length.
+  // Three tokens.
   std::string token3;
-  command = "COMMAND(item1?item2?item3):345";
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  command = "item1?item2?item3";
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 
   // Command string has 4 tokens but 3 are expected.
   // The first 3 will be read, the fourth will be ignored.
-  command = "COMMAND(item1?item2?item3?item4):345";
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  command = "item1?item2?item3?item4";
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 
   // Command string has 2 tokens but 3 are expected.
   // The third extracted token should be empty.
-  command = "COMMAND(item1?item2):345";
+  command = "item1?item2";
   token3.erase();
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_TRUE(token3.empty());
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 
   // Command string has 4 tokens. Get first 2 into the strings
   // and remaining 2 into a vector of strings.
-  command = "COMMAND(item1?item2?item3?item4):345";
+  command = "item1?item2?item3?item4";
   std::vector<std::string> bucket;
-  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, bucket);
+  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(bucket.size(), 2);
   ASSERT_EQ(bucket.at(0), "item3");
   ASSERT_EQ(bucket.at(1), "item4");
-  ASSERT_TRUE(max_length.has_value());
-  ASSERT_EQ(max_length.value(), 345);
 }
 
 TEST(SubstitutionFormatUtilsTest, protocolToString) {
@@ -1838,7 +1778,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format("DOWNSTREAM_PEER_CERT_V_START");
+    DownstreamPeerCertVStartFormatter cert_start_format("");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -1851,8 +1791,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVStartFormatter cert_start_format(
-        "DOWNSTREAM_PEER_CERT_V_START(%b %e %H:%M:%S %Y %Z)");
+    DownstreamPeerCertVStartFormatter cert_start_format("%b %e %H:%M:%S %Y %Z");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -1874,7 +1813,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
-    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
     EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
@@ -1884,7 +1823,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   // No expirationPeerCertificate
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    DownstreamPeerCertVEndFormatter cert_end_format("%Y/%m/%d");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, expirationPeerCertificate())
         .WillRepeatedly(Return(absl::nullopt));
@@ -1898,7 +1837,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   // Default format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END");
+    DownstreamPeerCertVEndFormatter cert_end_format("");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -1911,8 +1850,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
   // Custom format string
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    DownstreamPeerCertVEndFormatter cert_end_format(
-        "DOWNSTREAM_PEER_CERT_V_END(%b %e %H:%M:%S %Y %Z)");
+    DownstreamPeerCertVEndFormatter cert_end_format("%b %e %H:%M:%S %Y %Z");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -1932,7 +1870,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   std::string body;
 
   {
-    StartTimeFormatter start_time_format("START_TIME(%Y/%m/%d)");
+    StartTimeFormatter start_time_format("%Y/%m/%d");
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
@@ -1944,7 +1882,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   }
 
   {
-    StartTimeFormatter start_time_format("START_TIME");
+    StartTimeFormatter start_time_format("");
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
@@ -2013,6 +1951,64 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
         ProtoEq(ValueUtil::stringValue("42738")));
+    response_header.clear();
+  }
+}
+
+TEST(SubstitutionFormatterTest, GrpcStatusNumberFormatterTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(), true);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
+
+  for (size_t i = 0; i < grpcStatuses; ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(std::to_string(i), formatter.format(request_header, response_header, response_trailer,
+                                                  stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(i)));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(-1)));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(42738)));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(-1)));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(42738)));
     response_header.clear();
   }
 }
@@ -3106,6 +3102,9 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
 
   std::vector<std::string> test_cases = {
       "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)",
+      "%PROTOCOL(should_not_have_params)%",
+      "%PROTOCOL(should_not_have_params_or_length):12%",
+      "%PROTOCOL:12%",
       "%REQ(FIRST?SECOND)T%",
       "RESP(FIRST)%",
       "%REQ(valid)% %NOT_VALID%",
@@ -3114,6 +3113,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
+      "%REQ(TEST):-3%",
       "%REQ(\n)%",
       "%REQ(?\n)%",
       "%RESP(TEST):%",
@@ -3227,7 +3227,7 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
 TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
   {
     EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%"), EnvoyException,
-                              "Empty environment name is not allowed.");
+                              "ENVIRONMENT requires parameters");
   }
 
   {
@@ -3282,6 +3282,60 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
   }
 }
 
+TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
+  std::vector<
+      std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>>
+      test_cases = {
+          // COMMAND_ONLY. Any additional params are not allowed
+          {CommandSyntaxChecker::COMMAND_ONLY, "", 3},
+          {CommandSyntaxChecker::COMMAND_ONLY, "PARAMS", 3},
+          {CommandSyntaxChecker::COMMAND_ONLY, "PARAMS", absl::nullopt},
+          // PARAMS_REQUIRED. Length not allowed.
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "", 3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAM", 3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "", absl::nullopt},
+          // PARAMS_REQUIRED and LENGTH_ALLOWED
+          {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, "", 3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, "",
+           absl::nullopt},
+      };
+
+  for (const auto& test_case : test_cases) {
+    EXPECT_THROW(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                    std::get<1>(test_case), std::get<2>(test_case)),
+                 EnvoyException);
+  }
+}
+
+TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
+  std::vector<
+      std::tuple<CommandSyntaxChecker::CommandSyntaxFlags, std::string, absl::optional<size_t>>>
+      test_cases = {
+          // COMMAND_ONLY. Any additional params are not allowed
+          {CommandSyntaxChecker::COMMAND_ONLY, "", absl::nullopt},
+          // PARAMS_REQUIRED
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+          // PARAMS_REQUIRED and LENGTH_ALLOWED
+          {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS",
+           3},
+          {CommandSyntaxChecker::PARAMS_REQUIRED, "PARAMS", absl::nullopt},
+          // ALLOWS_PARAMS
+          {CommandSyntaxChecker::PARAMS_OPTIONAL, "PARAMS", absl::nullopt},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL, "", absl::nullopt},
+          // ALLOWS_PARAMS and LENGTH_ALLOWED
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS",
+           3},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "", 3},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "PARAMS",
+           absl::nullopt},
+          {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED, "",
+           absl::nullopt}};
+
+  for (const auto& test_case : test_cases) {
+    EXPECT_NO_THROW(CommandSyntaxChecker::verifySyntax(
+        std::get<0>(test_case), "TEST_TOKEN", std::get<1>(test_case), std::get<2>(test_case)));
+  }
+}
 } // namespace
 } // namespace Formatter
 } // namespace Envoy

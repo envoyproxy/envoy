@@ -11,6 +11,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -258,10 +260,11 @@ message FilterChain {
   // establishment, the connection is summarily closed.
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
-  // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
-  // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
-  // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
-  string name = 7;
+  // The unique name (or empty) by which this filter chain is known.
+  // Note: :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  // requires that filter chains are uniquely named within a listener.
+  string name = 7 [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // [#not-implemented-hide:] The configuration to specify whether the filter chain will be built on-demand.
   // If this field is not empty, the filter chain will be built on-demand.

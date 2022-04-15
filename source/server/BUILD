@@ -208,7 +208,6 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
     ],
@@ -234,7 +233,6 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
         "//source/common/stream_info:stream_info_lib",
     ],
 )
@@ -260,7 +258,6 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
     ],
 )
 
@@ -543,14 +540,19 @@ envoy_cc_library(
     deps = [
         ":filter_chain_factory_context_callback",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/network:filter_interface",
         "//envoy/server:instance_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
+        "//source/common/network/matching:data_impl_lib",
+        "//source/common/network/matching:inputs_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],

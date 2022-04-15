@@ -47,7 +47,6 @@ export TEST_TMPDIR=${BUILD_DIR}/tmp
 BAZEL_STARTUP_OPTIONS+=("--output_base=${TEST_TMPDIR/\/c/c:}")
 BAZEL_BUILD_OPTIONS=(
     -c opt
-    --show_task_finish
     --verbose_failures
     "--test_output=errors"
     "--repository_cache=${BUILD_DIR/\/c/c:}/repository_cache"
