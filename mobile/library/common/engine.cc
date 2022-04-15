@@ -175,6 +175,8 @@ envoy_status_t Engine::terminate() {
     main_thread_.join();
   }
 
+  dispatcher_->terminate();
+
   return ENVOY_SUCCESS;
 }
 

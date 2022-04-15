@@ -12,6 +12,12 @@ void ProvisionalDispatcher::drain(Event::Dispatcher& event_dispatcher) {
   // because of behavioral oddities in Event::Dispatcher: event_dispatcher_->isThreadSafe() will
   // crash.
   Thread::LockGuard lock(state_lock_);
+
+  // Don't perform any work on the dispatcher if marked as terminated.
+  if (terminated_) {
+    return;
+  }
+
   RELEASE_ASSERT(!drained_, "ProvisionalDispatcher::drain must only occur once");
   drained_ = true;
   event_dispatcher_ = &event_dispatcher;
@@ -23,6 +29,11 @@ void ProvisionalDispatcher::drain(Event::Dispatcher& event_dispatcher) {
 
 envoy_status_t ProvisionalDispatcher::post(Event::PostCb callback) {
   Thread::LockGuard lock(state_lock_);
+
+  // Don't perform any work on the dispatcher if marked as terminated.
+  if (terminated_) {
+    return ENVOY_FAILURE;
+  }
 
   if (drained_) {
     event_dispatcher_->post(callback);
@@ -67,6 +78,11 @@ bool ProvisionalDispatcher::trackedObjectStackIsEmpty() const {
 }
 
 TimeSource& ProvisionalDispatcher::timeSource() { return event_dispatcher_->timeSource(); }
+
+void ProvisionalDispatcher::terminate() {
+  Thread::LockGuard lock(state_lock_);
+  terminated_ = true;
+}
 
 } // namespace Event
 } // namespace Envoy
