@@ -231,6 +231,14 @@ private:
 
   bool valid() const;
 
+  // Test only method that does not have validation and allows setting arbitrary values.
+  // The only method that can access this function is the
+  // HeaderMapImpl::HeaderEntryImpl::valueForTest() method. However because there is no C++ syntax
+  // to declare a method of a nested class a friend, we have to grant friendship to the enclosing
+  // class HeaderMapImpl.
+  friend class HeaderMapImpl;
+  void setCopyForTest(absl::string_view view);
+
   /**
    * @return the type of backing storage for the string.
    */
@@ -275,6 +283,11 @@ public:
   virtual HeaderString& value() PURE;
 
 private:
+  // Test only method that does not have validation and allows setting arbitrary values.
+  // Made private with friend declarations to prevent use outside of tests.
+  template <typename, typename> friend class TestHeaderMapImplBase;
+  virtual void valueForTest(absl::string_view view) PURE;
+
   void value(const char*); // Do not allow auto conversion to std::string
 };
 

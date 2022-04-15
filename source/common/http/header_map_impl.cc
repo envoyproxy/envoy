@@ -169,6 +169,16 @@ void HeaderString::setReference(absl::string_view ref_value) {
   ASSERT(valid());
 }
 
+void HeaderString::setCopyForTest(absl::string_view view) {
+  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
+    // Switching from Type::Reference to Type::Inline
+    buffer_ = InlineHeaderVector();
+  }
+
+  getInVec(buffer_).reserve(view.size());
+  getInVec(buffer_).assign(view.data(), view.data() + view.size());
+}
+
 uint32_t HeaderString::size() const {
   if (type() == Type::Reference) {
     return getStrView(buffer_).size();
@@ -246,6 +256,10 @@ HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(HeaderString&& key, HeaderString
     : key_(std::move(key)), value_(std::move(value)) {}
 
 void HeaderMapImpl::HeaderEntryImpl::value(absl::string_view value) { value_.setCopy(value); }
+
+void HeaderMapImpl::HeaderEntryImpl::valueForTest(absl::string_view value) {
+  value_.setCopyForTest(value);
+}
 
 void HeaderMapImpl::HeaderEntryImpl::value(uint64_t value) { value_.setInteger(value); }
 

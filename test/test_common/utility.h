@@ -1060,6 +1060,12 @@ public:
   }
   StatefulHeaderKeyFormatterOptRef formatter() override { return header_map_->formatter(); }
 
+  void setCopyNoValidation(const LowerCaseString& key, absl::string_view value) {
+    auto entry = header_map_->getExisting(key);
+    ASSERT(!entry.empty());
+    entry[0]->valueForTest(value);
+  }
+
   std::unique_ptr<Impl> header_map_{Impl::create()};
 };
 

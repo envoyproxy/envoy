@@ -123,6 +123,9 @@ protected:
     HeaderString key_;
     HeaderString value_;
     std::list<HeaderEntryImpl>::iterator entry_;
+
+  private:
+    void valueForTest(absl::string_view view) override;
   };
   using HeaderNode = std::list<HeaderEntryImpl>::iterator;
 
@@ -323,6 +326,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
 
+  template <typename, typename> friend class TestHeaderMapImplBase;
   HeaderMap::NonConstGetResult getExisting(absl::string_view key);
   size_t removeExisting(absl::string_view key);
 
