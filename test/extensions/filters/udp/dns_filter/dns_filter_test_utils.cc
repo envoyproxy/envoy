@@ -105,7 +105,7 @@ DnsQueryContextPtr DnsResponseValidator::createResponseContext(Network::UdpRecvD
                                                                DnsParserCounters& counters) {
   DnsQueryContextPtr query_context = std::make_unique<DnsQueryContext>(
       client_request.addresses_.local_, client_request.addresses_.peer_, counters, 1);
-  query_context->parse_status_ = validateDnsResponeObject(query_context, client_request.buffer_);
+  query_context->parse_status_ = validateDnsResponseObject(query_context, client_request.buffer_);
   if (!query_context->parse_status_) {
     query_context->response_code_ = DNS_RESPONSE_CODE_FORMAT_ERROR;
     ENVOY_LOG(debug, "Unable to parse query buffer from '{}' into a DNS object",
@@ -114,8 +114,8 @@ DnsQueryContextPtr DnsResponseValidator::createResponseContext(Network::UdpRecvD
   return query_context;
 }
 
-bool DnsResponseValidator::validateDnsResponeObject(DnsQueryContextPtr& context,
-                                                    const Buffer::InstancePtr& buffer) {
+bool DnsResponseValidator::validateDnsResponseObject(DnsQueryContextPtr& context,
+                                                     const Buffer::InstancePtr& buffer) {
   static constexpr uint64_t field_size = sizeof(uint16_t);
   size_t available_bytes = buffer->length();
   uint64_t offset = 0;

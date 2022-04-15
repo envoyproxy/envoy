@@ -50,14 +50,15 @@ public:
    * @param client_request a structure containing addressing information and the buffer received
    * from a client
    */
-  DnsQueryContextPtr createResponseContext(Network::UdpRecvData& client_request,
-                                           DnsParserCounters& counters);
+  static DnsQueryContextPtr createResponseContext(Network::UdpRecvData& client_request,
+                                                  DnsParserCounters& counters);
 
   /**
    * @param buffer a reference to the incoming DNS response object
    * @return bool true if all DNS records and flags were successfully parsed from the buffer
    */
-  bool validateDnsResponeObject(DnsQueryContextPtr& context, const Buffer::InstancePtr& buffer);
+  static bool validateDnsResponseObject(DnsQueryContextPtr& context,
+                                        const Buffer::InstancePtr& buffer);
 
   /**
    * @brief Extracts a DNS query name from a buffer
@@ -67,8 +68,8 @@ public:
    * @param name_offset the offset from which parsing begins and ends. The updated value is
    * returned to the caller
    */
-  const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer, uint64_t& available_bytes,
-                                       uint64_t& name_offset);
+  static const std::string parseDnsNameRecord(const Buffer::InstancePtr& buffer,
+                                              uint64_t& available_bytes, uint64_t& name_offset);
 
   /**
    * @brief parse an A or AAAA DNS Record
@@ -78,7 +79,7 @@ public:
    answer
    * record
    */
-  DnsAnswerRecordPtr parseDnsARecord(DnsAnswerCtx& ctx);
+  static DnsAnswerRecordPtr parseDnsARecord(DnsAnswerCtx& ctx);
 
   /**
    * @brief parse a Server Selection (SRV) DNS Record
@@ -86,7 +87,7 @@ public:
    * @param context the query context for which we are generating a response
    * @return DnsSrvRecordPtr a pointer to a DnsSrvRecord object containing the parsed server record
    */
-  DnsSrvRecordPtr parseDnsSrvRecord(DnsAnswerCtx& ctx);
+  static DnsSrvRecordPtr parseDnsSrvRecord(DnsAnswerCtx& ctx);
 
   /**
    * @brief parse a single answer record from a client request or filter response
@@ -97,7 +98,8 @@ public:
    * @return DnsQueryRecordPtr a pointer to a DnsAnswerRecord object containing all query and
    * answer data parsed from the buffer
    */
-  DnsAnswerRecordPtr parseDnsAnswerRecord(const Buffer::InstancePtr& buffer, uint64_t& offset);
+  static DnsAnswerRecordPtr parseDnsAnswerRecord(const Buffer::InstancePtr& buffer,
+                                                 uint64_t& offset);
 
   /**
    * @brief Parse answer records using a single function. Answer records follow a common format
@@ -109,8 +111,8 @@ public:
    * @param offset a reference to an index into the buffer indicating the position where reading may
    * begin
    */
-  bool parseAnswerRecords(DnsAnswerMap& answers, const uint16_t answer_count,
-                          const Buffer::InstancePtr& buffer, uint64_t& offset);
+  static bool parseAnswerRecords(DnsAnswerMap& answers, const uint16_t answer_count,
+                                 const Buffer::InstancePtr& buffer, uint64_t& offset);
 
 private:
   enum class DnsQueryParseState {
