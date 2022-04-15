@@ -470,10 +470,10 @@ public:
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
    * values, e.g. an int32 set to 0 or a bool set to false.
-   * @return ProtobufUtil::StatusOr<std::string> of formatted JSON object, or an error status if
-   * conversion fails.
+   * @return absl::variant<std::string, ProtobufUtil::Status> of formatted JSON object, or an error
+   * status if conversion fails.
    */
-  static ProtobufUtil::StatusOr<std::string>
+  static absl::variant<std::string, ProtobufUtil::Status>
   getJsonStringFromMessage(const Protobuf::Message& message, bool pretty_print = false,
                            bool always_print_primitive_fields = false);
 
@@ -492,8 +492,9 @@ public:
                                                    bool always_print_primitive_fields = false) {
     auto json_or_error =
         getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
-    RELEASE_ASSERT(json_or_error.ok(), json_or_error.status().ToString());
-    return std::move(json_or_error).value();
+    RELEASE_ASSERT(absl::holds_alternative<std::string>(json_or_error),
+                   absl::get<ProtobufUtil::Status>(json_or_error).ToString());
+    return absl::get<std::string>(std::move(json_or_error));
   }
 
   /**

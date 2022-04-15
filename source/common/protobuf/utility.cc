@@ -496,11 +496,12 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
                                                   const bool always_print_primitive_fields) {
 
   auto json_or_error = getJsonStringFromMessage(message, false, always_print_primitive_fields);
-  if (!json_or_error.ok()) {
-    throw EnvoyException(json_or_error.status().ToString());
+  if (absl::holds_alternative<ProtobufUtil::Status>(json_or_error)) {
+    ASSERT(!absl::get<ProtobufUtil::Status>(json_or_error).ok());
+    throw EnvoyException(absl::get<ProtobufUtil::Status>(json_or_error).ToString());
   }
   YAML::Node node;
-  TRY_ASSERT_MAIN_THREAD { node = YAML::Load(json_or_error.value()); }
+  TRY_ASSERT_MAIN_THREAD { node = YAML::Load(absl::get<std::string>(json_or_error)); }
   END_TRY
   catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
@@ -520,7 +521,7 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
   return out.c_str();
 }
 
-ProtobufUtil::StatusOr<std::string>
+absl::variant<std::string, ProtobufUtil::Status>
 MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
                                       const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
@@ -549,9 +550,10 @@ std::string MessageUtil::getJsonStringFromMessageOrError(const Protobuf::Message
                                                          bool always_print_primitive_fields) {
   auto json_or_error =
       getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
-  return json_or_error.ok() ? std::move(json_or_error).value()
-                            : fmt::format("Failed to convert protobuf message to JSON string: {}",
-                                          json_or_error.status().ToString());
+  return absl::holds_alternative<std::string>(json_or_error)
+             ? absl::get<std::string>(std::move(json_or_error))
+             : fmt::format("Failed to convert protobuf message to JSON string: {}",
+                           absl::get<ProtobufUtil::Status>(json_or_error).ToString());
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
