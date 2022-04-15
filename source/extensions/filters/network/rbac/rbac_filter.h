@@ -21,6 +21,14 @@ struct Result {
   std::string connection_termination_details_;
 };
 
+class NetworkActionValidationVisitor : public Filters::Common::RBAC::ActionValidationVisitor {
+public:
+  absl::Status performDataInputValidation(
+      const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&
+          data_input,
+      absl::string_view type_url) override;
+};
+
 /**
  * Configuration for the RBAC network filter.
  */
@@ -55,7 +63,7 @@ private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
 
-  Filters::Common::RBAC::NetworkActionValidationVisitor validation_visitor_;
+  NetworkActionValidationVisitor validation_visitor_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
   const envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcement_type_;

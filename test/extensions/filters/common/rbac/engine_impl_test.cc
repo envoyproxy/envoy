@@ -451,45 +451,6 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
-// Log tests
-TEST(RoleBasedAccessControlEngineImpl, DisabledLog) {
-  NiceMock<StreamInfo::MockStreamInfo> info;
-  onMetadata(info);
-
-  envoy::config::rbac::v3::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
-  RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
-                                                ProtobufMessage::getStrictValidationVisitor());
-  checkEngine(engine, true, RBAC::LogResult::No, info);
-}
-
-TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
-  envoy::config::rbac::v3::Policy policy;
-  policy.add_permissions()->set_destination_port(123);
-  policy.add_principals()->set_any(true);
-
-  envoy::config::rbac::v3::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
-  (*rbac.mutable_policies())["foo"] = policy;
-  RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
-                                                ProtobufMessage::getStrictValidationVisitor());
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
-  onMetadata(info);
-
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  info.downstream_connection_info_provider_->setLocalAddress(addr);
-  checkEngine(engine, true, RBAC::LogResult::Yes, info, conn, headers);
-
-  addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  info.downstream_connection_info_provider_->setLocalAddress(addr);
-  checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
-}
-
-// Matcher tests
 TEST(RoleBasedAccessControlMatcherEngineImpl, Disabled) {
   xds::type::matcher::v3::Matcher matcher;
 
@@ -589,6 +550,44 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   provider.setLocalAddress(addr);
   checkMatcherEngine(engine, true, info, conn, headers);
+}
+
+// Log tests
+TEST(RoleBasedAccessControlEngineImpl, DisabledLog) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  onMetadata(info);
+
+  envoy::config::rbac::v3::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
+                                                ProtobufMessage::getStrictValidationVisitor());
+  checkEngine(engine, true, RBAC::LogResult::No, info);
+}
+
+TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+
+  envoy::config::rbac::v3::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac,
+                                                ProtobufMessage::getStrictValidationVisitor());
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  onMetadata(info);
+
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  checkEngine(engine, true, RBAC::LogResult::Yes, info, conn, headers);
+
+  addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
+  checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 
 } // namespace
