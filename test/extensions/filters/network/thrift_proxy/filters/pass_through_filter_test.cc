@@ -42,6 +42,7 @@ TEST_F(ThriftPassThroughDecoderFilterTest, AllMethodsAreImplementedTrivially) {
   initialize();
 
   EXPECT_EQ(&filter_callbacks_, filter_->decoderFilterCallbacks());
+  EXPECT_TRUE(filter_->passthroughSupported());
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(request_metadata_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
@@ -133,6 +134,7 @@ TEST_F(ThriftPassThroughEncoderFilterTest, AllMethodsAreImplementedTrivially) {
   initialize();
 
   EXPECT_EQ(&filter_callbacks_, filter_->encoderFilterCallbacks());
+  EXPECT_TRUE(filter_->passthroughSupported());
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(request_metadata_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
@@ -227,6 +229,8 @@ TEST_F(ThriftPassThroughBidirectionFilterTest, AllMethodsAreImplementedTrivially
   initialize();
 
   EXPECT_EQ(&decoder_filter_callbacks_, filter_->decoderFilterCallbacks());
+  EXPECT_TRUE(filter_->decodePassthroughSupported());
+  EXPECT_TRUE(filter_->encodePassthroughSupported());
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->decodeTransportBegin(request_metadata_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->decodeMessageBegin(request_metadata_));

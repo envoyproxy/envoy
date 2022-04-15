@@ -127,7 +127,7 @@ public:
  */
 class EncoderFilterCallbacks : public virtual FilterCallbacks {
 public:
-  virtual ~EncoderFilterCallbacks() override = default;
+  ~EncoderFilterCallbacks() override = default;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
