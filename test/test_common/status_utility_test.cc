@@ -28,20 +28,16 @@ TEST(StatusUtilityTest, ExpectOkForStatusOr) { EXPECT_OK(absl::StatusOr<int>{5})
 
 TEST(StatusUtilityTest, IsOkFailureForStatus) {
   auto err = expectThatOutput(absl::FailedPreconditionError("whatever"), IsOk());
-  EXPECT_THAT(
-      err,
-      AllOf(HasSubstr("Expected: is an object whose property `code` is equal to OK"),
-            HasSubstr("Actual: FAILED_PRECONDITION: whatever"),
-            HasSubstr("whose property `code` is FAILED_PRECONDITION (of type absl::StatusCode)")));
+  EXPECT_THAT(err, AllOf(HasSubstr("Expected: is an object whose property `code` is equal to OK"),
+                         HasSubstr("Actual: FAILED_PRECONDITION: whatever"),
+                         HasSubstr("whose property `code` is FAILED_PRECONDITION")));
 }
 
 TEST(StatusUtilityTest, IsOkFailureForStatusOr) {
   auto err =
       expectThatOutput(absl::StatusOr<int>{absl::FailedPreconditionError("whatever")}, IsOk());
-  EXPECT_THAT(
-      err,
-      HasSubstr("whose property `status` is FAILED_PRECONDITION: whatever (of type absl::Status), "
-                "whose property `code` is FAILED_PRECONDITION (of type absl::StatusCode)"));
+  EXPECT_THAT(err, AllOf(HasSubstr("whose property `status` is FAILED_PRECONDITION: whatever"),
+                         HasSubstr("whose property `code` is FAILED_PRECONDITION")));
 }
 
 TEST(StatusUtilityTest, HasStatusCodeSuccessForStatus) {
@@ -60,22 +56,19 @@ TEST(StatusUtilityTest, HasStatusCodeFailureForStatusOr) {
       err,
       AllOf(
           HasSubstr("Expected: is an object whose property `code` is equal to FAILED_PRECONDITION"),
-          HasSubstr("whose property `status` is OK (of type absl::Status), whose property `code` "
-                    "is OK (of type absl::StatusCode)")));
+          HasSubstr("whose property `status` is OK")));
 }
 
 TEST(StatusUtilityTest, HasStatusMessageFailureForStatus) {
   auto err = expectThatOutput(absl::InvalidArgumentError("oh no"), HasStatusMessage("whatever"));
-  EXPECT_THAT(err, HasSubstr("whose property `message` is \"oh no\" (of type absl::string_view)"));
+  EXPECT_THAT(err, HasSubstr("whose property `message` is \"oh no\""));
 }
 
 TEST(StatusUtilityTest, HasStatusFailureForStatusOr) {
   auto err = expectThatOutput(absl::StatusOr<int>{absl::InvalidArgumentError("oh no")},
                               HasStatus(absl::OkStatus()));
-  EXPECT_THAT(
-      err, AllOf(HasSubstr("Expected: is equal to OK"),
-                 HasSubstr(
-                     "whose property `status` is INVALID_ARGUMENT: oh no (of type absl::Status)")));
+  EXPECT_THAT(err, AllOf(HasSubstr("Expected: is equal to OK"),
+                         HasSubstr("whose property `status` is INVALID_ARGUMENT: oh no")));
 }
 
 TEST(StatusUtilityTest, HasStatusFailureForStatus) {
@@ -101,8 +94,7 @@ TEST(StatusUtilityTest, HasStatusTwoParamsFailureForStatusOr) {
       err,
       AllOf(HasSubstr("Expected: (is an object whose property `code` is equal to OK) and (is an "
                       "object whose property `message` has substring \"whatever\")"),
-            HasSubstr("whose property `status` is INVALID_ARGUMENT: oh no (of type absl::Status), "
-                      "whose property `code` is INVALID_ARGUMENT (of type absl::StatusCode)")));
+            HasSubstr("whose property `status` is INVALID_ARGUMENT: oh no")));
 }
 
 TEST(StatusUtilityTest, HasStatusTwoParamsFailureForStatus) {
@@ -113,7 +105,7 @@ TEST(StatusUtilityTest, HasStatusTwoParamsFailureForStatus) {
       AllOf(HasSubstr("Expected: (is an object whose property `code` is equal to OK) and (is an "
                       "object whose property `message` has substring \"whatever\")"),
             HasSubstr("Actual: INVALID_ARGUMENT: oh no"),
-            HasSubstr("whose property `code` is INVALID_ARGUMENT (of type absl::StatusCode)")));
+            HasSubstr("whose property `code` is INVALID_ARGUMENT")));
 }
 
 TEST(StatusUtilityTest, HasStatusTwoParamsSuccessForStatusOr) {
