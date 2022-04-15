@@ -95,6 +95,7 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
