@@ -1,10 +1,9 @@
 use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::*;
 
-#[no_mangle]
-pub fn _start() {
+proxy_wasm::main! {{
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestStream) });
-}
+}}
 
 struct TestStream;
 
