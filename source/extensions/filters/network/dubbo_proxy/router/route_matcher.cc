@@ -182,8 +182,8 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
   return clusterEntry(random_value);
 }
 
-SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
-                                               Server::Configuration::FactoryContext&)
+SingleRouteMatcher::SingleRouteMatcher(const RouteConfig& config,
+                                       Server::Configuration::ServerFactoryContext&)
     : interface_matcher_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
@@ -193,7 +193,7 @@ SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }
 
-bool SingleRouteMatcherImpl::matchServiceGroup(const RpcInvocationImpl& invocation) const {
+bool SingleRouteMatcher::matchServiceGroup(const RpcInvocationImpl& invocation) const {
   if (!group_.has_value() || group_.value().empty()) {
     return true;
   }
@@ -201,18 +201,18 @@ bool SingleRouteMatcherImpl::matchServiceGroup(const RpcInvocationImpl& invocati
   return invocation.serviceGroup().has_value() && invocation.serviceGroup().value() == group_;
 }
 
-bool SingleRouteMatcherImpl::matchServiceVersion(const RpcInvocationImpl& invocation) const {
+bool SingleRouteMatcher::matchServiceVersion(const RpcInvocationImpl& invocation) const {
   if (!version_.has_value() || version_.value().empty()) {
     return true;
   }
   return invocation.serviceVersion().has_value() && invocation.serviceVersion().value() == version_;
 }
 
-bool SingleRouteMatcherImpl::matchServiceName(const RpcInvocationImpl& invocation) const {
+bool SingleRouteMatcher::matchServiceName(const RpcInvocationImpl& invocation) const {
   return interface_matcher_.match(invocation.serviceName());
 }
 
-SingleRouteMatcherImpl::InterfaceMatcher::InterfaceMatcher(const std::string& interface_name) {
+SingleRouteMatcher::InterfaceMatcher::InterfaceMatcher(const std::string& interface_name) {
   if (interface_name == "*") {
     impl_ = [](const absl::string_view interface) { return !interface.empty(); };
     return;
@@ -236,8 +236,8 @@ SingleRouteMatcherImpl::InterfaceMatcher::InterfaceMatcher(const std::string& in
   };
 }
 
-RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadata,
-                                                  uint64_t random_value) const {
+RouteConstSharedPtr SingleRouteMatcher::route(const MessageMetadata& metadata,
+                                              uint64_t random_value) const {
   ASSERT(metadata.hasInvocationInfo());
   const auto invocation = dynamic_cast<const RpcInvocationImpl*>(&metadata.invocationInfo());
   ASSERT(invocation);
@@ -257,17 +257,16 @@ RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadat
   return nullptr;
 }
 
-MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list,
-                                     Server::Configuration::FactoryContext& context) {
+RouteConfigImpl::RouteConfigImpl(const RouteConfigList& route_config_list,
+                                 Server::Configuration::ServerFactoryContext& context, bool) {
   for (const auto& route_config : route_config_list) {
-    route_matcher_list_.emplace_back(
-        std::make_unique<SingleRouteMatcherImpl>(route_config, context));
+    route_matcher_list_.emplace_back(std::make_unique<SingleRouteMatcher>(route_config, context));
   }
   ENVOY_LOG(debug, "route matcher list size {}", route_matcher_list_.size());
 }
 
-RouteConstSharedPtr MultiRouteMatcher::route(const MessageMetadata& metadata,
-                                             uint64_t random_value) const {
+RouteConstSharedPtr RouteConfigImpl::route(const MessageMetadata& metadata,
+                                           uint64_t random_value) const {
   for (const auto& route_matcher : route_matcher_list_) {
     auto route = route_matcher->route(metadata, random_value);
     if (nullptr != route) {
@@ -277,16 +276,6 @@ RouteConstSharedPtr MultiRouteMatcher::route(const MessageMetadata& metadata,
 
   return nullptr;
 }
-
-class DefaultRouteMatcherConfigFactory : public RouteMatcherFactoryBase<MultiRouteMatcher> {
-public:
-  DefaultRouteMatcherConfigFactory() : RouteMatcherFactoryBase(RouteMatcherType::Default) {}
-};
-
-/**
- * Static registration for the Dubbo protocol. @see RegisterFactory.
- */
-REGISTER_FACTORY(DefaultRouteMatcherConfigFactory, NamedRouteMatcherConfigFactory);
 
 } // namespace Router
 } // namespace DubboProxy
