@@ -515,20 +515,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return ret;
 }
 
-template <class StatType>
-using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
-
-template <class StatType>
-StatTypeOptConstRef<StatType> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
-    StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
-  auto iter = central_cache_map.find(name);
-  if (iter == central_cache_map.end()) {
-    return absl::nullopt;
-  }
-
-  return std::cref(*iter->second);
-}
-
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
     const StatName& name,
     StatNameTagVectorOptConstRef stat_name_tags) ABSL_NO_THREAD_SAFETY_ANALYSIS {

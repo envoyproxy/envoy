@@ -468,7 +468,14 @@ private:
     template <class StatType>
     StatTypeOptConstRef<StatType>
     findStatLockHeld(StatName name,
-                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
+                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
+      auto iter = central_cache_map.find(name);
+      if (iter == central_cache_map.end()) {
+        return absl::nullopt;
+      }
+
+      return std::cref(*iter->second);
+    }
 
     StatName prefix() const override { return prefix_.statName(); }
 
