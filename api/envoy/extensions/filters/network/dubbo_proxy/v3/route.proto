@@ -129,7 +129,7 @@ message MethodMatch {
   map<uint32, ParameterMatchSpecifier> params_match = 2;
 }
 
-message MutipleRouteConfiguration {
+message MultipleRouteConfiguration {
   // The name of the named route configurations. This name is used in asynchronous route discovery.
   string name = 1;
 

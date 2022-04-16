@@ -172,6 +172,11 @@ private:
 };
 using RouteConfigImplPtr = std::unique_ptr<RouteConfigImpl>;
 
+class NullRouteConfigImpl : public Config {
+public:
+  RouteConstSharedPtr route(const MessageMetadata&, uint64_t) const override { return nullptr; }
+};
+
 } // namespace Router
 } // namespace DubboProxy
 } // namespace NetworkFilters
