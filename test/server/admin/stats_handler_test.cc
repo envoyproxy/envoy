@@ -1149,7 +1149,6 @@ protected:
   Stats::SymbolTableImpl symbol_table_;
   Stats::AllocatorImpl alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
-  // Stats::MockSink sink_;
   std::vector<Stats::ScopeSharedPtr> scopes_;
   std::atomic<uint64_t> total_lines_{0};
 };

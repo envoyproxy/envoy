@@ -739,6 +739,11 @@ GaugeOptConstRef ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const
 
 HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   Thread::LockGuard lock(parent_.lock_);
+  return findHistogramLockHeld(name);
+}
+
+HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogramLockHeld(StatName name) const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;

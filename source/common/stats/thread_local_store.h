@@ -191,41 +191,42 @@ public:
 
   CounterOptConstRef findCounter(StatName name) const override {
     CounterOptConstRef found_counter;
-    auto scope_iter = [&found_counter, name](const ScopeSharedPtr& scope) -> bool {
-      found_counter = scope->findCounter(name);
+    iterateScopes([&found_counter,
+                   name](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+      found_counter = scope->findStatLockHeld<Counter>(name, scope->central_cache_->counters_);
       return !found_counter.has_value();
-    };
-    iterateScopes(scope_iter);
+    });
     return found_counter;
   }
 
   GaugeOptConstRef findGauge(StatName name) const override {
     GaugeOptConstRef found_gauge;
-    auto scope_iter = [&found_gauge, name](const ScopeSharedPtr& scope) -> bool {
-      found_gauge = scope->findGauge(name);
+    iterateScopes([&found_gauge,
+                   name](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+      found_gauge = scope->findStatLockHeld<Gauge>(name, scope->central_cache_->gauges_);
       return !found_gauge.has_value();
-    };
-    iterateScopes(scope_iter);
+    });
     return found_gauge;
   }
 
   HistogramOptConstRef findHistogram(StatName name) const override {
     HistogramOptConstRef found_histogram;
-    auto scope_iter = [&found_histogram, name](const ScopeSharedPtr& scope) -> bool {
-      found_histogram = scope->findHistogram(name);
-      return !found_histogram.has_value();
-    };
-    iterateScopes(scope_iter);
+    iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope)
+                      ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+                        found_histogram = scope->findHistogramLockHeld(name);
+                        return !found_histogram.has_value();
+                      });
     return found_histogram;
   }
 
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     TextReadoutOptConstRef found_text_readout;
-    auto scope_iter = [&found_text_readout, name](const ScopeSharedPtr& scope) -> bool {
-      found_text_readout = scope->findTextReadout(name);
+    iterateScopes([&found_text_readout,
+                   name](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+      found_text_readout =
+          scope->findStatLockHeld<TextReadout>(name, scope->central_cache_->text_readouts_);
       return !found_text_readout.has_value();
-    };
-    iterateScopes(scope_iter);
+    });
     return found_text_readout;
   }
 
@@ -385,18 +386,35 @@ private:
 
     bool iterate(const IterateFn<Counter>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
-      return iterHelper(fn, central_cache_->counters_);
+      return iterateLockHeld(fn);
     }
     bool iterate(const IterateFn<Gauge>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
-      return iterHelper(fn, central_cache_->gauges_);
+      return iterateLockHeld(fn);
     }
     bool iterate(const IterateFn<Histogram>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
-      return iterHelper(fn, central_cache_->histograms_);
+      return iterateLockHeld(fn);
     }
     bool iterate(const IterateFn<TextReadout>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
+      return iterateLockHeld(fn);
+    }
+
+    bool iterateLockHeld(const IterateFn<Counter>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      return iterHelper(fn, central_cache_->counters_);
+    }
+    bool iterateLockHeld(const IterateFn<Gauge>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      return iterHelper(fn, central_cache_->gauges_);
+    }
+    bool iterateLockHeld(const IterateFn<Histogram>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      return iterHelper(fn, central_cache_->histograms_);
+    }
+    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       return iterHelper(fn, central_cache_->text_readouts_);
     }
 
@@ -406,6 +424,8 @@ private:
     GaugeOptConstRef findGauge(StatName name) const override;
     HistogramOptConstRef findHistogram(StatName name) const override;
     TextReadoutOptConstRef findTextReadout(StatName name) const override;
+
+    HistogramOptConstRef findHistogramLockHeld(StatName name) const;
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(
@@ -496,7 +516,9 @@ private:
   }
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
-    return iterateScopes([fn](const ScopeSharedPtr& scope) -> bool { return scope->iterate(fn); });
+    return iterateScopes(
+        [fn](const ScopeImplSharedPtr& scope)
+            ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool { return scope->iterateLockHeld(fn); });
   }
 
   StatName prefix() const override { return StatName(); }
