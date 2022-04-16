@@ -48,8 +48,8 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
 }
 
 void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
-  iterateScopes([](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
-    ASSERT(scope->central_cache_->histograms_.empty());
+  iterateScopes([](const ScopeImplSharedPtr& scope) -> bool {
+    ASSERT(scope->centralCacheLockHeld()->histograms_.empty());
     return true;
   });
   histogram_settings_ = std::move(histogram_settings);
@@ -69,6 +69,8 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   const uint32_t first_histogram_index = deleted_histograms_.size();
   iterateScopesLockHeld(
       [this](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+        // Thread annotation analysis can't determine that
+        // lock_==scope->parent_.lock_ so we must disable analysis.
         removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
                                               [this](const CounterSharedPtr& counter) mutable {
                                                 alloc_.markCounterForDeletion(counter);
@@ -253,8 +255,12 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
   rejected_stats_.free(symbol_table_);
 }
 
-void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope)
-    ABSL_NO_THREAD_SAFETY_ANALYSIS {
+void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
+  // ABSL_NO_THREAD_SAFETY_ANALYSIS {
+  // Thread annotation analysis can't determine that
+  // lock_==scope->parent_.lock_ so we just disable analysis to avoid error on referencing
+  // scope->central_cache_ below.
+
   Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
@@ -286,7 +292,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope)
     // VirtualHosts.
     bool need_post = scopes_to_cleanup_.empty();
     scopes_to_cleanup_.push_back(scope->scope_id_);
-    central_cache_entries_to_cleanup_.push_back(scope->central_cache_);
+    central_cache_entries_to_cleanup_.push_back(scope->centralCacheLockHeld());
     lock.release();
 
     if (need_post) {
@@ -517,7 +523,13 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
     const StatName& name,
-    StatNameTagVectorOptConstRef stat_name_tags) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    StatNameTagVectorOptConstRef stat_name_tags) { //ABSL_NO_THREAD_SAFETY_ANALYSIS {
+  // We must disable thread safety analysis due to passing
+  // central_cache_->counters_ by reference without lock below. safeMakeStat
+  // will take the parent_.lock_ prior to derferencing the central cache, so
+  // this is safe. See -Wthread-safety-reference in
+  // https://clang.llvm.org/docs/ThreadSafetyAnalysis.html.
+
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -541,9 +553,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
     tls_rejected_stats = &entry.rejected_stats_;
   }
 
+  const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   return safeMakeStat<Counter>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
-      fast_reject_result, central_cache_->rejected_stats_,
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache->counters_,
+      fast_reject_result, central_cache->rejected_stats_,
       [](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_extracted_name, tags);
@@ -570,6 +583,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+  // See safety analysis comment in counterFromStatNameWithTags above.
+
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -607,6 +622,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Histogram::Unit unit) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+  // See safety analysis comment in counterFromStatNameWithTags above.
+
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -680,6 +697,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
     const StatName& name,
     StatNameTagVectorOptConstRef stat_name_tags) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+  // See safety analysis comment in counterFromStatNameWithTags above.
+
   if (parent_.rejectsAll()) {
     return parent_.null_text_readout_;
   }

@@ -192,8 +192,8 @@ public:
   CounterOptConstRef findCounter(StatName name) const override {
     CounterOptConstRef found_counter;
     iterateScopes([&found_counter,
-                   name](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
-      found_counter = scope->findStatLockHeld<Counter>(name, scope->central_cache_->counters_);
+                   name](const ScopeImplSharedPtr& scope) -> bool {
+      found_counter = scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
       return !found_counter.has_value();
     });
     return found_counter;
@@ -202,8 +202,8 @@ public:
   GaugeOptConstRef findGauge(StatName name) const override {
     GaugeOptConstRef found_gauge;
     iterateScopes([&found_gauge,
-                   name](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
-      found_gauge = scope->findStatLockHeld<Gauge>(name, scope->central_cache_->gauges_);
+                   name](const ScopeImplSharedPtr& scope) -> bool {
+      found_gauge = scope->findStatLockHeld<Gauge>(name, scope->centralCacheLockHeld()->gauges_);
       return !found_gauge.has_value();
     });
     return found_gauge;
@@ -211,20 +211,19 @@ public:
 
   HistogramOptConstRef findHistogram(StatName name) const override {
     HistogramOptConstRef found_histogram;
-    iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope)
-                      ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
-                        found_histogram = scope->findHistogramLockHeld(name);
-                        return !found_histogram.has_value();
-                      });
+    iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope) -> bool {
+      found_histogram = scope->findHistogramLockHeld(name);
+      return !found_histogram.has_value();
+    });
     return found_histogram;
   }
 
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     TextReadoutOptConstRef found_text_readout;
     iterateScopes([&found_text_readout,
-                   name](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+                   name](const ScopeImplSharedPtr& scope) -> bool {
       found_text_readout =
-          scope->findStatLockHeld<TextReadout>(name, scope->central_cache_->text_readouts_);
+          scope->findStatLockHeld<TextReadout>(name, scope->centralCacheLockHeld()->text_readouts_);
       return !found_text_readout.has_value();
     });
     return found_text_readout;
@@ -401,21 +400,17 @@ private:
       return iterateLockHeld(fn);
     }
 
-    bool iterateLockHeld(const IterateFn<Counter>& fn) const
-        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, central_cache_->counters_);
+    bool iterateLockHeld(const IterateFn<Counter>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->counters_);
     }
-    bool iterateLockHeld(const IterateFn<Gauge>& fn) const
-        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, central_cache_->gauges_);
+    bool iterateLockHeld(const IterateFn<Gauge>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->gauges_);
     }
-    bool iterateLockHeld(const IterateFn<Histogram>& fn) const
-        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, central_cache_->histograms_);
+    bool iterateLockHeld(const IterateFn<Histogram>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->histograms_);
     }
-    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const
-        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, central_cache_->text_readouts_);
+    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
     }
 
     // NOTE: The find methods assume that `name` is fully-qualified.
@@ -479,6 +474,25 @@ private:
 
     StatName prefix() const override { return prefix_.statName(); }
 
+    // Returns the Central Cache, asserting that the parent lock is held.
+    //
+    // When a ThreadLocalStore method takes lock_ and then accesses
+    // scope->central_cache_, the analysis system cannot understand that the
+    // scope's parent_.lock_ is held, so we assert that here.
+    const CentralCacheEntrySharedPtr& centralCacheLockHeld() const
+        ABSL_ASSERT_EXCLUSIVE_LOCK(parent_.lock_) {
+      return central_cache_;
+    }
+
+    // Returns the central cache, bypassing thread analysis. This is used only
+    // when passing references to maps held in the central cache to
+    // safeMakeStat, which only takes the lock if those maps are actually
+    // referenced.
+    const CentralCacheEntrySharedPtr& centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      return central_cache_;
+    }
+
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
@@ -524,8 +538,7 @@ private:
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
     return iterateScopes(
-        [fn](const ScopeImplSharedPtr& scope)
-            ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool { return scope->iterateLockHeld(fn); });
+        [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
   }
 
   StatName prefix() const override { return StatName(); }
