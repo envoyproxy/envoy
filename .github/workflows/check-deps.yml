@@ -12,7 +12,7 @@ jobs:
     if: github.repository_owner == 'envoyproxy'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
         with:
           ref: ${{ github.head_ref }}
       - name: Set up Python ${{ matrix.python-version }}
