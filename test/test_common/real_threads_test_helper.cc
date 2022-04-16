@@ -50,7 +50,7 @@ void RealThreadsTestHelper::shutdownThreading() {
   });
 }
 
-void RealThreadsTestHelper::exitThreads() {
+void RealThreadsTestHelper::exitThreads(std::function<void()> cleanup) {
   for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
     dispatcher->post([&dispatcher]() { dispatcher->exit(); });
   }
@@ -59,7 +59,10 @@ void RealThreadsTestHelper::exitThreads() {
     thread->join();
   }
 
-  main_dispatcher_->post([this]() {
+  main_dispatcher_->post([this, cleanup]() {
+    if (cleanup != nullptr) {
+      cleanup();
+    }
     tls_.reset();
     main_dispatcher_->exit();
   });

@@ -3,12 +3,15 @@
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 #include "source/server/admin/stats_handler.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/utility.h"
 
 using testing::EndsWith;
@@ -1070,6 +1073,99 @@ TEST_P(AdminStatsTest, SortedHistograms) {
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});
   }
+}
+
+class ThreadedTest : public testing::Test {
+ protected:
+  static constexpr uint32_t NumThreads = 10;
+  static constexpr uint32_t NumScopes = 100;
+  static constexpr uint32_t NumStatsPerScope = 20;
+  static constexpr uint32_t NumIters = 5;
+
+  ThreadedTest()
+      : real_threads_(NumThreads),
+        alloc_(symbol_table_),
+        store_(std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_)) {
+    //store_->addSink(sink_);
+    for (uint32_t i = 0; i < NumScopes; ++i) {
+      scopes_.push_back(nullptr);
+    }
+    real_threads_.runOnMainBlocking([this]() {
+      store_->initializeThreading(real_threads_.mainDispatcher(), real_threads_.tls());
+    });
+  }
+
+  ~ThreadedTest() override {
+    shutdownThreading();
+    real_threads_.exitThreads([this](){
+      scopes_.clear();
+      store_.reset();
+    });
+  }
+
+  void shutdownThreading() {
+    real_threads_.runOnMainBlocking([this]() {
+      ThreadLocal::Instance& tls = real_threads_.tls();
+      if (!tls.isShutdown()) {
+        tls.shutdownGlobalThreading();
+      }
+      store_->shutdownThreading();
+      tls.shutdownThread();
+    });
+  }
+
+  void addStats() {
+    // Benchmark will be 10k clusters each with 100 counters, with 100+
+    // character names. The first counter in each scope will be given a value so
+    // it will be included in 'usedonly'.
+    ASSERT_EQ(NumScopes, scopes_.size());
+    for (uint32_t s = 0; s < NumScopes; ++s) {
+      Stats::ScopeSharedPtr scope = store_->createScope(absl::StrCat("scope_", s));
+      scopes_[s] = scope;
+      for (uint32_t c = 0; c < NumStatsPerScope; ++c) {
+        std::string name = absl::StrCat("c", "_", c);
+        Stats::Counter& counter = scope->counterFromString(name);
+        if (c == 0) {
+          counter.inc();
+        }
+      }
+    }
+  }
+
+  void statsEndpoint() {
+    StatsRequest request(*store_, false, false, Utility::HistogramBucketsMode::NoBuckets,
+                         absl::nullopt);
+    Http::TestResponseHeaderMapImpl response_headers;
+    request.start(response_headers);
+    Buffer::OwnedImpl data;
+    while (request.nextChunk(data)) {
+    }
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+      absl::string_view str(static_cast<const char*>(slice.mem_), slice.len_);
+      total_lines_ += std::count_if(str.begin(), str.end(), [](char c) { return c == '\n'; });
+    }
+  }
+
+  Thread::RealThreadsTestHelper real_threads_;
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::AllocatorImpl alloc_;
+  std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  //Stats::MockSink sink_;
+  std::vector<Stats::ScopeSharedPtr> scopes_;
+  std::atomic<uint64_t> total_lines_{0};
+};
+
+TEST_F(ThreadedTest, Threaded) {
+  const uint32_t num_iters = 5;
+  real_threads_.runOnAllWorkersBlocking([this]() {
+    for (uint32_t i = 0; i < num_iters; ++i) {
+      addStats();
+      statsEndpoint();
+    }
+  });
+  uint32_t expected = NumThreads * NumScopes * NumStatsPerScope * NumIters;
+  EXPECT_GE(expected, total_lines_);
+  EXPECT_LE(expected/2, total_lines_);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,

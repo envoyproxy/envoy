@@ -188,49 +188,45 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
+
   CounterOptConstRef findCounter(StatName name) const override {
     CounterOptConstRef found_counter;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
+    auto scope_iter = [&found_counter, name](const ScopeSharedPtr& scope) -> bool {
       found_counter = scope->findCounter(name);
-      if (found_counter.has_value()) {
-        return found_counter;
-      }
-    }
-    return absl::nullopt;
+      return !found_counter.has_value();
+    };
+    iterateScopes(scope_iter);
+    return found_counter;
   }
+
   GaugeOptConstRef findGauge(StatName name) const override {
     GaugeOptConstRef found_gauge;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
+    auto scope_iter = [&found_gauge, name](const ScopeSharedPtr& scope) -> bool {
       found_gauge = scope->findGauge(name);
-      if (found_gauge.has_value()) {
-        return found_gauge;
-      }
-    }
-    return absl::nullopt;
+      return !found_gauge.has_value();
+    };
+    iterateScopes(scope_iter);
+    return found_gauge;
   }
+
   HistogramOptConstRef findHistogram(StatName name) const override {
     HistogramOptConstRef found_histogram;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
+    auto scope_iter = [&found_histogram, name](const ScopeSharedPtr& scope) -> bool {
       found_histogram = scope->findHistogram(name);
-      if (found_histogram.has_value()) {
-        return found_histogram;
-      }
-    }
-    return absl::nullopt;
+      return !found_histogram.has_value();
+    };
+    iterateScopes(scope_iter);
+    return found_histogram;
   }
+
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     TextReadoutOptConstRef found_text_readout;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
+    auto scope_iter = [&found_text_readout, name](const ScopeSharedPtr& scope) -> bool {
       found_text_readout = scope->findTextReadout(name);
-      if (found_text_readout.has_value()) {
-        return found_text_readout;
-      }
-    }
-    return absl::nullopt;
+      return !found_text_readout.has_value();
+    };
+    iterateScopes(scope_iter);
+    return found_text_readout;
   }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
@@ -388,15 +384,19 @@ private:
     }
 
     bool iterate(const IterateFn<Counter>& fn) const override {
+      Thread::LockGuard lock(parent_.lock_);
       return iterHelper(fn, central_cache_->counters_);
     }
     bool iterate(const IterateFn<Gauge>& fn) const override {
+      Thread::LockGuard lock(parent_.lock_);
       return iterHelper(fn, central_cache_->gauges_);
     }
     bool iterate(const IterateFn<Histogram>& fn) const override {
+      Thread::LockGuard lock(parent_.lock_);
       return iterHelper(fn, central_cache_->histograms_);
     }
     bool iterate(const IterateFn<TextReadout>& fn) const override {
+      Thread::LockGuard lock(parent_.lock_);
       return iterHelper(fn, central_cache_->text_readouts_);
     }
 
@@ -455,7 +455,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    mutable CentralCacheEntrySharedPtr central_cache_;
+    mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -476,20 +476,29 @@ private:
     absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> tls_histogram_cache_;
   };
 
-  template <class StatFn> bool iterHelper(StatFn fn) const {
-    // Note that any thread can delete a scope at any time, and so another
-    // thread may have initiated destruction when we enter `iterHelper`.
-    // However the first thing that happens is releaseScopeCrossThread, which
-    // takes lock_, and doesn't release it until scopes_.erase(scope) finishes.
-    // thus there is no race risk with iterating over scopes while another
-    // thread deletes them.
+  using ScopeImplSharedPtr = std::shared_ptr<ScopeImpl>;
+
+  bool iterateScopes(const std::function<bool(const ScopeImplSharedPtr&)> fn) const {
     Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
-      if (!scope->iterate(fn)) {
+    return iterateScopesLockHeld(fn);
+  }
+
+  bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    for (auto& iter : scopes_) {
+      const std::weak_ptr<ScopeImpl>& scope  = iter.second;
+      const ScopeImplSharedPtr& locked = scope.lock();
+      if (locked != nullptr && !fn(locked)) {
         return false;
       }
     }
     return true;
+  }
+
+  template <class StatFn> bool iterHelper(StatFn fn) const {
+    return iterateScopes([fn](const ScopeSharedPtr& scope) -> bool {
+      return scope->iterate(fn);
+    });
   }
 
   StatName prefix() const override { return StatName(); }
@@ -519,7 +528,7 @@ private:
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
   ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
+  absl::flat_hash_map<ScopeImpl*, std::weak_ptr<ScopeImpl>> scopes_ ABSL_GUARDED_BY(lock_);
   ScopeSharedPtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;

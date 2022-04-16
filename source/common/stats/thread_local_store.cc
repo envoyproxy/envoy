@@ -47,11 +47,12 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(histograms_to_cleanup_.empty());
 }
 
-void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
+void ThreadLocalStoreImpl::setHistogramSettings(
+    HistogramSettingsConstPtr&& histogram_settings) {
+  iterateScopes([](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
     ASSERT(scope->central_cache_->histograms_.empty());
-  }
+    return true;
+  });
   histogram_settings_ = std::move(histogram_settings);
 }
 
@@ -67,7 +68,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   // be no copies in TLS caches.
   Thread::LockGuard lock(lock_);
   const uint32_t first_histogram_index = deleted_histograms_.size();
-  for (ScopeImpl* scope : scopes_) {
+  iterateScopesLockHeld([this](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool{
     removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
                                           [this](const CounterSharedPtr& counter) mutable {
                                             alloc_.markCounterForDeletion(counter);
@@ -81,7 +82,8 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
         [this](const TextReadoutSharedPtr& text_readout) mutable {
           alloc_.markTextReadoutForDeletion(text_readout);
         });
-  }
+    return true;
+  });
 
   // Remove any newly rejected histograms from histogram_set_.
   {
@@ -151,7 +153,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
   auto new_scope = std::make_shared<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
-  scopes_.emplace(new_scope.get());
+  scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
   return new_scope;
 }
 
@@ -251,7 +253,8 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
   rejected_stats_.free(symbol_table_);
 }
 
-void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
+void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope)
+    ABSL_NO_THREAD_SAFETY_ANALYSIS {
   Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
@@ -527,7 +530,8 @@ StatTypeOptConstRef<StatType> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags)
+    ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -579,7 +583,7 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
-    Gauge::ImportMode import_mode) {
+    Gauge::ImportMode import_mode) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -615,7 +619,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit)
+    ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -687,7 +692,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags)
+    ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_text_readout_;
   }
@@ -722,14 +728,17 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
 }
 
 CounterOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+  Thread::LockGuard lock(parent_.lock_);
   return findStatLockHeld<Counter>(name, central_cache_->counters_);
 }
 
 GaugeOptConstRef ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+  Thread::LockGuard lock(parent_.lock_);
   return findStatLockHeld<Gauge>(name, central_cache_->gauges_);
 }
 
 HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+  Thread::LockGuard lock(parent_.lock_);
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;
@@ -740,6 +749,7 @@ HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName nam
 }
 
 TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName name) const {
+  Thread::LockGuard lock(parent_.lock_);
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
@@ -972,11 +982,14 @@ void ThreadLocalStoreImpl::forEachHistogram(SizeFn f_size, StatFn<ParentHistogra
 
 void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
                                         StatFn<const Scope> f_scope) const {
-  Thread::LockGuard lock(lock_);
-  if (f_size != nullptr) {
-    f_size(scopes_.size());
-  }
-  for (ScopeImpl* scope : scopes_) {
+  std::vector<ScopeSharedPtr> scopes;
+  iterateScopes([&scopes](const ScopeImplSharedPtr& scope) -> bool {
+    scopes.push_back(scope);
+    return true;
+  });
+
+  f_size(scopes.size());
+  for (const ScopeSharedPtr& scope : scopes) {
     f_scope(*scope);
   }
 }
