@@ -516,12 +516,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
-  // We must disable thread safety analysis due to passing
-  // central_cache_->counters_ by reference without lock below. safeMakeStat
-  // will take the parent_.lock_ prior to dereferencing the central cache, so
-  // this is safe. See -Wthread-safety-reference in
-  // https://clang.llvm.org/docs/ThreadSafetyAnalysis.html.
-
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
