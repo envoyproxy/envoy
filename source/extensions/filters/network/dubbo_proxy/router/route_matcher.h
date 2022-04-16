@@ -6,10 +6,12 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/type/v3/range.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/config/utility.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
@@ -17,10 +19,6 @@
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 #include "absl/types/optional.h"
-
-#include "envoy/server/filter_config.h"
-
-#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {
