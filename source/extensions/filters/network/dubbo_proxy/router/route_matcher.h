@@ -128,7 +128,7 @@ private:
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 
-class SingleRouteMatcher : public Logger::Loggable<Logger::Id::dubbo> {
+class SingleRouteMatcherImpl : public Logger::Loggable<Logger::Id::dubbo> {
 public:
   class InterfaceMatcher {
   public:
@@ -140,8 +140,8 @@ public:
   };
 
   using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration;
-  SingleRouteMatcher(const RouteConfig& config,
-                     Server::Configuration::ServerFactoryContext& context);
+  SingleRouteMatcherImpl(const RouteConfig& config,
+                         Server::Configuration::ServerFactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
@@ -155,7 +155,7 @@ private:
   const absl::optional<std::string> group_;
   const absl::optional<std::string> version_;
 };
-using SingleRouteMatcherPtr = std::unique_ptr<SingleRouteMatcher>;
+using SingleRouteMatcherImplPtr = std::unique_ptr<SingleRouteMatcherImpl>;
 
 class RouteConfigImpl : public Config, public Logger::Loggable<Logger::Id::dubbo> {
 public:
@@ -163,12 +163,12 @@ public:
       envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration>;
   RouteConfigImpl(const RouteConfigList& route_config_list,
                   Server::Configuration::ServerFactoryContext& context,
-                  bool validate_clusters_default);
+                  bool validate_clusters_default = false);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
-  std::vector<SingleRouteMatcherPtr> route_matcher_list_;
+  std::vector<SingleRouteMatcherImplPtr> route_matcher_list_;
 };
 using RouteConfigImplPtr = std::unique_ptr<RouteConfigImpl>;
 
