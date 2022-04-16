@@ -1116,7 +1116,10 @@ protected:
     ASSERT_EQ(NumScopes, scopes_.size());
     for (uint32_t s = 0; s < NumScopes; ++s) {
       Stats::ScopeSharedPtr scope = store_->createScope(absl::StrCat("scope_", s));
-      scopes_[s] = scope;
+      {
+        absl::MutexLock lock(&scope_mutexes_[s]);
+        scopes_[s] = scope;
+      }
       for (uint32_t c = 0; c < NumStatsPerScope; ++c) {
         std::string name = absl::StrCat("c", "_", c);
         Stats::Counter& counter = scope->counterFromString(name);
@@ -1146,6 +1149,7 @@ protected:
   Stats::AllocatorImpl alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
   std::vector<Stats::ScopeSharedPtr> scopes_;
+  absl::Mutex scope_mutexes_[NumScopes];
   std::atomic<uint64_t> total_lines_{0};
 };
 
