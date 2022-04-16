@@ -494,6 +494,8 @@ private:
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
+
+  private:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
   };
