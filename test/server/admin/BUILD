@@ -107,6 +107,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:admin_lib",
         "//source/server/admin:stats_handler_lib",
+        "//test/mocks/server:admin_stream_mocks",
     ],
 )
 
