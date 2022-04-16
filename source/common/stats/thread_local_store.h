@@ -191,9 +191,9 @@ public:
 
   CounterOptConstRef findCounter(StatName name) const override {
     CounterOptConstRef found_counter;
-    iterateScopes([&found_counter,
-                   name](const ScopeImplSharedPtr& scope) -> bool {
-      found_counter = scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
+    iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
+      found_counter =
+          scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
       return !found_counter.has_value();
     });
     return found_counter;
@@ -201,8 +201,7 @@ public:
 
   GaugeOptConstRef findGauge(StatName name) const override {
     GaugeOptConstRef found_gauge;
-    iterateScopes([&found_gauge,
-                   name](const ScopeImplSharedPtr& scope) -> bool {
+    iterateScopes([&found_gauge, name](const ScopeImplSharedPtr& scope) -> bool {
       found_gauge = scope->findStatLockHeld<Gauge>(name, scope->centralCacheLockHeld()->gauges_);
       return !found_gauge.has_value();
     });
@@ -220,8 +219,7 @@ public:
 
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     TextReadoutOptConstRef found_text_readout;
-    iterateScopes([&found_text_readout,
-                   name](const ScopeImplSharedPtr& scope) -> bool {
+    iterateScopes([&found_text_readout, name](const ScopeImplSharedPtr& scope) -> bool {
       found_text_readout =
           scope->findStatLockHeld<TextReadout>(name, scope->centralCacheLockHeld()->text_readouts_);
       return !found_text_readout.has_value();
@@ -488,10 +486,10 @@ private:
     // when passing references to maps held in the central cache to
     // safeMakeStat, which only takes the lock if those maps are actually
     // referenced.
-    const CentralCacheEntrySharedPtr& centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const CentralCacheEntrySharedPtr&
+    centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
       return central_cache_;
     }
-
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;

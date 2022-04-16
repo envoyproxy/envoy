@@ -69,8 +69,9 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   const uint32_t first_histogram_index = deleted_histograms_.size();
   iterateScopesLockHeld(
       [this](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
-        // Thread annotation analysis can't determine that
-        // lock_==scope->parent_.lock_ so we must disable analysis.
+        // It would be preferable to annotate this with
+        // ABSL_ASSERT_EXCLUSIVE_LOCK(lock_) but thread annotation analysis
+        // fails even with that, so we disable it.
         removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
                                               [this](const CounterSharedPtr& counter) mutable {
                                                 alloc_.markCounterForDeletion(counter);
@@ -256,11 +257,6 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
-  // ABSL_NO_THREAD_SAFETY_ANALYSIS {
-  // Thread annotation analysis can't determine that
-  // lock_==scope->parent_.lock_ so we just disable analysis to avoid error on referencing
-  // scope->central_cache_ below.
-
   Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
@@ -522,11 +518,10 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name,
-    StatNameTagVectorOptConstRef stat_name_tags) { //ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
   // We must disable thread safety analysis due to passing
   // central_cache_->counters_ by reference without lock below. safeMakeStat
-  // will take the parent_.lock_ prior to derferencing the central cache, so
+  // will take the parent_.lock_ prior to dereferencing the central cache, so
   // this is safe. See -Wthread-safety-reference in
   // https://clang.llvm.org/docs/ThreadSafetyAnalysis.html.
 
@@ -582,9 +577,7 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
-    Gauge::ImportMode import_mode) ABSL_NO_THREAD_SAFETY_ANALYSIS {
-  // See safety analysis comment in counterFromStatNameWithTags above.
-
+    Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -607,9 +600,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     tls_rejected_stats = &entry.rejected_stats_;
   }
 
+  const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   Gauge& gauge = safeMakeStat<Gauge>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
-      fast_reject_result, central_cache_->rejected_stats_,
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache->gauges_,
+      fast_reject_result, central_cache->rejected_stats_,
       [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
                     const StatNameTagVector& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
@@ -620,8 +614,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
-    Histogram::Unit unit) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
   // See safety analysis comment in counterFromStatNameWithTags above.
 
   if (parent_.rejectsAll()) {
@@ -654,12 +647,13 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  auto iter = central_cache_->histograms_.find(final_stat_name);
+  const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
+  auto iter = central_cache->histograms_.find(final_stat_name);
   ParentHistogramImplSharedPtr* central_ref = nullptr;
-  if (iter != central_cache_->histograms_.end()) {
+  if (iter != central_cache->histograms_.end()) {
     central_ref = &iter->second;
   } else if (parent_.checkAndRememberRejection(final_stat_name, fast_reject_result,
-                                               central_cache_->rejected_stats_,
+                                               central_cache->rejected_stats_,
                                                tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
@@ -684,7 +678,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       }
     }
 
-    central_ref = &central_cache_->histograms_[stat->statName()];
+    central_ref = &central_cache->histograms_[stat->statName()];
     *central_ref = stat;
   }
 
@@ -695,8 +689,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
-    const StatName& name,
-    StatNameTagVectorOptConstRef stat_name_tags) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
   // See safety analysis comment in counterFromStatNameWithTags above.
 
   if (parent_.rejectsAll()) {
@@ -722,9 +715,10 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
     tls_rejected_stats = &entry.rejected_stats_;
   }
 
+  const CentralCacheEntrySharedPtr& central_cache = centralCacheNoThreadAnalysis();
   return safeMakeStat<TextReadout>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->text_readouts_,
-      fast_reject_result, central_cache_->rejected_stats_,
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache->text_readouts_,
+      fast_reject_result, central_cache->rejected_stats_,
       [](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> TextReadoutSharedPtr {
         return allocator.makeTextReadout(name, tag_extracted_name, tags);
