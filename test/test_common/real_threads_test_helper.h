@@ -58,6 +58,7 @@ public:
 
   // TODO(chaoqin-li1123): make these variables private when we figure out how to clean up the
   // threading resources inside the helper class.
+ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;

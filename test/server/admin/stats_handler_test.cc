@@ -3,7 +3,6 @@
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
-#include "source/common/thread_local/thread_local_impl.h"
 #include "source/server/admin/stats_handler.h"
 #include "source/server/admin/stats_request.h"
 
