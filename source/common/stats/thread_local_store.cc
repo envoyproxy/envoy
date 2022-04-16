@@ -47,8 +47,7 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(histograms_to_cleanup_.empty());
 }
 
-void ThreadLocalStoreImpl::setHistogramSettings(
-    HistogramSettingsConstPtr&& histogram_settings) {
+void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
   iterateScopes([](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
     ASSERT(scope->central_cache_->histograms_.empty());
     return true;
@@ -68,22 +67,23 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   // be no copies in TLS caches.
   Thread::LockGuard lock(lock_);
   const uint32_t first_histogram_index = deleted_histograms_.size();
-  iterateScopesLockHeld([this](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool{
-    removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
-                                          [this](const CounterSharedPtr& counter) mutable {
-                                            alloc_.markCounterForDeletion(counter);
-                                          });
-    removeRejectedStats<GaugeSharedPtr>(
-        scope->central_cache_->gauges_,
-        [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
-    removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
-    removeRejectedStats<TextReadoutSharedPtr>(
-        scope->central_cache_->text_readouts_,
-        [this](const TextReadoutSharedPtr& text_readout) mutable {
-          alloc_.markTextReadoutForDeletion(text_readout);
-        });
-    return true;
-  });
+  iterateScopesLockHeld(
+      [this](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
+        removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
+                                              [this](const CounterSharedPtr& counter) mutable {
+                                                alloc_.markCounterForDeletion(counter);
+                                              });
+        removeRejectedStats<GaugeSharedPtr>(
+            scope->central_cache_->gauges_,
+            [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
+        removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
+        removeRejectedStats<TextReadoutSharedPtr>(
+            scope->central_cache_->text_readouts_,
+            [this](const TextReadoutSharedPtr& text_readout) mutable {
+              alloc_.markTextReadoutForDeletion(text_readout);
+            });
+        return true;
+      });
 
   // Remove any newly rejected histograms from histogram_set_.
   {
@@ -530,8 +530,8 @@ StatTypeOptConstRef<StatType> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags)
-    ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const StatName& name,
+    StatNameTagVectorOptConstRef stat_name_tags) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -619,8 +619,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit)
-    ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
+    Histogram::Unit unit) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -692,8 +692,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 }
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags)
-    ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    const StatName& name,
+    StatNameTagVectorOptConstRef stat_name_tags) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (parent_.rejectsAll()) {
     return parent_.null_text_readout_;
   }

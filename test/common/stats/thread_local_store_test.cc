@@ -1700,7 +1700,7 @@ public:
     // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
     // RealThreadsTestHelper.
     shutdownThreading();
-    exitThreads([this](){ store_.reset(); });
+    exitThreads([this]() { store_.reset(); });
   }
 
   void shutdownThreading() {

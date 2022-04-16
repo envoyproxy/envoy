@@ -486,7 +486,7 @@ private:
   bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     for (auto& iter : scopes_) {
-      const std::weak_ptr<ScopeImpl>& scope  = iter.second;
+      const std::weak_ptr<ScopeImpl>& scope = iter.second;
       const ScopeImplSharedPtr& locked = scope.lock();
       if (locked != nullptr && !fn(locked)) {
         return false;
@@ -496,9 +496,7 @@ private:
   }
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
-    return iterateScopes([fn](const ScopeSharedPtr& scope) -> bool {
-      return scope->iterate(fn);
-    });
+    return iterateScopes([fn](const ScopeSharedPtr& scope) -> bool { return scope->iterate(fn); });
   }
 
   StatName prefix() const override { return StatName(); }

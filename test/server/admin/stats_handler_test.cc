@@ -1076,17 +1076,16 @@ TEST_P(AdminStatsTest, SortedHistograms) {
 }
 
 class ThreadedTest : public testing::Test {
- protected:
+protected:
   static constexpr uint32_t NumThreads = 10;
   static constexpr uint32_t NumScopes = 100;
   static constexpr uint32_t NumStatsPerScope = 20;
   static constexpr uint32_t NumIters = 5;
 
   ThreadedTest()
-      : real_threads_(NumThreads),
-        alloc_(symbol_table_),
+      : real_threads_(NumThreads), alloc_(symbol_table_),
         store_(std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_)) {
-    //store_->addSink(sink_);
+    // store_->addSink(sink_);
     for (uint32_t i = 0; i < NumScopes; ++i) {
       scopes_.push_back(nullptr);
     }
@@ -1097,7 +1096,7 @@ class ThreadedTest : public testing::Test {
 
   ~ThreadedTest() override {
     shutdownThreading();
-    real_threads_.exitThreads([this](){
+    real_threads_.exitThreads([this]() {
       scopes_.clear();
       store_.reset();
     });
@@ -1150,7 +1149,7 @@ class ThreadedTest : public testing::Test {
   Stats::SymbolTableImpl symbol_table_;
   Stats::AllocatorImpl alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
-  //Stats::MockSink sink_;
+  // Stats::MockSink sink_;
   std::vector<Stats::ScopeSharedPtr> scopes_;
   std::atomic<uint64_t> total_lines_{0};
 };
@@ -1165,7 +1164,7 @@ TEST_F(ThreadedTest, Threaded) {
   });
   uint32_t expected = NumThreads * NumScopes * NumStatsPerScope * NumIters;
   EXPECT_GE(expected, total_lines_);
-  EXPECT_LE(expected/2, total_lines_);
+  EXPECT_LE(expected / 2, total_lines_);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
