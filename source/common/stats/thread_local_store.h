@@ -472,7 +472,7 @@ private:
 
     StatName prefix() const override { return prefix_.statName(); }
 
-    // Returns the Central Cache, asserting that the parent lock is held.
+    // Returns the central cache, asserting that the parent lock is held.
     //
     // When a ThreadLocalStore method takes lock_ and then accesses
     // scope->central_cache_, the analysis system cannot understand that the
@@ -482,10 +482,11 @@ private:
       return central_cache_;
     }
 
-    // Returns the central cache, bypassing thread analysis. This is used only
-    // when passing references to maps held in the central cache to
-    // safeMakeStat, which only takes the lock if those maps are actually
-    // referenced.
+    // Returns the central cache, bypassing thread analysis.
+    //
+    // This is used only when passing references to maps held in the central
+    // cache to safeMakeStat, which takes the lock only if those maps are
+    // actually referenced, due to the lookup missing the TLS cache.
     const CentralCacheEntrySharedPtr&
     centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
       return central_cache_;

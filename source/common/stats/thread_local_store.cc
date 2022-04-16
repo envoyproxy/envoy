@@ -67,26 +67,23 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   // be no copies in TLS caches.
   Thread::LockGuard lock(lock_);
   const uint32_t first_histogram_index = deleted_histograms_.size();
-  iterateScopesLockHeld(
-      [this](const ScopeImplSharedPtr& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS -> bool {
-        // It would be preferable to annotate this with
-        // ABSL_ASSERT_EXCLUSIVE_LOCK(lock_) but thread annotation analysis
-        // fails even with that, so we disable it.
-        removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
-                                              [this](const CounterSharedPtr& counter) mutable {
-                                                alloc_.markCounterForDeletion(counter);
-                                              });
-        removeRejectedStats<GaugeSharedPtr>(
-            scope->central_cache_->gauges_,
-            [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
-        removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
-        removeRejectedStats<TextReadoutSharedPtr>(
-            scope->central_cache_->text_readouts_,
-            [this](const TextReadoutSharedPtr& text_readout) mutable {
-              alloc_.markTextReadoutForDeletion(text_readout);
-            });
-        return true;
-      });
+  iterateScopesLockHeld([this](const ScopeImplSharedPtr& scope) ABSL_EXCLUSIVE_LOCKS_REQUIRED(
+                            lock_) -> bool {
+    const CentralCacheEntrySharedPtr& central_cache = scope->centralCacheLockHeld();
+    removeRejectedStats<CounterSharedPtr>(central_cache->counters_,
+                                          [this](const CounterSharedPtr& counter) mutable {
+                                            alloc_.markCounterForDeletion(counter);
+                                          });
+    removeRejectedStats<GaugeSharedPtr>(
+        central_cache->gauges_,
+        [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
+    removeRejectedStats(central_cache->histograms_, deleted_histograms_);
+    removeRejectedStats<TextReadoutSharedPtr>(
+        central_cache->text_readouts_, [this](const TextReadoutSharedPtr& text_readout) mutable {
+          alloc_.markTextReadoutForDeletion(text_readout);
+        });
+    return true;
+  });
 
   // Remove any newly rejected histograms from histogram_set_.
   {
