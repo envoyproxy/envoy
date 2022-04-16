@@ -1154,9 +1154,8 @@ protected:
 };
 
 TEST_F(ThreadedTest, Threaded) {
-  const uint32_t num_iters = 5;
   real_threads_.runOnAllWorkersBlocking([this]() {
-    for (uint32_t i = 0; i < num_iters; ++i) {
+    for (uint32_t i = 0; i < NumIters; ++i) {
       addStats();
       statsEndpoint();
     }
