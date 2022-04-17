@@ -21,7 +21,6 @@
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -188,45 +187,10 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-
-  CounterOptConstRef findCounter(StatName name) const override {
-    CounterOptConstRef found_counter;
-    iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
-      found_counter =
-          scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
-      return !found_counter.has_value();
-    });
-    return found_counter;
-  }
-
-  GaugeOptConstRef findGauge(StatName name) const override {
-    GaugeOptConstRef found_gauge;
-    iterateScopes([&found_gauge, name](const ScopeImplSharedPtr& scope) -> bool {
-      found_gauge = scope->findStatLockHeld<Gauge>(name, scope->centralCacheLockHeld()->gauges_);
-      return !found_gauge.has_value();
-    });
-    return found_gauge;
-  }
-
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    HistogramOptConstRef found_histogram;
-    iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope) -> bool {
-      found_histogram = scope->findHistogramLockHeld(name);
-      return !found_histogram.has_value();
-    });
-    return found_histogram;
-  }
-
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    TextReadoutOptConstRef found_text_readout;
-    iterateScopes([&found_text_readout, name](const ScopeImplSharedPtr& scope) -> bool {
-      found_text_readout =
-          scope->findStatLockHeld<TextReadout>(name, scope->centralCacheLockHeld()->text_readouts_);
-      return !found_text_readout.has_value();
-    });
-    return found_text_readout;
-  }
-
+  CounterOptConstRef findCounter(StatName name) const override;
+  GaugeOptConstRef findGauge(StatName name) const override;
+  HistogramOptConstRef findHistogram(StatName name) const override;
+  TextReadoutOptConstRef findTextReadout(StatName name) const override;
   bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
@@ -520,23 +484,23 @@ private:
 
   using ScopeImplSharedPtr = std::shared_ptr<ScopeImpl>;
 
-  bool iterateScopes(const std::function<bool(const ScopeImplSharedPtr&)> fn) const {
+  /**
+   * Calls fn_lock_held for every scope with, lock_ held. This ensures to avoid
+   * iterate/destruct races for scopes.
+   *
+   * @param fn_lock_held function to be called, with lock_ held, on every scope, until
+   *   fn_lock_held() returns false.
+   * @return true if the iteration completed with fn_lock_held never returning false.
+   */
+  bool iterateScopes(const std::function<bool(const ScopeImplSharedPtr&)> fn_lock_held) const {
     Thread::LockGuard lock(lock_);
-    return iterateScopesLockHeld(fn);
+    return iterateScopesLockHeld(fn_lock_held);
   }
 
   bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-    for (auto& iter : scopes_) {
-      const std::weak_ptr<ScopeImpl>& scope = iter.second;
-      const ScopeImplSharedPtr& locked = scope.lock();
-      if (locked != nullptr && !fn(locked)) {
-        return false;
-      }
-    }
-    return true;
-  }
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
+  // The Store versions of iterate cover all the scopes in the store.
   template <class StatFn> bool iterHelper(StatFn fn) const {
     return iterateScopes(
         [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });

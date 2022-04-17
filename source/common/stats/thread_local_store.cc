@@ -462,6 +462,44 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
+CounterOptConstRef ThreadLocalStoreImpl::findCounter(StatName name) const {
+  CounterOptConstRef found_counter;
+  iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
+    found_counter =
+        scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
+    return !found_counter.has_value();
+  });
+  return found_counter;
+}
+
+GaugeOptConstRef ThreadLocalStoreImpl::findGauge(StatName name) const {
+  GaugeOptConstRef found_gauge;
+  iterateScopes([&found_gauge, name](const ScopeImplSharedPtr& scope) -> bool {
+    found_gauge = scope->findStatLockHeld<Gauge>(name, scope->centralCacheLockHeld()->gauges_);
+    return !found_gauge.has_value();
+  });
+  return found_gauge;
+}
+
+HistogramOptConstRef ThreadLocalStoreImpl::findHistogram(StatName name) const {
+  HistogramOptConstRef found_histogram;
+  iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope) -> bool {
+    found_histogram = scope->findHistogramLockHeld(name);
+    return !found_histogram.has_value();
+  });
+  return found_histogram;
+}
+
+TextReadoutOptConstRef ThreadLocalStoreImpl::findTextReadout(StatName name) const {
+  TextReadoutOptConstRef found_text_readout;
+  iterateScopes([&found_text_readout, name](const ScopeImplSharedPtr& scope) -> bool {
+    found_text_readout =
+        scope->findStatLockHeld<TextReadout>(name, scope->centralCacheLockHeld()->text_readouts_);
+    return !found_text_readout.has_value();
+  });
+  return found_text_readout;
+}
+
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName full_stat_name, StatName name_no_tags,
@@ -681,8 +719,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
-  // See safety analysis comment in counterFromStatNameWithTags above.
-
   if (parent_.rejectsAll()) {
     return parent_.null_text_readout_;
   }
@@ -987,6 +1023,23 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
   for (const ScopeSharedPtr& scope : scopes) {
     f_scope(*scope);
   }
+}
+
+bool ThreadLocalStoreImpl::iterateScopesLockHeld(
+    const std::function<bool(const ScopeImplSharedPtr&)> fn) const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  for (auto& iter : scopes_) {
+    // We keep the scopes as a map from Scope* to weak_ptr<Scope> so that if, during
+    // the iteration, the last reference to a ScopeSharedPtr is dropped, we can test
+    // for that here by attempting to lock the weak pointer, and skip those that are
+    // nullptr.
+    const std::weak_ptr<ScopeImpl>& scope = iter.second;
+    const ScopeImplSharedPtr& locked = scope.lock();
+    if (locked != nullptr && !fn(locked)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
