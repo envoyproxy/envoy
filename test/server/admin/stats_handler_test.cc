@@ -1127,8 +1127,8 @@ protected:
         absl::MutexLock lock(&scope_mutexes_[s]);
         scopes_[s] = scope;
       }
-      for (uint32_t c = 0; c < NumStatsPerScope; ++c) {
-        scope->counterFromStatName(counter_names_[c]);
+      for (Stats::StatName counter_name : counter_names_) {
+        scope->counterFromStatName(counter_name);
       }
     }
   }
