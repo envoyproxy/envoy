@@ -44,3 +44,8 @@ def _backport():
   github.issue_label('backport/review')
 
 handlers.command(name='backport', func=_backport)
+
+def _haim():
+  github.issue_label('hamike')
+  
+handlers.command(name='haim', func=_haim)
