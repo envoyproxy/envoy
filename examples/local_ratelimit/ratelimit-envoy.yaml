@@ -70,6 +70,10 @@ static_resources:
                   prefix: "/"
                 route:
                   cluster: service
+                  rate_limits:
+                  - actions:
+                    - generic_key:
+                        descriptor_value: test
           http_filters:
           - name: envoy.filters.http.local_ratelimit
             typed_config:
@@ -95,6 +99,14 @@ static_resources:
                     key: x-local-rate-limit
                     value: 'true'
               local_rate_limit_per_downstream_connection: false
+              descriptors: 
+              - entries:
+                - key: generic_key
+                  value: test
+                token_bucket:
+                  max_tokens: 3
+                  tokens_per_fill: 3
+                  fill_interval: 60s
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
