@@ -95,8 +95,13 @@ public:
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
   template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {
     switch (config.matcher_type_case()) {
-    case MatcherType::kMatcherTree:
-      return createTreeMatcher(config).value();
+    case MatcherType::kMatcherTree: {
+      auto matcher = createTreeMatcher(config);
+      if (!matcher.has_value()) {
+        return nullptr;
+      }
+      return matcher.value();
+    }
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     case MatcherType::MATCHER_TYPE_NOT_SET:
