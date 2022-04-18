@@ -79,9 +79,6 @@ public:
       envoy::config::rbac::v3::Action shadow_action;
       shadow_action.set_name("bar");
       shadow_action.set_allow(allow);
-      envoy::config::rbac::v3::Action on_no_match_action;
-      on_no_match_action.set_name("action");
-      on_no_match_action.set_allow(!allow);
 
       xds::type::matcher::v3::Matcher matcher;
       {
@@ -105,10 +102,6 @@ public:
         matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
         matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
         matcher_destination_port_predicate->mutable_value_match()->set_exact("123");
-
-        auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
-        matcher_on_no_match_action->set_name("action");
-        matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
       }
       *config.mutable_matcher() = matcher;
 
@@ -131,10 +124,6 @@ public:
         matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
         matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
         matcher_destination_port_predicate->mutable_value_match()->set_exact("456");
-
-        auto matcher_on_no_match_action = shadow_matcher.mutable_on_no_match()->mutable_action();
-        matcher_on_no_match_action->set_name("action");
-        matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
       }
       *config.mutable_shadow_matcher() = shadow_matcher;
     }
@@ -384,8 +373,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerNameMatcher) {
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoMatcher) {
-  // Set on_no_match to allow all connections.
-  setupMatcher(false, false, false);
+  setupMatcher(false);
 
   setDestinationPort(0);
 
