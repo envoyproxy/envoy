@@ -104,8 +104,8 @@ static_resources:
                 - key: generic_key
                   value: test
                 token_bucket:
-                  max_tokens: 2
-                  tokens_per_fill: 2
+                  max_tokens: 3
+                  tokens_per_fill: 3
                   fill_interval: 5s
           - name: envoy.filters.http.router
             typed_config:
