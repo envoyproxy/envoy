@@ -206,6 +206,7 @@ private:
     case AsyncFileManager::Mode::ReadWrite:
       return O_RDWR;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
   const std::string filename_;
   const AsyncFileManager::Mode mode_;
