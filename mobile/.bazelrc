@@ -2,6 +2,7 @@
 try-import ./envoy/.bazelrc
 
 # Common flags for all builds
+build --platform_mappings=envoy/bazel/platform_mappings
 build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled

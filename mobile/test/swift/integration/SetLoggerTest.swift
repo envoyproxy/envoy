@@ -12,6 +12,8 @@ final class LoggerTests: XCTestCase {
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
     // swiftlint:disable:next line_length
     let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+    // swiftlint:disable:next line_length
+    let testLoggerFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger"
     let config =
 """
 static_resources:
@@ -40,6 +42,8 @@ static_resources:
                       status: 200
           http_filters:
             - name: test_logger
+              typed_config:
+                "@type": \(testLoggerFilterType)
             - name: envoy.filters.http.assertion
               typed_config:
                 "@type": \(assertionFilterType)
