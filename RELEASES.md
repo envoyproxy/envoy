@@ -27,7 +27,7 @@ version from the `main` branch by creating a `vX.Y.0` tag and a corresponding `r
 branch, with merge permissions given to the release manager of stable releases, and CI configured
 to execute tests on it.
 
-### Security Releases
+### Security releases
 
 Critical security fixes are owned by the Envoy security team, which provides fixes for the
 `main` branch. Once those fixes are ready, the maintainers
@@ -46,7 +46,7 @@ are backported from the `main` branch to all supported stable branches by the ma
 stable releases. New stable versions from non-critical security fixes are released on a regular
 schedule, initially aiming for the bi-weekly releases.
 
-### Release Management
+### Release management
 
 Major releases are handled by Matt Klein ([mattklein123](https://github.com/mattklein123))
 or Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) and do not involve any backports.
@@ -70,7 +70,7 @@ actual mechanics of the release itself.
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist)) |
 | 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | TBD                                                                   |
 
-## Major Release Schedule
+## Major release schedule
 
 In order to accommodate downstream projects, new Envoy releases are produced on a fixed release
 schedule (the 15th day of each quarter), with an acceptable delay of up to 2 weeks, with a hard
@@ -91,5 +91,8 @@ deadline of 3 weeks.
 | 1.22.0  | 2022/04/15 | 2022/04/15 |    0 days  | 2023/04/15  |
 | 1.23.0  | 2022/07/15 |            |            |             |
 
-TODO(RyanTheOptimist): Should we also mention the security release schedule here? I think that would be helpful.
-[repokitteh]: https://github.com/repokitteh
+## Security release schedule
+
+There is no fixed scheduled for security fixes. Zero-day vulnerabilities might necessitate
+an emergency release with little or no warning. However, historically security release have
+happened roughly once per quarter, midway between major releases.
