@@ -2,6 +2,8 @@
 
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/matching/inputs.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -11,7 +13,10 @@ namespace Matching {
 
 TEST(HttpHeadersDataInputBase, ReturnValueNotPersistedBetweenCalls) {
   HttpRequestHeadersDataInput input("header");
-  HttpMatchingDataImpl data;
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
+  HttpMatchingDataImpl data(connection_info_provider);
 
   {
     TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
