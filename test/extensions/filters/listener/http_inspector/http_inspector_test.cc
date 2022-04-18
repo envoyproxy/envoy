@@ -543,6 +543,11 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
+#ifdef ENVOY_ENABLE_UHV
+  // permissive parsing
+  return;
+#endif
+
   init();
   const std::string valid_header = "GET /index HTTP/1.1\r";
   //  offset:                       0         10
