@@ -79,7 +79,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
-  throw EnvoyException(absl::StrCat("Unexpected principal identifier case:", principal.identifier_case()));
+  throw EnvoyException(
+      absl::StrCat("Unexpected principal identifier case:", principal.identifier_case()));
 }
 
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,

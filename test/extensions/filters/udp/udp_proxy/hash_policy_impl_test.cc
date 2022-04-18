@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 
 #include "source/common/common/hash.h"

@@ -87,7 +87,7 @@ private:
 
   template <typename ValueType>
   absl::optional<const std::string> buildMessage(const Stats::Metric& metric, ValueType value,
-                                 const std::string& type) const;
+                                                 const std::string& type) const;
   const std::string getName(const Stats::Metric& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 

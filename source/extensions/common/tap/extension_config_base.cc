@@ -39,7 +39,8 @@ ExtensionConfigBase::ExtensionConfigBase(
   }
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
       CONFIG_TYPE_NOT_SET:
-    throw EnvoyException(absl::StrCat("Unexpected extenison config type case", proto_config_.config_type_case()));
+    throw EnvoyException(
+        absl::StrCat("Unexpected extenison config type case", proto_config_.config_type_case()));
   }
 }
 

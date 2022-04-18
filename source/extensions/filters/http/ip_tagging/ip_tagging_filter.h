@@ -46,23 +46,24 @@ public:
   void incTotal() { incCounter(total_); }
 
 private:
-  static FilterRequestType requestTypeEnum(
+  static absl::optional<const FilterRequestType> requestTypeEnum(
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
     switch (request_type) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::BOTH:
-      return FilterRequestType::BOTH;
+      return absl::make_optional(FilterRequestType::BOTH);
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::INTERNAL:
-      return FilterRequestType::INTERNAL;
+      return absl::make_optional(FilterRequestType::INTERNAL);
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::EXTERNAL:
-      return FilterRequestType::EXTERNAL;
+      return absl::make_optional(FilterRequestType::EXTERNAL);
     }
-    throw EnvoyException("Unexpected ip tagging filter request type");
+    IS_ENVOY_BUG("unexpected request type enum");
+    return absl::nullopt;
   }
 
   void incCounter(Stats::StatName name);
 
-  const FilterRequestType request_type_;
+  FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Stats::StatNameSetPtr stat_name_set_;

@@ -28,7 +28,8 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
   case Config_InvocationMode_SYNCHRONOUS:
     return InvocationMode::Synchronous;
   }
-  throw EnvoyException(absl::StrCat("Unexpected aws lambda invocation mode: ", proto_config.invocation_mode()));
+  throw EnvoyException(
+      absl::StrCat("Unexpected aws lambda invocation mode: ", proto_config.invocation_mode()));
 }
 
 } // namespace

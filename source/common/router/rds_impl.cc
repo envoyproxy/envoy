@@ -54,7 +54,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     PANIC("not implemented");
   }
   throw EnvoyException(absl::StrCat("unexpected HTTP route specifier case provided: ",
-                        config.route_specifier_case()));
+                                    config.route_specifier_case()));
 }
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(

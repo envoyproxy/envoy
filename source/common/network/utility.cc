@@ -517,7 +517,7 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
       return Socket::Type::Datagram;
     }
   }
-  throw EnvoyException("unexpected proto address socket type");
+    throw EnvoyException("unexpected proto address socket type");
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Socket::Type::Stream;
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:

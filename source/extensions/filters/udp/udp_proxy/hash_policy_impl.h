@@ -42,7 +42,10 @@ using HashPolicyImplPtr = std::unique_ptr<const HashPolicyImpl>;
  */
 class HashPolicyImplFactory {
 public:
-  static HashPolicyImplPtr create(const google::protobuf::RepeatedPtrField<envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy> hash_policies);
+  static HashPolicyImplPtr
+  create(const google::protobuf::RepeatedPtrField<
+         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>
+             hash_policies);
 };
 
 } // namespace UdpProxy

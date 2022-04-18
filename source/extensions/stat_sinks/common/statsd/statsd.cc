@@ -62,7 +62,8 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      absl::optional<const std::string> counter_str = buildMessage(counter.counter_.get(), counter.delta_, "|c");
+      absl::optional<const std::string> counter_str =
+          buildMessage(counter.counter_.get(), counter.delta_, "|c");
       if (!counter_str) {
         return;
       }
@@ -72,7 +73,8 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      absl::optional<const std::string> gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
+      absl::optional<const std::string> gauge_str =
+          buildMessage(gauge.get(), gauge.get().value(), "|g");
       if (!gauge_str) {
         return;
       }
@@ -125,8 +127,8 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     constexpr float divisor = Stats::Histogram::PercentScale;
     const float float_value = value;
     const float scaled = float_value / divisor;
-    //message = buildMessage(histogram, scaled, "|h");
-    //absl::optional<const std::string> message = buildMessage(histogram, scaled, "|h");
+    // message = buildMessage(histogram, scaled, "|h");
+    // absl::optional<const std::string> message = buildMessage(histogram, scaled, "|h");
     auto message_opt = buildMessage(histogram, scaled, "|h");
     if (!message_opt) {
       return;
@@ -146,8 +148,9 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
 }
 
 template <typename ValueType>
-absl::optional<const std::string> UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
-                                              const std::string& type) const {
+absl::optional<const std::string> UdpStatsdSink::buildMessage(const Stats::Metric& metric,
+                                                              ValueType value,
+                                                              const std::string& type) const {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
     const std::string message = absl::StrCat(

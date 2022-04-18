@@ -16,11 +16,17 @@ namespace IpTagging {
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
+    : scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
       unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
+
+  auto request_type = requestTypeEnum(config.request_type());
+  if (!request_type.has_value()) {
+    throw EnvoyException("Could not create request type");
+  }
+  request_type_ = request_type.value();
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs

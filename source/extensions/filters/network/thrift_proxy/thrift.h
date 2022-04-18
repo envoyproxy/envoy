@@ -1,9 +1,9 @@
 #pragma once
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/singleton/const_singleton.h"
-
-#include "envoy/common/exception.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +48,8 @@ public:
     case TransportType::Auto:
       return AUTO;
     }
-    throw EnvoyException(absl::StrCat("unexpected thrift transport type", type));
+    IS_ENVOY_BUG("unexpected transport type");
+    return AUTO;
   }
 };
 
@@ -98,7 +99,8 @@ public:
     case ProtocolType::Auto:
       return AUTO;
     }
-    throw EnvoyException(absl::StrCat("unexpected thrift protocol type", type));
+    IS_ENVOY_BUG("unexpected protocol type");
+    return AUTO;
   }
 };
 

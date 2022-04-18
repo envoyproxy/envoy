@@ -197,7 +197,8 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break;
   }
-  throw EnvoyException(absl::StrCat("Unexpected matcher requirement rule", rule.match().path_specifier_case()));
+  throw EnvoyException(
+      absl::StrCat("Unexpected matcher requirement rule", rule.match().path_specifier_case()));
 }
 
 } // namespace JwtAuthn

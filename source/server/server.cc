@@ -872,7 +872,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceImpl::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  std::cout << "----------------------------------------------------------------- Running Server!!!\n";
+  std::cout
+      << "----------------------------------------------------------------- Running Server!!!\n";
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
                                     access_log_manager_, init_manager_, overloadManager(), [this] {
                                       notifyCallbacksForStage(Stage::PostInit);

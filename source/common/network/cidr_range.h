@@ -117,7 +117,7 @@ public:
    *         in an address of the IP version (i.e. address->ip()->version()).
    */
   static InstanceConstSharedPtr truncateIpAddressAndLength(InstanceConstSharedPtr address,
-                                                           int *length_io);
+                                                           int* length_io);
 
 private:
   CidrRange(InstanceConstSharedPtr address, int length);

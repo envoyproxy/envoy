@@ -30,7 +30,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
                               result.errno_);
   }
   // @tom
-  //ENVOY_LOG(debug, "[SOCKET] binding socket");
+  // ENVOY_LOG(debug, "[SOCKET] binding socket");
   return {0, 0};
 }
 
