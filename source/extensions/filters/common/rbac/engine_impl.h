@@ -56,13 +56,6 @@ public:
 
 using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Matching::MatchingData>;
 
-class HttpActionValidationVisitor : public ActionValidationVisitor {
-public:
-  absl::Status performDataInputValidation(
-      const Envoy::Matcher::DataInputFactory<Matching::MatchingData>& data_input,
-      absl::string_view type_url) override;
-};
-
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules,

@@ -16,6 +16,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+class HttpActionValidationVisitor : public Filters::Common::RBAC::ActionValidationVisitor {
+public:
+  absl::Status performDataInputValidation(
+      const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&
+          data_input,
+      absl::string_view type_url) override;
+};
+
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   RoleBasedAccessControlRouteSpecificFilterConfig(
@@ -30,7 +38,7 @@ public:
   }
 
 private:
-  Filters::Common::RBAC::HttpActionValidationVisitor validation_visitor_;
+  HttpActionValidationVisitor validation_visitor_;
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
 };
@@ -70,7 +78,7 @@ private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
 
-  Filters::Common::RBAC::HttpActionValidationVisitor validation_visitor_;
+  HttpActionValidationVisitor validation_visitor_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
 };

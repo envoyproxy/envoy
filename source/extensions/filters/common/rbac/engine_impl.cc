@@ -27,11 +27,6 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionCont
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
 
-absl::Status HttpActionValidationVisitor::performDataInputValidation(
-    const Envoy::Matcher::DataInputFactory<Matching::MatchingData>&, absl::string_view) {
-  return absl::OkStatus();
-}
-
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
     ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)

@@ -12,6 +12,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+absl::Status HttpActionValidationVisitor::performDataInputValidation(
+    const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&,
+    absl::string_view) {
+  return absl::OkStatus();
+}
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
