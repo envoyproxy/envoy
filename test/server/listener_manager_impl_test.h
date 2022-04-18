@@ -197,6 +197,7 @@ protected:
     }
     socket_->connection_info_provider_->setLocalAddress(local_address_);
 
+    socket_->connection_info_provider_->setRequestedServerName(server_name);
     ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
     ON_CALL(*socket_, detectedTransportProtocol())
         .WillByDefault(Return(absl::string_view(transport_protocol)));
