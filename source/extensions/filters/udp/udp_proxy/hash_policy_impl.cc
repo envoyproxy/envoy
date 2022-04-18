@@ -45,7 +45,7 @@ HashPolicyImpl::generateHash(const Network::Address::Instance& downstream_addr) 
 }
 
 HashPolicyImplPtr HashPolicyImplFactory::create(
-    const google::protobuf::RepeatedPtrField<
+    const Protobuf::RepeatedPtrField<
         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>
         hash_policies) {
   ASSERT(hash_policies.size() == 1);

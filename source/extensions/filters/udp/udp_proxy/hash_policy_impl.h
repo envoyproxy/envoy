@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/udp/hash_policy.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/common/hash.h"
 
 namespace Envoy {
@@ -43,7 +44,7 @@ using HashPolicyImplPtr = std::unique_ptr<const HashPolicyImpl>;
 class HashPolicyImplFactory {
 public:
   static HashPolicyImplPtr
-  create(const google::protobuf::RepeatedPtrField<
+  create(const Protobuf::RepeatedPtrField<
          envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>
              hash_policies);
 };

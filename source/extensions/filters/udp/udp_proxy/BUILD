@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/udp:hash_policy_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+        "//source/common/protobuf",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
