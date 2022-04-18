@@ -29,18 +29,21 @@ using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 
 enum class EnforcementMode { Enforced, Shadow };
 
-struct ActionContext {};
+struct ActionContext {
+  bool has_log_;
+};
 
 class Action : public Envoy::Matcher::ActionBase<envoy::config::rbac::v3::Action> {
 public:
-  Action(const std::string& name, bool allow) : name_(name), allow_(allow) {}
+  Action(const std::string& name, const envoy::config::rbac::v3::RBAC::Action action)
+      : name_(name), action_(action) {}
 
   const std::string& name() const { return name_; }
-  bool allow() const { return allow_; }
+  envoy::config::rbac::v3::RBAC::Action action() const { return action_; }
 
 private:
   const std::string name_;
-  const bool allow_;
+  const envoy::config::rbac::v3::RBAC::Action action_;
 };
 
 class ActionFactory : public Envoy::Matcher::ActionFactory<ActionContext> {
@@ -100,7 +103,9 @@ public:
                     std::string* effective_policy_id) const override;
 
 private:
+  const EnforcementMode mode_;
   Envoy::Matcher::MatchTreeSharedPtr<Matching::MatchingData> matcher_;
+  bool has_log_;
 };
 
 } // namespace RBAC

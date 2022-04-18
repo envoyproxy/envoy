@@ -14,15 +14,20 @@ namespace Common {
 namespace RBAC {
 
 Envoy::Matcher::ActionFactoryCb
-ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionContext&,
+ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionContext& context,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& action_config =
       MessageUtil::downcastAndValidate<const envoy::config::rbac::v3::Action&>(config,
                                                                                validation_visitor);
   const auto& name = action_config.name();
-  const auto allow = action_config.allow();
+  const auto action = action_config.action();
 
-  return [name, allow]() { return std::make_unique<Action>(name, allow); };
+  // If there is at least an action is LOG, we have to go through LOG procedure when handle action.
+  if (action == envoy::config::rbac::v3::RBAC::LOG) {
+    context.has_log_ = true;
+  }
+
+  return [name, action]() { return std::make_unique<Action>(name, action); };
 }
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
@@ -100,11 +105,13 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
 RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl(
     const xds::type::matcher::v3::Matcher& matcher,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ActionValidationVisitor& validation_visitor, const EnforcementMode) {
-  ActionContext context{};
+    ActionValidationVisitor& validation_visitor, const EnforcementMode mode)
+    : mode_(mode) {
+  ActionContext context{false};
   Envoy::Matcher::MatchTreeFactory<Matching::MatchingData, ActionContext> factory(
       context, factory_context, validation_visitor);
   matcher_ = factory.create(matcher)();
+  has_log_ = context.has_log_;
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
@@ -132,7 +139,25 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
       *effective_policy_id = action.name();
     }
 
-    return action.allow();
+    // If there is at least an LOG action in matchers, we have to turn on and off for shared log
+    // metadata every time when there is a connection or request.
+    auto rbac_action = action.action();
+    if (has_log_ && mode_ != EnforcementMode::Shadow) {
+      ProtobufWkt::Struct log_metadata;
+      auto& log_fields = *log_metadata.mutable_fields();
+      log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(
+          rbac_action == envoy::config::rbac::v3::RBAC::LOG);
+      info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
+    }
+
+    switch (rbac_action) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::rbac::v3::RBAC::ALLOW:
+    case envoy::config::rbac::v3::RBAC::LOG:
+      return true;
+    case envoy::config::rbac::v3::RBAC::DENY:
+      return false;
+    }
   }
 
   // Default to DENY.

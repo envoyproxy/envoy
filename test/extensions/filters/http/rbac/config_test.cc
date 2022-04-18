@@ -38,7 +38,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
   envoy::config::rbac::v3::Action action;
   action.set_name("foo");
-  action.set_allow(true);
+  action.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
 
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_action = matcher.mutable_on_no_match()->mutable_action();

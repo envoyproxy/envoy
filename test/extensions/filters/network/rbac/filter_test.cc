@@ -64,7 +64,11 @@ public:
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
-  void setupMatcher(bool with_matcher = true, bool continuous = false, bool allow = true) {
+  void setupMatcher(
+      bool with_matcher = true, bool continuous = false,
+      envoy::config::rbac::v3::RBAC::Action rbac_action = envoy::config::rbac::v3::RBAC::ALLOW,
+      envoy::config::rbac::v3::RBAC::Action on_no_match_rbac_action =
+          envoy::config::rbac::v3::RBAC::DENY) {
     envoy::extensions::filters::network::rbac::v3::RBAC config;
     config.set_stat_prefix("tcp.");
     config.set_shadow_rules_stat_prefix("prefix_");
@@ -75,10 +79,13 @@ public:
           destination_port_input;
       envoy::config::rbac::v3::Action action;
       action.set_name("foo");
-      action.set_allow(allow);
+      action.set_action(rbac_action);
       envoy::config::rbac::v3::Action shadow_action;
       shadow_action.set_name("bar");
-      shadow_action.set_allow(allow);
+      shadow_action.set_action(rbac_action);
+      envoy::config::rbac::v3::Action on_no_match_action;
+      on_no_match_action.set_name("none");
+      on_no_match_action.set_action(on_no_match_rbac_action);
 
       xds::type::matcher::v3::Matcher matcher;
       {
@@ -102,6 +109,10 @@ public:
         matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
         matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
         matcher_destination_port_predicate->mutable_value_match()->set_exact("123");
+
+        auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
+        matcher_on_no_match_action->set_name("action");
+        matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
       }
       *config.mutable_matcher() = matcher;
 
@@ -124,6 +135,10 @@ public:
         matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
         matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
         matcher_destination_port_predicate->mutable_value_match()->set_exact("456");
+
+        auto matcher_on_no_match_action = shadow_matcher.mutable_on_no_match()->mutable_action();
+        matcher_on_no_match_action->set_name("action");
+        matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
       }
       *config.mutable_shadow_matcher() = shadow_matcher;
     }
@@ -453,6 +468,56 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldNotLog) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowNoChangeLog) {
   setupPolicy();
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+
+  // Check that Allow action does not set access log metadata
+  EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),
+            stream_info_.dynamicMetadata().filter_metadata().find(
+                Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherShouldLog) {
+  setupMatcher(true, false, envoy::config::rbac::v3::RBAC::LOG,
+               envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  checkAccessLogMetadata(true);
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherShouldNotLog) {
+  setupMatcher(true, false, envoy::config::rbac::v3::RBAC::LOG,
+               envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(456);
+  setMetadata();
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  checkAccessLogMetadata(false);
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowNoChangeLog) {
+  setupMatcher();
 
   setDestinationPort(123);
   setMetadata();

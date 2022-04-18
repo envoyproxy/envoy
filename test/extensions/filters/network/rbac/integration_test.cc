@@ -171,7 +171,7 @@ typed_config:
         typed_config:
           "@type": type.googleapis.com/envoy.config.rbac.v3.Action
           name: allow_all
-          allow: true
+          action: ALLOW
   shadow_matcher:
     on_no_match:
       action:
@@ -179,6 +179,7 @@ typed_config:
         typed_config:
           "@type": type.googleapis.com/envoy.config.rbac.v3.Action
           name: deny_all
+          action: DENY
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello"));
@@ -204,6 +205,7 @@ typed_config:
         typed_config:
           "@type": type.googleapis.com/envoy.config.rbac.v3.Action
           name: deny_all
+          action: DENY
   shadow_matcher:
     on_no_match:
       action:
@@ -211,7 +213,7 @@ typed_config:
         typed_config:
           "@type": type.googleapis.com/envoy.config.rbac.v3.Action
           name: allow_all
-          allow: true
+          action: ALLOW
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello", false, false));
@@ -237,6 +239,7 @@ typed_config:
         typed_config:
           "@type": type.googleapis.com/envoy.config.rbac.v3.Action
           name: "deny all"
+          action: DENY
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello", false, false));

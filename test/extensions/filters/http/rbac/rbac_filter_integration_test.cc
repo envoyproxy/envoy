@@ -166,7 +166,7 @@ typed_config:
             typed_config:
               "@type": type.googleapis.com/envoy.config.rbac.v3.Action
               name: foo
-              allow: true
+              action: ALLOW
 )EOF";
 
 const std::string RBAC_MATCHER_CONFIG_WITH_DENY_ACTION = R"EOF(
@@ -191,13 +191,14 @@ typed_config:
             typed_config:
               "@type": type.googleapis.com/envoy.config.rbac.v3.Action
               name: "deny policy"
+              action: DENY
     on_no_match:
       action:
         name: action
         typed_config:
           "@type": type.googleapis.com/envoy.config.rbac.v3.Action
           name: none
-          allow: true
+          action: ALLOW
 )EOF";
 
 const std::string RBAC_MATCHER_CONFIG_WITH_PREFIX_MATCH = R"EOF(
@@ -222,7 +223,62 @@ typed_config:
             typed_config:
               "@type": type.googleapis.com/envoy.config.rbac.v3.Action
               name: foo
-              allow: true
+              action: ALLOW
+)EOF";
+
+// TODO(zhxie): it is not equivalent with the URL path rule in RBAC_CONFIG_WITH_PATH_EXACT_MATCH.
+// There will be a replacement when the URL path custom matcher is ready.
+const std::string RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: :path
+            value_match:
+              prefix: "/allow"
+        on_match:
+          action:
+            name: action
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+              name: foo
+              action: ALLOW
+)EOF";
+
+// TODO(zhxie): it is not equivalent with the URL path rule in
+// RBAC_CONFIG_DENY_WITH_PATH_EXACT_MATCH. There will be a replacement when the URL path custom
+// matcher is ready.
+const std::string RBAC_MATCHER_CONFIG_DENY_WITH_PATH_EXACT_MATCH = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: :path
+            value_match:
+              prefix: "/deny"
+        on_match:
+          action:
+            name: action
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+              name: foo
+              action: DENY
 )EOF";
 
 const std::string RBAC_MATCHER_CONFIG_WITH_PATH_IGNORE_CASE_MATCH = R"EOF(
@@ -248,7 +304,39 @@ typed_config:
             typed_config:
               "@type": type.googleapis.com/envoy.config.rbac.v3.Action
               name: foo
-              allow: true
+              action: ALLOW
+)EOF";
+
+const std::string RBAC_MATCHER_CONFIG_WITH_LOG_ACTION = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: :method
+            value_match:
+              exact: GET
+        on_match:
+          action:
+            name: action
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+              name: foo
+              action: LOG
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: none
+          action: ALLOW
 )EOF";
 
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
@@ -745,7 +833,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedWithPrefixRule) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(RBACIntegrationTest, RbacMatcherPrefixRuleUseNormalizePath) {
+TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePathMatcher) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              cfg) { cfg.mutable_normalize_path()->set_value(true); });
@@ -829,7 +917,92 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(RBACIntegrationTest, MatcherPathIgnoreCase) {
+TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
+  config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH);
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
+                                    "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::vector<std::string> paths{"/allow", "/allow?p1=v1&p2=v2", "/allow?p1=v1#seg"};
+
+  for (const auto& path : paths) {
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{
+            {":method", "POST"},
+            {":path", path},
+            {":scheme", "http"},
+            {":authority", "host"},
+            {"x-forwarded-for", "10.0.0.1"},
+        },
+        1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
+TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
+  config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/allow?p1=v1#seg"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  // Request should not hit the upstream
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// This test ensures that the exact match deny rule is not affected by fragment and query
+// when Envoy is configured to strip both fragment and query.
+TEST_P(RBACIntegrationTest, MatcherDenyExactMatchIgnoresQueryAndFragment) {
+  config_helper_.prependFilter(RBAC_MATCHER_CONFIG_DENY_WITH_PATH_EXACT_MATCH);
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
+                                    "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::vector<std::string> paths{"/deny#", "/deny#fragment", "/deny?p1=v1&p2=v2",
+                                       "/deny?p1=v1#seg"};
+
+  for (const auto& path : paths) {
+    printf("Testing: %s\n", path.c_str());
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{
+            {":method", "POST"},
+            {":path", path},
+            {":scheme", "http"},
+            {":authority", "host"},
+            {"x-forwarded-for", "10.0.0.1"},
+        },
+        1024);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+    if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+    }
+  }
+}
+
+TEST_P(RBACIntegrationTest, PathIgnoreCaseMatcher) {
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_IGNORE_CASE_MATCH);
   initialize();
 
@@ -854,6 +1027,29 @@ TEST_P(RBACIntegrationTest, MatcherPathIgnoreCase) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+}
+
+TEST_P(RBACIntegrationTest, MatcherLogConnectionAllow) {
+  config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_LOG_ACTION);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Helper for integration testing of RBAC filter with dynamic forward proxy.

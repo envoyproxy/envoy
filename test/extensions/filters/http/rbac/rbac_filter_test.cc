@@ -60,7 +60,8 @@ public:
         config, "test", store_, context_, ProtobufMessage::getStrictValidationVisitor()));
   }
 
-  void setupMatcher(bool allow) {
+  void setupMatcher(envoy::config::rbac::v3::RBAC::Action rbac_action,
+                    envoy::config::rbac::v3::RBAC::Action on_no_match_rbac_action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
     envoy::extensions::matching::common_inputs::network::v3::ServerNameInput server_name_input;
@@ -71,10 +72,13 @@ public:
 
     envoy::config::rbac::v3::Action action;
     action.set_name("foo");
-    action.set_allow(allow);
+    action.set_action(rbac_action);
     envoy::config::rbac::v3::Action shadow_action;
     shadow_action.set_name("bar");
-    shadow_action.set_allow(allow);
+    shadow_action.set_action(rbac_action);
+    envoy::config::rbac::v3::Action on_no_match_action;
+    on_no_match_action.set_name("none");
+    on_no_match_action.set_action(on_no_match_rbac_action);
 
     xds::type::matcher::v3::Matcher matcher;
     {
@@ -106,6 +110,10 @@ public:
       // TODO(zhxie): it is not equivalent with the URL path rule in setupPolicy(). There will be a
       // replacement when the URL path custom matcher is ready.
       matcher_header_predicate->mutable_value_match()->set_prefix("/suffix");
+
+      auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
+      matcher_on_no_match_action->set_name("action");
+      matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
     }
     *config.mutable_matcher() = matcher;
 
@@ -128,6 +136,10 @@ public:
       matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
       matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
       matcher_destination_port_predicate->mutable_value_match()->set_exact("456");
+
+      auto matcher_on_no_match_action = shadow_matcher.mutable_on_no_match()->mutable_action();
+      matcher_on_no_match_action->set_name("action");
+      matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
     }
     *config.mutable_shadow_matcher() = shadow_matcher;
     config.set_shadow_rules_stat_prefix("prefix_");
@@ -327,7 +339,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherAllowed) {
-  setupMatcher(true);
+  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
 
   setDestinationPort(123);
   setMetadata();
@@ -350,7 +362,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherAllowed) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameMatcher) {
-  setupMatcher(true);
+  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
 
   setDestinationPort(999);
   setRequestedServerName("www.cncf.io");
@@ -374,7 +386,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameMatcher) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, PathMatcher) {
-  setupMatcher(true);
+  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
 
   setDestinationPort(999);
   setMetadata();
@@ -390,7 +402,7 @@ TEST_F(RoleBasedAccessControlFilterTest, PathMatcher) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
-  setupMatcher(true);
+  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
 
   setDestinationPort(456);
   setMetadata();
@@ -419,7 +431,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
-  setupMatcher(true);
+  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
 
   setDestinationPort(456);
   setMetadata();
@@ -427,7 +439,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
   envoy::config::rbac::v3::Action action;
   action.set_name("none");
-  action.set_allow(true);
+  action.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
@@ -473,6 +485,48 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
 
 TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   setupPolicy(envoy::config::rbac::v3::RBAC::LOG);
+
+  setDestinationPort(456);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::No);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherShouldLog) {
+  setupMatcher(envoy::config::rbac::v3::RBAC::LOG, envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::Yes);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherShouldNotLog) {
+  setupMatcher(envoy::config::rbac::v3::RBAC::LOG, envoy::config::rbac::v3::RBAC::ALLOW);
 
   setDestinationPort(456);
   setMetadata();

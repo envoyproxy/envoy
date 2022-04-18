@@ -62,22 +62,35 @@ void checkEngine(
 }
 
 void checkMatcherEngine(
-    RBAC::RoleBasedAccessControlMatcherEngineImpl& engine, bool expected,
+    RBAC::RoleBasedAccessControlMatcherEngineImpl& engine, bool expected, LogResult expected_log,
     StreamInfo::StreamInfo& info,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
 
   bool engineRes = engine.handleAction(connection, headers, info, nullptr);
   EXPECT_EQ(expected, engineRes);
+
+  if (expected_log != LogResult::Undecided) {
+    auto filter_meta = info.dynamicMetadata().filter_metadata().at(
+        RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
+    EXPECT_EQ(expected_log == LogResult::Yes,
+              filter_meta.fields()
+                  .at(RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
+                  .bool_value());
+  } else {
+    EXPECT_EQ(info.dynamicMetadata().filter_metadata().end(),
+              info.dynamicMetadata().filter_metadata().find(
+                  Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
+  }
 }
 
 void checkMatcherEngine(
-    RBAC::RoleBasedAccessControlMatcherEngineImpl& engine, bool expected,
+    RBAC::RoleBasedAccessControlMatcherEngineImpl& engine, bool expected, LogResult expected_log,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
 
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
-  checkMatcherEngine(engine, expected, empty_info, connection, headers);
+  checkMatcherEngine(engine, expected, expected_log, empty_info, connection, headers);
 }
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
@@ -460,17 +473,17 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, Disabled) {
   RBAC::RoleBasedAccessControlMatcherEngineImpl engine(matcher, factory_context,
                                                        validation_visitor);
 
-  checkMatcherEngine(engine, false);
+  checkMatcherEngine(engine, false, LogResult::Undecided);
 }
 
 TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {
   envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput input;
   envoy::config::rbac::v3::Action allow_action;
   allow_action.set_name("allow");
-  allow_action.set_allow(true);
+  allow_action.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   envoy::config::rbac::v3::Action deny_action;
   deny_action.set_name("deny");
-  deny_action.set_allow(false);
+  deny_action.set_action(envoy::config::rbac::v3::RBAC::DENY);
 
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
@@ -501,21 +514,21 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   provider.setLocalAddress(addr);
-  checkMatcherEngine(engine, true, info, conn, headers);
+  checkMatcherEngine(engine, true, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   provider.setLocalAddress(addr);
-  checkMatcherEngine(engine, false, info, conn, headers);
+  checkMatcherEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
 TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput input;
   envoy::config::rbac::v3::Action allow_action;
   allow_action.set_name("allow");
-  allow_action.set_allow(true);
+  allow_action.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   envoy::config::rbac::v3::Action deny_action;
   deny_action.set_name("deny");
-  deny_action.set_allow(false);
+  deny_action.set_action(envoy::config::rbac::v3::RBAC::DENY);
 
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
@@ -546,11 +559,11 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   provider.setLocalAddress(addr);
-  checkMatcherEngine(engine, false, info, conn, headers);
+  checkMatcherEngine(engine, false, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   provider.setLocalAddress(addr);
-  checkMatcherEngine(engine, true, info, conn, headers);
+  checkMatcherEngine(engine, true, LogResult::Undecided, info, conn, headers);
 }
 
 // Log tests
@@ -589,6 +602,53 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
   checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
+}
+
+TEST(RoleBasedAccessControlMatcherEngineImpl, LogIfMatched) {
+  envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput input;
+  envoy::config::rbac::v3::Action log_action;
+  log_action.set_name("log");
+  log_action.set_action(envoy::config::rbac::v3::RBAC::LOG);
+  envoy::config::rbac::v3::Action allow_action;
+  allow_action.set_name("allow");
+  allow_action.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+
+  xds::type::matcher::v3::Matcher matcher;
+  auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
+  auto matcher_action = matcher_matcher->mutable_on_match()->mutable_action();
+  matcher_action->set_name("action");
+  matcher_action->mutable_typed_config()->PackFrom(log_action);
+  auto matcher_predicate = matcher_matcher->mutable_predicate()->mutable_single_predicate();
+  auto matcher_input = matcher_predicate->mutable_input();
+  matcher_input->set_name("envoy.matching.inputs.destination_port");
+  matcher_input->mutable_typed_config()->PackFrom(input);
+  matcher_predicate->mutable_value_match()->set_exact("123");
+
+  auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
+  matcher_on_no_match_action->set_name("action");
+  matcher_on_no_match_action->mutable_typed_config()->PackFrom(allow_action);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
+  RBAC::RoleBasedAccessControlMatcherEngineImpl engine(matcher, factory_context,
+                                                       validation_visitor);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Network::ConnectionInfoSetterImpl provider(std::make_shared<Network::Address::Ipv4Instance>(80),
+                                             std::make_shared<Network::Address::Ipv4Instance>(80));
+  EXPECT_CALL(conn, connectionInfoProvider()).WillRepeatedly(ReturnRef(provider));
+  onMetadata(info);
+
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
+  provider.setLocalAddress(addr);
+  checkMatcherEngine(engine, true, RBAC::LogResult::Yes, info, conn, headers);
+
+  addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
+  provider.setLocalAddress(addr);
+  checkMatcherEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 
 } // namespace
