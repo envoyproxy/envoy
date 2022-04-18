@@ -41,7 +41,9 @@ public:
       Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
 private:
-  void initMessageRoot(const std::string& log_name, const LocalInfo::LocalInfo& local_info);
+  void initMessageRoot(
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      const LocalInfo::LocalInfo& local_info);
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   // Non used addEntry method (the above is used for both TCP and HTTP).

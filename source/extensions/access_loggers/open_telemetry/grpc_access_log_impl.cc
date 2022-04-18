@@ -27,7 +27,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     : GrpcAccessLogger(client, config, dispatcher, scope, GRPC_LOG_STATS_PREFIX,
                        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                            "opentelemetry.proto.collector.logs.v1.LogsService.Export")) {
-  initMessageRoot(config.log_name(), local_info);
+  initMessageRoot(config, local_info);
 }
 
 namespace {
@@ -43,15 +43,23 @@ opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& 
 } // namespace
 
 // See comment about the structure of repeated fields in the header file.
-void GrpcAccessLoggerImpl::initMessageRoot(const std::string& log_name,
-                                           const LocalInfo::LocalInfo& local_info) {
+void GrpcAccessLoggerImpl::initMessageRoot(
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+    const LocalInfo::LocalInfo& local_info) {
   auto* resource_logs = message_.add_resource_logs();
   root_ = resource_logs->add_instrumentation_library_logs();
   auto* resource = resource_logs->mutable_resource();
-  *resource->add_attributes() = getStringKeyValue("log_name", log_name);
+  *resource->add_attributes() = getStringKeyValue("log_name", config.log_name());
   *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());
   *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
   *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
+
+  // TODO: support other type
+  for (const auto& custom_tag : config.custom_tags()) {
+    if (custom_tag.type_case() == envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral) {
+      *resource->add_attributes() = getStringKeyValue(std::string(custom_tag.tag()), custom_tag.literal().value());
+    }
+  }
 }
 
 void GrpcAccessLoggerImpl::addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) {
