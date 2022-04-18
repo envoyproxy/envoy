@@ -84,7 +84,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
     the major version release notes. These should not be duplicated.
   * If the "Deprecated" section is empty, delete it.
   * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
-  * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+  * Switch the [VERSION.txt](VERSION.txt) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
     release, please also make sure there's a stable maintainer signed up for next quarter,
@@ -106,7 +106,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
 * Do a new PR to setup the next version
-  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
+  * Update [VERSION.txt](VERSION.txt) to the next development release. E.g., "1.7.0-dev".
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
     release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
     Add an entry for the new file in the `toctree` in

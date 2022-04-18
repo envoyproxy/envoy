@@ -169,6 +169,11 @@ private:
     static const NullConfig route_configuration_;
   };
 
+  struct NullPathMatchCriterion : public Router::PathMatchCriterion {
+    Router::PathMatchType matchType() const override { return Router::PathMatchType::None; }
+    const std::string& matcher() const override { return EMPTY_STRING; }
+  };
+
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(
         AsyncClientImpl& parent, const absl::optional<std::chrono::milliseconds>& timeout,
@@ -265,6 +270,9 @@ private:
     bool autoHostRewrite() const override { return false; }
     bool appendXfh() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
+    const Router::PathMatchCriterion& pathMatchCriterion() const override {
+      return path_match_criterion_;
+    }
 
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return connect_config_nullopt_;
@@ -283,6 +291,7 @@ private:
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
+    static const NullPathMatchCriterion path_match_criterion_;
 
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;

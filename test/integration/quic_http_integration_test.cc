@@ -180,7 +180,7 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-    OptRef<Http::AlternateProtocolsCache> cache;
+    OptRef<Http::HttpServerPropertiesCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         quic::QuicServerId{
