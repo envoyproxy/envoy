@@ -131,9 +131,11 @@ private:
         matcher_factories;
     matcher_factories.reserve(config.matcher_list().matchers().size());
     for (const auto& matcher : config.matcher_list().matchers()) {
-      matcher_factories.push_back(std::make_pair(
-          createFieldMatcher<typename MatcherType::MatcherList::Predicate>(matcher.predicate()),
+      auto matcher_opt = createFieldMatcher<typename MatcherType::MatcherList::Predicate>(matcher.predicate());
+      if (matcher_opt.has_value()) {
+        matcher_factories.push_back(std::make_pair(matcher_opt.value(),
           *createOnMatch(matcher.on_match())));
+      }
     }
 
     auto on_no_match = createOnMatch(config.on_no_match());
@@ -155,7 +157,10 @@ private:
       const Protobuf::RepeatedPtrField<FieldPredicateType>& predicates) {
     std::vector<FieldMatcherFactoryCb<DataType>> sub_matchers;
     for (const auto& predicate : predicates) {
-      sub_matchers.emplace_back(createFieldMatcher<PredicateType>(predicate));
+      auto matcher = createFieldMatcher<PredicateType>(predicate);
+      if (matcher.has_value()) {
+        sub_matchers.emplace_back(std::move(matcher.value()));
+      }
     }
 
     return [sub_matchers]() {
@@ -170,33 +175,37 @@ private:
   }
 
   template <class PredicateType, class FieldMatcherType>
-  FieldMatcherFactoryCb<DataType> createFieldMatcher(const FieldMatcherType& field_predicate) {
+  absl::optional<FieldMatcherFactoryCb<DataType>> createFieldMatcher(const FieldMatcherType& field_predicate) {
     switch (field_predicate.match_type_case()) {
     case (PredicateType::kSinglePredicate): {
       auto data_input = createDataInput(field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
-      return [data_input, input_matcher]() {
+      return absl::make_optional([data_input, input_matcher]() {
         return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
-      };
+      });
     }
     case (PredicateType::kOrMatcher):
-      return createAggregateFieldMatcherFactoryCb<AnyFieldMatcher<DataType>, PredicateType>(
-          field_predicate.or_matcher().predicate());
+      return absl::make_optional(createAggregateFieldMatcherFactoryCb<AnyFieldMatcher<DataType>, PredicateType>(
+          field_predicate.or_matcher().predicate()));
     case (PredicateType::kAndMatcher):
-      return createAggregateFieldMatcherFactoryCb<AllFieldMatcher<DataType>, PredicateType>(
-          field_predicate.and_matcher().predicate());
+      return absl::make_optional(createAggregateFieldMatcherFactoryCb<AllFieldMatcher<DataType>, PredicateType>(
+          field_predicate.and_matcher().predicate()));
     case (PredicateType::kNotMatcher): {
-      auto matcher_factory = createFieldMatcher<PredicateType>(field_predicate.not_matcher());
+      auto matcher_factory_opt = createFieldMatcher<PredicateType>(field_predicate.not_matcher());
+      if (!matcher_factory_opt.has_value()) {
+        return absl::nullopt;
+      }
 
-      return [matcher_factory]() {
-        return std::make_unique<NotFieldMatcher<DataType>>(matcher_factory());
-      };
+      return absl::make_optional([matcher_factory_opt]() {
+        return std::make_unique<NotFieldMatcher<DataType>>(matcher_factory_opt.value()());
+      });
     }
     case PredicateType::MATCH_TYPE_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;
     }
-    throw EnvoyException(absl::StrCat("unexpected matcher type", field_predicate.match_type_case()));
+    IS_ENVOY_BUG("unexpected field predicate type case enum");
+    return absl::nullopt;
   }
 
   template <class MatcherType>
