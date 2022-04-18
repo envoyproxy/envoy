@@ -22,6 +22,8 @@
 namespace Envoy {
 namespace Stats {
 
+const char ThreadLocalStoreImpl::DeleteScopeSync[] = "delete-scope";
+const char ThreadLocalStoreImpl::IterateScopeSync[] = "iterate-scope";
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
@@ -388,6 +390,11 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatNam
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
+  // Helps reproduce a previous race condition by pausing here in tests while we
+  // loop over scopes. 'this' will not have been removed from the scopes_ table
+  // yet, so we need to be careful.
+  parent_.sync_.syncPoint(DeleteScopeSync);
+
   // Note that scope iteration is thread-safe due to the lock held in
   // releaseScopeCrossThread. For more details see the comment in
   // `ThreadLocalStoreImpl::iterHelper`, and the lock it takes prior to the loop.
@@ -1019,7 +1026,9 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
     return true;
   });
 
-  f_size(scopes.size());
+  if (f_size != nullptr) {
+    f_size(scopes.size());
+  }
   for (const ScopeSharedPtr& scope : scopes) {
     f_scope(*scope);
   }
@@ -1029,10 +1038,12 @@ bool ThreadLocalStoreImpl::iterateScopesLockHeld(
     const std::function<bool(const ScopeImplSharedPtr&)> fn) const
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   for (auto& iter : scopes_) {
-    // We keep the scopes as a map from Scope* to weak_ptr<Scope> so that if, during
-    // the iteration, the last reference to a ScopeSharedPtr is dropped, we can test
-    // for that here by attempting to lock the weak pointer, and skip those that are
-    // nullptr.
+    sync_.syncPoint(ThreadLocalStoreImpl::IterateScopeSync);
+
+    // We keep the scopes as a map from Scope* to weak_ptr<Scope> so that if,
+    // during the iteration, the last reference to a ScopeSharedPtr is dropped,
+    // we can test for that here by attempting to lock the weak pointer, and
+    // skip those that are nullptr.
     const std::weak_ptr<ScopeImpl>& scope = iter.second;
     const ScopeImplSharedPtr& locked = scope.lock();
     if (locked != nullptr && !fn(locked)) {

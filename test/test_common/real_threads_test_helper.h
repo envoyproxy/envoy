@@ -52,6 +52,14 @@ public:
   // executed.
   void tlsBlock();
 
+  // Runs a function on all workers, and returns a lambda which blocks waiting
+  // for all the workers to finish.
+  std::function<void()> runOnAllWorkers(std::function<void()> work);
+
+  // Runs a function on the main thread, and returns a lambda which blocks
+  // waiting for the main thread to finish.
+  std::function<void()> runOnMain(std::function<void()> work);
+
   ThreadLocal::Instance& tls() { return *tls_; }
   Api::Api& api() { return *api_; }
   Event::Dispatcher& mainDispatcher() { return *main_dispatcher_; }

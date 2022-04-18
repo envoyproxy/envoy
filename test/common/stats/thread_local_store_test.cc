@@ -1716,6 +1716,50 @@ public:
   StatNamePool pool_;
 };
 
+class OneWorkerThread : public ThreadLocalRealThreadsTestBase {
+protected:
+  static constexpr uint32_t NumThreads = 1;
+  OneWorkerThread() : ThreadLocalRealThreadsTestBase(NumThreads) {}
+};
+
+// Reproduces a race-condition between forEachScope and scope deletion. If we
+// replace the code in ThreadLocalStoreImpl::forEachScope with this:
+//
+// SPELLCHECKER(off)
+//     Thread::LockGuard lock(lock_);
+//     if (f_size != nullptr) {
+//       f_size(scopes_.size());
+//     }
+//     for (auto iter : scopes_) {
+//       if (iter.first != default_scope_.get()) {
+//         sync_.syncPoint(ThreadLocalStoreImpl::IterateScopeSync);
+//       }
+//       f_scope(*(iter.first));
+//     }
+// SPELLCHECKER(on)
+//
+// then we'll get a fatal exception on a weak_ptr conversion with this test.
+TEST_F(OneWorkerThread, DeleteForEachRace) {
+  ScopeSharedPtr scope = store_->createScope("scope.");
+  std::vector<ConstScopeSharedPtr> scopes;
+
+  store_->sync().enable();
+  store_->sync().waitOn(ThreadLocalStoreImpl::DeleteScopeSync);
+  store_->sync().waitOn(ThreadLocalStoreImpl::IterateScopeSync);
+  auto wait_for_worker = runOnAllWorkers([this, &scopes]() {
+    store_->forEachScope(
+        nullptr, [&scopes](const Scope& scope) { scopes.push_back(scope.getConstShared()); });
+    EXPECT_EQ(1, scopes.size());
+  });
+  store_->sync().barrierOn(ThreadLocalStoreImpl::IterateScopeSync);
+  auto wait_for_main = runOnMain([&scope]() { scope.reset(); });
+  store_->sync().barrierOn(ThreadLocalStoreImpl::DeleteScopeSync);
+  store_->sync().signal(ThreadLocalStoreImpl::IterateScopeSync);
+  wait_for_worker();
+  store_->sync().signal(ThreadLocalStoreImpl::DeleteScopeSync);
+  wait_for_main();
+}
+
 class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsTestBase {
 protected:
   static constexpr uint32_t NumThreads = 2;

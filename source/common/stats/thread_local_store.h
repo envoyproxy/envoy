@@ -144,6 +144,8 @@ using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
+  static const char DeleteScopeSync[];
+  static const char IterateScopeSync[];
   static const char MainDispatcherCleanupSync[];
 
   ThreadLocalStoreImpl(Allocator& alloc);
@@ -549,7 +551,7 @@ private:
   NullHistogramImpl null_histogram_;
   NullTextReadoutImpl null_text_readout_;
 
-  Thread::ThreadSynchronizer sync_;
+  mutable Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
