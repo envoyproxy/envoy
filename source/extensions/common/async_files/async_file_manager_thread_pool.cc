@@ -61,15 +61,18 @@ std::string AsyncFileManagerThreadPool::describe() const {
 }
 
 std::function<void()> AsyncFileManagerThreadPool::enqueue(std::shared_ptr<AsyncFileAction> action) {
-  auto cancelFunc = [action]() { action->cancel(); };
-  absl::MutexLock lock(&queue_mutex_);
+  auto cancel_func = [action]() { action->cancel(); };
+  // If an action is being enqueued from within a callback, we don't have to actually queue it,
+  // we can just set it as the thread's next action - this acts to chain the actions without
+  // yielding to another file.
   if (ThreadIsWorker) {
     ASSERT(!ThreadNextAction); // only do one file action per callback.
     ThreadNextAction = std::move(action);
-    return cancelFunc;
+    return cancel_func;
   }
+  absl::MutexLock lock(&queue_mutex_);
   queue_.push(std::move(action));
-  return cancelFunc;
+  return cancel_func;
 }
 
 void AsyncFileManagerThreadPool::worker() {
@@ -201,7 +204,6 @@ private:
     case AsyncFileManager::Mode::WriteOnly:
       return O_WRONLY;
     case AsyncFileManager::Mode::ReadWrite:
-    default:
       return O_RDWR;
     }
   }

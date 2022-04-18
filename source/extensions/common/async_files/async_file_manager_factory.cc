@@ -15,6 +15,13 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
+namespace {
+struct ManagerAndConfig {
+  std::shared_ptr<AsyncFileManager> manager;
+  const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
+};
+} // namespace
+
 SINGLETON_MANAGER_REGISTRATION(async_file_manager_factory_singleton);
 
 class AsyncFileManagerFactoryImpl : public AsyncFileManagerFactory {
@@ -27,11 +34,7 @@ public:
 
 private:
   absl::Mutex mu_;
-  absl::flat_hash_map<std::string, std::shared_ptr<AsyncFileManager>>
-      managers_ ABSL_GUARDED_BY(mu_);
-  absl::flat_hash_map<std::string,
-                      envoy::extensions::common::async_files::v3::AsyncFileManagerConfig>
-      configs_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<std::string, ManagerAndConfig> managers_ ABSL_GUARDED_BY(mu_);
 };
 
 std::shared_ptr<AsyncFileManagerFactory>
@@ -53,17 +56,20 @@ std::shared_ptr<AsyncFileManager> AsyncFileManagerFactoryImpl::getAsyncFileManag
     switch (config.manager_type_case()) {
     case envoy::extensions::common::async_files::v3::AsyncFileManagerConfig::kThreadPool:
       it = managers_
-               .insert({config.id(), std::make_shared<AsyncFileManagerThreadPool>(config, posix)})
+               .insert({config.id(),
+                        ManagerAndConfig{
+                            std::make_shared<AsyncFileManagerThreadPool>(config, posix), config}})
                .first;
-      configs_.insert({config.id(), config});
       break;
-    default:
+    case envoy::extensions::common::async_files::v3::AsyncFileManagerConfig::MANAGER_TYPE_NOT_SET:
+      // This is theoretically unreachable due to proto validation 'required', but it's possible
+      // for code to have modified the proto post-validation.
       throw EnvoyException("unrecognized AsyncFileManagerConfig::ManagerType");
     };
-  } else if (!Protobuf::util::MessageDifferencer::Equivalent(configs_[config.id()], config)) {
+  } else if (!Protobuf::util::MessageDifferencer::Equivalent(it->second.config, config)) {
     throw EnvoyException("AsyncFileManager mismatched config");
   }
-  return it->second;
+  return it->second.manager;
 }
 
 } // namespace AsyncFiles
