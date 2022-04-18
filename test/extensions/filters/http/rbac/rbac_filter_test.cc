@@ -433,7 +433,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   matcher_on_no_match_action->set_name("action");
   matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
   *route_config.mutable_rbac()->mutable_matcher() = matcher;
-  HttpActionValidationVisitor validation_visitor;
+  ActionValidationVisitor validation_visitor;
   NiceMock<Filters::Common::RBAC::MockMatcherEngine> engine{route_config.rbac().matcher(), context_,
                                                             validation_visitor};
   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config,

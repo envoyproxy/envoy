@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-absl::Status HttpActionValidationVisitor::performDataInputValidation(
+absl::Status ActionValidationVisitor::performDataInputValidation(
     const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&,
     absl::string_view) {
   return absl::OkStatus();

@@ -6,6 +6,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/rbac/engine_impl.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -455,7 +456,7 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, Disabled) {
   xds::type::matcher::v3::Matcher matcher;
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  RBAC::HttpActionValidationVisitor validation_visitor;
+  HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
   RBAC::RoleBasedAccessControlMatcherEngineImpl engine(matcher, factory_context,
                                                        validation_visitor);
 
@@ -487,7 +488,7 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {
   matcher_on_no_match_action->mutable_typed_config()->PackFrom(deny_action);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  RBAC::HttpActionValidationVisitor validation_visitor;
+  HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
   RBAC::RoleBasedAccessControlMatcherEngineImpl engine(matcher, factory_context,
                                                        validation_visitor);
 
@@ -532,7 +533,7 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   matcher_on_no_match_action->mutable_typed_config()->PackFrom(allow_action);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  RBAC::HttpActionValidationVisitor validation_visitor;
+  HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
   RBAC::RoleBasedAccessControlMatcherEngineImpl engine(matcher, factory_context,
                                                        validation_visitor);
 

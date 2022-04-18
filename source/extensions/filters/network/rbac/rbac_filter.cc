@@ -14,7 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
-absl::Status NetworkActionValidationVisitor::performDataInputValidation(
+absl::Status ActionValidationVisitor::performDataInputValidation(
     const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&,
     absl::string_view type_url) {
   static absl::flat_hash_set<std::string> allowed_inputs_set{
