@@ -650,6 +650,26 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_proto_library(
+    name = "inspect_data_listener_filter_config_proto",
+    srcs = [":inspect_data_listener_filter_config.proto"],
+)
+
+envoy_cc_test_library(
+    name = "inspect_data_listener_filter_lib",
+    srcs = [
+        "inspect_data_listener_filter.cc",
+    ],
+    deps = [
+        ":inspect_data_listener_filter_config_proto_cc_proto",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "set_route_filter_lib",
     srcs = [

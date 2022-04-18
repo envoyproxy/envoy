@@ -7,8 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" || "$1" == "verify_examples" || \
-          "$1" == "verify_build_examples" ]]; then
+          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" || "$1" == "tooling" \
+          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
+          || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -228,6 +229,30 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   bazel_contrib_binary_build release
 
   exit 0
+elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
+  echo "Building distro packages..."
+
+  setup_clang_toolchain
+
+  # By default the packages will be signed by the first available key.
+  # If there is no key available, a throwaway key is created
+  # and the packages signed with it, for the purpose of testing only.
+  if ! gpg --list-secret-keys "*"; then
+      export PACKAGES_MAINTAINER_NAME="Envoy CI"
+      export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
+      BAZEL_BUILD_OPTIONS+=(
+          "--action_env=PACKAGES_GEN_KEY=1"
+          "--action_env=PACKAGES_MAINTAINER_NAME"
+          "--action_env=PACKAGES_MAINTAINER_EMAIL")
+  fi
+
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution:packages.tar.gz
+  if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+      cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
+  else
+      cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.arm64.tar.gz"
+  fi
+  exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
@@ -348,6 +373,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "deprecated_features=disabled"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng"
+    "--define" "uhv=enabled"
     "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
@@ -507,6 +533,14 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" "wasm-cc|win32-front-proxy|shared"
   exit 0
+elif [[ "$CI_TARGET" == "verify_distro" ]]; then
+    if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+        PACKAGE_BUILD=/build/bazel.distribution/packages.x64.tar.gz
+    else
+        PACKAGE_BUILD=/build/bazel.distribution.arm64/packages.arm64.tar.gz
+    fi
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
+    exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc
   exit 0

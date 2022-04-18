@@ -47,28 +47,93 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AlpnIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AlpnIntegrationTest, Http2) {
+TEST_P(AlpnIntegrationTest, Http2Old) {
   setUpstreamProtocol(Http::CodecType::HTTP2);
   protocols_ = {Http::CodecType::HTTP2, Http::CodecType::HTTP2};
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",
+                                    "false");
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
 }
 
-TEST_P(AlpnIntegrationTest, Http1) {
-  setUpstreamProtocol(Http::CodecType::HTTP1);
-  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP1};
+TEST_P(AlpnIntegrationTest, Http2New) {
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  protocols_ = {Http::CodecType::HTTP2, Http::CodecType::HTTP2};
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",
+                                    "true");
+
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
+}
+
+TEST_P(AlpnIntegrationTest, Http1Old) {
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP1};
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",
+                                    "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
+  codec_client2->close();
+}
+
+TEST_P(AlpnIntegrationTest, Http1New) {
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP1};
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",
+                                    "true");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
+  codec_client2->close();
 }
 
 TEST_P(AlpnIntegrationTest, Mixed) {
