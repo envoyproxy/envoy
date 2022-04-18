@@ -145,10 +145,17 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  auto descriptor = descriptorHelper(request_descriptors);
-
-  return descriptor.has_value() ? requestAllowedHelper(*descriptor.value().get().token_state_)
-                                : requestAllowedHelper(tokens_);
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    bool limit = true;
+    for (const auto& request_descriptor : request_descriptors) {
+      auto it = descriptors_.find(request_descriptor);
+      if (it != descriptors_.end()) {
+        limit &= requestAllowedHelper(*it->token_state_);
+      }
+    }
+    return limit;
+  }
+  return requestAllowedHelper(tokens_);
 }
 
 uint32_t LocalRateLimiterImpl::maxTokens(
