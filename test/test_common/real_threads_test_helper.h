@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Thread {
 
 class RealThreadsTestHelper {
-public:
+protected:
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingBarrier {
   public:
@@ -40,7 +40,7 @@ public:
   // Shutdown thread local instance.
   void shutdownThreading();
   // Post exit signal and wait for main thread and worker threads to join.
-  void exitThreads(std::function<void()> cleanup = nullptr);
+  void exitThreads();
   // Run the callback in all the workers, block until the callback has finished in all threads.
   void runOnAllWorkersBlocking(std::function<void()> work);
   // Run the callback in main thread, block until the callback has been executed in main thread.
@@ -53,12 +53,11 @@ public:
   void tlsBlock();
 
   ThreadLocal::Instance& tls() { return *tls_; }
+
   Api::Api& api() { return *api_; }
-  Event::Dispatcher& mainDispatcher() { return *main_dispatcher_; }
 
   // TODO(chaoqin-li1123): make these variables private when we figure out how to clean up the
   // threading resources inside the helper class.
-protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;

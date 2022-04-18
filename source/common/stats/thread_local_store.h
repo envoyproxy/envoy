@@ -21,6 +21,7 @@
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -187,10 +188,51 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-  CounterOptConstRef findCounter(StatName name) const override;
-  GaugeOptConstRef findGauge(StatName name) const override;
-  HistogramOptConstRef findHistogram(StatName name) const override;
-  TextReadoutOptConstRef findTextReadout(StatName name) const override;
+  CounterOptConstRef findCounter(StatName name) const override {
+    CounterOptConstRef found_counter;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_counter = scope->findCounter(name);
+      if (found_counter.has_value()) {
+        return found_counter;
+      }
+    }
+    return absl::nullopt;
+  }
+  GaugeOptConstRef findGauge(StatName name) const override {
+    GaugeOptConstRef found_gauge;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_gauge = scope->findGauge(name);
+      if (found_gauge.has_value()) {
+        return found_gauge;
+      }
+    }
+    return absl::nullopt;
+  }
+  HistogramOptConstRef findHistogram(StatName name) const override {
+    HistogramOptConstRef found_histogram;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_histogram = scope->findHistogram(name);
+      if (found_histogram.has_value()) {
+        return found_histogram;
+      }
+    }
+    return absl::nullopt;
+  }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    TextReadoutOptConstRef found_text_readout;
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      found_text_readout = scope->findTextReadout(name);
+      if (found_text_readout.has_value()) {
+        return found_text_readout;
+      }
+    }
+    return absl::nullopt;
+  }
+
   bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
@@ -346,33 +388,16 @@ private:
     }
 
     bool iterate(const IterateFn<Counter>& fn) const override {
-      Thread::LockGuard lock(parent_.lock_);
-      return iterateLockHeld(fn);
+      return iterHelper(fn, central_cache_->counters_);
     }
     bool iterate(const IterateFn<Gauge>& fn) const override {
-      Thread::LockGuard lock(parent_.lock_);
-      return iterateLockHeld(fn);
+      return iterHelper(fn, central_cache_->gauges_);
     }
     bool iterate(const IterateFn<Histogram>& fn) const override {
-      Thread::LockGuard lock(parent_.lock_);
-      return iterateLockHeld(fn);
+      return iterHelper(fn, central_cache_->histograms_);
     }
     bool iterate(const IterateFn<TextReadout>& fn) const override {
-      Thread::LockGuard lock(parent_.lock_);
-      return iterateLockHeld(fn);
-    }
-
-    bool iterateLockHeld(const IterateFn<Counter>& fn) const {
-      return iterHelper(fn, centralCacheLockHeld()->counters_);
-    }
-    bool iterateLockHeld(const IterateFn<Gauge>& fn) const {
-      return iterHelper(fn, centralCacheLockHeld()->gauges_);
-    }
-    bool iterateLockHeld(const IterateFn<Histogram>& fn) const {
-      return iterHelper(fn, centralCacheLockHeld()->histograms_);
-    }
-    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const {
-      return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
+      return iterHelper(fn, central_cache_->text_readouts_);
     }
 
     // NOTE: The find methods assume that `name` is fully-qualified.
@@ -381,8 +406,6 @@ private:
     GaugeOptConstRef findGauge(StatName name) const override;
     HistogramOptConstRef findHistogram(StatName name) const override;
     TextReadoutOptConstRef findTextReadout(StatName name) const override;
-
-    HistogramOptConstRef findHistogramLockHeld(StatName name) const;
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(
@@ -425,43 +448,14 @@ private:
     template <class StatType>
     StatTypeOptConstRef<StatType>
     findStatLockHeld(StatName name,
-                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
-      auto iter = central_cache_map.find(name);
-      if (iter == central_cache_map.end()) {
-        return absl::nullopt;
-      }
-
-      return std::cref(*iter->second);
-    }
+                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
     StatName prefix() const override { return prefix_.statName(); }
 
-    // Returns the central cache, asserting that the parent lock is held.
-    //
-    // When a ThreadLocalStore method takes lock_ and then accesses
-    // scope->central_cache_, the analysis system cannot understand that the
-    // scope's parent_.lock_ is held, so we assert that here.
-    const CentralCacheEntrySharedPtr& centralCacheLockHeld() const
-        ABSL_ASSERT_EXCLUSIVE_LOCK(parent_.lock_) {
-      return central_cache_;
-    }
-
-    // Returns the central cache, bypassing thread analysis.
-    //
-    // This is used only when passing references to maps held in the central
-    // cache to safeMakeStat, which takes the lock only if those maps are
-    // actually referenced, due to the lookup missing the TLS cache.
-    const CentralCacheEntrySharedPtr&
-    centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
-      return central_cache_;
-    }
-
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
-
-  private:
     StatNameStorage prefix_;
-    mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
+    mutable CentralCacheEntrySharedPtr central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -482,28 +476,20 @@ private:
     absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> tls_histogram_cache_;
   };
 
-  using ScopeImplSharedPtr = std::shared_ptr<ScopeImpl>;
-
-  /**
-   * Calls fn_lock_held for every scope with, lock_ held. This ensures to avoid
-   * iterate/destruct races for scopes.
-   *
-   * @param fn_lock_held function to be called, with lock_ held, on every scope, until
-   *   fn_lock_held() returns false.
-   * @return true if the iteration completed with fn_lock_held never returning false.
-   */
-  bool iterateScopes(const std::function<bool(const ScopeImplSharedPtr&)> fn_lock_held) const {
-    Thread::LockGuard lock(lock_);
-    return iterateScopesLockHeld(fn_lock_held);
-  }
-
-  bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-
-  // The Store versions of iterate cover all the scopes in the store.
   template <class StatFn> bool iterHelper(StatFn fn) const {
-    return iterateScopes(
-        [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
+    // Note that any thread can delete a scope at any time, and so another
+    // thread may have initiated destruction when we enter `iterHelper`.
+    // However the first thing that happens is releaseScopeCrossThread, which
+    // takes lock_, and doesn't release it until scopes_.erase(scope) finishes.
+    // thus there is no race risk with iterating over scopes while another
+    // thread deletes them.
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      if (!scope->iterate(fn)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   StatName prefix() const override { return StatName(); }
@@ -533,7 +519,7 @@ private:
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
   ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_map<ScopeImpl*, std::weak_ptr<ScopeImpl>> scopes_ ABSL_GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopeSharedPtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;

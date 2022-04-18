@@ -43,7 +43,7 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
   }
 }
 
-void StatsTextRender::finalize(Buffer::Instance& response) { response.add(""); }
+void StatsTextRender::finalize(Buffer::Instance&) {}
 
 // Computes disjoint buckets as text and adds them to the response buffer.
 void StatsTextRender::addDisjointBuckets(const std::string& name,
