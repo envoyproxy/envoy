@@ -11,11 +11,11 @@ namespace KeyValue {
 PlatformKeyValueStore::PlatformKeyValueStore(Event::Dispatcher& dispatcher,
                                              std::chrono::milliseconds save_interval,
                                              PlatformInterface& platform_interface,
-                                             const std::string& key)
-    : KeyValueStoreBase(dispatcher, save_interval), platform_interface_(platform_interface),
-      key_(key) {
+                                             uint64_t max_entries, const std::string& key)
+    : KeyValueStoreBase(dispatcher, save_interval, max_entries),
+      platform_interface_(platform_interface), key_(key) {
   const std::string contents = platform_interface.read(key);
-  if (!parseContents(contents, store_)) {
+  if (!parseContents(contents)) {
     ENVOY_LOG(warn, "Failed to parse key value store contents {}", key);
   }
 }
@@ -41,8 +41,9 @@ PlatformKeyValueStoreFactory::createStore(const Protobuf::Message& config,
       typed_config.config().typed_config(), validation_visitor);
   auto milliseconds =
       std::chrono::milliseconds(DurationUtil::durationToMilliseconds(file_config.save_interval()));
-  return std::make_unique<PlatformKeyValueStore>(
-      dispatcher, milliseconds, platform_interface_.value().get(), file_config.key());
+  return std::make_unique<PlatformKeyValueStore>(dispatcher, milliseconds,
+                                                 platform_interface_.value().get(),
+                                                 file_config.max_entries(), file_config.key());
 }
 
 REGISTER_FACTORY(PlatformKeyValueStoreFactory, KeyValueStoreFactory);

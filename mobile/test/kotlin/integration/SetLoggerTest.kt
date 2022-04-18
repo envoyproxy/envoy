@@ -15,6 +15,7 @@ import org.junit.Test
 private const val apiListenerType =
   "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val testLoggerFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger"
 private const val config =
 """
 static_resources:
@@ -43,6 +44,8 @@ static_resources:
                       status: 200
           http_filters:
             - name: test_logger
+              typed_config:
+                "@type": $testLoggerFilterType
             - name: envoy.filters.http.assertion
               typed_config:
                 "@type": $assertionFilterType

@@ -12,4 +12,7 @@ message PlatformKeyValueStoreConfig {
 
   // The interval at which the key value store should be saved.
   google.protobuf.Duration save_interval = 2;
+
+  // The maximum number of entries that can be stored in the cache.
+  uint64 max_entries = 3;
 }

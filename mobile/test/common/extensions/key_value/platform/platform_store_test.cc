@@ -37,8 +37,8 @@ protected:
 
   void createStore() {
     flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    store_ =
-        std::make_unique<PlatformKeyValueStore>(dispatcher_, save_interval_, mock_platform_, key_);
+    store_ = std::make_unique<PlatformKeyValueStore>(dispatcher_, save_interval_, mock_platform_,
+                                                     std::numeric_limits<uint64_t>::max(), key_);
   }
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::string key_{"key"};
