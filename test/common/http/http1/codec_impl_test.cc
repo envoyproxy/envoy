@@ -3165,7 +3165,7 @@ TEST_F(Http1ServerConnectionImplTest, Utf8Path) {
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
   auto status = codec_->dispatch(buffer);
-  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
 #else
   // strict
