@@ -96,7 +96,7 @@ public:
   template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {
     switch (config.matcher_type_case()) {
     case MatcherType::kMatcherTree:
-      return createTreeMatcher(config);
+      return createTreeMatcher(config).value();
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     case MatcherType::MATCHER_TYPE_NOT_SET:
@@ -180,9 +180,12 @@ private:
     case (PredicateType::kSinglePredicate): {
       auto data_input = createDataInput(field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
+      if (!input_matcher.has_value()) {
+        return absl::nullopt;
+      }
 
       return absl::make_optional([data_input, input_matcher]() {
-        return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
+        return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher.value()());
       });
     }
     case (PredicateType::kOrMatcher):
@@ -209,18 +212,18 @@ private:
   }
 
   template <class MatcherType>
-  MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
+  absl::optional<MatchTreeFactoryCb<DataType>> createTreeMatcher(const MatcherType& matcher) {
     auto data_input = createDataInput(matcher.matcher_tree().input());
     auto on_no_match = createOnMatch(matcher.on_no_match());
 
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
-      return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(), data_input,
-                                               on_no_match);
+      return absl::make_optional(std::move(createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(), data_input,
+                                               on_no_match)));
     }
     case MatcherType::MatcherTree::kPrefixMatchMap: {
-      return createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
-                                                data_input, on_no_match);
+      return absl::make_optional(std::move(createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
+                                                data_input, on_no_match)));
     }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
@@ -230,11 +233,12 @@ private:
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           matcher.matcher_tree().custom_match().typed_config(),
           server_factory_context_.messageValidationVisitor(), factory);
-      return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
-                                                  on_no_match, *this);
+      return absl::make_optional(std::move(factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
+                                                  on_no_match, *this)));
     }
     }
-    throw EnvoyException(absl::StrCat("unexpected matcher type", matcher.matcher_tree().tree_type_case())); 
+    IS_ENVOY_BUG("unexpected matcher case type enum");
+    return absl::nullopt;
   }
 
   template <template <class> class MapMatcherType, class MapType>
@@ -322,25 +326,26 @@ private:
   }
 
   template <class SinglePredicateType>
-  InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
+  absl::optional<InputMatcherFactoryCb> createInputMatcher(const SinglePredicateType& predicate) {
     switch (predicate.matcher_case()) {
     case SinglePredicateType::kValueMatch:
-      return [value_match = predicate.value_match()]() {
+      return absl::make_optional([value_match = predicate.value_match()]() {
         return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
             value_match);
-      };
+      });
     case SinglePredicateType::kCustomMatch: {
       auto& factory =
           Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           predicate.custom_match().typed_config(),
           server_factory_context_.messageValidationVisitor(), factory);
-      return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
+      return absl::make_optional(std::move(factory.createInputMatcherFactoryCb(*message, server_factory_context_)));
     }
     case SinglePredicateType::MATCHER_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;
     }
-    throw EnvoyException(absl::StrCat("unexpected predicate matcher type", predicate.matcher_case())); 
+    IS_ENVOY_BUG("unexpected predicate matcher case");
+    return absl::nullopt;
   }
 
   const std::string stats_prefix_;
