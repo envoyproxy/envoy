@@ -487,7 +487,6 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
   return;
 #endif
 
-  init();
   const std::string valid_header = "GET /index HTTP/1.1\r";
   //  offset:                       0         10
   const std::string truncate_header = valid_header.substr(0, 14).append("\r");
