@@ -27,14 +27,14 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-constexpr absl::string_view kBody = "abc";
+constexpr absl::string_view CacheResponseBody = "abc";
 
 // Returns a std::function that can be used as an action with
 // MockLookupContext::getBody to return the provided body or chunk.
 std::function<void(const AdjustedByteRange&, LookupBodyCallback&&)>
 getBodyChunk(absl::string_view chunk) {
   return [chunk = std::string(chunk)](const AdjustedByteRange&, LookupBodyCallback&& cb) {
-    cb(std::make_unique<Envoy::Buffer::OwnedImpl>(chunk));
+    cb(std::make_unique<Buffer::OwnedImpl>(chunk));
   };
 }
 
@@ -47,7 +47,7 @@ MATCHER_P(bufferContains, matcher,
 
 MATCHER_P(doesNotHaveHeaders, matcher, "") {
   for (const std::string& header : matcher) {
-    if (!arg.get(Envoy::Http::LowerCaseString(header)).empty()) {
+    if (!arg.get(Http::LowerCaseString(header)).empty()) {
       return false;
     }
   }
@@ -58,7 +58,7 @@ MATCHER_P(doesNotHaveHeaders, matcher, "") {
 // sequencing cache callbacks for e.g. testing flow control.
 class CacheFilterTest : public ::testing::Test {
 protected:
-  void SetUp() override {
+  CacheFilterTest() {
     cache_ = std::make_shared<StrictMock<MockHttpCache>>();
     filter_ = makeFilter();
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(*dispatcher_));
@@ -74,7 +74,7 @@ protected:
     response_headers_.setDate(formatter_.now(time_source_));
   }
 
-  void TearDown() override { filter_->onDestroy(); }
+  ~CacheFilterTest() { filter_->onDestroy(); }
 
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
@@ -92,7 +92,7 @@ protected:
   void expectCacheMiss(std::function<void(MockLookupContext&)> context_callback = nullptr) {
     EXPECT_CALL(*cache_, makeLookupContext).WillOnce(InvokeWithoutArgs([this, context_callback]() {
       std::unique_ptr<MockLookupContext> lookup_context =
-          makeLookupContext({/*cache_entry_status_=*/CacheEntryStatus::Unusable});
+          makeLookupContext({CacheEntryStatus::Unusable});
       if (context_callback) {
         context_callback(*lookup_context);
       }
@@ -120,7 +120,7 @@ protected:
   void expectCacheHitNoBody() {
     // The filter should ask the cache for a lookup context, which will return a
     // headers-only hit.
-    expectLookup({/*cache_entry_status_=*/CacheEntryStatus::Ok,
+    expectLookup({CacheEntryStatus::Ok,
                   /*headers_=*/nullptr, /*content_length_=*/0});
 
     // The filter should encode cached headers.
@@ -129,9 +129,8 @@ protected:
   }
 
   void expectCacheHitWithBody(absl::string_view body) {
-    expectLookup({/*cache_entry_status_=*/CacheEntryStatus::Ok,
-                  /*headers_=*/nullptr,
-                  /*content_length_=*/body.size()},
+    expectLookup({CacheEntryStatus::Ok,
+                  /*headers_=*/nullptr, body.size()},
                  [body = std::string(body)](MockLookupContext& lookup) {
                    EXPECT_CALL(lookup, getBody(AdjustedByteRange(0, body.size()), _))
                        .WillOnce(getBodyChunk(body));
@@ -170,13 +169,10 @@ protected:
             range_details = lookup_result.range_details_,
             has_trailers = lookup_result.has_trailers_](LookupHeadersCallback cb) {
       auto response_headers_from_cache =
-          std::make_unique<Envoy::Http::TestResponseHeaderMapImpl>(response_headers);
+          std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers);
       response_headers_from_cache->setCopy(Http::CustomHeaders::get().Age, age);
-      cb({/*cache_entry_status_=*/cache_entry_status,
-          /*headers_=*/std::move(response_headers_from_cache),
-          /*content_length_=*/content_length,
-          /*range_details_=*/range_details,
-          /*has_trailers_=*/has_trailers});
+      cb({cache_entry_status, std::move(response_headers_from_cache), content_length, range_details,
+          has_trailers});
     };
   }
 
@@ -197,13 +193,11 @@ protected:
     for (absl::string_view chunk : body_chunks) {
       content_length += chunk.length();
     }
-    EXPECT_CALL(
-        *insert_context,
-        insertHeaders(/*response_headers=*/testing::AllOf(
-                          isSupersetOfCacheableResponseHeaders(),
-                          Envoy::HeaderHasValueRef(Envoy::Http::Headers::get().ContentLength,
-                                                   absl::StrCat(content_length))),
-                      /*metadata=*/_, /*end_stream=*/false));
+    EXPECT_CALL(*insert_context,
+                insertHeaders(testing::AllOf(isSupersetOfCacheableResponseHeaders(),
+                                             HeaderHasValueRef(Http::Headers::get().ContentLength,
+                                                               absl::StrCat(content_length))),
+                              /*metadata=*/_, /*end_stream=*/false));
     for (const absl::string_view& chunk : body_chunks) {
       bool end_stream = (&chunk == &body_chunks.back());
       EXPECT_CALL(*insert_context, insertBody(bufferContains(chunk), _, end_stream))
@@ -217,31 +211,30 @@ protected:
   // Passes request_headers_ into the filter's decodeHeaders(), and runs any
   // subsequent callbacks posted to the dispatcher. Returns the return value of
   // the encodeHeaders() call.
-  Envoy::Http::FilterHeadersStatus decodeHeadersAndRunDispatcher(bool end_stream = true) {
-    Envoy::Http::FilterHeadersStatus decode_headers_result =
+  Http::FilterHeadersStatus decodeHeadersAndRunDispatcher(bool end_stream = true) {
+    Http::FilterHeadersStatus decode_headers_result =
         filter_->decodeHeaders(request_headers_, end_stream);
-    dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
     return decode_headers_result;
   }
 
   void waitBeforeLookup() { time_source_.advanceTimeWait(delay_); }
 
-  testing::Matcher<const Envoy::Http::ResponseHeaderMap&>
-  isSupersetOfCacheableHeaders(const Envoy::Http::TestResponseHeaderMapImpl& headers) const {
-    Envoy::Http::TestResponseHeaderMapImpl cacheable_response_headers = headers;
+  testing::Matcher<const Http::ResponseHeaderMap&>
+  isSupersetOfCacheableHeaders(const Http::TestResponseHeaderMapImpl& headers) const {
+    Http::TestResponseHeaderMapImpl cacheable_response_headers = headers;
     for (const std::string& header : uncached_headers_) {
-      cacheable_response_headers.remove(Envoy::Http::LowerCaseString(header));
+      cacheable_response_headers.remove(Http::LowerCaseString(header));
     }
     return testing::AllOf(IsSupersetOfHeaders(cacheable_response_headers),
                           doesNotHaveHeaders(uncached_headers_));
   }
 
-  testing::Matcher<const Envoy::Http::ResponseHeaderMap&>
-  isSupersetOfCacheableResponseHeaders() const {
+  testing::Matcher<const Http::ResponseHeaderMap&> isSupersetOfCacheableResponseHeaders() const {
     return isSupersetOfCacheableHeaders(response_headers_);
   }
 
-  testing::Matcher<Envoy::Http::ResponseHeaderMap&> isSupersetOfResponseHeadersWithAge() {
+  testing::Matcher<Http::ResponseHeaderMap&> isSupersetOfResponseHeadersWithAge() {
     return testing::AllOf(IsSupersetOfHeaders(response_headers_),
                           HeaderHasValueRef(Http::CustomHeaders::get().Age, age_));
   }
@@ -283,13 +276,11 @@ TEST_F(CacheFilterTest, UncacheableRequest) {
   // Uncacheable requests should bypass the cache filter; no cache lookups
   // should be initiated.
   EXPECT_CALL(*cache_, makeLookupContext).Times(0);
-  EXPECT_EQ(filter_->decodeHeaders(request_headers_, true),
-            Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
   // Encode response header
   EXPECT_CALL(*cache_, makeInsertContext).Times(0);
-  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true),
-            Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(CacheFilterTest, UncacheableResponse) {
@@ -301,12 +292,11 @@ TEST_F(CacheFilterTest, UncacheableResponse) {
   expectCacheMiss();
 
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream=*/true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Encode response headers.
   EXPECT_CALL(*cache_, makeInsertContext).Times(0);
-  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true),
-            Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(CacheFilterTest, CacheMiss) {
@@ -314,7 +304,7 @@ TEST_F(CacheFilterTest, CacheMiss) {
 
   expectCacheMiss();
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream=*/true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   EXPECT_CALL(*cache_, makeInsertContext).WillOnce(Return(ByMove(headerOnlyInsertContext())));
 
@@ -328,16 +318,16 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
 
   expectCacheHitNoBody();
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream=*/true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
 
 TEST_F(CacheFilterTest, CacheHitWithBody) {
   request_headers_.setHost("CacheHitWithBody");
   waitBeforeLookup();
 
-  expectCacheHitWithBody(kBody);
+  expectCacheHitWithBody(CacheResponseBody);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
 
 TEST_F(CacheFilterTest, SuccessfulValidation) {
@@ -345,14 +335,14 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   const std::string etag = "abc123";
   const std::string last_modified_date = formatter_.now(time_source_);
   // Add Etag & Last-Modified headers to the response for validation
-  response_headers_.setReferenceKey(Envoy::Http::CustomHeaders::get().Etag, etag);
-  response_headers_.setReferenceKey(Envoy::Http::CustomHeaders::get().LastModified,
-                                    last_modified_date);
-  response_headers_.setContentLength(kBody.size());
+  const auto& custom_headers = Http::CustomHeaders::get();
+  response_headers_.setReferenceKey(custom_headers.Etag, etag);
+  response_headers_.setReferenceKey(custom_headers.LastModified, last_modified_date);
+  response_headers_.setContentLength(CacheResponseBody.size());
   waitBeforeLookup();
 
   // Make request require validation
-  request_headers_.setReferenceKey(Envoy::Http::CustomHeaders::get().CacheControl, "no-cache");
+  request_headers_.setReferenceKey(custom_headers.CacheControl, "no-cache");
 
   const std::string not_modified_date = formatter_.now(time_source_);
 
@@ -360,22 +350,22 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   // filter sees a 304 response, it should update the cached headers to
   // match the response, and then fetch the cached body.
 
-  Envoy::Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
+  Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
   updated_response_headers.setDate(not_modified_date);
 
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
-                /*headers_=*/nullptr,
-                /*content_length_=*/kBody.size()},
-               [this, updated_response_headers](MockLookupContext& lookup_context) {
-                 EXPECT_CALL(*cache_, updateHeaders(
-                                          Ref(lookup_context),
-                                          isSupersetOfCacheableHeaders(updated_response_headers),
-                                          Field("response_time_", &ResponseMetadata::response_time_,
-                                                time_source_.systemTime())));
+  expectLookup(
+      {CacheEntryStatus::RequiresValidation,
+       /*headers_=*/nullptr, CacheResponseBody.size()},
+      [this, updated_response_headers](MockLookupContext& lookup_context) {
+        EXPECT_CALL(*cache_,
+                    updateHeaders(Ref(lookup_context),
+                                  isSupersetOfCacheableHeaders(updated_response_headers),
+                                  Field("response_time_", &ResponseMetadata::response_time_,
+                                        time_source_.systemTime())));
 
-                 EXPECT_CALL(lookup_context, getBody(AdjustedByteRange(0, kBody.size()), _))
-                     .WillOnce(getBodyChunk(kBody));
-               });
+        EXPECT_CALL(lookup_context, getBody(AdjustedByteRange(0, CacheResponseBody.size()), _))
+            .WillOnce(getBodyChunk(CacheResponseBody));
+      });
 
   // Decoding the request should find a cached response that requires
   // validation. As far as decoding the request is concerned, this is the same
@@ -383,16 +373,16 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   // headers.
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added
-  const Envoy::Http::TestRequestHeaderMapImpl injected_headers = {
+  const Http::TestRequestHeaderMapImpl injected_headers = {
       {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
   EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
   // Encode 304 response
-  Envoy::Http::TestResponseHeaderMapImpl not_modified_response_headers = {
-      {":status", "304"}, {"date", not_modified_date}};
+  Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
+                                                                   {"date", not_modified_date}};
 
   // The filter should stop encoding iteration when encodeHeaders is called as a cached response
   // is being fetched and added to the encoding stream. StopIteration does not stop encodeData of
@@ -404,40 +394,40 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
 
   // The filter should add the cached response body to encoded data.
-  Buffer::OwnedImpl buffer(kBody);
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(bufferContains(kBody), true));
+  Buffer::OwnedImpl buffer(CacheResponseBody);
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(bufferContains(CacheResponseBody), true));
 
   // The cache getBody callback should be posted to the dispatcher.
   // Run events on the dispatcher so that the callback is invoked.
-  dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   request_headers_.setHost("UnsuccessfulValidation");
   const std::string etag = "abc123";
   const std::string last_modified_date = formatter_.now(time_source_);
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
-  response_headers_.setContentLength(kBody.size());
+  const auto& custom_headers = Http::CustomHeaders::get();
+  response_headers_.setReferenceKey(custom_headers.Etag, etag);
+  response_headers_.setReferenceKey(custom_headers.LastModified, last_modified_date);
+  response_headers_.setContentLength(CacheResponseBody.size());
 
   waitBeforeLookup();
 
   // Make request require validation
-  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+  request_headers_.setReferenceKey(custom_headers.CacheControl, "no-cache");
 
   // Decoding the request should find a cached response that requires
   // validation. As far as decoding the request is concerned, this is the same
   // as a cache miss with the exception of injecting validation precondition
   // headers.
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
-                /*headers_=*/nullptr,
-                /*content_length_=*/kBody.size()});
+  expectLookup({CacheEntryStatus::RequiresValidation,
+                /*headers_=*/nullptr, CacheResponseBody.size()});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream=*/true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added.
-  const Envoy::Http::TestRequestHeaderMapImpl injected_headers = {
+  const Http::TestRequestHeaderMapImpl injected_headers = {
       {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
   EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
@@ -452,7 +442,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   // Encode new response.
   // The filter should not stop encoding iteration as this is a new response.
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-  Envoy::Buffer::OwnedImpl new_body_buffer(new_body);
+  Buffer::OwnedImpl new_body_buffer(new_body);
   EXPECT_EQ(filter_->encodeData(new_body_buffer, true), Http::FilterDataStatus::Continue);
 
   // The response headers should have the new status.
@@ -464,7 +454,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   // If a cache getBody callback is made, it should be posted to the
   // dispatcher. Run events on the dispatcher so that any available callbacks
   // are invoked.
-  dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(CacheFilterTest, SingleSatisfiableRange) {
@@ -477,15 +467,12 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
   response_headers_.addReference(Http::Headers::get().ContentRange, "bytes 1-2/3");
   response_headers_.setContentLength(2);
 
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::Ok,
-                /*headers_=*/nullptr,
-                /*content_length_=*/kBody.size(),
-                /*range_details_=*/
-                RangeDetails{/*satisfiable_=*/true,
-                             /*ranges_=*/{AdjustedByteRange(1, 3)}}},
+  expectLookup({CacheEntryStatus::Ok,
+                /*headers_=*/nullptr, CacheResponseBody.size(),
+                RangeDetails{/*satisfiable_=*/true, {AdjustedByteRange(1, 3)}}},
                [](MockLookupContext& lookup_context) {
                  EXPECT_CALL(lookup_context, getBody(AdjustedByteRange(1, 3), _))
-                     .WillOnce(getBodyChunk(kBody.substr(1)));
+                     .WillOnce(getBodyChunk(CacheResponseBody.substr(1)));
                });
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
 
@@ -514,21 +501,18 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
   // multi-part responses are not supported, 200 expected
   request_headers_.addReference(Http::Headers::get().Range, "bytes=0-1,-2");
 
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::Ok,
-                /*headers_=*/nullptr,
-                /*content_length_=*/kBody.size(),
-                /*range_details_=*/
-                RangeDetails{/*satisfiable_=*/true,
-                             /*ranges_=*/{AdjustedByteRange(0, 1), AdjustedByteRange(1, 3)}}},
-               [](MockLookupContext& lookup_context) {
-                 // Fall back to looking up the entire body.
-                 EXPECT_CALL(lookup_context, getBody(AdjustedByteRange(0, kBody.size()), _))
-                     .WillOnce(getBodyChunk(kBody));
-               });
+  expectLookup(
+      {CacheEntryStatus::Ok, /*headers_=*/nullptr, CacheResponseBody.size(),
+       RangeDetails{/*satisfiable_=*/true, {AdjustedByteRange(0, 1), AdjustedByteRange(1, 3)}}},
+      [](MockLookupContext& lookup_context) {
+        // Fall back to looking up the entire body.
+        EXPECT_CALL(lookup_context, getBody(AdjustedByteRange(0, CacheResponseBody.size()), _))
+            .WillOnce(getBodyChunk(CacheResponseBody));
+      });
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(isSupersetOfResponseHeadersWithAge(), false));
 
-  EXPECT_CALL(decoder_callbacks_, encodeData(bufferContains(kBody), true));
+  EXPECT_CALL(decoder_callbacks_, encodeData(bufferContains(CacheResponseBody), true));
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
@@ -549,10 +533,9 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
   response_headers_.addReference(Http::Headers::get().ContentRange, "bytes */3");
   response_headers_.setContentLength(0);
 
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::Ok,
-                /*headers_=*/nullptr,
-                /*content_length_=*/kBody.size(),
-                /*range_details_=*/RangeDetails{/*satisfiable_=*/false}});
+  expectLookup({CacheEntryStatus::Ok,
+                /*headers_=*/nullptr, CacheResponseBody.size(),
+                RangeDetails{/*satisfiable_=*/false}});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(isSupersetOfResponseHeadersWithAge(), true))
@@ -574,7 +557,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
 // Send a GET request with a body. The CacheFilter will just pass everything through.
 TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
   request_headers_.setHost("GetRequestWithBodyAndTrailers");
-  Buffer::OwnedImpl request_buffer(kBody);
+  Buffer::OwnedImpl request_buffer(CacheResponseBody);
   Http::TestRequestTrailerMapImpl request_trailers;
 
   EXPECT_EQ(decodeHeadersAndRunDispatcher(false), Http::FilterHeadersStatus::Continue);
@@ -597,7 +580,7 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
   // Create filter for request 2.
   CacheFilterSharedPtr filter = makeFilter();
 
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::Ok,
+  expectLookup({CacheEntryStatus::Ok,
                 /*headers_=*/nullptr,
                 /*content_length_=*/0});
 
@@ -625,20 +608,20 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
   request_headers_.setHost("EtagAndLastModified");
   const std::string etag = "abc123";
 
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
-                                    formatter_.now(time_source_));
+  const auto& custom_headers = Http::CustomHeaders::get();
+  response_headers_.setReferenceKey(custom_headers.Etag, etag);
+  response_headers_.setReferenceKey(custom_headers.LastModified, formatter_.now(time_source_));
 
   CacheFilterSharedPtr filter = makeFilter();
 
   // Make sure the request requires validation
-  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
+  request_headers_.setReferenceKey(custom_headers.CacheControl, "no-cache");
+  expectLookup({CacheEntryStatus::RequiresValidation,
                 /*headers_=*/nullptr,
                 /*content_length_=*/0});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added
   const Http::TestRequestHeaderMapImpl injected_headers = {
@@ -651,17 +634,18 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
   const std::string etag = "abc123";
 
   // Add validation headers to the response
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+  const auto& custom_headers = Http::CustomHeaders::get();
+  response_headers_.setReferenceKey(custom_headers.Etag, etag);
 
   // Make sure the request requires validation
-  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+  request_headers_.setReferenceKey(custom_headers.CacheControl, "no-cache");
 
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
+  expectLookup({CacheEntryStatus::RequiresValidation,
                 /*headers_=*/nullptr,
                 /*content_length_=*/0});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added
   // If-Modified-Since falls back to date
@@ -674,17 +658,17 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
   request_headers_.setHost("LastModifiedOnly");
 
   // Add validation headers to the response
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
-                                    formatter_.now(time_source_));
+  const auto& custom_headers = Http::CustomHeaders::get();
+  response_headers_.setReferenceKey(custom_headers.LastModified, formatter_.now(time_source_));
 
   // Make sure the request requires validation
-  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
+  request_headers_.setReferenceKey(custom_headers.CacheControl, "no-cache");
+  expectLookup({CacheEntryStatus::RequiresValidation,
                 /*headers_=*/nullptr,
                 /*content_length_=*/0});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added
   const Http::TestRequestHeaderMapImpl injected_headers = {
@@ -697,12 +681,12 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
 
   // Make sure the request requires validation
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
+  expectLookup({CacheEntryStatus::RequiresValidation,
                 /*headers_=*/nullptr,
                 /*content_length_=*/0});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added
   // If-Modified-Since falls back to date
@@ -715,16 +699,17 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
   request_headers_.setHost("InvalidLastModified");
 
   // Add validation headers to the response
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, "invalid-date");
+  const auto& custom_headers = Http::CustomHeaders::get();
+  response_headers_.setReferenceKey(custom_headers.LastModified, "invalid-date");
 
   // Make sure the request requires validation
-  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
-  expectLookup({/*cache_entry_status_=*/CacheEntryStatus::RequiresValidation,
+  request_headers_.setReferenceKey(custom_headers.CacheControl, "no-cache");
+  expectLookup({CacheEntryStatus::RequiresValidation,
                 /*headers_=*/nullptr,
                 /*content_length_=*/0});
   EXPECT_CALL(decoder_callbacks_, continueDecoding);
   EXPECT_EQ(decodeHeadersAndRunDispatcher(/*end_stream*/ true),
-            Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   // Make sure validation conditional headers are added
   // If-Modified-Since falls back to date
