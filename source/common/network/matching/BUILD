@@ -21,6 +21,7 @@ envoy_cc_library(
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
     deps = [
+        "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/registry",

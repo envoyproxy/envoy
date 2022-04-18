@@ -546,6 +546,10 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
+
+  const ConnectionInfoProvider& connectionInfoProvider() const {
+    return socket().connectionInfoProvider();
+  }
 };
 
 /**
