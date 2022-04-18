@@ -20,6 +20,8 @@ A sample filter configuration could be:
 
   listener_filters:
     - name: "envoy.filters.listener.http_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.http_inspector.v3.HttpInspector
 
 Statistics
 ----------

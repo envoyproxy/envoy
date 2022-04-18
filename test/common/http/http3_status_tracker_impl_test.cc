@@ -20,7 +20,7 @@ class Http3StatusTrackerImplTest : public testing::Test {
 public:
   Http3StatusTrackerImplTest() : timer_(new MockTimer(&dispatcher_)), tracker_(dispatcher_) {}
 
-  AlternateProtocolsCache::Origin origin_{"https", "hostname", 1};
+  HttpServerPropertiesCache::Origin origin_{"https", "hostname", 1};
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockTimer* timer_; // Owned by tracker_;
   Http3StatusTrackerImpl tracker_;

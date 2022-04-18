@@ -119,7 +119,8 @@ public:
 
     EXPECT_CALL(*filter_, settings()).WillRepeatedly(Return(sip_settings_));
     tra_handler_ = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandler>>(
-        *filter_, sip_proxy_config_.settings().tra_service_config(), context_, stream_info);
+        *filter_, dispatcher_, sip_proxy_config_.settings().tra_service_config(), context_,
+        stream_info);
   }
 
   void initializeRouter() {

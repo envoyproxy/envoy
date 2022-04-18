@@ -186,7 +186,7 @@ public:
 class MockTrafficRoutingAssistantHandler : public TrafficRoutingAssistantHandler {
 public:
   MockTrafficRoutingAssistantHandler(
-      ConnectionManager& parent,
+      ConnectionManager& parent, Event::Dispatcher& dispatcher,
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
   MOCK_METHOD(void, updateTrafficRoutingAssistant,
@@ -222,10 +222,10 @@ public:
 class MockTrafficRoutingAssistantHandlerDeep : public TrafficRoutingAssistantHandler {
 public:
   MockTrafficRoutingAssistantHandlerDeep(
-      ConnectionManager& parent,
+      ConnectionManager& parent, Event::Dispatcher& dispatcher,
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
-      : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {}
+      : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {}
   MOCK_METHOD(TrafficRoutingAssistant::ClientPtr&, traClient, (), (override));
 };
 
