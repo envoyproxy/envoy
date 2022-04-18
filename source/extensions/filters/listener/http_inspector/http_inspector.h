@@ -69,11 +69,13 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
+
+  size_t maxReadBytes() const override { return Config::MAX_INSPECT_SIZE; }
 
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
-  ParseState onRead();
   void done(bool success);
   ParseState parseHttpHeader(absl::string_view data);
 
@@ -85,9 +87,6 @@ private:
   absl::string_view protocol_;
   http_parser parser_;
   static http_parser_settings settings_;
-
-  // Use static thread_local to avoid allocating buffer over and over again.
-  static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
 };
 
 } // namespace HttpInspector
