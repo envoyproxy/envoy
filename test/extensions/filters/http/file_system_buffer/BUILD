@@ -19,3 +19,13 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "file_system_buffer_test",
+    srcs = ["config_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/http/file_system_buffer:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)
