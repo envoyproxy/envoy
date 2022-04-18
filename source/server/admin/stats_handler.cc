@@ -105,7 +105,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
       response.add("\n");
-      return Http::Code::NotFound;
+      return Http::Code::BadRequest;
     }
   }
   return handlerStats(server_.stats(), used_only, json, regex, histogram_buckets_mode,

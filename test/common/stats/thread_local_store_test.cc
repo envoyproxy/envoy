@@ -1700,7 +1700,7 @@ public:
     // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
     // RealThreadsTestHelper.
     shutdownThreading();
-    exitThreads();
+    exitThreads([this]() { store_.reset(); });
   }
 
   void shutdownThreading() {
@@ -1711,23 +1711,6 @@ public:
       store_->shutdownThreading();
       tls_->shutdownThread();
     });
-  }
-
-  void exitThreads() {
-    for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
-      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
-    }
-
-    for (Thread::ThreadPtr& thread : threads_) {
-      thread->join();
-    }
-
-    main_dispatcher_->post([this]() {
-      store_.reset();
-      tls_.reset();
-      main_dispatcher_->exit();
-    });
-    main_thread_->join();
   }
 
   StatNamePool pool_;
@@ -1751,7 +1734,6 @@ protected:
   }
 
   void createScopesIncCountersAndCleanupAllThreads() {
-
     runOnAllWorkersBlocking([this]() { createScopesIncCountersAndCleanup(); });
   }
 

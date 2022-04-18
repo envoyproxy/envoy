@@ -83,6 +83,16 @@ envoy.compression.gzip.decompressor:
   - envoy.compression.decompressor
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.compression.zstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.compression.zstd.decompressor:
+  categories:
+  - envoy.compression.decompressor
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
 envoy.config.validators.minimum_clusters:
   categories:
   - envoy.config.validators
@@ -92,12 +102,12 @@ envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
@@ -183,6 +193,11 @@ envoy.filters.http.fault:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.http.gcp_authn:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.http.grpc_http1_bridge:
   categories:
   - envoy.filters.http

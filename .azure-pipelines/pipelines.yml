@@ -212,6 +212,8 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - bash: .azure-pipelines/cleanup.sh
+      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
@@ -453,7 +455,7 @@ stages:
   - job: test
     timeoutInMinutes: 180
     pool:
-      vmImage: "macos-latest"
+      vmImage: "macos-11"
     steps:
     - script: ./ci/mac_ci_setup.sh
       displayName: "Install dependencies"
