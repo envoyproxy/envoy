@@ -19,8 +19,8 @@ for i in {1..3}; do
     echo "${output}" | grep "x-local-rate-limit: true" || exit 1
 done
 
-run_log "Sleep 5s to wait rate limiting refresh"
-sleep 5
+run_log "Sleep 6s to wait rate limiting refresh"
+sleep 6
 
 run_log "Test upstream: localhost:10000 without rate limit response three times"
 for i in {1..3}; do
