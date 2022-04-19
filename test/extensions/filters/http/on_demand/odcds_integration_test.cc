@@ -26,36 +26,6 @@ public:
   using OnDemandConfig = envoy::extensions::filters::http::on_demand::v3::OnDemand;
   using PerRouteConfig = envoy::extensions::filters::http::on_demand::v3::PerRouteConfig;
 
-  // Get the base config, without any listeners. Similar to ConfigHelper::baseConfig(), but there's
-  // no lds_config nor any listeners configured, and no TLS certificate stuff.
-  static std::string baseBootstrapConfig() {
-    return fmt::format(R"EOF(
-admin:
-  access_log:
-    name: envoy.access_loggers.file
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: "{}"
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-static_resources:
-  clusters:
-    name: cluster_0
-    load_assignment:
-      cluster_name: cluster_0
-      endpoints:
-        lb_endpoints:
-          endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-)EOF",
-                       Platform::null_device_path);
-  }
-
   // Get the listener configuration. Listener named "listener_0" comes with the on_demand HTTP
   // filter enabled, but with an empty config (so ODCDS is disabled), comes with "integration"
   // vhost, which has "odcds_route" with cluster_header action looking for cluster name in the
@@ -103,10 +73,10 @@ static_resources:
                        address, Platform::null_device_path);
   }
 
-  // Get the config, with a static listener. Similar to ConfigHelper::baseConfig(), but there's no
-  // lds_config and no TLS certificate stuff. Listener is configured with listenerConfig.
+  // Get the config, with a static listener. Uses ConfigHelper::baseConfigNoListener() together with
+  // OdCdsIntegrationHelper::listenerConfig().
   static std::string bootstrapConfig() {
-    return absl::StrCat(baseBootstrapConfig(), "  listeners:", listenerConfig("127.0.0.1"));
+    return absl::StrCat(ConfigHelper::baseConfigNoListeners(), "  listeners:", listenerConfig("127.0.0.1"));
   }
 
   static envoy::config::core::v3::ConfigSource
