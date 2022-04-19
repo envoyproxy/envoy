@@ -52,6 +52,7 @@ createEngine(const ConfigType& config, Server::Configuration::ServerFactoryConte
   case ConfigType::RULES_SPECIFIER_NOT_SET:
     return nullptr;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 template <class ConfigType>
@@ -69,6 +70,7 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
   case ConfigType::SHADOW_RULES_SPECIFIER_NOT_SET:
     return nullptr;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 std::string responseDetail(const std::string& policy_id);
