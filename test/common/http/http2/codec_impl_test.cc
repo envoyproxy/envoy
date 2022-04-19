@@ -35,6 +35,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::ElementsAre;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -64,6 +65,14 @@ public:
   static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
     return connection.slowContainsStreamId(id);
   }
+  static std::vector<uint32_t> getActiveStreamsIds(ConnectionImpl& connection) {
+    std::vector<uint32_t> stream_ids;
+    for (auto& stream : connection.active_streams_) {
+      stream_ids.push_back(stream->stream_id_);
+    }
+    return stream_ids;
+  }
+
   struct ClientCodecError : public std::runtime_error {
     ClientCodecError(Http::Status&& status)
         : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
@@ -3641,6 +3650,69 @@ TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
       EXPECT_FALSE(process_buffered_data_callback->enabled_);
     }
   }
+}
+
+TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProcessing) {
+  allow_metadata_ = true;
+
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  // Check headers
+  RequestEncoder* request_encoder1 = request_encoder_;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder1->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1));
+  EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1));
+  ResponseEncoder* response_encoder1 = response_encoder_;
+
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1));
+  EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(3, 1));
+
+  // Check body
+  Buffer::OwnedImpl body{"some data"};
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  request_encoder1->encodeData(body, false);
+  driveToCompletion();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 3));
+
+  // Check metadata
+  MetadataMapVector metadata_map_vector;
+  const MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+  };
+  metadata_map_vector.push_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
+  request_encoder2->encodeMetadata(metadata_map_vector);
+  driveToCompletion();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1));
+
+  // Check trailers
+  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+  request_encoder1->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 3));
+
+  // Check headers from server side
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder1->encodeHeaders(response_headers, false);
+  driveToCompletion();
+  EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
 class TestNghttp2SessionFactory;
