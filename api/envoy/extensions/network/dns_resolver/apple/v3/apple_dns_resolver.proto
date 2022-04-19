@@ -25,5 +25,4 @@ message AppleDnsResolverConfig {
   bool include_unroutable_families = 1;
   // TODO(jpsim): Add tests
   // TODO(jpsim): Add docs
-  // TODO(jpsim): Add release notes
 }
