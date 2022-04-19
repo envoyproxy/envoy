@@ -164,12 +164,15 @@ Matcher::MatchTreeSharedPtr<HttpMatchingData> createMatchingTree(const std::stri
 
 Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestAndResponseMatchingTree() {
   auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
-      std::make_unique<Matching::HttpResponseHeadersDataInput>("match-header"), absl::nullopt);
+      std::make_unique<Matching::HttpResponseHeadersDataInput<HttpMatchingData>>("match-header"),
+      absl::nullopt);
 
-  tree->addChild("match", Matcher::OnMatch<HttpMatchingData>{
-                              []() { return std::make_unique<SkipAction>(); },
-                              createMatchingTree<Matching::HttpRequestHeadersDataInput, SkipAction>(
-                                  "match-header", "match")});
+  tree->addChild(
+      "match",
+      Matcher::OnMatch<HttpMatchingData>{
+          []() { return std::make_unique<SkipAction>(); },
+          createMatchingTree<Matching::HttpRequestHeadersDataInput<HttpMatchingData>, SkipAction>(
+              "match-header", "match")});
 
   return tree;
 }
@@ -185,8 +188,9 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionDecodingHeaders) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamDecoderFilter(
-            decoder_filter, createMatchingTree<Matching::HttpRequestHeadersDataInput, SkipAction>(
-                                "match-header", "match"));
+            decoder_filter,
+            createMatchingTree<Matching::HttpRequestHeadersDataInput<HttpMatchingData>, SkipAction>(
+                "match-header", "match"));
       }));
 
   RequestHeaderMapPtr grpc_headers{
@@ -286,8 +290,9 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingHeaders) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamDecoderFilter(
-            decoder_filter, createMatchingTree<Matching::HttpRequestHeadersDataInput, TestAction>(
-                                "match-header", "match"));
+            decoder_filter,
+            createMatchingTree<Matching::HttpRequestHeadersDataInput<HttpMatchingData>, TestAction>(
+                "match-header", "match"));
       }));
 
   RequestHeaderMapPtr grpc_headers{
@@ -316,8 +321,9 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingTrailers) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamDecoderFilter(
-            decoder_filter, createMatchingTree<Matching::HttpRequestTrailersDataInput, TestAction>(
-                                "match-trailer", "match"));
+            decoder_filter,
+            createMatchingTree<Matching::HttpRequestTrailersDataInput<HttpMatchingData>,
+                               TestAction>("match-trailer", "match"));
       }));
 
   RequestHeaderMapPtr grpc_headers{
@@ -363,8 +369,8 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(
-            filter, createMatchingTree<Matching::HttpResponseTrailersDataInput, TestAction>(
-                        "match-trailer", "match"));
+            filter, createMatchingTree<Matching::HttpResponseTrailersDataInput<HttpMatchingData>,
+                                       TestAction>("match-trailer", "match"));
       }));
 
   EXPECT_CALL(*filter, decodeComplete());
@@ -425,8 +431,8 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(
-            filter, createMatchingTree<Matching::HttpResponseHeadersDataInput, TestAction>(
-                        "match-header", "match"));
+            filter, createMatchingTree<Matching::HttpResponseHeadersDataInput<HttpMatchingData>,
+                                       TestAction>("match-header", "match"));
       }));
 
   RequestHeaderMapPtr grpc_headers{
