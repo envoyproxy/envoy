@@ -1081,12 +1081,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        version = "3.1.8",
+        # v3.1.7 with Bazel fixes and support for Linux/aarch64
+        version = "dd10e14bcebbd821e7399c3934456685d7584f32",
         sha256 = "98e2a5b5aefd6beb8265991cdde2992f4eac1aacbad52da425f877b823de9560",
         strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2022-03-25",
+        release_date = "2022-03-24",
     ),
     rules_rust = dict(
         project_name = "Bazel rust rules",
