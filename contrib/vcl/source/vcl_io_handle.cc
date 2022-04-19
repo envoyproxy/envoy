@@ -183,7 +183,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
       break;
     }
     num_bytes_read += rv;
-    if (num_bytes_read == max_length) {
+    if (static_cast<size_t>(rv) < slice_length || num_bytes_read == max_length) {
       break;
     }
   }

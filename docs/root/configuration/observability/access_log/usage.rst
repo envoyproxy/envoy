@@ -569,6 +569,9 @@ The following command operators are supported:
 %GRPC_STATUS%
   gRPC status code which is easy to interpret with text message corresponding with number.
 
+%GRPC_STATUS_NUMBER%
+  gRPC status code.
+
 .. _config_access_log_format_req:
 
 %REQ(X?Y):Z%

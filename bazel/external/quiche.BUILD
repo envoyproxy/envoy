@@ -1,6 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -39,14 +38,6 @@ src_files = glob([
     "**/*.inc",
     "**/*.proto",
 ])
-
-genrule(
-    name = "quiche_files",
-    srcs = src_files,
-    outs = ["quiche/" + f for f in src_files],
-    cmd = genrule_cmd("@envoy//bazel/external:quiche.genrule_cmd"),
-    visibility = ["//visibility:private"],
-)
 
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
@@ -168,6 +159,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":http2_core_write_scheduler_lib",
+        ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
         ":spdy_core_protocol_lib",
     ],
@@ -1128,19 +1120,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_error_code_wrappers",
-    hdrs = [
-        "quiche/quic/platform/api/quic_error_code_wrappers.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_error_code_wrappers",
-    ],
-)
-
-envoy_cc_library(
     name = "quic_platform_stack_trace",
     hdrs = [
         "quiche/quic/platform/api/quic_stack_trace.h",
@@ -1197,7 +1176,6 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
-        "quiche/quic/platform/api/quic_error_code_wrappers.h",
         "quiche/quic/platform/api/quic_exported_stats.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_flags.h",
@@ -1212,7 +1190,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_containers",
-        ":quic_platform_error_code_wrappers",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
         ":quic_platform_stream_buffer_allocator",
@@ -4357,7 +4334,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_hostname_utils_impl_lib",
+        ":quiche_common_platform_logging",
+        "@com_googlesource_googleurl//url",
     ],
 )
 
@@ -4424,20 +4402,6 @@ envoy_cc_test_library(
     deps = [
         ":quiche_common_platform_export",
         "@envoy//test/common/quic/platform:quiche_mock_log_impl_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "quiche_common_platform_error_code_wrappers",
-    hdrs = [
-        "quiche/common/platform/api/quiche_error_code_wrappers.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_error_code_wrappers_impl_lib",
     ],
 )
 
