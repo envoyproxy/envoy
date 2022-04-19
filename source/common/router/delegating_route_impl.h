@@ -103,6 +103,7 @@ public:
   const std::multimap<std::string, std::string>& opaqueConfig() const override;
   bool includeVirtualHostRateLimits() const override;
   const TlsContextMatchCriteria* tlsContextMatchCriteria() const override;
+  const PathMatchCriterion& pathMatchCriterion() const override;
   bool includeAttemptCountInRequest() const override;
   bool includeAttemptCountInResponse() const override;
   const UpgradeMap& upgradeMap() const override;

@@ -1644,7 +1644,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   }
 
   if (matcher_) {
-    Http::Matching::HttpMatchingDataImpl data;
+    Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
     data.onRequestHeaders(headers);
 
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
