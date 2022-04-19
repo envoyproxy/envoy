@@ -287,9 +287,8 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
   source_any.set_type_url("type.googleapis.com/bad.type.url");
   source_any.set_value("asdf");
   auto json_or_status = MessageUtil::getJsonStringFromMessage(source_any, true);
-  EXPECT_FALSE(absl::holds_alternative<std::string>(json_or_status));
-  EXPECT_THAT(absl::get<ProtobufUtil::Status>(json_or_status).ToString(),
-              testing::HasSubstr("bad.type.url"));
+  EXPECT_FALSE(json_or_status.ok());
+  EXPECT_THAT(json_or_status.status().ToString(), testing::HasSubstr("bad.type.url"));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
