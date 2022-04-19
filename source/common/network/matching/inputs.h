@@ -5,6 +5,8 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/filter.h"
 
+#include "source/common/network/utility.h"
+
 namespace Envoy {
 namespace Network {
 namespace Matching {
@@ -172,17 +174,29 @@ public:
                     MatchingDataType>("direct_source_ip") {}
 };
 
-class SourceTypeInput : public Matcher::DataInput<MatchingData> {
+template <class MatchingDataType>
+class SourceTypeInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const bool is_local_connection =
+        Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
+    if (is_local_connection) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
 };
 
-class SourceTypeInputFactory
-    : public BaseFactory<SourceTypeInput,
+template <class MatchingDataType>
+class SourceTypeInputBaseFactory
+    : public BaseFactory<SourceTypeInput<MatchingDataType>,
                          envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
-                         MatchingData> {
+                         MatchingDataType> {
 public:
-  SourceTypeInputFactory() : BaseFactory("source_type") {}
+  SourceTypeInputBaseFactory()
+      : BaseFactory<SourceTypeInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
+                    MatchingDataType>("source_type") {}
 };
 
 template <class MatchingDataType>
@@ -199,12 +213,12 @@ public:
 };
 
 template <class MatchingDataType>
-class ServerNameBaseFactory
+class ServerNameInputBaseFactory
     : public BaseFactory<ServerNameInput<MatchingDataType>,
                          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput,
                          MatchingDataType> {
 public:
-  ServerNameBaseFactory()
+  ServerNameInputBaseFactory()
       : BaseFactory<ServerNameInput<MatchingDataType>,
                     envoy::extensions::matching::common_inputs::network::v3::ServerNameInput,
                     MatchingDataType>("server_name") {}
