@@ -58,7 +58,7 @@ Now, use ``curl`` to make a request five times for the limited upsteam service:
     x-local-rate-limit: true
     local_rate_limited
 
-The first two requests get responses, and the remaining requests are refused with expected responses.
+The first three requests get responses, and the remaining requests are refused with expected responses.
 
 
 Step 3: Test rate limiting of Envoy’s statistics
