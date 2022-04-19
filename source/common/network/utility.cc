@@ -280,16 +280,16 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isSameIpOrLoopback(const ConnectionSocket& socket) {
+bool Utility::isSameIpOrLoopback(const ConnectionInfoProvider& connection_info_provider) {
   // These are local:
   // - Pipes
   // - Sockets to a loopback address
   // - Sockets where the local and remote address (ignoring port) are the same
-  const auto& remote_address = socket.connectionInfoProvider().remoteAddress();
+  const auto& remote_address = connection_info_provider.remoteAddress();
   if (remote_address->type() == Address::Type::Pipe || isLoopbackAddress(*remote_address)) {
     return true;
   }
-  const auto local_ip = socket.connectionInfoProvider().localAddress()->ip();
+  const auto local_ip = connection_info_provider.localAddress()->ip();
   const auto remote_ip = remote_address->ip();
   if (remote_ip != nullptr && local_ip != nullptr &&
       remote_ip->addressAsString() == local_ip->addressAsString()) {

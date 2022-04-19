@@ -100,7 +100,7 @@ Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
 std::unique_ptr<Network::ClientConnection>
 Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
-                                          OptRef<Http::AlternateProtocolsCache> rtt_cache,
+                                          OptRef<Http::HttpServerPropertiesCache> rtt_cache,
                                           Stats::Scope& scope) {
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
@@ -125,7 +125,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
-                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
+                 OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info) {
   return std::make_unique<Http3ConnPoolImpl>(

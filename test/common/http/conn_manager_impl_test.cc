@@ -1074,6 +1074,11 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
                   delegating_route_foo->routeEntry()->tlsContextMatchCriteria());
 
+        EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matcher(),
+                  delegating_route_foo->routeEntry()->pathMatchCriterion().matcher());
+        EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matchType(),
+                  delegating_route_foo->routeEntry()->pathMatchCriterion().matchType());
+
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInRequest(),
                   delegating_route_foo->routeEntry()->includeAttemptCountInRequest());
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInResponse(),
