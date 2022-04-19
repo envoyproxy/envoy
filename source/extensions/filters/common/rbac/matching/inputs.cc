@@ -28,8 +28,11 @@ REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>
 
 using HttpRequestHeadersDataInputFactory =
     Http::Matching::HttpRequestHeadersDataInputFactoryBase<MatchingData>;
+using HttpRequestTrailersDataInputFactory =
+    Http::Matching::HttpRequestTrailersDataInputFactoryBase<MatchingData>;
 
 REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(HttpRequestTrailersDataInputFactory, Matcher::DataInputFactory<MatchingData>);
 
 } // namespace Matching
 } // namespace RBAC
