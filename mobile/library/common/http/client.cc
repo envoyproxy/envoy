@@ -517,6 +517,7 @@ void Client::cancelStream(envoy_stream_t stream) {
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     removeStream(direct_stream->stream_handle_);
 
+    ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);
     direct_stream->callbacks_->onCancel();
 
     // Since https://github.com/envoyproxy/envoy/pull/13052, the connection manager expects that
