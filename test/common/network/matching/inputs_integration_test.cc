@@ -134,11 +134,12 @@ TEST_F(InputsIntegrationTest, SourceTypeInput) {
 }
 
 TEST_F(InputsIntegrationTest, ServerNameInput) {
-  initialize("ServerNameInput", "example.com");
+  const auto host = "example.com";
+  initialize("ServerNameInput", host);
 
   Network::MockConnectionSocket socket;
   MatchingDataImpl data(socket);
-  EXPECT_CALL(socket, requestedServerName).WillOnce(testing::Return("example.com"));
+  socket.connection_info_provider_->setRequestedServerName(host);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);

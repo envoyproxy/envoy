@@ -123,10 +123,8 @@ TEST_F(IoUringImplTest, RegisterEventfd) {
 }
 
 TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
-  std::string test_dir = TestEnvironment::temporaryDirectory();
-  TestEnvironment::createPath(test_dir);
-  std::string test_file = TestEnvironment::writeStringToFileForTest(
-      absl::StrCat(test_dir, "/prepare_readv"), "test text", true);
+  std::string test_file =
+      TestEnvironment::writeStringToFileForTest("prepare_readv", "test text", true);
   os_fd_t fd = open(test_file.c_str(), O_RDONLY);
   ASSERT_TRUE(fd >= 0);
 
@@ -163,14 +161,11 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   EXPECT_EQ(completions_nr, 1);
   // The file's content is in the read buffer now.
   EXPECT_STREQ(static_cast<char*>(iov.iov_base), "test text");
-  TestEnvironment::removePath(test_dir);
 }
 
 TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
-  std::string test_dir = TestEnvironment::temporaryDirectory();
-  TestEnvironment::createPath(test_dir);
-  std::string test_file = TestEnvironment::writeStringToFileForTest(
-      absl::StrCat(test_dir, "/prepare_readv_overflow"), "abcdefhg", true);
+  std::string test_file =
+      TestEnvironment::writeStringToFileForTest("prepare_readv_overflow", "abcdefhg", true);
   os_fd_t fd = open(test_file.c_str(), O_RDONLY);
   ASSERT_TRUE(fd >= 0);
 
@@ -244,7 +239,6 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   // Check the completion callback was called actually.
   EXPECT_EQ(completions_nr, 3);
-  TestEnvironment::removePath(test_dir);
 }
 
 } // namespace

@@ -17,8 +17,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
-        "//test/mocks/http:alternate_protocols_cache_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
     ],

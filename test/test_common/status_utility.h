@@ -53,7 +53,7 @@ public:
 
   template <typename T>
   // NOLINTNEXTLINE(readability-identifier-naming)
-  bool MatchAndExplain(absl::StatusOr<T> status_or,
+  bool MatchAndExplain(const absl::StatusOr<T>& status_or,
                        ::testing::MatchResultListener* listener) const {
     return ::testing::ExplainMatchResult(
         ::testing::Property("status", &absl::StatusOr<T>::status, matcher_), status_or, listener);

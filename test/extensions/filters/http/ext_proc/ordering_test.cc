@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -57,7 +58,7 @@ protected:
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -69,7 +70,7 @@ protected:
       (*cb)(proto_config);
     }
     config_.reset(new FilterConfig(proto_config, kMessageTimeout, stats_store_, ""));
-    filter_ = std::make_unique<Filter>(config_, std::move(client_));
+    filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -78,6 +79,7 @@ protected:
 
   // Called by the "start" method on the stream by the filter
   virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
+                                             const envoy::config::core::v3::GrpcService&,
                                              const StreamInfo::StreamInfo&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
@@ -213,6 +215,7 @@ protected:
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
+                                     const envoy::config::core::v3::GrpcService&,
                                      const StreamInfo::StreamInfo&) override {
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, close());
