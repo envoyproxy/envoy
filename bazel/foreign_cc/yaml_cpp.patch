@@ -18,3 +18,16 @@ index b0b9016..e0ebfd9 100644
      srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
 +    defines = yaml_cpp_defines,
  )
+diff --git a/src/exp.h b/src/exp.h
+index c623ec9..a0d6d76 100644
+--- a/src/exp.h
++++ b/src/exp.h
+@@ -37,7 +37,7 @@ inline const RegEx& Blank() {
+   return e;
+ }
+ inline const RegEx& Break() {
+-  static const RegEx e = RegEx('\n') | RegEx("\r");
++  static const RegEx e = RegEx('\n') | RegEx("\r\n") | RegEx('\r');
+   return e;
+ }
+ inline const RegEx& BlankOrBreak() {
