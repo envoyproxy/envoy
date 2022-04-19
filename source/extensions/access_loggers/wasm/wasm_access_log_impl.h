@@ -31,6 +31,9 @@ public:
       }
     }
 
+    if (!tls_slot_->currentThreadRegistered()) {
+      return;
+    }
     auto handle = tls_slot_->get()->handle();
     if (!handle) {
       return;
