@@ -1960,7 +1960,7 @@ route_config:
                           "unknown thrift cluster");
 }
 
-TEST_F(ThriftConnectionManagerTest, UnknownClusterWithNegativeValidateClusters) {
+TEST_F(ThriftConnectionManagerTest, UnknownClusterWithValidateClustersDisabled) {
   const std::string yaml = R"EOF(
 transport: FRAMED
 protocol: BINARY
@@ -2006,7 +2006,7 @@ TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster) {
                           "unknown thrift weighted cluster");
 }
 
-TEST_F(ThriftConnectionManagerTest, UnknownWeightedClusterWithNegativeValidateClusters) {
+TEST_F(ThriftConnectionManagerTest, UnknownWeightedClusterWithValidateClustersDisabled) {
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
   {
     auto* route_config = config.mutable_route_config();
@@ -2071,7 +2071,7 @@ route_config:
                           "unknown thrift shadow cluster");
 }
 
-TEST_F(ThriftConnectionManagerTest, UnknownMirrorPolicyClusterWithNegativeValidateClusters) {
+TEST_F(ThriftConnectionManagerTest, UnknownMirrorPolicyClusterWithValidateClustersDisabled) {
   const std::string yaml = R"EOF(
 transport: FRAMED
 protocol: BINARY
