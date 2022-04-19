@@ -147,13 +147,25 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     }
 
     while (num_headers-- > 0) {
-      std::string key_string = drainVarString(buffer, header_size, "header key");
-      // LowerCaseString doesn't allow '\0', '\n', and '\r'.
-      key_string =
-          absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
-      const Http::LowerCaseString key = Http::LowerCaseString(key_string);
-      const std::string value = drainVarString(buffer, header_size, "header value");
-      metadata.headers().addCopy(key, value);
+      if (!metadata.headerKeysCaseSensitive()) {
+        std::string key_string = drainVarString(buffer, header_size, "header key");
+        // LowerCaseString doesn't allow '\0', '\n', and '\r'.
+        key_string =
+            absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+        const Http::LowerCaseString key = Http::LowerCaseString(key_string);
+        const std::string value = drainVarString(buffer, header_size, "header value");
+        metadata.headers().addCopy(key, value);
+      } else {
+        Http::HeaderString key;
+        std::string key_string = drainVarString(buffer, header_size, "header key");
+        key.setCopy(key_string.c_str(), key_string.size());
+
+        Http::HeaderString value;
+        std::string val_string = drainVarString(buffer, header_size, "header value");
+        value.setCopy(val_string.c_str(), val_string.size());
+
+        metadata.headers().addViaMove(std::move(key), std::move(value));
+      }
     }
   }
 

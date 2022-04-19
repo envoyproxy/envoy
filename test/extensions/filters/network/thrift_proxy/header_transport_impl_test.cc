@@ -436,22 +436,26 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
   }
 }
 
-TEST(HeaderTransportTest, InfoBlock) {
+void testInfoBlock(bool case_sensitive = false) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata;
+
+  metadata.setHeaderKeysCaseSensitive(case_sensitive);
   metadata.headers().addCopy(Http::LowerCaseString("not"), "empty");
 
+  const char* key = case_sensitive ? "Key" : "key";
+  const char* value = case_sensitive ? "Value" : "value";
   buffer.writeBEInt<int32_t>(200);
   buffer.writeBEInt<int16_t>(0x0FFF);
   buffer.writeBEInt<int16_t>(0);
   buffer.writeBEInt<int32_t>(1);  // sequence number
   buffer.writeBEInt<int16_t>(38); // size 152
   addSeq(buffer, {0, 0, 1, 3}); // 0 = binary proto, 0 = num transforms, 1 = key value, 3 = num kvs
-  buffer.writeByte(3);
-  buffer.add("key");
-  buffer.writeByte(5);
-  buffer.add("value");
+  buffer.writeByte(std::strlen(key));
+  buffer.add(key);
+  buffer.writeByte(std::strlen(value));
+  buffer.add(value);
   buffer.writeByte(4);
   buffer.add("key2");
   addSeq(buffer, {0x80, 0x01}); // var int 128
@@ -459,10 +463,13 @@ TEST(HeaderTransportTest, InfoBlock) {
   buffer.writeByte(0); // empty key
   buffer.writeByte(0); // empty value
   buffer.writeByte(0); // padding
-
   Http::TestRequestHeaderMapImpl expected_headers;
   expected_headers.addCopy(Http::LowerCaseString("not"), "empty");
-  expected_headers.addCopy(Http::LowerCaseString("key"), "value");
+  Http::HeaderString key_string;
+  key_string.setCopy(key, std::strlen(key));
+  Http::HeaderString value_string;
+  value_string.setCopy(value, std::strlen(value));
+  expected_headers.addViaMove(std::move(key_string), std::move(value_string));
   expected_headers.addCopy(Http::LowerCaseString("key2"), std::string(128, 'x'));
   expected_headers.addCopy(Http::LowerCaseString(""), "");
 
@@ -472,6 +479,10 @@ TEST(HeaderTransportTest, InfoBlock) {
   EXPECT_EQ(expected_headers, metadata.headers());
   EXPECT_EQ(buffer.length(), 0);
 }
+
+TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(); }
+
+TEST(HeaderTransportTest, InfoBlockCaseSensitive) { testInfoBlock(true /* case-sensitive */); }
 
 TEST(HeaderTransportTest, DecodeFrameEnd) {
   HeaderTransportImpl transport;

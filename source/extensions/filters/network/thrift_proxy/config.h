@@ -87,6 +87,7 @@ public:
   Router::Config& routerConfig() override { return *this; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  bool headerKeysCaseSensitive() const override{return header_keys_case_sensitive_};
 
 private:
   void processFilter(
@@ -103,6 +104,7 @@ private:
   const bool payload_passthrough_;
 
   const uint64_t max_requests_per_connection_{};
+  const bool header_keys_case_sensitive_;
 };
 
 } // namespace ThriftProxy

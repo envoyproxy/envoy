@@ -205,6 +205,10 @@ bool ConnectionManager::passthroughEnabled() const {
   return (*rpcs_.begin())->passthroughSupported();
 }
 
+bool ConnectionManager::headerKeysCaseSensitive() const {
+  return config_.headerKeysCaseSensitive();
+}
+
 bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   upstream_buffer_.move(data);
 
@@ -311,6 +315,10 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
 
 bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
   return parent_.parent_.passthroughEnabled();
+}
+
+bool ConnectionManager::ResponseDecoder::headerKeysCaseSensitive() const {
+  return parent_.parent_.headerKeysCaseSensitive();
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {

@@ -41,6 +41,7 @@ public:
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual bool headerKeysCaseSensitive() const PURE;
 };
 
 /**
@@ -68,6 +69,7 @@ public:
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
   bool passthroughEnabled() const override;
+  bool headerKeysCaseSensitive() const override;
 
 private:
   struct ActiveRpc;
@@ -93,6 +95,7 @@ private:
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
+    bool headerKeysCaseSensitive() const override;
 
     ActiveRpc& parent_;
     DecoderPtr decoder_;

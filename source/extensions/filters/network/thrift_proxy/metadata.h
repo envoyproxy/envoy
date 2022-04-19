@@ -181,6 +181,11 @@ public:
   absl::optional<bool> sampled() const { return sampled_; }
   void setSampled(bool sampled) { sampled_ = sampled; }
 
+  bool headerKeysCaseSensitive() const { return header_keys_case_sensitive_; }
+  void setHeaderKeysCaseSensitive(bool header_keys_case_sensitive) {
+    header_keys_case_sensitive_ = header_keys_case_sensitive;
+  }
+
 private:
   absl::optional<uint32_t> frame_size_{};
   absl::optional<ProtocolType> proto_{};
@@ -201,6 +206,7 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
+  bool header_keys_case_sensitive_;
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

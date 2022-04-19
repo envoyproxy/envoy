@@ -196,6 +196,11 @@ public:
    * @return True if payload passthrough is enabled and is supported by filter chain.
    */
   virtual bool passthroughEnabled() const PURE;
+
+  /**
+   * @return True if payload header keys should be treated as case-sensitive.
+   */
+  virtual bool headerKeysCaseSensitive() const PURE;
 };
 
 /**
