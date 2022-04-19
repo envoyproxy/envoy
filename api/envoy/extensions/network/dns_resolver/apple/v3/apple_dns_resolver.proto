@@ -23,6 +23,4 @@ message AppleDnsResolverConfig {
   // useful when performing custom filtering of addresses, such as with
   // Happy Eyeballs.
   bool include_unroutable_families = 1;
-  // TODO(jpsim): Add tests
-  // TODO(jpsim): Add docs
 }
