@@ -1233,6 +1233,67 @@ TEST_F(DnsFilterTest, InvalidAnswersInQueryTest) {
   EXPECT_EQ(0, response_ctx_->answers_.size());
 }
 
+TEST_F(DnsFilterTest, InvalidAuthorityRRsInQueryTest) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  const std::string domain("www.foo3.com");
+
+  // Authority RRs count is non-zero in a query.
+  constexpr char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x01,                               // Authority RRs
+      0x00, 0x00,                               // Additional RRs
+      0x03, 0x77, 0x77, 0x77, 0x04, 0x66, 0x6f, // Query record for
+      0x6f, 0x33, 0x03, 0x63, 0x6f, 0x6d, 0x00, // www.foo3.com
+      0x00, 0x01,                               // Query Type - A
+      0x00, 0x01,                               // Query Class - IN
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+  const std::string query = Utils::buildQueryFromBytes(dns_request, count);
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_FALSE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, response_ctx_->answers_.size());
+}
+
+TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  const std::string domain("www.foo3.com");
+
+  // Additional RRs count is non-zero in a query.
+  constexpr char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x01,                               // Additional RRs
+      0x03, 0x77, 0x77, 0x77, 0x04, 0x66, 0x6f, // Query record for
+      0x6f, 0x33, 0x03, 0x63, 0x6f, 0x6d, 0x00, // www.foo3.com
+      0x00, 0x01,                               // Query Type - A
+      0x00, 0x01,                               // Query Class - IN
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+  const std::string query = Utils::buildQueryFromBytes(dns_request, count);
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_FALSE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+}
+
 TEST_F(DnsFilterTest, InvalidQueryNameTest) {
   InSequence s;
 
@@ -1597,7 +1658,7 @@ TEST_F(DnsFilterTest, InvalidQueryClassTypeTest) {
 TEST_F(DnsFilterTest, InsufficientDataforQueryRecord) {
   InSequence s;
 
-  // In this buffer the query class is unsupported.
+  // In this buffer the query data is insufficient.
   constexpr unsigned char dns_request[] = {
       0x36, 0x6b,                               // Transaction ID
       0x01, 0x20,                               // Flags
