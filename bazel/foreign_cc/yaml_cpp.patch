@@ -1,0 +1,33 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index b0b9016..e0ebfd9 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1,3 +1,9 @@
++yaml_cpp_defines = select({
++    # On Windows, ensure static linking is used.
++    "@envoy//bazel:windows_x86_64": ["YAML_CPP_STATIC_DEFINE", "YAML_CPP_NO_CONTRIB"],
++    "//conditions:default": [],
++})
++
+ cc_library(
+     name = "yaml-cpp_internal",
+     visibility = ["//:__subpackages__"],
+@@ -11,4 +17,5 @@ cc_library(
+     includes = ["include"],
+     hdrs = glob(["include/**/*.h"]),
+     srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
++    defines = yaml_cpp_defines,
+ )
+diff --git a/src/exp.h b/src/exp.h
+index c623ec9..a0d6d76 100644
+--- a/src/exp.h
++++ b/src/exp.h
+@@ -37,7 +37,7 @@ inline const RegEx& Blank() {
+   return e;
+ }
+ inline const RegEx& Break() {
+-  static const RegEx e = RegEx('\n') | RegEx("\r");
++  static const RegEx e = RegEx('\n') | RegEx("\r\n") | RegEx('\r');
+   return e;
+ }
+ inline const RegEx& BlankOrBreak() {
