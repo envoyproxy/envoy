@@ -73,7 +73,7 @@ static_resources:
                   rate_limits:
                   - actions:
                     - generic_key:
-                        descriptor_value: test
+                        descriptor_value: test1
           http_filters:
           - name: envoy.filters.http.local_ratelimit
             typed_config:
@@ -102,10 +102,17 @@ static_resources:
               descriptors:
               - entries:
                 - key: generic_key
-                  value: test
+                  value: test1
                 token_bucket:
                   max_tokens: 3
                   tokens_per_fill: 3
+                  fill_interval: 5s
+              - entries:
+                - key: generic_key
+                  value: test2
+                token_bucket:
+                  max_tokens: 5
+                  tokens_per_fill: 5
                   fill_interval: 5s
           - name: envoy.filters.http.router
             typed_config:
