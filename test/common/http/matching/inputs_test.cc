@@ -12,7 +12,7 @@ namespace Http {
 namespace Matching {
 
 TEST(HttpHeadersDataInputBase, ReturnValueNotPersistedBetweenCalls) {
-  HttpRequestHeadersDataInput input("header");
+  HttpRequestHeadersDataInput<HttpMatchingData> input("header");
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
