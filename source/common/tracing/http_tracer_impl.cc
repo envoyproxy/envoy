@@ -207,6 +207,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     }
   }
 
+  span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
+  span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
+
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
 
   CustomTagContext ctx{request_headers, stream_info};
@@ -246,9 +249,6 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
                                       const Config& tracing_config) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
-
-  span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
-  span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
 
   if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster,
