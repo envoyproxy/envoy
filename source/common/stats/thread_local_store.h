@@ -487,8 +487,8 @@ private:
   using ScopeImplSharedPtr = std::shared_ptr<ScopeImpl>;
 
   /**
-   * Calls fn_lock_held for every scope with, lock_ held. This ensures to avoid
-   * iterate/destruct races for scopes.
+   * Calls fn_lock_held for every scope with, lock_ held. This avoids iterate/destruct
+   * races for scopes.
    *
    * @param fn_lock_held function to be called, with lock_ held, on every scope, until
    *   fn_lock_held() returns false.

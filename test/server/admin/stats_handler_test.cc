@@ -1075,7 +1075,7 @@ TEST_P(AdminStatsTest, SortedHistograms) {
 // and iterating over them.
 class ThreadedTest : public testing::Test {
 protected:
-  // These values were picked by trial an error, with a log added to
+  // These values were picked by trial and error, with a log added to
   // ThreadLocalStoreImpl::iterateScopesLockHeld for when locked==nullptr. The
   // goal with these numbers was to maximize the number of times we'd have to
   // skip over a deleted scope that fails the lock, while keeping the test
