@@ -141,7 +141,7 @@ static_resources:
                                          int timeout_millis) {
     OnDemandConfigType on_demand;
     *on_demand.mutable_odcds_config() = std::move(config_source);
-    *on_demand.mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    *on_demand.mutable_odcds_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
     return on_demand;
   }
 

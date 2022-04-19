@@ -81,7 +81,7 @@ getOdCdsConfig(const ProtoConfig& proto_config) {
 template <typename ProtoConfig>
 std::chrono::milliseconds getTimeout(const ProtoConfig& proto_config) {
   // If changing the default timeout, please update the documentation in on_demand.proto too.
-  return std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 5000));
+  return std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, odcds_timeout, 5000));
 }
 
 } // namespace
@@ -93,14 +93,14 @@ OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
     : OnDemandFilterConfig(createDecodeHeadersBehavior(
-          getOdCdsConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
+          getOdCdsConfig(proto_config), proto_config.odcds_resources_locator(), getTimeout(proto_config),
           cm, validation_visitor)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
     : OnDemandFilterConfig(createDecodeHeadersBehavior(
-          getOdCdsConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
+          getOdCdsConfig(proto_config), proto_config.odcds_resources_locator(), getTimeout(proto_config),
           cm, validation_visitor)) {}
 
 OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
