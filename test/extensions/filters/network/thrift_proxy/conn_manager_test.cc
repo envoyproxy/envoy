@@ -435,6 +435,9 @@ public:
     int32_t five = 5;
     int64_t six = 6;
     int32_t eight = 8;
+    FieldType field_type_i32 = FieldType::I32;
+
+    uint32_t one_32 = 1;
     EXPECT_CALL(*decoder_filter_, messageBegin(_))
         .WillOnce(
             Invoke([req_msg_type, req_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
@@ -447,9 +450,11 @@ public:
               return FilterStatus::Continue;
             }));
     EXPECT_CALL(*decoder_filter_, messageEnd());
-    EXPECT_CALL(*decoder_filter_, structBegin(_)).Times(2);
+    // The struct name is not available at runtime.
+    EXPECT_CALL(*decoder_filter_, structBegin("")).Times(2);
     EXPECT_CALL(*decoder_filter_, structEnd()).Times(2);
-    EXPECT_CALL(*decoder_filter_, fieldBegin(_, _, _)).Times(11);
+    // The field name is not available at runtime.
+    EXPECT_CALL(*decoder_filter_, fieldBegin("", _, _)).Times(11);
     EXPECT_CALL(*decoder_filter_, fieldEnd()).Times(11);
     EXPECT_CALL(*decoder_filter_, boolValue(one));
     EXPECT_CALL(*decoder_filter_, byteValue(two));
@@ -458,12 +463,12 @@ public:
     EXPECT_CALL(*decoder_filter_, int32Value(five));
     EXPECT_CALL(*decoder_filter_, int64Value(six));
     EXPECT_CALL(*decoder_filter_, stringValue("seven"));
-    EXPECT_CALL(*decoder_filter_, mapBegin(_, _, _));
+    EXPECT_CALL(*decoder_filter_, mapBegin(field_type_i32, field_type_i32, one_32));
     EXPECT_CALL(*decoder_filter_, int32Value(eight)).Times(4);
     EXPECT_CALL(*decoder_filter_, mapEnd());
-    EXPECT_CALL(*decoder_filter_, listBegin(_, _));
+    EXPECT_CALL(*decoder_filter_, listBegin(field_type_i32, one_32));
     EXPECT_CALL(*decoder_filter_, listEnd());
-    EXPECT_CALL(*decoder_filter_, setBegin(_, _));
+    EXPECT_CALL(*decoder_filter_, setBegin(field_type_i32, one_32));
     EXPECT_CALL(*decoder_filter_, setEnd());
 
     EXPECT_CALL(*encoder_filter_, transportBegin(_));
@@ -480,9 +485,9 @@ public:
               return FilterStatus::Continue;
             }));
     EXPECT_CALL(*encoder_filter_, messageEnd());
-    EXPECT_CALL(*encoder_filter_, structBegin(_)).Times(2);
+    EXPECT_CALL(*encoder_filter_, structBegin("")).Times(2);
     EXPECT_CALL(*encoder_filter_, structEnd()).Times(2);
-    EXPECT_CALL(*encoder_filter_, fieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*encoder_filter_, fieldBegin("", _, _)).Times(11);
     EXPECT_CALL(*encoder_filter_, fieldEnd()).Times(11);
     EXPECT_CALL(*encoder_filter_, boolValue(one));
     EXPECT_CALL(*encoder_filter_, byteValue(two));
@@ -491,12 +496,12 @@ public:
     EXPECT_CALL(*encoder_filter_, int32Value(five));
     EXPECT_CALL(*encoder_filter_, int64Value(six));
     EXPECT_CALL(*encoder_filter_, stringValue("seven"));
-    EXPECT_CALL(*encoder_filter_, mapBegin(_, _, _));
+    EXPECT_CALL(*encoder_filter_, mapBegin(field_type_i32, field_type_i32, one_32));
     EXPECT_CALL(*encoder_filter_, int32Value(eight)).Times(4);
     EXPECT_CALL(*encoder_filter_, mapEnd());
-    EXPECT_CALL(*encoder_filter_, listBegin(_, _));
+    EXPECT_CALL(*encoder_filter_, listBegin(field_type_i32, one_32));
     EXPECT_CALL(*encoder_filter_, listEnd());
-    EXPECT_CALL(*encoder_filter_, setBegin(_, _));
+    EXPECT_CALL(*encoder_filter_, setBegin(field_type_i32, one_32));
     EXPECT_CALL(*encoder_filter_, setEnd());
 
     EXPECT_CALL(*bidirection_filter_, decodeMessageBegin(_))
@@ -511,9 +516,9 @@ public:
               return FilterStatus::Continue;
             }));
     EXPECT_CALL(*bidirection_filter_, decodeMessageEnd());
-    EXPECT_CALL(*bidirection_filter_, decodeStructBegin(_)).Times(2);
+    EXPECT_CALL(*bidirection_filter_, decodeStructBegin("")).Times(2);
     EXPECT_CALL(*bidirection_filter_, decodeStructEnd()).Times(2);
-    EXPECT_CALL(*bidirection_filter_, decodeFieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*bidirection_filter_, decodeFieldBegin("", _, _)).Times(11);
     EXPECT_CALL(*bidirection_filter_, decodeFieldEnd()).Times(11);
     EXPECT_CALL(*bidirection_filter_, decodeBoolValue(one));
     EXPECT_CALL(*bidirection_filter_, decodeByteValue(two));
@@ -522,12 +527,12 @@ public:
     EXPECT_CALL(*bidirection_filter_, decodeInt32Value(five));
     EXPECT_CALL(*bidirection_filter_, decodeInt64Value(six));
     EXPECT_CALL(*bidirection_filter_, decodeStringValue("seven"));
-    EXPECT_CALL(*bidirection_filter_, decodeMapBegin(_, _, _));
+    EXPECT_CALL(*bidirection_filter_, decodeMapBegin(field_type_i32, field_type_i32, one_32));
     EXPECT_CALL(*bidirection_filter_, decodeInt32Value(eight)).Times(4);
     EXPECT_CALL(*bidirection_filter_, decodeMapEnd());
-    EXPECT_CALL(*bidirection_filter_, decodeListBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, decodeListBegin(field_type_i32, one_32));
     EXPECT_CALL(*bidirection_filter_, decodeListEnd());
-    EXPECT_CALL(*bidirection_filter_, decodeSetBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, decodeSetBegin(field_type_i32, one_32));
     EXPECT_CALL(*bidirection_filter_, decodeSetEnd());
 
     EXPECT_CALL(*bidirection_filter_, encodeTransportBegin(_));
@@ -544,9 +549,9 @@ public:
               return FilterStatus::Continue;
             }));
     EXPECT_CALL(*bidirection_filter_, encodeMessageEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeStructBegin(_)).Times(2);
+    EXPECT_CALL(*bidirection_filter_, encodeStructBegin("")).Times(2);
     EXPECT_CALL(*bidirection_filter_, encodeStructEnd()).Times(2);
-    EXPECT_CALL(*bidirection_filter_, encodeFieldBegin(_, _, _)).Times(11);
+    EXPECT_CALL(*bidirection_filter_, encodeFieldBegin("", _, _)).Times(11);
     EXPECT_CALL(*bidirection_filter_, encodeFieldEnd()).Times(11);
     EXPECT_CALL(*bidirection_filter_, encodeBoolValue(one));
     EXPECT_CALL(*bidirection_filter_, encodeByteValue(two));
@@ -555,12 +560,12 @@ public:
     EXPECT_CALL(*bidirection_filter_, encodeInt32Value(five));
     EXPECT_CALL(*bidirection_filter_, encodeInt64Value(six));
     EXPECT_CALL(*bidirection_filter_, encodeStringValue("seven"));
-    EXPECT_CALL(*bidirection_filter_, encodeMapBegin(_, _, _));
+    EXPECT_CALL(*bidirection_filter_, encodeMapBegin(field_type_i32, field_type_i32, one_32));
     EXPECT_CALL(*bidirection_filter_, encodeInt32Value(eight)).Times(4);
     EXPECT_CALL(*bidirection_filter_, encodeMapEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeListBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, encodeListBegin(field_type_i32, one_32));
     EXPECT_CALL(*bidirection_filter_, encodeListEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeSetBegin(_, _));
+    EXPECT_CALL(*bidirection_filter_, encodeSetBegin(field_type_i32, one_32));
     EXPECT_CALL(*bidirection_filter_, encodeSetEnd());
   }
 
