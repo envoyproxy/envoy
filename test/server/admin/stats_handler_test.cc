@@ -4,11 +4,13 @@
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/utility.h"
 
 using testing::EndsWith;
@@ -1067,6 +1069,115 @@ TEST_P(AdminStatsTest, SortedHistograms) {
     ASSERT_EQ(Http::Code::OK, code_response.first);
     checkOrder(code_response.second, {"h1", "h2", "h3", "h4"});
   }
+}
+
+// Sets up a test using real threads to reproduce a race between deleting scopes
+// and iterating over them.
+class ThreadedTest : public testing::Test {
+protected:
+  // These values were picked by trial and error, with a log added to
+  // ThreadLocalStoreImpl::iterateScopesLockHeld for when locked==nullptr. The
+  // goal with these numbers was to maximize the number of times we'd have to
+  // skip over a deleted scope that fails the lock, while keeping the test
+  // duration under a few seconds. On one dev box, these settings allow for
+  // about 20 reproductions of the race in a 5 second test.
+  static constexpr uint32_t NumThreads = 12;
+  static constexpr uint32_t NumScopes = 5;
+  static constexpr uint32_t NumStatsPerScope = 5;
+  static constexpr uint32_t NumIters = 20;
+
+  ThreadedTest()
+      : real_threads_(NumThreads), pool_(symbol_table_), alloc_(symbol_table_),
+        store_(std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_)) {
+    for (uint32_t i = 0; i < NumStatsPerScope; ++i) {
+      counter_names_[i] = pool_.add(absl::StrCat("c", "_", i));
+    }
+    for (uint32_t i = 0; i < NumScopes; ++i) {
+      scope_names_[i] = pool_.add(absl::StrCat("scope", "_", i));
+    }
+    real_threads_.runOnMainBlocking([this]() {
+      store_->initializeThreading(real_threads_.mainDispatcher(), real_threads_.tls());
+    });
+  }
+
+  ~ThreadedTest() override {
+    real_threads_.runOnMainBlocking([this]() {
+      ThreadLocal::Instance& tls = real_threads_.tls();
+      if (!tls.isShutdown()) {
+        tls.shutdownGlobalThreading();
+      }
+      store_->shutdownThreading();
+      tls.shutdownThread();
+    });
+    real_threads_.exitThreads([this]() {
+      scopes_.clear();
+      store_.reset();
+    });
+  }
+
+  // Builds, or re-builds, NumScopes scopes, each of which has NumStatsPerScopes
+  // counters. The scopes are kept in an already-sized vector. We keep a
+  // fine-grained mutex for each scope just for each entry in the scope vector
+  // so we can have multiple threads concurrently rebuilding the scopes.
+  void addStats() {
+    ASSERT_EQ(NumScopes, scopes_.size());
+    for (uint32_t s = 0; s < NumScopes; ++s) {
+      Stats::ScopeSharedPtr scope = store_->scopeFromStatName(scope_names_[s]);
+      {
+        absl::MutexLock lock(&scope_mutexes_[s]);
+        scopes_[s] = scope;
+      }
+      for (Stats::StatName counter_name : counter_names_) {
+        scope->counterFromStatName(counter_name);
+      }
+    }
+  }
+
+  void statsEndpoint() {
+    StatsRequest request(*store_, false, false, Utility::HistogramBucketsMode::NoBuckets,
+                         absl::nullopt);
+    Http::TestResponseHeaderMapImpl response_headers;
+    request.start(response_headers);
+    Buffer::OwnedImpl data;
+    while (request.nextChunk(data)) {
+    }
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+      absl::string_view str(static_cast<const char*>(slice.mem_), slice.len_);
+      // Sanity check that the /stats endpoint is doing something by counting
+      // newlines.
+      total_lines_ += std::count_if(str.begin(), str.end(), [](char c) { return c == '\n'; });
+    }
+  }
+
+  Thread::RealThreadsTestHelper real_threads_;
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::StatNamePool pool_;
+  Stats::AllocatorImpl alloc_;
+  std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  std::vector<Stats::ScopeSharedPtr> scopes_{NumScopes};
+  absl::Mutex scope_mutexes_[NumScopes];
+  std::atomic<uint64_t> total_lines_{0};
+  Stats::StatName counter_names_[NumStatsPerScope];
+  Stats::StatName scope_names_[NumScopes];
+};
+
+TEST_F(ThreadedTest, Threaded) {
+  real_threads_.runOnAllWorkersBlocking([this]() {
+    for (uint32_t i = 0; i < NumIters; ++i) {
+      addStats();
+      statsEndpoint();
+    }
+  });
+
+  // We expect all the constants, multiplied together, give us the expected
+  // number of lines. However, whenever there is an attempt to iterate over
+  // scopes in one thread while another thread has replaced that scope, we will
+  // drop some scopes and/or stats in an in-construction scope. So we just test
+  // here that the number of lines is between 0.5x and 1.x expected. If this
+  // proves flaky we can loosen this check.
+  uint32_t expected = NumThreads * NumScopes * NumStatsPerScope * NumIters;
+  EXPECT_GE(expected, total_lines_);
+  EXPECT_LE(expected / 2, total_lines_);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
