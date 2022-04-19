@@ -144,13 +144,13 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return;
   }
-  auto entry = route.routeEntry();
+  const auto entry = route.routeEntry();
   if (entry == nullptr) {
     // No entry? Nothing we can do here.
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return;
   }
-  auto cluster_name = entry->clusterName();
+  const auto cluster_name = entry->clusterName();
   if (cluster_name.empty()) {
     // Empty cluster name may be a result of a missing HTTP header
     // used for getting the cluster name. Nothing we can do here.
