@@ -18,7 +18,12 @@ using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 // method.
 class DecodeHeadersBehavior {
 public:
+  // The returned object will only perform route discovery if it's missing.
   static DecodeHeadersBehaviorPtr rds();
+  // The returned object will perform route discovery if it's missing,
+  // then after route is successfully discovered, it will proceed to
+  // on-demand cluster discovery if the cluster is missing. The latter
+  // discovery will be done with the passed OdCdsApi and timeout.
   static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds,
                                          std::chrono::milliseconds timeout);
 
