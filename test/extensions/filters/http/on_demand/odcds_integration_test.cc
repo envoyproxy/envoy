@@ -76,7 +76,8 @@ public:
   // Get the config, with a static listener. Uses ConfigHelper::baseConfigNoListener() together with
   // OdCdsIntegrationHelper::listenerConfig().
   static std::string bootstrapConfig() {
-    return absl::StrCat(ConfigHelper::baseConfigNoListeners(), "  listeners:", listenerConfig("127.0.0.1"));
+    return absl::StrCat(ConfigHelper::baseConfigNoListeners(),
+                        "  listeners:", listenerConfig("127.0.0.1"));
   }
 
   static envoy::config::core::v3::ConfigSource
@@ -111,7 +112,8 @@ public:
                                          int timeout_millis) {
     OnDemandConfigType on_demand;
     *on_demand.mutable_odcds_config() = std::move(config_source);
-    *on_demand.mutable_odcds_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    *on_demand.mutable_odcds_timeout() =
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
     return on_demand;
   }
 
