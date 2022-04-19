@@ -28,7 +28,7 @@ public:
     setupWithConfig(std::move(config));
   }
 
-  void setupWithCDS() {
+  void setupWithCds() {
     auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
     odcds_ = mock_odcds.get();
     auto config = std::make_shared<OnDemandFilterConfig>(
@@ -47,7 +47,7 @@ public:
 };
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButHasNoEntry) {
-  setupWithCDS();
+  setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
   EXPECT_CALL(*decoder_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
@@ -60,19 +60,19 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableAndConfigIsNull) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
-TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButODCDSIsDisabled) {
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButOdCdsIsDisabled) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableAndClusterIsAvailable) {
-  setupWithCDS();
+  setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterIsNotAvailable) {
-  setupWithCDS();
+  setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
   EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
@@ -80,7 +80,7 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterIsNotAva
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEmpty) {
-  setupWithCDS();
+  setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
   std::string empty_cluster_name;
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));

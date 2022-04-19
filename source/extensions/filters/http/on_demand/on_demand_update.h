@@ -63,7 +63,7 @@ public:
   OptRef<const Router::Route> handleMissingRoute();
   // Do on-demand cluster discovery if the cluster used by the route
   // is missing.
-  void handleOnDemandCDS(const Router::Route& route, Upstream::OdCdsApiHandle& odcds,
+  void handleOnDemandCds(const Router::Route& route, Upstream::OdCdsApiHandle& odcds,
                          std::chrono::milliseconds timeout);
   // Get the per-route config if it's available, otherwise the
   // extension's config.

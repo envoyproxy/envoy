@@ -15,14 +15,14 @@ namespace OnDemand {
 
 namespace {
 
-class RDSDecodeHeadersBehavior : public DecodeHeadersBehavior {
+class RdsDecodeHeadersBehavior : public DecodeHeadersBehavior {
 public:
   void decodeHeaders(OnDemandRouteUpdate& filter) override { filter.handleMissingRoute(); }
 };
 
-class RDSCDSDecodeHeadersBehavior : public DecodeHeadersBehavior {
+class RdsCdsDecodeHeadersBehavior : public DecodeHeadersBehavior {
 public:
-  RDSCDSDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout)
+  RdsCdsDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout)
       : odcds_(std::move(odcds)), timeout_(timeout) {}
 
   void decodeHeaders(OnDemandRouteUpdate& filter) override {
@@ -30,7 +30,7 @@ public:
     if (!route.has_value()) {
       return;
     }
-    filter.handleOnDemandCDS(route.value(), *odcds_, timeout_);
+    filter.handleOnDemandCds(route.value(), *odcds_, timeout_);
   }
 
 private:
@@ -41,12 +41,12 @@ private:
 } // namespace
 
 DecodeHeadersBehaviorPtr DecodeHeadersBehavior::rds() {
-  return std::make_unique<RDSDecodeHeadersBehavior>();
+  return std::make_unique<RdsDecodeHeadersBehavior>();
 }
 
 DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds,
                                                        std::chrono::milliseconds timeout) {
-  return std::make_unique<RDSCDSDecodeHeadersBehavior>(std::move(odcds), timeout);
+  return std::make_unique<RdsCdsDecodeHeadersBehavior>(std::move(odcds), timeout);
 }
 
 namespace {
@@ -71,7 +71,7 @@ createDecodeHeadersBehavior(OptRef<const envoy::config::core::v3::ConfigSource> 
 
 template <typename ProtoConfig>
 OptRef<const envoy::config::core::v3::ConfigSource>
-getODCDSConfig(const ProtoConfig& proto_config) {
+getOdCdsConfig(const ProtoConfig& proto_config) {
   if (!proto_config.has_odcds_config()) {
     return absl::nullopt;
   }
@@ -93,14 +93,14 @@ OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
     : OnDemandFilterConfig(createDecodeHeadersBehavior(
-          getODCDSConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
+          getOdCdsConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
           cm, validation_visitor)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
     : OnDemandFilterConfig(createDecodeHeadersBehavior(
-          getODCDSConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
+          getOdCdsConfig(proto_config), proto_config.resources_locator(), getTimeout(proto_config),
           cm, validation_visitor)) {}
 
 OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
@@ -136,7 +136,7 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
 }
 
 // Passed route pointer here is not null.
-void OnDemandRouteUpdate::handleOnDemandCDS(const Router::Route& route,
+void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
                                             Upstream::OdCdsApiHandle& odcds,
                                             std::chrono::milliseconds timeout) {
   if (callbacks_->clusterInfo() != nullptr) {

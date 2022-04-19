@@ -110,7 +110,7 @@ static_resources:
   }
 
   static envoy::config::core::v3::ConfigSource
-  createODCDSConfigSource(absl::string_view cluster_name) {
+  createOdCdsConfigSource(absl::string_view cluster_name) {
     envoy::config::core::v3::ConfigSource source;
     TestUtility::loadFromYaml(fmt::format(R"EOF(
       resource_api_version: V3
@@ -126,7 +126,7 @@ static_resources:
     return source;
   }
 
-  static envoy::config::core::v3::ConfigSource createADSODCDSConfigSource() {
+  static envoy::config::core::v3::ConfigSource createAdsOdCdsConfigSource() {
     envoy::config::core::v3::ConfigSource source;
     TestUtility::loadFromYaml(R"EOF(
       resource_api_version: V3
@@ -329,7 +329,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -370,7 +370,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -405,7 +405,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -440,10 +440,10 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
 //  - ODCDS is disabled at a route level
 //  - making a request to an unknown cluster
 //  - request fails
-TEST_P(OdCdsIntegrationTest, DisablingODCDSAtRouteLevelWorks) {
+TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtRouteLevelWorks) {
   doCleanUpXdsConnection_ = false;
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
                     "integration", {});
   addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", "odcds_route");
   initialize();
@@ -469,10 +469,10 @@ TEST_P(OdCdsIntegrationTest, DisablingODCDSAtRouteLevelWorks) {
 //  - ODCDS is disabled at a virtual host level
 //  - making a request to an unknown cluster
 //  - request fails
-TEST_P(OdCdsIntegrationTest, DisablingODCDSAtVHostLevelWorks) {
+TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtVirtualHostLevelWorks) {
   doCleanUpXdsConnection_ = false;
   addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
-      OdCdsIntegrationHelper::createODCDSConfigSource("cluster_0"), 2500));
+      OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500));
   addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -507,7 +507,7 @@ public:
 
   envoy::config::listener::v3::Listener buildListener() {
     OdCdsListenerBuilder builder(Network::Test::getLoopbackAddressString(ipVersion()));
-    auto ads_config_source = OdCdsIntegrationHelper::createADSODCDSConfigSource();
+    auto ads_config_source = OdCdsIntegrationHelper::createAdsOdCdsConfigSource();
     auto per_route_config =
         OdCdsIntegrationHelper::createPerRouteConfig(std::move(ads_config_source), 2500);
     OdCdsIntegrationHelper::addPerRouteConfig(builder.hcm(), std::move(per_route_config),
