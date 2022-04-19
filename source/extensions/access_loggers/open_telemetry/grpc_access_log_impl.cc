@@ -57,7 +57,8 @@ void GrpcAccessLoggerImpl::initMessageRoot(
   // TODO: support other type
   for (const auto& custom_tag : config.custom_tags()) {
     if (custom_tag.type_case() == envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral) {
-      *resource->add_attributes() = getStringKeyValue(std::string(custom_tag.tag()), custom_tag.literal().value());
+      *resource->add_attributes() =
+          getStringKeyValue(std::string(custom_tag.tag()), custom_tag.literal().value());
     }
   }
 }
