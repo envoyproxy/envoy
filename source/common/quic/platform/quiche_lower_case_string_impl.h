@@ -10,6 +10,6 @@
 
 namespace quiche {
 
-using QuicheLowerCaseStringImpl = Http::LowerCaseString;
+using QuicheLowerCaseStringImpl = Envoy::Http::LowerCaseString;
 
 }
