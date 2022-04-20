@@ -86,6 +86,26 @@ back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing impro
 the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
 to stay aprised of the latest and greatest changes.
 
+.. _arch_overview_happy_eyeballs:
+
+Happy Eyeballs Support
+----------------------
+
+Envoy supports Happy Eyeballs, `RFC6555 <https://tools.ietf.org/html/rfc6555>`_,
+for upstream TCP connections. This behavior is off by default but can be enabled by the runtime flag
+``envoy.reloadable_features.allow_multiple_dns_addresses``. For clusters which use
+:ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
+this behavior is configured by setting the DNS IP address resolution policy in
+:ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
+to the :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return
+both IPv4 and IPv6 addresses. The returned addresses will be sorted according the the Happy Eyeballs
+specification and a connection will be attempted to the first in the list. If this connection succeeds,
+it will be used. If it fails, an attempt will be made to the next on the list. If after 300ms the connection
+is still connecting, then a backup connection attempt will be made to the next address on the list.
+
+Eventually an attempt will succeed to one of the addresses in which case that connection will be used, or else
+all attempts will fail in which case a connection error will be reported.
+
 
 .. _arch_overview_conn_pool_how_many:
 

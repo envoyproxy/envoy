@@ -9,6 +9,8 @@
 namespace Envoy {
 namespace Io {
 
+bool isIoUringSupported();
+
 class IoUringImpl : public IoUring, public ThreadLocal::ThreadLocalObject {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);

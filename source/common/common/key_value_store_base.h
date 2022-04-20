@@ -6,27 +6,25 @@
 
 #include "source/common/common/logger.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
 
 // This is the base implementation of the KeyValueStore. It handles the various
 // functions other than flush(), which will be implemented by subclasses.
-//
-// Note this implementation HAS UNBOUNDED SIZE.
-// It is assumed the callers manage the number of entries. Use with care.
 class KeyValueStoreBase : public KeyValueStore,
                           public Logger::Loggable<Logger::Id::key_value_store> {
 public:
   // Sets up flush() for the configured interval.
-  KeyValueStoreBase(Event::Dispatcher& dispatcher, std::chrono::milliseconds flush_interval);
+  KeyValueStoreBase(Event::Dispatcher& dispatcher, std::chrono::milliseconds flush_interval,
+                    uint32_t max_entries);
 
   // If |contents| is in the form of
   // [length]\n[key][length]\n[value]
-  // parses key value pairs from |contents| into the store provided.
+  // parses key value pairs from |contents| and inserts into store_.
   // Returns true on success and false on failure.
-  bool parseContents(absl::string_view contents,
-                     absl::flat_hash_map<std::string, std::string>& store) const;
+  bool parseContents(absl::string_view contents);
+
   std::string error;
   // KeyValueStore
   void addOrUpdate(absl::string_view key, absl::string_view value) override;
@@ -35,8 +33,11 @@ public:
   void iterate(ConstIterateCb cb) const override;
 
 protected:
+  const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
-  absl::flat_hash_map<std::string, std::string> store_;
+  quiche::QuicheLinkedHashMap<std::string, std::string> store_;
+  // Used for validation only.
+  mutable bool under_iterate_{};
 };
 
 } // namespace Envoy

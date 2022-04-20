@@ -698,7 +698,8 @@ public:
       addStreamDecoderFilterWorker(
           filter,
           std::make_shared<FilterMatchState>(std::move(match_tree),
-                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
+                                             std::make_shared<Matching::HttpMatchingDataImpl>(
+                                                 stream_info_.downstreamAddressProvider())),
           false);
       return;
     }
@@ -715,7 +716,8 @@ public:
       addStreamEncoderFilterWorker(
           filter,
           std::make_shared<FilterMatchState>(std::move(match_tree),
-                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
+                                             std::make_shared<Matching::HttpMatchingDataImpl>(
+                                                 stream_info_.downstreamAddressProvider())),
           false);
       return;
     }
@@ -736,7 +738,8 @@ public:
     // the result to both filters after the first match evaluation.
     if (match_tree) {
       auto matching_state = std::make_shared<FilterMatchState>(
-          std::move(match_tree), std::make_shared<Matching::HttpMatchingDataImpl>());
+          std::move(match_tree), std::make_shared<Matching::HttpMatchingDataImpl>(
+                                     stream_info_.downstreamAddressProvider()));
       addStreamDecoderFilterWorker(filter, matching_state, true);
       addStreamEncoderFilterWorker(filter, std::move(matching_state), true);
       return;
