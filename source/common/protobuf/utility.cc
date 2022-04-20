@@ -521,7 +521,7 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
   return out.c_str();
 }
 
-StatusOr<std::string>
+ProtoStatusOr<std::string>
 MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
                                       const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
