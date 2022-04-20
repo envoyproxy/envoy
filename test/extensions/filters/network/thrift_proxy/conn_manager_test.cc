@@ -349,6 +349,7 @@ public:
 
     proto->writeMessageBegin(msg, metadata);
     proto->writeStructBegin(msg, "");
+    // successful response struct in field id 0, error (IDL exception) in field id greater than 0
     proto->writeFieldBegin(msg, "", FieldType::Struct, 2);
 
     proto->writeStructBegin(msg, "");
