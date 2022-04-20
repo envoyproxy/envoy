@@ -198,7 +198,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
         context->header_.authority_rrs == 0 && context->header_.additional_rrs == 0)) {
     ENVOY_LOG(
         debug,
-        "One or more of Answes [{}], Authority [{}], and Additional [{}] RRspresent in the query."
+        "One or more of Answes [{}], Authority [{}], and Additional [{}] RRs present in the query."
         "Inverse query is not supported",
         static_cast<int>(context->header_.answers),
         static_cast<int>(context->header_.authority_rrs),
