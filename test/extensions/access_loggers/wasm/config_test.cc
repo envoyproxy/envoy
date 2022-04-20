@@ -151,10 +151,9 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  auto filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
-  EXPECT_THROW_WITH_MESSAGE(
-      factory->createAccessLogInstance(proto_config, std::move(filter), context_),
-      Envoy::Extensions::Common::Wasm::WasmException, "Unable to create Wasm access log ");
+  EXPECT_THROW_WITH_MESSAGE(factory->createAccessLogInstance(proto_config, nullptr, context_),
+                            Envoy::Extensions::Common::Wasm::WasmException,
+                            "Unable to create Wasm access log ");
   const std::string valid_yaml =
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
@@ -172,20 +171,15 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
       value: "valid"
   )EOF"));
   TestUtility::loadFromYaml(valid_yaml, proto_config);
-  filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
   AccessLog::InstanceSharedPtr filter_instance =
-      factory->createAccessLogInstance(proto_config, std::move(filter), context_);
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
+      factory->createAccessLogInstance(proto_config, nullptr, context_);
   StreamInfo::MockStreamInfo log_stream_info;
-  filter_instance = factory->createAccessLogInstance(proto_config, std::move(filter), context_);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
 
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
-  filter_instance = factory->createAccessLogInstance(proto_config, std::move(filter), context_);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
 }
 
 } // namespace Wasm
