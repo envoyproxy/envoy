@@ -117,7 +117,7 @@ To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, please tag it
    `option (xds.annotations.v3.file_status).work_in_progress = true;` and
-   optionally hide it from the docs (`[#not-implemented-hide:]`.
+   optionally hide it from the docs (`[#not-implemented-hide:]`.)
 1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
    `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
