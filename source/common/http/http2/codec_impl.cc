@@ -1781,7 +1781,7 @@ void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
     }
   } else {
     for (auto& stream : active_streams_) {
-      stream->runHighWatermarkCallbacks();
+      stream->runLowWatermarkCallbacks();
     }
   }
 }
