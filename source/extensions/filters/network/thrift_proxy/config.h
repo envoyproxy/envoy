@@ -87,7 +87,7 @@ public:
   Router::Config& routerConfig() override { return *this; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
-  bool headerKeysCaseSensitive() const override{return header_keys_case_sensitive_};
+  bool headerKeysCaseSensitive() const override { return header_keys_case_sensitive_; }
 
 private:
   void processFilter(
