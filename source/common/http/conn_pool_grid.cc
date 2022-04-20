@@ -211,8 +211,9 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    AlternateProtocolsCacheSharedPtr alternate_protocols, ConnectivityOptions connectivity_options,
-    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
+    HttpServerPropertiesCacheSharedPtr alternate_protocols,
+    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
+    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
@@ -375,7 +376,7 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-AlternateProtocolsCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
+HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
   ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
   return alternate_protocols_->getOrCreateHttp3StatusTracker(origin_);
 }
@@ -418,7 +419,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return false;
   }
   uint32_t port = host_->address()->ip()->port();
-  OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
+  OptRef<const std::vector<HttpServerPropertiesCache::AlternateProtocol>> protocols =
       alternate_protocols_->findAlternatives(origin_);
   if (!protocols.has_value()) {
     ENVOY_LOG(trace, "No alternate protocols available for host '{}', skipping HTTP/3.",
@@ -429,7 +430,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
     return false;
   }
-  for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
+  for (const HttpServerPropertiesCache::AlternateProtocol& protocol : protocols.ref()) {
     // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
     if (!protocol.hostname_.empty() || protocol.port_ != port) {
       ENVOY_LOG(trace,

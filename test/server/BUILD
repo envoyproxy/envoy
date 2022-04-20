@@ -88,6 +88,8 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -286,6 +288,7 @@ envoy_cc_test_library(
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         "//source/common/init:manager_lib",
+        "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",
@@ -322,6 +325,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/request_id/uuid:config",

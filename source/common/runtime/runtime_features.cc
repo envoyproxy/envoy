@@ -77,6 +77,8 @@ RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// TODO(alyssawilk) flip true once H2 caching is on by default.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 // TODO(adisuissa) reset to true to enable unified mux by default
