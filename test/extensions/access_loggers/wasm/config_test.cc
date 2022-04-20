@@ -3,6 +3,8 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
 #include "source/extensions/access_loggers/wasm/config.h"
 #include "source/extensions/access_loggers/wasm/wasm_access_log_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
@@ -179,6 +181,60 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
 
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
   filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+}
+
+TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"));
+  const std::string sha256 = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        remote:
+          http_uri:
+            uri: https://example.com/data
+            cluster: cluster_1
+            timeout: 5s
+          sha256: )EOF",
+                                                                    sha256));
+  WasmAccessLogFactory factory;
+  envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  Http::AsyncClient::Callbacks* async_callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            if (!async_callbacks) {
+              async_callbacks = &callbacks;
+            }
+            return &request;
+          }));
+  StreamInfo::MockStreamInfo log_stream_info;
+  AccessLog::InstanceSharedPtr filter_instance =
+      factory.createAccessLogInstance(proto_config, nullptr, context_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+  EXPECT_CALL(init_watcher_, ready());
+  context_.initManager().initialize(init_watcher_);
+  auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
+  response->body().add(code);
+  async_callbacks->onSuccess(request, std::move(response));
+  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
 }
 
