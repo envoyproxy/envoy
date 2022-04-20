@@ -71,18 +71,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "http2_adapter_event_forwarder",
-    srcs = ["quiche/http2/adapter/event_forwarder.cc"],
-    hdrs = ["quiche/http2/adapter/event_forwarder.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform_export",
-        ":spdy_core_http2_deframer_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "http2_adapter_callback_visitor",
     srcs = ["quiche/http2/adapter/callback_visitor.cc"],
     hdrs = ["quiche/http2/adapter/callback_visitor.h"],
@@ -97,6 +85,20 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_test(
+    name = "http2_adapter_callback_visitor_test",
+    srcs = ["quiche/http2/adapter/callback_visitor_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_callback_visitor",
+        ":http2_adapter_mock_nghttp2_callbacks",
+        ":http2_adapter_nghttp2_test_utils",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+    ],
+)
+
 envoy_cc_library(
     name = "http2_adapter_data_source",
     hdrs = ["quiche/http2/adapter/data_source.h"],
@@ -104,6 +106,31 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_adapter_event_forwarder",
+    srcs = ["quiche/http2/adapter/event_forwarder.cc"],
+    hdrs = ["quiche/http2/adapter/event_forwarder.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_platform_export",
+        ":spdy_core_http2_deframer_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_event_forwarder_test",
+    srcs = ["quiche/http2/adapter/event_forwarder_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_event_forwarder",
+        ":quiche_common_platform_test",
+        ":spdy_core_protocol_lib",
+        ":spdy_core_mock_spdy_framer_visitor_lib",
     ],
 )
 
@@ -116,6 +143,17 @@ envoy_cc_library(
     deps = [
         ":http2_constants_lib",
         ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_header_validator_test",
+    srcs = ["quiche/http2/adapter/header_validator_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_header_validator",
+        ":quiche_common_platform_test",
     ],
 )
 
@@ -155,12 +193,108 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "http2_adapter_nghttp2_include",
-    hdrs = ["quiche/http2/adapter/nghttp2.h"],
+envoy_cc_test(
+    name = "http2_adapter_impl_comparison_test",
+    srcs = ["quiche/http2/adapter/adapter_impl_comparison_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
-    external_deps = ["nghttp2"],
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter",
+        ":http2_adapter_recording_http2_visitor",
+        ":http2_adapter_test_frame_sequence",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_adapter_interface_lib",
+    hdrs = [
+        "quiche/http2/adapter/http2_session.h",
+        "quiche/http2/adapter/http2_adapter.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_data_source",
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_visitor_interface",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http2_adapter_mock_http2_visitor",
+    hdrs = ["quiche/http2/adapter/mock_http2_visitor.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_visitor_interface",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http2_adapter_mock_nghttp2_callbacks",
+    srcs = ["quiche/http2/adapter/mock_nghttp2_callbacks.cc"],
+    hdrs = ["quiche/http2/adapter/mock_nghttp2_callbacks.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_nghttp2_include",
+        ":http2_adapter_nghttp2_util",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_adapter_nghttp2_adapter",
+    srcs = [
+        "quiche/http2/adapter/nghttp2_adapter.cc",
+        "quiche/http2/adapter/nghttp2_session.cc",
+    ],
+    hdrs = [
+        "quiche/http2/adapter/nghttp2_adapter.h",
+        "quiche/http2/adapter/nghttp2_session.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_callback_visitor",
+        ":http2_adapter_data_source",
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_util",
+        ":http2_adapter_http2_visitor_interface",
+        ":http2_adapter_interface_lib",
+        ":http2_adapter_nghttp2_callbacks",
+        ":http2_adapter_nghttp2_data_provider",
+        ":http2_adapter_nghttp2_include",
+        ":http2_adapter_nghttp2_util",
+        ":http2_adapter_window_manager",
+        ":http2_core_http2_trace_logging_lib",
+        ":http2_core_priority_write_scheduler_lib",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_nghttp2_adapter_test",
+    srcs = ["quiche/http2/adapter/nghttp2_adapter_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_visitor_interface",
+        ":http2_adapter_mock_http2_visitor",
+        ":http2_adapter_nghttp2_adapter",
+        ":http2_adapter_nghttp2_include",
+        ":http2_adapter_nghttp2_test_utils",
+        ":http2_adapter_oghttp2_util",
+        ":http2_adapter_test_frame_sequence",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+    ],
 )
 
 envoy_cc_library(
@@ -195,6 +329,58 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_test(
+    name = "http2_adapter_nghttp2_data_provider_test",
+    srcs = ["quiche/http2/adapter/nghttp2_data_provider_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_nghttp2_data_provider",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_adapter_nghttp2_include",
+    hdrs = ["quiche/http2/adapter/nghttp2.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    external_deps = ["nghttp2"],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_nghttp2_session_test",
+    srcs = ["quiche/http2/adapter/nghttp2_session_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter",
+        ":http2_adapter_mock_http2_visitor",
+        ":http2_adapter_nghttp2_callbacks",
+        ":http2_adapter_nghttp2_util",
+        ":http2_adapter_test_frame_sequence",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+        ":quiche_common_platform_test_helpers_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http2_adapter_nghttp2_test_utils",
+    srcs = ["quiche/http2/adapter/nghttp2_test_utils.cc"],
+    hdrs = ["quiche/http2/adapter/nghttp2_test_utils.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_nghttp2_include",
+        ":http2_adapter_nghttp2_util",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_test",
+    ],
+)
+
 envoy_cc_library(
     name = "http2_adapter_nghttp2_util",
     srcs = ["quiche/http2/adapter/nghttp2_util.cc"],
@@ -208,77 +394,6 @@ envoy_cc_library(
         ":http2_adapter_nghttp2_include",
         ":quiche_common_platform_export",
         ":spdy_core_header_block_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "http2_adapter_oghttp2_util",
-    srcs = ["quiche/http2/adapter/oghttp2_util.cc"],
-    hdrs = ["quiche/http2/adapter/oghttp2_util.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_http2_protocol",
-        ":quiche_common_platform_export",
-        ":spdy_core_header_block_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "http2_adapter_window_manager",
-    srcs = ["quiche/http2/adapter/window_manager.cc"],
-    hdrs = ["quiche/http2/adapter/window_manager.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_platform",
-        ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_library(
-    name = "http2_adapter_interface_lib",
-    hdrs = [
-        "quiche/http2/adapter/http2_session.h",
-        "quiche/http2/adapter/http2_adapter.h",
-    ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_data_source",
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_http2_visitor_interface",
-        ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_library(
-    name = "http2_adapter_nghttp2_adapter",
-    srcs = [
-        "quiche/http2/adapter/nghttp2_adapter.cc",
-        "quiche/http2/adapter/nghttp2_session.cc",
-    ],
-    hdrs = [
-        "quiche/http2/adapter/nghttp2_adapter.h",
-        "quiche/http2/adapter/nghttp2_session.h",
-    ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_callback_visitor",
-        ":http2_adapter_data_source",
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_http2_util",
-        ":http2_adapter_http2_visitor_interface",
-        ":http2_adapter_interface_lib",
-        ":http2_adapter_nghttp2_callbacks",
-        ":http2_adapter_nghttp2_data_provider",
-        ":http2_adapter_nghttp2_include",
-        ":http2_adapter_nghttp2_util",
-        ":http2_adapter_window_manager",
-        ":http2_core_http2_trace_logging_lib",
-        ":http2_core_priority_write_scheduler_lib",
-        ":quiche_common_platform_export",
     ],
 )
 
@@ -316,6 +431,99 @@ envoy_cc_library(
         ":spdy_core_protocol_lib",
         ":spdy_header_byte_listener_interface_lib",
         ":spdy_no_op_headers_handler_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_oghttp2_adapter_test",
+    srcs = ["quiche/http2/adapter/oghttp2_adapter_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_oghttp2_adapter",
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_visitor_interface",
+        ":http2_adapter_mock_http2_visitor",
+        ":http2_adapter_oghttp2_util",
+        ":http2_adapter_test_frame_sequence",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+        ":quiche_common_platform_test_helpers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_adapter_oghttp2_util",
+    srcs = ["quiche/http2/adapter/oghttp2_util.cc"],
+    hdrs = ["quiche/http2/adapter/oghttp2_util.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":quiche_common_platform_export",
+        ":spdy_core_header_block_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http2_adapter_recording_http2_visitor",
+    srcs = ["quiche/http2/adapter/recording_http2_visitor.cc"],
+    hdrs = ["quiche/http2/adapter/recording_http2_visitor.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_util",
+        ":http2_adapter_http2_visitor_interface",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http2_adapter_test_frame_sequence",
+    hdrs = ["quiche/http2/adapter/test_frame_sequence.h"],
+    srcs = ["quiche/http2/adapter/test_frame_sequence.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_util",
+        ":http2_adapter_oghttp2_util",
+        ":quiche_common_platform_export",
+        ":spdy_core_framer_lib",
+        ":spdy_core_hpack_hpack_lib",
+        ":spdy_core_protocol_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http2_adapter_test_utils",
+    srcs = ["quiche/http2/adapter/test_utils.cc"],
+    hdrs = ["quiche/http2/adapter/test_utils.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_data_source",
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_visitor_interface",
+        ":http2_adapter_mock_http2_visitor",
+        ":quiche_common_platform_test",
+        ":spdy_core_header_block_lib",
+        ":spdy_core_protocol_lib",
+        ":spdy_core_hpack_hpack_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_adapter_window_manager",
+    srcs = ["quiche/http2/adapter/window_manager.cc"],
+    hdrs = ["quiche/http2/adapter/window_manager.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_platform",
+        ":quiche_common_platform_export",
     ],
 )
 
@@ -1208,6 +1416,20 @@ envoy_cc_library(
         ":spdy_core_header_block_lib",
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_hpack_hpack_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "spdy_core_mock_spdy_framer_visitor_lib",
+    srcs = ["quiche/spdy/core/mock_spdy_framer_visitor.cc"],
+    hdrs = ["quiche/spdy/core/mock_spdy_framer_visitor.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_platform_test",
+        ":spdy_core_http2_deframer_lib",
+        ":spdy_core_recording_headers_handler_lib",
+        ":spdy_core_test_utils_lib",
     ],
 )
 
