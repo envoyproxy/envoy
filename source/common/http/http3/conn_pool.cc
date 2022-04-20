@@ -105,8 +105,8 @@ void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
 
 void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& client) {
   ASSERT(client.numActiveStreams() == 0);
-  if (static_cast<ActiveClient&>(client).hasCreatedStream()) {
-    // TODO(danzh) notify callback about the 0-RTT handshake failure.
+  if (static_cast<ActiveClient&>(client).hasCreatedStream() && connect_callback_ != absl::nullopt) {
+    connect_callback_->onZeroRttHandshakeFailed();
   }
 }
 
