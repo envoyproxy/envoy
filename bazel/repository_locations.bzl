@@ -557,14 +557,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "yaml-cpp",
         project_desc = "YAML parser and emitter in C++ matching the YAML 1.2 spec",
         project_url = "https://github.com/jbeder/yaml-cpp",
-        version = "7d066556112e6899783608ef917b9b326fb6497a",
-        sha256 = "bf6aff0593445cdc779fd0d30f8af809e04cc636a0e72cf26f3f4dfc6fa01c11",
+        version = "fa744bbbe22da24c745d991fd8f6f0401af7acf7",
+        sha256 = "9420032cc1a5b34bc5ae056980662dc4aaa31e7ea8a649e408abd0769a606323",
         strip_prefix = "yaml-cpp-{version}",
         urls = ["https://github.com/jbeder/yaml-cpp/archive/{version}.tar.gz"],
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-04-03",
+        release_date = "2022-04-20",
         cpe = "cpe:2.3:a:yaml-cpp_project:yaml-cpp:*",
     ),
     com_github_msgpack_msgpack_c = dict(

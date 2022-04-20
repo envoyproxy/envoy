@@ -390,8 +390,6 @@ def _com_github_intel_ipp_crypto_crypto_mb():
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:yaml_cpp.patch"],
     )
     native.bind(
         name = "yaml_cpp",
