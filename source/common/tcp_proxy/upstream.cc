@@ -278,7 +278,6 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                          downstream_info_.downstreamAddressProvider().requestedServerName(),
                          config_.defaultPort())
           : config_.hostname();
-  // downstream_info_.downstreamAddressProvider().requestedServerName()
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
