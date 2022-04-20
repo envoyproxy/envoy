@@ -25,23 +25,23 @@ message BufferBehavior {
   oneof behavior {
     option (validate.required) = true;
 
-    // Don't inject content length header.
+    // Don't inject `content-length` header.
     // Output immediately, buffer only if output is slower than input.
     bool stream_when_possible = 1 [(validate.rules).bool = {const: true}];
 
     // Never buffer, do nothing.
     bool bypass = 2 [(validate.rules).bool = {const: true}];
 
-    // If content length is not present, buffer the entire input,
-    // inject content length header, then output.
-    // If content length is already present, act like stream_when_possible.
+    // If `content-length` is not present, buffer the entire input,
+    // inject `content-length` header, then output.
+    // If `content-length` is already present, act like `stream_when_possible`.
     bool inject_content_length_if_necessary = 3 [(validate.rules).bool = {const: true}];
 
-    // Always buffer the entire input, and inject content-length,
+    // Always buffer the entire input, and inject `content-length`,
     // overwriting any provided content-length header.
     bool fully_buffer_and_always_inject_content_length = 4 [(validate.rules).bool = {const: true}];
 
-    // Always buffer the entire input, do not inject content-length.
+    // Always buffer the entire input, do not inject `content-length`.
     bool fully_buffer = 5 [(validate.rules).bool = {const: true}];
   }
 }
@@ -50,21 +50,21 @@ message BufferBehavior {
 // The configuration for one direction of the filter behavior.
 message StreamConfig {
   // Whether to bypass / stream / fully buffer / etc.
-  // May be unset, in which case the default is stream_when_possible.
+  // May be unset, in which case the default is `stream_when_possible`.
   BufferBehavior behavior = 1;
 
-  // The amount that can be in the buffer before it starts trying to buffer to disk.
+  // The amount stored in the memory buffer before buffering to disk.
   google.protobuf.UInt64Value memory_buffer_bytes_limit = 2;
 
-  // The maximum storage excluding memory to be buffered in this filter.
+  // The maximum storage (excluding memory) to be buffered in this filter.
   google.protobuf.UInt64Value storage_buffer_bytes_limit = 3;
 
   // The maximum amount that can be queued for writing to storage, above which the
   // source is requested to pause. If unset, defaults to the same value as
-  // memory_buffer_bytes_limit.
+  // `memory_buffer_bytes_limit`.
   //
   // For example, assuming the recipient is not consuming data at all, if
-  // memory_buffer_bytes_limit was 32*1024, and storage_buffer_queue_high_watermark_bytes
+  // `memory_buffer_bytes_limit` was 32*1024, and `storage_buffer_queue_high_watermark_bytes`
   // was 64*1024, and the filesystem is backed up so writes are not occurring promptly,
   // then:
   // * Any request less than 32*1024 will eventually pass through without ever attempting
@@ -73,13 +73,13 @@ message StreamConfig {
   //   * If it reaches (32+64)*1024 buffered and not yet written to disk, a high
   //     watermark signal is sent to the source.
   // * Any stream whose total size exceeds
-  //   memory_buffer_bytes_limit+storage_buffer_bytes_limit will provoke an error.
+  //   `memory_buffer_bytes_limit + storage_buffer_bytes_limit` will provoke an error.
   //   (Note, if the recipient *is* consuming data then it is possible for such an
   //   oversized request to pass through the buffer filter, provided the recipient
   //   isn't consuming data too slowly.)
   //
   // The low watermark signal is sent when the memory buffer is at size
-  //  memory_buffer_bytes_limit + (storage_buffer_bytes_limit / 2).
+  //  `memory_buffer_bytes_limit + (storage_buffer_bytes_limit / 2)`.
   google.protobuf.UInt64Value storage_buffer_queue_high_watermark_bytes = 4;
 }
 
@@ -102,8 +102,8 @@ message FileSystemBufferFilterConfig {
   // An optional path to which the unlinked files should be written - this may
   // determine which physical storage device will be used.
   //
-  // If unspecified, will use the environment variable TMPDIR, or, if that's unset,
-  // will use /tmp.
+  // If unspecified, will use the environment variable `TMPDIR`, or, if that's unset,
+  // will use `/tmp`.
   google.protobuf.StringValue storage_buffer_path = 2;
 
   // The configuration for how to buffer (or not) requests.
