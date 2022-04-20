@@ -870,7 +870,7 @@ protected:
   void writeToRequests(std::vector<RequestEncoderResponseDecoderPair>& request_response_pairs,
                        std::vector<int> write_sizes, bool end_stream) {
     ASSERT_EQ(write_sizes.size(), request_response_pairs.size());
-    for (uint i = 0; i < write_sizes.size(); ++i) {
+    for (uint32_t i = 0; i < write_sizes.size(); ++i) {
       const char stream_char = 'A' + i;
       Buffer::OwnedImpl send_buffer{std::string(write_sizes[i], stream_char)};
       codec_client_->sendData(request_response_pairs[i].first, send_buffer, end_stream);
@@ -1168,6 +1168,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
   auto record_turns_on_decode =
       [&turns, &mu](StreamTee& tee, Http::StreamDecoderFilterCallbacks* decoder_callbacks)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    (void)tee; // silence gcc unused warning (the absl annotation usage didn't mark it used.)
     absl::MutexLock l(&mu);
     turns.push_back(decoder_callbacks->streamId());
     return Http::FilterDataStatus::Continue;
@@ -1245,7 +1246,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
-  // Install turns.
+  // Tracking turns and block writes to downstream on end stream.
   absl::Mutex mu;
   std::vector<uint64_t> turns;
   auto record_turns_on_encode_and_stop_writes_on_endstream =

@@ -168,12 +168,7 @@ public:
       stream->runHighWatermarkCallbacks();
     }
   }
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    // Notify the streams based on least recently encoding to the connection.
-    for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); it++) {
-      (*it)->runLowWatermarkCallbacks();
-    }
-  }
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
   void setVisitor(std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor) {
     visitor_ = std::move(visitor);

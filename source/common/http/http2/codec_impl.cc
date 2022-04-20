@@ -1773,6 +1773,19 @@ void ConnectionImpl::onProtocolConstraintViolation() {
   connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
 }
 
+void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // Notify the streams based on least recently encoding to the connection.
+    for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
+      (*it)->runLowWatermarkCallbacks();
+    }
+  } else {
+    for (auto& stream : active_streams_) {
+      stream->runHighWatermarkCallbacks();
+    }
+  }
+}
+
 ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
   nghttp2_session_callbacks_new(&callbacks_);
   nghttp2_session_callbacks_set_send_callback(

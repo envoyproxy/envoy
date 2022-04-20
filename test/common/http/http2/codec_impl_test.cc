@@ -3652,7 +3652,7 @@ TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
   }
 }
 
-TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProcessing) {
+TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProcessingEnabled) {
   allow_metadata_ = true;
 
   // We must initialize before dtor, otherwise we'll touch uninitialized
@@ -3671,6 +3671,7 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder1->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
+  // The stream just created should be the only active stream.
   EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1));
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1));
   ResponseEncoder* response_encoder1 = response_encoder_;
@@ -3679,7 +3680,12 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
+  // The newest stream created should come first as on the client
+  // side we most recently encoded on the http2 connection with
+  // that stream.
   EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1));
+  // On the server side (where no encoding has yet been done), we
+  // just have prepended streams to the list.
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(3, 1));
 
   // Check body
@@ -3687,6 +3693,8 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   request_encoder1->encodeData(body, false);
   driveToCompletion();
+  // The first request should be at the front of the active streams list as it
+  // just encoded above.
   EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 3));
 
   // Check metadata
@@ -3699,12 +3707,16 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_CALL(request_decoder_, decodeMetadata_(_));
   request_encoder2->encodeMetadata(metadata_map_vector);
   driveToCompletion();
+  // The second request should be at the front of the active streams list as it
+  // just encoded above.
   EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1));
 
   // Check trailers
   EXPECT_CALL(request_decoder_, decodeTrailers_(_));
   request_encoder1->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
   driveToCompletion();
+  // The first request should be at the front of the active streams list as it
+  // just encoded above.
   EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 3));
 
   // Check headers from server side
@@ -3712,6 +3724,8 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder1->encodeHeaders(response_headers, false);
   driveToCompletion();
+  // The first response should be at the front of the active streams list as it
+  // just encoded above.
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
