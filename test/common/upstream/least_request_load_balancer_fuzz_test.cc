@@ -45,7 +45,11 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
-
+  if (input.least_request_lb_config().has_choice_count() &&
+      input.least_request_lb_config().choice_count().value() > 10000) {
+    ENVOY_LOG_MISC(debug, "a choice count greater than 10,000 has no added value");
+    return;
+  }
   const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
       input.zone_aware_load_balancer_test_case();
 
