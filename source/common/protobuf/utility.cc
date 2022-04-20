@@ -197,7 +197,7 @@ uint64_t fractionalPercentDenominatorToInt(
     return 1000000;
   }
   IS_ENVOY_BUG("unexpected denominator type enum");
-  return 1; // unexpected fallthrough to one to avoid division by zero.
+  return 1; // unexpected fall-through to one to avoid division by zero.
 }
 
 } // namespace ProtobufPercentHelper
