@@ -30,6 +30,8 @@ the request, for example, the method and path of a HTTP request. The principal s
 downstream client identities of the request, for example, the URI SAN of the downstream client
 certificate. A policy is matched if its permissions and principals are matched at the same time.
 
+.. _arch_overview_rbac_matcher:
+
 Matcher
 -------
 Instead of specifying :ref:`policies <envoy_v3_api_field_config.rbac.v3.RBAC.policies>`, the RBAC
