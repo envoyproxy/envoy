@@ -1171,8 +1171,7 @@ protected:
   }
 
   void statsEndpoint() {
-    StatsRequest request(*store_, false, false, Utility::HistogramBucketsMode::NoBuckets,
-                         absl::nullopt);
+    StatsRequest request(*store_, StatsParams());
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;
