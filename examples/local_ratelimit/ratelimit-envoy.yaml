@@ -106,14 +106,14 @@ static_resources:
                 token_bucket:
                   max_tokens: 3
                   tokens_per_fill: 3
-                  fill_interval: 5s
+                  fill_interval: 6s
               - entries:
                 - key: generic_key
                   value: test2
                 token_bucket:
                   max_tokens: 5
                   tokens_per_fill: 5
-                  fill_interval: 5s
+                  fill_interval: 6s
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
