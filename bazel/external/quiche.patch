@@ -1250,3 +1250,35 @@ diff --git a/quiche/http2/adapter/oghttp2_adapter_test.cc b/quiche/http2/adapter
    auto adapter = OgHttp2Adapter::Create(visitor, options);
  
    const std::string frames = TestFrameSequence()
+diff --git a/quiche/http2/adapter/oghttp2_adapter_test.cc b/quiche/http2/adapter/oghttp2_adapter_test.cc
+--- quiche/http2/adapter/oghttp2_adapter_test.cc
++++ quiche/http2/adapter/oghttp2_adapter_test.cc
+@@ -5653,13 +5653,13 @@ TEST(OgHttp2AdapterTest, ServerRejectsSt
+ // Exercises a naive mutually recursive test client and server. This test fails
+ // without recursion guards in OgHttp2Session.
+ TEST(OgHttp2AdapterInteractionTest, ClientServerInteractionTest) {
+-  MockHttp2Visitor client_visitor;
++  testing::NiceMock<MockHttp2Visitor> client_visitor;
+   OgHttp2Adapter::Options client_options;
+   client_options.perspective = Perspective::kClient;
+   auto client_adapter = OgHttp2Adapter::Create(
+       client_visitor, client_options);
+-  MockHttp2Visitor server_visitor;
++  testing::NiceMock<MockHttp2Visitor> server_visitor;
+   OgHttp2Adapter::Options server_options;
+   server_options.perspective = Perspective::kServer;
+   auto server_adapter = OgHttp2Adapter::Create(
+       server_visitor, server_options);
+diff --git a/quiche/http2/adapter/recording_http2_visitor_test.cc b/quiche/http2/adapter/recording_http2_visitor_test.cc
+--- quiche/http2/adapter/recording_http2_visitor_test.cc
++++ quiche/http2/adapter/recording_http2_visitor_test.cc
+@@ -51,8 +51,7 @@ TEST(RecordingHttp2VisitorTest, SameEven
+   const uint8_t flags = random.Rand8();
+   const Http2ErrorCode error_code = static_cast<Http2ErrorCode>(
+       random.Uniform(static_cast<int>(Http2ErrorCode::MAX_ERROR_CODE)));
+-  const Http2Setting setting = {.id = random.Rand16(),
+-                                .value = random.Rand32()};
++  const Http2Setting setting = {random.Rand16(), random.Rand32()};
+   const absl::string_view alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-";
+   const std::string some_string =
+       random.RandStringWithAlphabet(random.Rand8(), alphabet);

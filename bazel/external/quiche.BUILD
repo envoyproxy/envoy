@@ -397,6 +397,19 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_test(
+    name = "http2_adapter_nghttp2_util_test",
+    srcs = ["quiche/http2/adapter/nghttp2_util_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_nghttp2_test_utils",
+        ":http2_adapter_nghttp2_util",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+    ],
+)
+
 envoy_cc_library(
     name = "http2_adapter_oghttp2_adapter",
     srcs = [
@@ -440,15 +453,29 @@ envoy_cc_test(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":http2_adapter_oghttp2_adapter",
         ":http2_adapter_http2_protocol",
         ":http2_adapter_http2_visitor_interface",
         ":http2_adapter_mock_http2_visitor",
+        ":http2_adapter_oghttp2_adapter",
         ":http2_adapter_oghttp2_util",
         ":http2_adapter_test_frame_sequence",
         ":http2_adapter_test_utils",
         ":quiche_common_platform_test",
         ":quiche_common_platform_test_helpers_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_oghttp2_session_test",
+    srcs = ["quiche/http2/adapter/oghttp2_session_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_mock_http2_visitor",
+        ":http2_adapter_oghttp2_adapter",
+        ":http2_adapter_test_frame_sequence",
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
     ],
 )
 
@@ -465,6 +492,19 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_test(
+    name = "http2_adapter_oghttp2_util_test",
+    srcs = ["quiche/http2/adapter/oghttp2_util_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_oghttp2_util",
+        ":http2_adapter_test_frame_sequence",
+        ":quiche_common_platform_test",
+    ],
+)
+
 envoy_cc_test_library(
     name = "http2_adapter_recording_http2_visitor",
     srcs = ["quiche/http2/adapter/recording_http2_visitor.cc"],
@@ -477,6 +517,20 @@ envoy_cc_test_library(
         ":http2_adapter_http2_visitor_interface",
         ":quiche_common_platform_export",
         ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_recording_http2_visitor_test",
+    srcs = ["quiche/http2/adapter/recording_http2_visitor_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_http2_protocol",
+        ":http2_adapter_http2_visitor_interface",
+        ":http2_test_tools_random",
+        ":quiche_common_platform_test",
+        ":http2_adapter_recording_http2_visitor",
     ],
 )
 
@@ -515,6 +569,18 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "http2_adapter_test_utils_test",
+    srcs = ["quiche/http2/adapter/test_utils_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_test_utils",
+        ":quiche_common_platform_test",
+        ":spdy_core_framer_lib",
+    ],
+)
+
 envoy_cc_library(
     name = "http2_adapter_window_manager",
     srcs = ["quiche/http2/adapter/window_manager.cc"],
@@ -524,6 +590,21 @@ envoy_cc_library(
     deps = [
         ":http2_platform",
         ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_adapter_window_manager_test",
+    srcs = ["quiche/http2/adapter/window_manager_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":http2_adapter_window_manager",
+        ":http2_test_tools_random",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_test",
+        ":quiche_common_platform_test_helpers_lib",
+        "@com_google_absl//absl/functional:bind_front",
     ],
 )
 
