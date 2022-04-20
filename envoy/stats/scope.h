@@ -35,7 +35,7 @@ using ScopeSharedPtr = std::shared_ptr<Scope>;
 // ScopePtr. We should fully remove this alias in a future PR and change all the
 // references, once known consumers that might break from this change have a
 // chance to do the global replace in their own repos.
-using ScopePtr = ScopeSharedPtr;
+using ScopePtr ABSL_DEPRECATED("Use ScopeSharedPtr() instead.") = ScopeSharedPtr;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
