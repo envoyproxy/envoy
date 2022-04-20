@@ -41,7 +41,7 @@ message BufferBehavior {
     // overwriting any provided content-length header.
     bool fully_buffer_and_always_inject_content_length = 4 [(validate.rules).bool = {const: true}];
 
-    // Always buffer the entire input, do not inject ``content-length``.
+    // Always buffer the entire input, do not modify ``content-length``.
     bool fully_buffer = 5 [(validate.rules).bool = {const: true}];
   }
 }
@@ -50,13 +50,17 @@ message BufferBehavior {
 // The configuration for one direction of the filter behavior.
 message StreamConfig {
   // Whether to bypass / stream / fully buffer / etc.
-  // May be unset, in which case the default is ``stream_when_possible``.
+  // If unset in route, vhost and listener config, the default is ``stream_when_possible``.
   BufferBehavior behavior = 1;
 
   // The amount stored in the memory buffer before buffering to disk.
+  // If unset in route, vhost and listener config, defaults to a hardcoded value
+  // ``default_memory_buffer_bytes_limit`` == 1024*1024
   google.protobuf.UInt64Value memory_buffer_bytes_limit = 2;
 
   // The maximum storage (excluding memory) to be buffered in this filter.
+  // If unset in route, vhost and listener config, defaults to a hardcoded value
+  // ``default_storage_buffer_bytes_limit`` == 32*1024*1024
   google.protobuf.UInt64Value storage_buffer_bytes_limit = 3;
 
   // The maximum amount that can be queued for writing to storage, above which the
@@ -84,10 +88,7 @@ message StreamConfig {
 }
 
 // [#not-implemented-hide:]
-// Configuration for file system buffer filters.
-//
-// Most fields are wrapped in well-known types so that we can detect the difference between
-// unset and explicitly zero.
+// Configuration for file system buffer filter.
 //
 // Route-specific configs override only the fields they explicitly include; unset
 // fields inherit from the vhost or listener-level config, or, if never set,
@@ -95,20 +96,21 @@ message StreamConfig {
 message FileSystemBufferFilterConfig {
   // A configuration for an AsyncFileManager.
   //
-  // Must be set somewhere, but may be set at the route/vhost level or the listener level,
-  // or both with the more specific taking precedence, so cannot be validate-required.
+  // If unspecified in route, vhost and listener, an exception will be thrown.
   common.async_files.v3.AsyncFileManagerConfig manager_config = 1;
 
   // An optional path to which the unlinked files should be written - this may
   // determine which physical storage device will be used.
   //
-  // If unspecified, will use the environment variable ``TMPDIR``, or, if that's unset,
-  // will use ``/tmp``.
+  // If unspecified in route, vhost and listener, will use the environment variable
+  // ``TMPDIR``, or, if that's unset, will use ``/tmp``.
   google.protobuf.StringValue storage_buffer_path = 2;
 
-  // The configuration for how to buffer (or not) requests.
+  // Optional configuration for how to buffer (or not) requests.
+  // See ``StreamConfig`` definition for defaults.
   StreamConfig request = 3;
 
-  // The configuration for how to buffer (or not) responses.
+  // Optional configuration for how to buffer (or not) responses.
+  // See ``StreamConfig`` definition for defaults.
   StreamConfig response = 4;
 }
