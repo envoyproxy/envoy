@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.common_inputs.ssl.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.ssl.v3";
+option java_outer_classname = "SslInputsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/common_inputs/ssl/v3;sslv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Common SSL Matching Inputs]
+
+// Input that matches the authentication attributes for a downstream.
+// [#extension: envoy.matching.inputs.authenticated]
+message AuthenticatedInput {
+  enum Field {
+    // The URIs in the SAN field of the certificate. Certificate with multiple URIs will be
+    // concatenated into a ','-delimited list.
+    UriSan = 0;
+
+    // The DNS entries in the SAN field of the certificate. Certificate with multiple DNS
+    // entires will be concatenated into a ','-delimited list.
+    DnsSan = 1;
+
+    // The subject field of the certificate in RFC 2253 format.
+    Subject = 2;
+  }
+
+  // The field in the peer certificate which should be matched on.
+  Field field = 1 [(validate.rules).enum = {defined_only: true}];
+}
