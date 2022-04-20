@@ -87,9 +87,12 @@ public:
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
-    Buffer::OwnedImpl data;
+    Admin::RequestPtr request = handler.makeRequest(url, admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream_);
+    Http::Code code = request->start(response_headers);
+    Buffer::OwnedImpl data;
+    while (request->nextChunk(data)) {
+    }
     return std::make_pair(code, data.toString());
   }
 
