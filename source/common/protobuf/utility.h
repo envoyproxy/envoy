@@ -221,15 +221,15 @@ public:
 
 // Move semantics friendly StatusOr that will used to replace ProtoBufUtil::StatusOr temporary to
 // achieve better performance.
-template <typename T, typename Status = ProtobufUtil::Status> class StatusOr {
+template <typename T, typename Status = ProtobufUtil::Status> class ProtoStatusOr {
 public:
-  StatusOr(T&& value) : value_(std::move(value)), status_(Status()) {}
-  StatusOr(ProtobufUtil::Status&& status) : value_(T()), status_(std::move(status)) {
+  ProtoStatusOr(T&& value) : value_(std::move(value)), status_(Status()) {}
+  ProtoStatusOr(ProtobufUtil::Status&& status) : value_(T()), status_(std::move(status)) {
     ASSERT(!status.ok());
   }
 
-  StatusOr(const T& value) : value_(value), status_(Status()) {}
-  StatusOr(const ProtobufUtil::Status& status) : value_(T()), status_(status) {
+  ProtoStatusOr(const T& value) : value_(value), status_(Status()) {}
+  ProtoStatusOr(const ProtobufUtil::Status& status) : value_(T()), status_(status) {
     ASSERT(!status.ok());
   }
 
@@ -499,11 +499,12 @@ public:
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
    * values, e.g. an int32 set to 0 or a bool set to false.
-   * @return StatusOr<std::string> of formatted JSON object, or an error status if conversion fails.
+   * @return ProtoStatusOr<std::string> of formatted JSON object, or an error status if conversion
+   * fails.
    */
-  static StatusOr<std::string> getJsonStringFromMessage(const Protobuf::Message& message,
-                                                        bool pretty_print = false,
-                                                        bool always_print_primitive_fields = false);
+  static ProtoStatusOr<std::string>
+  getJsonStringFromMessage(const Protobuf::Message& message, bool pretty_print = false,
+                           bool always_print_primitive_fields = false);
 
   /**
    * Extract JSON as string from a google.protobuf.Message, crashing if the conversion to JSON
