@@ -6,6 +6,9 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/network/matching/data_impl.h"
+#include "source/common/network/matching/inputs.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/utility.h"
 #include "source/server/configuration_impl.h"
@@ -26,6 +29,48 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
                          Network::Utility::parseInternetAddress("255.255.255.255"));
 }
+
+struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
+  explicit FilterChainNameAction(Network::DrainableFilterChainSharedPtr chain) : chain_(chain) {}
+  const Network::DrainableFilterChainSharedPtr chain_;
+};
+
+using FilterChainActionFactoryContext =
+    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext>,
+                                     Logger::Loggable<Logger::Id::config> {
+public:
+  std::string name() const override { return "filter-chain-name"; }
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
+                                                 FilterChainActionFactoryContext& filter_chains,
+                                                 ProtobufMessage::ValidationVisitor&) override {
+    Network::DrainableFilterChainSharedPtr chain = nullptr;
+    const auto& name = dynamic_cast<const ProtobufWkt::StringValue&>(config);
+    const auto chain_match = filter_chains.find(name.value());
+    if (chain_match != filter_chains.end()) {
+      chain = chain_match->second;
+    } else {
+      ENVOY_LOG(debug, "matcher API points to an absent filter chain '{}'", name.value());
+    }
+    return [chain]() { return std::make_unique<FilterChainNameAction>(chain); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+};
+
+REGISTER_FACTORY(FilterChainNameActionFactory,
+                 Matcher::ActionFactory<FilterChainActionFactoryContext>);
+
+class FilterChainNameActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Network::MatchingData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Network::MatchingData>&,
+                                          absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
 
 } // namespace
 
@@ -160,6 +205,7 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 }
 
 void FilterChainManagerImpl::addFilterChains(
+    const xds::type::matcher::v3::Matcher* filter_chain_matcher,
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
@@ -169,6 +215,8 @@ void FilterChainManagerImpl::addFilterChains(
                       MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
+  absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_by_name;
+
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -176,43 +224,15 @@ void FilterChainManagerImpl::addFilterChains(
                                        "unimplemented fields",
                                        address_->asString(), filter_chain->name()));
     }
-    const auto& matching_iter = filter_chains.find(filter_chain_match);
-    if (matching_iter != filter_chains.end()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
-                                       "the same matching rules defined as '{}'",
-                                       address_->asString(), filter_chain->name(),
-                                       matching_iter->second));
-    }
-    filter_chains.insert({filter_chain_match, filter_chain->name()});
-
-    auto createAddressVector = [](const auto& prefix_ranges) -> std::vector<std::string> {
-      std::vector<std::string> ips;
-      ips.reserve(prefix_ranges.size());
-      for (const auto& ip : prefix_ranges) {
-        const auto& cidr_range = Network::Address::CidrRange::create(ip);
-        ips.push_back(cidr_range.asString());
+    if (!filter_chain_matcher) {
+      const auto& matching_iter = filter_chains.find(filter_chain_match);
+      if (matching_iter != filter_chains.end()) {
+        throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
+                                         "the same matching rules defined as '{}'",
+                                         address_->asString(), filter_chain->name(),
+                                         matching_iter->second));
       }
-      return ips;
-    };
-
-    // Validate IP addresses.
-    std::vector<std::string> destination_ips =
-        createAddressVector(filter_chain_match.prefix_ranges());
-    std::vector<std::string> source_ips =
-        createAddressVector(filter_chain_match.source_prefix_ranges());
-    std::vector<std::string> direct_source_ips =
-        createAddressVector(filter_chain_match.direct_source_prefix_ranges());
-
-    std::vector<std::string> server_names;
-    // Reject partial wildcards, we don't match on them.
-    for (const auto& server_name : filter_chain_match.server_names()) {
-      if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': partial wildcards are not supported in "
-                        "\"server_names\"",
-                        address_->asString()));
-      }
-      server_names.push_back(absl::AsciiStrToLower(server_name));
+      filter_chains.insert({filter_chain_match, filter_chain->name()});
     }
 
     // Reuse created filter chain if possible.
@@ -225,19 +245,75 @@ void FilterChainManagerImpl::addFilterChains(
       ++new_filter_chain_size;
     }
 
-    addFilterChainForDestinationPorts(
-        destination_ports_map_,
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-        server_names, filter_chain_match.transport_protocol(),
-        filter_chain_match.application_protocols(), direct_source_ips,
-        filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
-        filter_chain_impl);
+    // If using the matcher, require usage of "name" field and skip building the index.
+    if (filter_chain_matcher) {
+      if (filter_chain->name().empty()) {
+        throw EnvoyException(fmt::format(
+            "error adding listener '{}': \"name\" field is required when using a listener matcher",
+            address_->asString()));
+      }
+      auto [_, inserted] =
+          filter_chains_by_name.try_emplace(filter_chain->name(), filter_chain_impl);
+      if (!inserted) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': \"name\" field is duplicated with value '{}'",
+                        address_->asString(), filter_chain->name()));
+      }
+      if (filter_chain->has_filter_chain_match()) {
+        ENVOY_LOG(debug, "filter chain match in chain '{}' is ignored", filter_chain->name());
+      }
+    } else {
+      auto createAddressVector = [](const auto& prefix_ranges) -> std::vector<std::string> {
+        std::vector<std::string> ips;
+        ips.reserve(prefix_ranges.size());
+        for (const auto& ip : prefix_ranges) {
+          const auto& cidr_range = Network::Address::CidrRange::create(ip);
+          ips.push_back(cidr_range.asString());
+        }
+        return ips;
+      };
+
+      // Validate IP addresses.
+      std::vector<std::string> destination_ips =
+          createAddressVector(filter_chain_match.prefix_ranges());
+      std::vector<std::string> source_ips =
+          createAddressVector(filter_chain_match.source_prefix_ranges());
+      std::vector<std::string> direct_source_ips =
+          createAddressVector(filter_chain_match.direct_source_prefix_ranges());
+
+      std::vector<std::string> server_names;
+      // Reject partial wildcards, we don't match on them.
+      for (const auto& server_name : filter_chain_match.server_names()) {
+        if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
+          throw EnvoyException(
+              fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                          "\"server_names\"",
+                          address_->asString()));
+        }
+        server_names.push_back(absl::AsciiStrToLower(server_name));
+      }
+
+      addFilterChainForDestinationPorts(
+          destination_ports_map_,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+          server_names, filter_chain_match.transport_protocol(),
+          filter_chain_match.application_protocols(), direct_source_ips,
+          filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
+          filter_chain_impl);
+    }
 
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   convertIPsToTries();
   copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
                                   context_creator);
+  // Construct matcher if it is present in the listener configuration.
+  if (filter_chain_matcher) {
+    FilterChainNameActionValidationVisitor validation_visitor;
+    Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
+        filter_chains_by_name, parent_context_.getServerFactoryContext(), validation_visitor);
+    matcher_ = factory.create(*filter_chain_matcher)();
+  }
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);
 }
@@ -468,6 +544,10 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
+  if (matcher_) {
+    return findFilterChainUsingMatcher(socket);
+  }
+
   const auto& address = socket.connectionInfoProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
@@ -494,6 +574,19 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
              ? best_match_filter_chain
              // Neither exact port nor catch-all port matches. Use fallback filter chain.
              : default_filter_chain_.get();
+}
+
+const Network::FilterChain*
+FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const {
+  Network::Matching::MatchingDataImpl data(socket);
+  const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
+  ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
+         "Matching must complete for network streams.");
+  if (match_result.result_) {
+    const auto result = match_result.result_();
+    return result->getTyped<FilterChainNameAction>().chain_.get();
+  }
+  return default_filter_chain_.get();
 }
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
@@ -613,7 +706,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
   // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
       (!filter_chain_local.first.empty() || !filter_chain_external.first.empty())
-          ? Network::Utility::isSameIpOrLoopback(socket)
+          ? Network::Utility::isSameIpOrLoopback(socket.connectionInfoProvider())
           : false;
 
   if (is_local_connection) {

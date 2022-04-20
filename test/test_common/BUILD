@@ -287,6 +287,14 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "status_utility_test",
+    srcs = ["status_utility_test.cc"],
+    deps = [
+        ":status_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "simulated_time_system_test",
     srcs = ["simulated_time_system_test.cc"],
     deps = [
