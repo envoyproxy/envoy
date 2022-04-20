@@ -105,6 +105,8 @@ DnsQueryContextPtr DnsResponseValidator::createResponseContext(Network::UdpRecvD
                                                                DnsParserCounters& counters) {
   DnsQueryContextPtr query_context = std::make_unique<DnsQueryContext>(
       client_request.addresses_.local_, client_request.addresses_.peer_, counters, 1);
+
+  // TODO(boteng): The response parse can be replaced by c-ares methods like: ares_parse_a_reply
   query_context->parse_status_ = validateDnsResponseObject(query_context, client_request.buffer_);
   if (!query_context->parse_status_) {
     query_context->response_code_ = DNS_RESPONSE_CODE_FORMAT_ERROR;

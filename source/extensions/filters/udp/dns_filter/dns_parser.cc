@@ -196,13 +196,17 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   // Only QR == 0 and questions without any answer RRs are expected
   if (!(context->header_.flags.qr == 0 && context->header_.answers == 0 &&
         context->header_.authority_rrs == 0 && context->header_.additional_rrs == 0)) {
-    ENVOY_LOG(debug, "One or more of Answer, Authority, and Additional RRs present in the query",
-              "Inverse query is not supported");
+    ENVOY_LOG(
+        debug,
+        "One or more of Answes [{}], Authority [{}], and Additional [{}] RRspresent in the query."
+        "Inverse query is not supported",
+        static_cast<int>(context->header_.answers),
+        static_cast<int>(context->header_.authority_rrs),
+        static_cast<int>(context->header_.additional_rrs));
     return false;
   }
 
   if (context->header_.questions != 1) {
-    context->response_code_ = DNS_RESPONSE_CODE_FORMAT_ERROR;
     ENVOY_LOG(debug, "Unexpected number [{}] of questions in DNS query",
               static_cast<int>(context->header_.questions));
     return false;
