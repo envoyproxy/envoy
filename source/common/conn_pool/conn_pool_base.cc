@@ -142,7 +142,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // prevent pending streams being queued to this upstream with no way to be processed.
   if (can_create_connection ||
       (ready_clients_.empty() && busy_clients_.empty() && connecting_clients_.empty())) {
-    ENVOY_LOG(debug, "creating a new connection");
+    ENVOY_LOG(debug, "creating a new connection (connecting={})", connecting_clients_.size());
     ActiveClientPtr client = instantiateActiveClient();
     if (client.get() == nullptr) {
       ENVOY_LOG(trace, "connection creation failed");
