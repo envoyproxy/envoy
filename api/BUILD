@@ -72,6 +72,7 @@ proto_library(
     name = "v3_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
@@ -125,6 +126,7 @@ proto_library(
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/redis/v3:pkg",
+        "//envoy/extensions/common/async_files/v3:pkg",
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/common/matching/v3:pkg",
         "//envoy/extensions/common/ratelimit/v3:pkg",
@@ -158,6 +160,7 @@ proto_library(
         "//envoy/extensions/filters/http/ext_authz/v3:pkg",
         "//envoy/extensions/filters/http/ext_proc/v3:pkg",
         "//envoy/extensions/filters/http/fault/v3:pkg",
+        "//envoy/extensions/filters/http/gcp_authn/v3:pkg",
         "//envoy/extensions/filters/http/grpc_http1_bridge/v3:pkg",
         "//envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3:pkg",
         "//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg",

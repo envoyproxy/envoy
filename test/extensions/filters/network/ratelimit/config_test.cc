@@ -57,6 +57,7 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
+
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }

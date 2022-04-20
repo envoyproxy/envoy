@@ -98,11 +98,16 @@ void ActiveStreamFilterBase::commonContinue() {
 
   doMetadata();
 
+  // It is possible for trailers to be added during doData(). doData() itself handles continuation
+  // of trailers for the non-continuation case. Thus, we must keep track of whether we had
+  // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
+  // on doData() to do so.
+  const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
-    doData(complete() && !hasTrailers());
+    doData(complete() && !had_trailers_before_data);
   }
 
-  if (hasTrailers()) {
+  if (had_trailers_before_data) {
     doTrailers();
   }
 

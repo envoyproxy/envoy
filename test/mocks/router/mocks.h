@@ -329,6 +329,19 @@ public:
   MOCK_METHOD(const absl::optional<bool>&, validated, (), (const));
 };
 
+class MockPathMatchCriterion : public PathMatchCriterion {
+public:
+  MockPathMatchCriterion();
+  ~MockPathMatchCriterion() override;
+
+  // Router::PathMatchCriterion
+  MOCK_METHOD(PathMatchType, matchType, (), (const));
+  MOCK_METHOD(const std::string&, matcher, (), (const));
+
+  PathMatchType type_;
+  std::string matcher_;
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -375,6 +388,7 @@ public:
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
               (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
@@ -395,6 +409,7 @@ public:
   MockMetadataMatchCriteria metadata_matches_criteria_;
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
   TestCorsPolicy cors_policy_;
+  testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
 };

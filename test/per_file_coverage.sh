@@ -4,8 +4,8 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.0"
-"source/common/api:72.9" # TODO(ravenblack): should be higher after PR#20332
-"source/common/api/posix:71.5" # TODO(ravenblack): should be 75+ after PR#20332
+"source/common/api:82.5"
+"source/common/api/posix:81.7"
 "source/common/common:96.2"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
@@ -14,6 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:95.5"
 "source/common/http:96.3"
 "source/common/http/http2:96.4"
+"source/common/io:98.0"
 "source/common/json:89.8"
 "source/common/matcher:92.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
@@ -49,7 +50,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/wasm:95.8"
 "source/extensions/filters/listener:95.9"
 "source/extensions/filters/listener/http_inspector:95.8"
-"source/extensions/filters/listener/original_dst:93.3"
+"source/extensions/filters/listener/original_dst:82.4"
+"source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/listener/tls_inspector:92.3"
 "source/extensions/filters/network/common:96.0"
 "source/extensions/filters/network/common/redis:96.2"

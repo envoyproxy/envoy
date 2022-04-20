@@ -160,6 +160,7 @@ envoy_cc_library(
         "//envoy/server:admin_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/html:utility_lib",
+        "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ],
 )
