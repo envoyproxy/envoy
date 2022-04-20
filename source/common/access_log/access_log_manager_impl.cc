@@ -41,16 +41,16 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
 }
 
 AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,
-                                     Thread::BasicLockable& lock, AccessLogFileStatsSharedPtr stats,
+                                     Thread::BasicLockable& lock, AccessLogFileStats& stats,
                                      std::chrono::milliseconds flush_interval_msec,
                                      Thread::ThreadFactory& thread_factory)
-    : file_(std::move(file)), file_lock_(lock), thread_factory_(thread_factory),
-      flush_interval_msec_(flush_interval_msec), stats_(stats),
+    : file_(std::move(file)), file_lock_(lock),
       flush_timer_(dispatcher.createTimer([this]() -> void {
-        stats_->flushed_by_timer_.inc();
+        stats_.flushed_by_timer_.inc();
         flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
-      })) {
+      })),
+      thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
   flush_timer_->enableTimer(flush_interval_msec_);
   auto open_result = open();
   if (!open_result.return_value_) {
@@ -113,15 +113,15 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
       absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
       const Api::IoCallSizeResult result = file_->write(data);
       if (result.ok() && result.return_value_ == static_cast<ssize_t>(slice.len_)) {
-        stats_->write_completed_.inc();
+        stats_.write_completed_.inc();
       } else {
         // Probably disk full.
-        stats_->write_failed_.inc();
+        stats_.write_failed_.inc();
       }
     }
   }
 
-  stats_->write_total_buffered_.sub(buffer.length());
+  stats_.write_total_buffered_.sub(buffer.length());
   buffer.drain(buffer.length());
 }
 
@@ -158,7 +158,7 @@ void AccessLogFileImpl::flushThreadFunc() {
       }
       const Api::IoCallBoolResult open_result = open();
       if (!open_result.return_value_) {
-        stats_->reopen_failed_.inc();
+        stats_.reopen_failed_.inc();
       } else {
         reopen_file_ = false;
       }
@@ -199,8 +199,8 @@ void AccessLogFileImpl::write(absl::string_view data) {
     createFlushStructures();
   }
 
-  stats_->write_buffered_.inc();
-  stats_->write_total_buffered_.add(data.length());
+  stats_.write_buffered_.inc();
+  stats_.write_total_buffered_.add(data.length());
   flush_buffer_.add(data.data(), data.size());
   if (flush_buffer_.length() > MIN_FLUSH_SIZE) {
     flush_event_.notifyOne();

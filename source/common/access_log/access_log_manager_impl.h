@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -30,8 +29,6 @@ struct AccessLogFileStats {
   ACCESS_LOG_FILE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-using AccessLogFileStatsSharedPtr = std::shared_ptr<AccessLogFileStats>;
-
 namespace AccessLog {
 
 class AccessLogManagerImpl : public AccessLogManager, Logger::Loggable<Logger::Id::main> {
@@ -40,9 +37,9 @@ public:
                        Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
                        Stats::Store& stats_store)
       : file_flush_interval_msec_(file_flush_interval_msec), api_(api), dispatcher_(dispatcher),
-        lock_(lock), file_stats_{std::make_shared<AccessLogFileStats>(AccessLogFileStats{
+        lock_(lock), file_stats_{
                          ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
-                                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))})} {}
+                                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
   ~AccessLogManagerImpl() override;
 
   // AccessLog::AccessLogManager
@@ -54,7 +51,7 @@ private:
   Api::Api& api_;
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
-  AccessLogFileStatsSharedPtr file_stats_;
+  AccessLogFileStats file_stats_;
   absl::node_hash_map<std::string, AccessLogFileSharedPtr> access_logs_;
 };
 
@@ -68,7 +65,7 @@ private:
 class AccessLogFileImpl : public AccessLogFile {
 public:
   AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,
-                    Thread::BasicLockable& lock, AccessLogFileStatsSharedPtr stats,
+                    Thread::BasicLockable& lock, AccessLogFileStats& stats,
                     std::chrono::milliseconds flush_interval_msec,
                     Thread::ThreadFactory& thread_factory);
   ~AccessLogFileImpl() override;
@@ -131,12 +128,12 @@ private:
                                             // the lock is released so that flush_buffer_ can
                                             // continue to fill. This buffer is then used for the
                                             // final write to disk.
+  Event::TimerPtr flush_timer_;
   Thread::ThreadFactory& thread_factory_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
-  AccessLogFileStatsSharedPtr stats_;
-  Event::TimerPtr flush_timer_;
+  AccessLogFileStats& stats_;
 };
 
 } // namespace AccessLog
