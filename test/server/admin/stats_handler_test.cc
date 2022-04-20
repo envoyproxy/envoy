@@ -188,11 +188,11 @@ TEST_P(AdminStatsTest, HandlerStatsHtml) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   store_->counterFromStatName(makeStat("foo.c0")).add(0);
-  Stats::ScopePtr scope0 = store_->createScope("");
+  Stats::ScopeSharedPtr scope0 = store_->createScope("");
   store_->counterFromStatName(makeStat("foo.c1")).add(1);
-  Stats::ScopePtr scope = store_->createScope("scope");
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
   scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
-  Stats::ScopePtr scope2 = store_->createScope("scope1.scope2");
+  Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
   scope2->textReadoutFromStatName(makeStat("t3")).set("text readout value");
   scope2->counterFromStatName(makeStat("unset"));
 
