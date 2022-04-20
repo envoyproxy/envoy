@@ -524,6 +524,11 @@ config_setting(
 )
 
 config_setting(
+    name = "ios_sim_arm64",
+    values = {"cpu": "ios_sim_arm64"},
+)
+
+config_setting(
     name = "ios_arm64e",
     values = {"cpu": "ios_arm64e"},
 )
@@ -576,6 +581,7 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":ios_x86_64",
     ],
 )
@@ -610,6 +616,7 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":linux_aarch64",
         ":linux_mips64",
         ":linux_ppc",
@@ -706,7 +713,7 @@ platform(
 )
 
 platform(
-    name = "ios_sim_arm64",
+    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:ios",
