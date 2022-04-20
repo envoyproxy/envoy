@@ -22,27 +22,42 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // The behavior of the filter for a stream.
 // [#next-free-field: 6]
 message BufferBehavior {
+  message StreamWhenPossible {
+  }
+
+  message Bypass {
+  }
+
+  message InjectContentLengthIfNecessary {
+  }
+
+  message FullyBufferAndAlwaysInjectContentLength {
+  }
+
+  message FullyBuffer {
+  }
+
   oneof behavior {
     option (validate.required) = true;
 
     // Don't inject ``content-length`` header.
     // Output immediately, buffer only if output is slower than input.
-    bool stream_when_possible = 1 [(validate.rules).bool = {const: true}];
+    StreamWhenPossible stream_when_possible = 1;
 
     // Never buffer, do nothing.
-    bool bypass = 2 [(validate.rules).bool = {const: true}];
+    Bypass bypass = 2;
 
     // If ``content-length`` is not present, buffer the entire input,
     // inject ``content-length`` header, then output.
     // If ``content-length`` is already present, act like ``stream_when_possible``.
-    bool inject_content_length_if_necessary = 3 [(validate.rules).bool = {const: true}];
+    InjectContentLengthIfNecessary inject_content_length_if_necessary = 3;
 
     // Always buffer the entire input, and inject ``content-length``,
     // overwriting any provided content-length header.
-    bool fully_buffer_and_always_inject_content_length = 4 [(validate.rules).bool = {const: true}];
+    FullyBufferAndAlwaysInjectContentLength fully_buffer_and_always_inject_content_length = 4;
 
     // Always buffer the entire input, do not modify ``content-length``.
-    bool fully_buffer = 5 [(validate.rules).bool = {const: true}];
+    FullyBuffer fully_buffer = 5;
   }
 }
 
