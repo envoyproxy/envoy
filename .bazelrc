@@ -21,10 +21,10 @@ build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
-build --action_env=CC
-build --action_env=CXX
-build --action_env=LLVM_CONFIG
-build --action_env=PATH
+build --action_env=CC --host_action_env=CC
+build --action_env=CXX --host_action_env=CXX
+build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
+build --action_env=PATH --host_action_env=PATH
 
 build --enable_platform_specific_config
 
