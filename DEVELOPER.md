@@ -1,4 +1,4 @@
-# Developer documentation
+# Developer docs
 
 Envoy is built using the Bazel build system. Our CI on Azure Pipelines builds, tests, and runs coverage against
 all pull requests and the main branch.
