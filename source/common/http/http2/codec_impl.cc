@@ -446,8 +446,6 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffersOverrun()) {
-      // TODO(kbaichoo): In a follow up, only schedule deferred processing if
-      // actually has data to process.
       scheduleProcessingOfBufferedData();
       grantPeerAdditionalStreamWindow();
     }
@@ -455,7 +453,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
-  if (defer_processing_backedup_streams_) {
+  if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
           [this]() { processBufferedData(); });

@@ -3656,6 +3656,73 @@ TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
   }
 }
 
+TEST_P(Http2CodecImplTest,
+       ShouldOnlyScheduledDeferredProcessingCallbackIfHasBufferedBodyOrTrailers) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  server_->getStream(1)->readDisable(true);
+
+  // Transitioning to read enabled, since no data pending shouldn't schedule
+  // a processing callback.
+  server_->getStream(1)->readDisable(false);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  // Transitioning to read enable with data pending should lead to scheduling
+  // a processing callback.
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
+
+  // Enable and disable, since no data nothing should be scheduled.
+  server_->getStream(1)->readDisable(true);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(true);
+  // Send trailers, when we transition to read enabled we should schedule.
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+    process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
+}
+
 TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProcessingEnabled) {
   allow_metadata_ = true;
 
