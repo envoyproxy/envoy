@@ -19,7 +19,7 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh
+      - run: ./ci/mac_ci_setup.sh --android
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         env:
