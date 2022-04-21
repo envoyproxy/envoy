@@ -761,7 +761,6 @@ FilterStatus ConnectionManager::ActiveRpc::boolValue(bool& value) {
 }
 
 void ConnectionManager::ActiveRpc::byteValueSetup(uint8_t& value) {
-
   filter_context_ = value;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     uint8_t& value = absl::any_cast<uint8_t&>(filter_context_);

@@ -1817,7 +1817,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
 TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   initializeFilterWithCustomFilters();
 
-  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1840,7 +1840,6 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
       }));
-
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
         EXPECT_EQ("name", metadata->methodName());
@@ -1852,7 +1851,16 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
         EXPECT_EQ("alternate", metadata->methodName());
         return FilterStatus::Continue;
       }));
-
+  EXPECT_CALL(*custom_decoder_filter_, boolValue(_))
+      .WillOnce(Invoke([&](bool& value) -> FilterStatus {
+        EXPECT_EQ(true, value);
+        value = false;
+        return FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filter_, boolValue(_)).WillOnce(Invoke([&](bool& value) -> FilterStatus {
+    EXPECT_EQ(false, value);
+    return FilterStatus::Continue;
+  }));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
@@ -1888,7 +1896,6 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
       }));
-
   EXPECT_CALL(*encoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
         EXPECT_EQ("name", metadata->methodName());
@@ -1900,8 +1907,17 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
         EXPECT_EQ("alternate", metadata->methodName());
         return FilterStatus::Continue;
       }));
-
-  writeFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x01);
+  EXPECT_CALL(*encoder_filter_, boolValue(_)).WillOnce(Invoke([&](bool& value) -> FilterStatus {
+    EXPECT_EQ(true, value);
+    value = false;
+    return FilterStatus::Continue;
+  }));
+  EXPECT_CALL(*custom_encoder_filter_, boolValue(_))
+      .WillOnce(Invoke([&](bool& value) -> FilterStatus {
+        EXPECT_EQ(false, value);
+        return FilterStatus::Continue;
+      }));
+  writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
   FramedTransportImpl transport;
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
