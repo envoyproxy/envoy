@@ -253,14 +253,14 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
 
     EXPECT_CALL(config_discovery_test.init_watcher_, ready());
     config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                            response.version_info());
+                                                     response.version_info());
     EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-    EXPECT_EQ(1UL, config_discovery_test.scope_
-                       .counter(config_discovery_test.getConfigReloadCounter())
-                       .value());
-    EXPECT_EQ(0UL, config_discovery_test.scope_
-                       .counter(config_discovery_test.getConfigFailCounter())
-                       .value());
+    EXPECT_EQ(1UL,
+              config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter())
+                  .value());
+    EXPECT_EQ(
+        0UL,
+        config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
   }
 
   // 2nd request with same response. Based on hash should not reload config.
@@ -269,14 +269,14 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
     config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                            response.version_info());
+                                                     response.version_info());
 
-    EXPECT_EQ(1UL, config_discovery_test.scope_
-                       .counter(config_discovery_test.getConfigReloadCounter())
-                       .value());
-    EXPECT_EQ(0UL, config_discovery_test.scope_
-                       .counter(config_discovery_test.getConfigFailCounter())
-                       .value());
+    EXPECT_EQ(1UL,
+              config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter())
+                  .value());
+    EXPECT_EQ(
+        0UL,
+        config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
   }
 }
 
@@ -296,14 +296,14 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, BasicDeprecatedStatPrefix) {
 
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
   config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                          response.version_info());
+                                                   response.version_info());
   EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-  EXPECT_EQ(1UL, config_discovery_test.scope_
-                     .counter("xds.extension_config_discovery.foo.config_reload")
-                     .value());
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter("xds.extension_config_discovery.foo.config_fail")
-                     .value());
+  EXPECT_EQ(1UL,
+            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_reload")
+                .value());
+  EXPECT_EQ(0UL,
+            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_fail")
+                .value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
@@ -313,12 +313,12 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
   config_discovery_test.callbacks_->onConfigUpdateFailed(
       Config::ConfigUpdateFailureReason::FetchTimedout, {});
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigReloadCounter())
-                     .value());
-  EXPECT_EQ(1UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigFailCounter())
-                     .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+  EXPECT_EQ(
+      1UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
@@ -338,9 +338,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
                                 decoded_resources.refvec_, response.version_info()),
                             EnvoyException,
                             "Unexpected number of resources in ExtensionConfigDS response: 2");
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigReloadCounter())
-                     .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
@@ -355,9 +355,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
                                 decoded_resources.refvec_, response.version_info()),
                             EnvoyException,
                             "Unexpected resource name in ExtensionConfigDS response: bar");
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigReloadCounter())
-                     .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 // Without default config.
@@ -388,12 +388,12 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
   config_discovery_test.setup(false);
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
   EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigReloadCounter())
-                     .value());
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigFailCounter())
-                     .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigFailCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
@@ -408,12 +408,12 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
   config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                          response.version_info());
+                                                   response.version_info());
   EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
   EXPECT_NE(absl::nullopt, provider2->config());
-  EXPECT_EQ(1UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigReloadCounter())
-                     .value());
+  EXPECT_EQ(
+      1UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
@@ -437,14 +437,14 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                              response.version_info()),
+                                                       response.version_info()),
       EnvoyException,
       "Error: filter config has type URL test.integration.filters.AddBodyFilterConfig but "
       "expect " +
           config_discovery_test.getTypeUrl() + ".");
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter(config_discovery_test.getConfigReloadCounter())
-                     .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter(config_discovery_test.getConfigReloadCounter()).value());
 }
 
 // Throw Envoy exception when default config is wrong.
@@ -456,10 +456,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
   config_source.mutable_default_config()->set_type_url(
       "type.googleapis.com/test.integration.filters.Bogus");
   EXPECT_THROW_WITH_MESSAGE(
-      config_discovery_test.filter_config_provider_manager_
-          ->createDynamicFilterConfigProvider(config_source, "foo",
-                                              config_discovery_test.factory_context_, "xds.",
-                                              true, config_discovery_test.getFilterType()),
+      config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
+          config_source, "foo", config_discovery_test.factory_context_, "xds.", true,
+          config_discovery_test.getFilterType()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "
@@ -491,13 +490,13 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                              response.version_info()),
+                                                       response.version_info()),
       EnvoyException,
       "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
       "in a http filter chain.");
-  EXPECT_EQ(0UL, config_discovery_test.scope_
-                     .counter("xds.extension_config_discovery.foo.config_reload")
-                     .value());
+  EXPECT_EQ(0UL,
+            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_reload")
+                .value());
 }
 
 } // namespace
