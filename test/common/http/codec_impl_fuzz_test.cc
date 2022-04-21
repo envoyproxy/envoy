@@ -59,6 +59,8 @@ fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& header
 Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
   Http1Settings h1_settings;
 
+  // When in future allowing trailers, then the kTrailers case in directionalAction() needs change,
+  // too.
   h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
   h1_settings.accept_http_10_ = settings.accept_http_10();
   h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
@@ -292,7 +294,9 @@ public:
       break;
     }
     case test::common::http::DirectionalAction::kTrailers: {
-      if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
+      // Trailers can by-configuration only be used for http2.
+      if (http_protocol_ == Protocol::Http2 && state.isLocalOpen() &&
+          state.stream_state_ == StreamState::PendingDataOrTrailers) {
         if (response) {
           state.response_encoder_->encodeTrailers(
               fromSanitizedHeaders<TestResponseTrailerMapImpl>(directional_action.trailers()));
