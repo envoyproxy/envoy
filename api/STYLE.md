@@ -132,7 +132,7 @@ To add an extension config to the API, the steps below should be followed:
 1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml)
    with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture).
    * Any extension category added to `extensions_metadata.yaml` should be annotated in precisely one proto file, associated with a field of a proto message. e.g.
-     ```
+     ```proto
      message SomeMessage {
        // An ordered list of http filters
        // [#extension-category: envoy.http.filters]
@@ -140,7 +140,7 @@ To add an extension config to the API, the steps below should be followed:
      }
      ```
    * Each extension added to `extensions_metadata.yaml` should have precisely one proto message annotated with the extension name. e.g.
-     ```
+     ```proto
      // YourFilterConfig is a message with this description.
      // [#extension: envoy.http.filters.your_new_filter]
      message YourFilterConfig {
