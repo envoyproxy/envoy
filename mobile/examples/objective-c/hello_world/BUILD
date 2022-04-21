@@ -1,3 +1,4 @@
+load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
 
@@ -17,7 +18,7 @@ ios_application(
     bundle_id = "io.envoyproxy.envoymobile.helloworld",
     families = ["iphone"],
     infoplists = ["Info.plist"],
-    minimum_os_version = "12.0",
+    minimum_os_version = MINIMUM_IOS_VERSION,
     deps = [
         "appmain",
     ],
