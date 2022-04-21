@@ -280,53 +280,43 @@ message DeltaDiscoveryResponse {
 // dynamic parameters in the subscription. This allows xDS implementations (clients, servers, and
 // caching proxies) to determine which variant of a resource is appropriate for a given client.
 message DynamicParameterConstraints {
-  // A list of constraints that may be combined with AND or OR semantics.
-  message ConstraintList {
-    enum MatchType {
-      // Default value.
-      MATCH_TYPE_UNSPECIFIED = 0;
-
-      // Logical AND of constraints.
-      MATCH_TYPE_AND = 1;
-
-      // Logical OR of constraints.
-      MATCH_TYPE_OR = 2;
+  // A single constraint for a given key.
+  message SingleConstraint {
+    message Exists {
     }
 
-    // A constraint for a given key.
-    message Constraint {
-      message Exists {
-      }
+    // The key to match against.
+    string key = 1;
 
-      // The key to match against.
-      string key = 1;
+    oneof constraint_type {
+      // Matches this exact value.
+      string value = 2;
 
-      oneof constraint_type {
-        // Matches this exact value.
-        string value = 2;
-
-        // Key is present (matches any value except for the key being absent).
-        // This allows setting a default constraint for clients that do
-        // not send a key at all, while there may be other clients that need
-        // special configuration based on that key.
-        Exists exists = 3;
-      }
-
-      // If set to true, the match is inverted -- i.e., the key must NOT
-      // match the specified matcher.
-      bool invert = 4;
+      // Key is present (matches any value except for the key being absent).
+      // This allows setting a default constraint for clients that do
+      // not send a key at all, while there may be other clients that need
+      // special configuration based on that key.
+      Exists exists = 3;
     }
-
-    // A list of key/value constraints.
-    repeated Constraint constraints = 1;
-
-    // How to match the constraints.
-    MatchType match_type = 2;
   }
 
-  // A list of constraint lists. All constraint lists must match (i.e.,
-  // logical AND semantics).
-  repeated ConstraintList constraints = 1;
+  message ConstraintList {
+    repeated DynamicParameterConstraints constraints = 1;
+  }
+
+  oneof type {
+    // A single constraint to evaluate.
+    SingleConstraint constraint = 1;
+
+    // A list of constraints to be ORed together.
+    ConstraintList or_constraints = 2;
+
+    // A list of constraints to be ANDed together.
+    ConstraintList and_constraints = 3;
+
+    // The inverse (NOT) of a set of constraints.
+    DynamicParameterConstraints not_constraints = 4;
+  }
 }
 
 // [#next-free-field: 9]
