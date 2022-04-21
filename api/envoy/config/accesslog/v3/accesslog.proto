@@ -110,7 +110,7 @@ message ComparisonFilter {
   Op op = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Value to compare against.
-  core.v3.RuntimeUInt32 value = 2;
+  core.v3.RuntimeUInt32 value = 2 [(validate.rules).message = {required: true}];
 }
 
 // Filters on HTTP response/status code.
