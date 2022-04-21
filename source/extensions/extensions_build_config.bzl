@@ -153,6 +153,7 @@ EXTENSIONS = {
     "envoy.filters.network.sni_dynamic_forward_proxy":            "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
     "envoy.filters.network.wasm":                                 "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":                      "//source/extensions/filters/network/zookeeper_proxy:config",
+    "envoy.filters.network.meta_protocol_proxy":                  "//source/extensions/filters/network/meta_protocol_proxy:config",
 
     #
     # UDP filters

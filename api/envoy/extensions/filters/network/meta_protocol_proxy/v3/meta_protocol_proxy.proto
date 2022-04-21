@@ -21,7 +21,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Meta Protocol Proxy]
 // Meta Protocol proxy.
 
-// [#not-implemented-hide:]
 // [#next-free-field: 6]
 message MetaProtocolProxy {
   // The human readable prefix to use when emitting statistics.
@@ -33,6 +32,7 @@ message MetaProtocolProxy {
   oneof route_specifier {
     option (validate.required) = true;
 
+    // [#not-implemented-hide:]
     // The meta protocol proxies route table will be dynamically loaded via the meta RDS API.
     MetaRds rds = 3;
 
@@ -46,7 +46,6 @@ message MetaProtocolProxy {
   repeated config.core.v3.TypedExtensionConfig meta_protocol_filters = 5;
 }
 
-// [#not-implemented-hide:]
 message ApplicationProtocol {
   // The name of the application protocol.
   string name = 1 [(validate.rules).string = {min_len: 1}];

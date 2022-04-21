@@ -255,6 +255,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ip_tagging @rgs1 @alyssawilk
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
+# Mata protocol filter
+/*/extensions/filters/network/meta_protocol_proxy @wbpcode @zhaohuabing @rojkov @htuch
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

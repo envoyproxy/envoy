@@ -22,7 +22,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // the incoming requests, and send the matching requests to v1 of the upstream service.
 //
 // name: demo-v1
-// route:
+// routes:
 //   matcher_tree:
 //     input:
 //       name: request-service
@@ -30,7 +30,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //         "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3.ServiceMatchInput
 //     exact_match_map:
 //       map:
-//         org.apache.dubbo.samples.basic.api.DemoService:
+//         service_name_0:
 //           matcher:
 //             matcher_list:
 //               matchers:
@@ -58,13 +58,12 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //                     name: route
 //                     typed_config:
 //                       "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3.routeAction
-//                       cluster: outbound|20880|v1|org.apache.dubbo.samples.basic.api.demoservice
-// [#not-implemented-hide:]
+//                       cluster: cluster_0
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match route_config_name in
   // envoy.extensions.filters.network.meta_protocol_proxy.v3.Rds.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The match tree to use when resolving route actions for incoming requests.
-  xds.type.matcher.v3.Matcher route = 2 [(validate.rules).message = {required: true}];
+  xds.type.matcher.v3.Matcher routes = 2 [(validate.rules).message = {required: true}];
 }
