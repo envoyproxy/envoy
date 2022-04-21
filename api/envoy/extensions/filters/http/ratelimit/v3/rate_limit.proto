@@ -6,6 +6,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/metadata/v3/metadata.proto";
+import "envoy/type/v3/http_status.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -16,18 +17,21 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ratelimit.v3";
 option java_outer_classname = "RateLimitProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ratelimit/v3;ratelimitv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate limit]
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
 
   // Defines the version of the standard to use for X-RateLimit headers.
+  //
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
   enum XRateLimitHeadersRFCVersion {
     // X-RateLimit headers disabled.
     OFF = 0;
@@ -99,6 +103,8 @@ message RateLimit {
   // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
   //
   // Disabled by default.
+  //
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
       [(validate.rules).enum = {defined_only: true}];
 
@@ -106,6 +112,14 @@ message RateLimit {
   // in case of rate limiting (i.e. 429 responses).
   // Having this header not present potentially makes the request retriable.
   bool disable_x_envoy_ratelimited_header = 9;
+
+  // This field allows for a custom HTTP response status code to the downstream client when
+  // the request has been rate limited.
+  // Defaults to 429 (TooManyRequests).
+  //
+  // .. note::
+  //   If this is set to < 400, 429 will be used instead.
+  type.v3.HttpStatus rate_limited_status = 10;
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.

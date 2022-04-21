@@ -65,6 +65,7 @@ public:
   MOCK_METHOD(void, readDisable, (bool disable));                                                  \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
+  MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \
   MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \
   MOCK_METHOD(ConnectionInfoProviderSharedPtr, connectionInfoProviderSharedPtr, (), (const));      \
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
@@ -72,6 +73,7 @@ public:
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
+  MOCK_METHOD(absl::string_view, ja3Hash, (), (const));                                            \
   MOCK_METHOD(State, state, (), (const));                                                          \
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
@@ -85,6 +87,9 @@ public:
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
+  MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
+              (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
+  MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {

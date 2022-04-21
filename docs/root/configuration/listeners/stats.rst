@@ -26,6 +26,8 @@ with the following statistics:
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    global_cx_overflow, Counter, Total connections rejected due to enforcement of the global connection limit
    no_filter_chain_match, Counter, Total connections that didn't match any filter chain
+   downstream_listener_filter_remote_close, Counter, Total connections closed by remote when peek data for listener filters
+   downstream_listener_filter_error, Counter, Total numbers of read errors when peeking data for listener filters
 
 .. _config_listener_stats_tls:
 
@@ -35,6 +37,16 @@ TLS statistics
 The following TLS statistics are rooted at *listener.<address>.ssl.*:
 
 .. include:: ../../_include/ssl_stats.rst
+
+.. _config_listener_stats_tcp:
+
+TCP statistics
+--------------
+
+The following TCP statistics, which are available when using the :ref:`TCP stats transport socket <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>`,
+are rooted at *listener.<address>.tcp_stats.*:
+
+.. include:: ../../_include/tcp_stats.rst
 
 .. _config_listener_stats_udp:
 

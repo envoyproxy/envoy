@@ -27,8 +27,8 @@ ingress/response path. They are documented in this section.
 x-envoy-max-retries
 ^^^^^^^^^^^^^^^^^^^
 If a :ref:`route config retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or a
-:ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` is in place, Envoy will default to retrying
-one time unless explicitly specified. The number of retries can be explicitly set in the virtual host retry config,
+:ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` is in place,
+or the cluster is configured to use :ref:`HTTP/3 <arch_overview_http3>` to talk to the upstream server and an early-data request fails during connect or gets a TooEarly(425 response code) response, Envoy will default to retrying one time unless explicitly specified. The number of retries can be explicitly set in the virtual host retry config,
 the route retry config, or by using this header. If this header is used, its value takes precedence over the number of
 retries set in either retry policy. If a retry policy is not configured and :ref:`config_http_filters_router_x-envoy-retry-on`
 or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed request.
@@ -127,6 +127,9 @@ retriable-headers
   Envoy will attempt a retry if the upstream server response includes any headers matching in either
   :ref:`the retry policy <envoy_v3_api_field_config.route.v3.RetryPolicy.retriable_headers>` or in the
   :ref:`config_http_filters_router_x-envoy-retriable-header-names` header.
+
+http3-post-connect-failure:
+  Envoy will attempt a retry if a request is sent over HTTP/3 to the upstream server and failed after getting connected.
 
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route

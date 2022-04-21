@@ -42,6 +42,7 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
   bool matched = checkPolicyMatch(connection, info, headers, effective_policy_id);
 
   switch (action_) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::rbac::v3::RBAC::ALLOW:
     return matched;
   case envoy::config::rbac::v3::RBAC::DENY:
@@ -57,9 +58,8 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
 
     return true;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(

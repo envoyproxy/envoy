@@ -20,7 +20,7 @@ public:
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
-                                       "LocalReplyWithMetadataFilter is ready");
+                                       "local_reply_with_metadata_filter_is_ready");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

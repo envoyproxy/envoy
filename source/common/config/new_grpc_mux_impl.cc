@@ -39,10 +39,11 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const Protobuf::MethodDescriptor& service_method,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
-                               const LocalInfo::LocalInfo& local_info)
+                               const LocalInfo::LocalInfo& local_info,
+                               CustomConfigValidatorsPtr&& config_validators)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      local_info_(local_info),
+      local_info_(local_info), config_validators_(std::move(config_validators)),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
@@ -99,12 +100,12 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
 
-  if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
-    sub->second->control_plane_identifier_ = message->control_plane().identifier();
-    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
-              sub->second->control_plane_identifier_);
+    if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
+      sub->second->control_plane_identifier_ = message->control_plane().identifier();
+      ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
+                sub->second->control_plane_identifier_);
+    }
   }
 
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
@@ -158,7 +159,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, options.use_namespace_matching_, resources.empty());
+    addSubscription(type_url, options.use_namespace_matching_);
     return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
@@ -230,11 +231,11 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching,
-                                     const bool wildcard) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_,
-                                                                       use_namespace_matching,
-                                                                       dispatcher_, wildcard));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
+                                     const bool use_namespace_matching) {
+  subscriptions_.emplace(
+      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
+                                                    dispatcher_, *config_validators_.get()));
   subscription_ordering_.emplace_back(type_url);
 }
 

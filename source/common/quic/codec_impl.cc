@@ -79,9 +79,6 @@ Http::RequestEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder) {
   EnvoyQuicClientStream* stream =
       quicStreamToEnvoyClientStream(quic_client_session_.CreateOutgoingBidirectionalStream());
-  // TODO(danzh) handle stream creation failure gracefully. This can happen when
-  // there are already 100 open streams. In such case, caller should hold back
-  // the stream creation till an existing stream is closed.
   ASSERT(stream != nullptr, "Fail to create QUIC stream.");
   stream->setResponseDecoder(response_decoder);
   if (quic_client_session_.aboveHighWatermark()) {

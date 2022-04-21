@@ -54,19 +54,35 @@ public:
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
                                               bool skip_cluster_check) override;
-
-private:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
+    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher);
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) const;
+
+    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
   private:
-    absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
+    void evictEntriesAndResetEvictionTimer();
+    struct CacheEntry {
+      CacheEntry(const envoy::config::core::v3::GrpcService& config,
+                 RawAsyncClientSharedPtr const& client, MonotonicTime create_time)
+          : config_(config), client_(client), accessed_time_(create_time) {}
+      envoy::config::core::v3::GrpcService config_;
+      RawAsyncClientSharedPtr client_;
+      MonotonicTime accessed_time_;
+    };
+    using LruList = std::list<CacheEntry>;
+    absl::flat_hash_map<envoy::config::core::v3::GrpcService, LruList::iterator, MessageUtil,
                         MessageUtil>
-        cache_;
+        lru_map_;
+    LruList lru_list_;
+    Event::Dispatcher& dispatcher_;
+    Envoy::Event::TimerPtr cache_eviction_timer_;
+    static constexpr std::chrono::seconds EntryTimeoutInterval{50};
   };
+
+private:
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
   ThreadLocal::SlotPtr google_tls_slot_;

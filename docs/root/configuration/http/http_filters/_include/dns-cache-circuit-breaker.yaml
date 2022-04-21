@@ -43,14 +43,17 @@ static_resources:
               dns_cache_config:
                 name: dynamic_forward_proxy_cache_config
                 dns_lookup_family: V4_ONLY
-                dns_resolution_config:
-                  resolvers:
-                  - socket_address:
-                      address: "8.8.8.8"
-                      port_value: 53
-                  dns_resolver_options:
-                    use_tcp_for_dns_lookups: true
-                    no_default_search_domain: true
+                typed_dns_resolver_config:
+                  name: envoy.network.dns_resolver.cares
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+                    resolvers:
+                    - socket_address:
+                        address: "8.8.8.8"
+                        port_value: 53
+                    dns_resolver_options:
+                      use_tcp_for_dns_lookups: true
+                      no_default_search_domain: true
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -64,14 +67,17 @@ static_resources:
         dns_cache_config:
           name: dynamic_forward_proxy_cache_config
           dns_lookup_family: V4_ONLY
-          dns_resolution_config:
-            resolvers:
-            - socket_address:
-                address: "8.8.8.8"
-                port_value: 53
-            dns_resolver_options:
-              use_tcp_for_dns_lookups: true
-              no_default_search_domain: true
+          typed_dns_resolver_config:
+            name: envoy.network.dns_resolver.cares
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+              resolvers:
+              - socket_address:
+                  address: "8.8.8.8"
+                  port_value: 53
+              dns_resolver_options:
+                use_tcp_for_dns_lookups: true
+                no_default_search_domain: true
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:

@@ -13,6 +13,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "grpcpp/support/proto_buffer_reader.h"
 
 namespace Envoy {
@@ -80,7 +81,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              const envoy::config::core::v3::GrpcService& config,
                                              Api::Api& api, const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
-      scope_(scope),
+      target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
       metadata_parser_(
@@ -234,6 +235,13 @@ void GoogleAsyncStreamImpl::closeStream() {
 
 void GoogleAsyncStreamImpl::resetStream() {
   ENVOY_LOG(debug, "resetStream");
+  // The gRPC API requires calling Finish() at the end of a stream, even
+  // if the stream is cancelled.
+  if (!finish_pending_) {
+    finish_pending_ = true;
+    rw_->Finish(&status_, &finish_tag_);
+    ++inflight_tags_;
+  }
   cleanup();
 }
 
@@ -368,8 +376,6 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     cleanup();
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -425,10 +431,12 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
     Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options)
     : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
-  current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
-                                         "async " + parent.stat_prefix_ + " egress",
-                                         parent.timeSource().systemTime());
+  current_span_ =
+      parent_span.spawnChild(Tracing::EgressConfig::get(),
+                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
+                             parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
+  current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
   current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 

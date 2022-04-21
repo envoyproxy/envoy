@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Echo L4 network filter. This is primarily a simplistic example.
-# Public docs: docs/root/configuration/network_filters/echo_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/echo_filter
 
 envoy_extension_package()
 
@@ -28,7 +28,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    # TODO(#9953) move echo integration test to extensions.
+    # The echo filter is used in integration tests which don't need an upstream.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],

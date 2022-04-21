@@ -36,6 +36,7 @@ public:
   absl::optional<Details>
   getOptionDetails(const Network::Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
+  bool isSupported() const override { return true; }
 
 private:
   Network::Address::InstanceConstSharedPtr src_address_;

@@ -70,6 +70,12 @@ public:
   virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
+   * Returns version of computedBuckets() with disjoint buckets. This vector is
+   * guaranteed to be the same length as supportedBuckets().
+   */
+  virtual std::vector<uint64_t> computeDisjointBuckets() const PURE;
+
+  /**
    * Returns number of values during the period. This number may be an approximation
    * of the number of samples in the histogram, it is not guaranteed that this will be
    * 100% the number of samples observed.
@@ -104,7 +110,15 @@ public:
     Bytes,
     Microseconds,
     Milliseconds,
+    Percent, // A percent value stored as fixed-point, where the stored value is divided by
+             // PercentScale to get the actual value, eg a value of 100% (or 1.0) is encoded as
+             // PercentScale, 50% is encoded as PercentScale * 0.5. Encoding as fixed-point allows
+             // enough dynamic range, without needing to support floating-point values in
+             // histograms.
   };
+
+  // The scaling factor for Unit::Percent.
+  static constexpr uint64_t PercentScale = 1000000;
 
   ~Histogram() override = default;
 
@@ -147,12 +161,12 @@ public:
   /**
    * Returns the quantile summary representation.
    */
-  virtual const std::string quantileSummary() const PURE;
+  virtual std::string quantileSummary() const PURE;
 
   /**
    * Returns the bucket summary representation.
    */
-  virtual const std::string bucketSummary() const PURE;
+  virtual std::string bucketSummary() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

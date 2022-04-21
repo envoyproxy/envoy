@@ -10,6 +10,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/http/header_utility.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -51,6 +52,7 @@ class RouteEntryImplBase : public RouteEntry,
 public:
   RouteEntryImplBase(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
+  void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -94,7 +96,11 @@ private:
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
-    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const Http::LowerCaseString& clusterHeader() const override {
+      // Weighted cluster entries don't have a cluster header based on proto.
+      ASSERT(parent_.clusterHeader().get().empty());
+      return parent_.clusterHeader();
+    }
     const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
     requestMirrorPolicies() const override {
       return parent_.requestMirrorPolicies();
@@ -183,7 +189,10 @@ private:
 
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&);
+  // validation_clusters = absl::nullopt means that clusters are not validated.
+  RouteMatcher(
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
@@ -266,7 +275,25 @@ public:
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    return route_entry_ ? route_entry_->metadataMatchCriteria() : nullptr;
+    const Envoy::Router::MetadataMatchCriteria* route_criteria =
+        (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
+
+    // Support getting metadata match criteria from thrift request.
+    const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+    if (filter_it == request_metadata.end()) {
+      return route_criteria;
+    }
+
+    if (route_criteria != nullptr) {
+      metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+    } else {
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
+
+    return metadata_match_criteria_.get();
   }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
@@ -282,6 +309,7 @@ private:
   std::unique_ptr<UpstreamResponseCallbacksImpl> upstream_response_callbacks_{};
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;

@@ -175,8 +175,8 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
     {
       // Validate a valid CEL expression
       const std::string expr = R"(
-  envoy.api.v2.core.GrpcService{
-    envoy_grpc: envoy.api.v2.core.GrpcService.EnvoyGrpc {
+  envoy.config.core.v3.GrpcService{
+    envoy_grpc: envoy.config.core.v3.GrpcService.EnvoyGrpc {
       cluster_name: "test"
     }
   })";

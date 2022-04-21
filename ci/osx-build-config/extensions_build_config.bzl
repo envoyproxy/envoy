@@ -10,6 +10,8 @@ EXTENSIONS = {
     "envoy.stat_sinks.metrics_service": "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.transport_sockets.raw_buffer": "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
+    "envoy.network.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
+    "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
 }
 WINDOWS_EXTENSIONS = {}
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]

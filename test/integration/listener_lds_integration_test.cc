@@ -21,6 +21,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::StartsWith;
+
 namespace Envoy {
 namespace {
 
@@ -82,7 +84,7 @@ protected:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
       listener_config_.set_name(listener_name_);
-      ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
+      ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
       bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
       auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
       lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -314,7 +316,7 @@ TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
       name: fake_listener
       address:
         socket_address:
-          address: 127.0.0.1
+          address: "::"
           port_value: 0
       filter_chains:
         - filters:
@@ -488,6 +490,169 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   }
 }
 
+// Create a listener, then do an in-place update for the listener.
+// Remove the listener before the filter chain draining is done,
+// then expect the connection will be reset.
+TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  setDrainTime(std::chrono::seconds(30));
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({listener_name_});
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Trigger a listener in-place updating.
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
+  // Make a new connection to the new listener.
+  codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  const uint32_t response_size = 800;
+  const uint32_t request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  codec_client_->close();
+
+  // Remove the active listener.
+  sendLdsResponse(std::vector<std::string>{}, "3");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
+  // All the listen socket are closed. include the sockets in the active listener and
+  // the sockets in the filter chain draining listener. The new connection should be reset.
+  auto codec =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  EXPECT_FALSE(codec->connected());
+  EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+
+  // Ensure the old listener is still in filter chain draining.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+}
+
+// Create a listener, then do two in-place updates for the listener.
+// Remove the listener before the filter chain draining is done,
+// then expect the connection will be reset.
+TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  setDrainTime(std::chrono::seconds(30));
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({listener_name_});
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Trigger a listener in-place updating.
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
+  // Trigger second listener in-place updating.
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter2");
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 2);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
+
+  // Make a new connection to the new listener.
+  codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  const uint32_t response_size = 800;
+  const uint32_t request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  codec_client_->close();
+
+  // Remove the active listener.
+  sendLdsResponse(std::vector<std::string>{}, "3");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
+
+  // All the listen socket are closed. include the sockets in the active listener and
+  // the sockets in the filter chain draining listener. The new connection should be reset.
+  auto codec =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  EXPECT_FALSE(codec->connected());
+  EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+
+  // Ensure the old listener is still in filter chain draining.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
+}
+
 TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
   on_server_init_function_ = [&]() {
     createLdsStream();
@@ -559,11 +724,201 @@ struct PerConnection {
   std::unique_ptr<RawConnectionDriver> client_conn_;
   FakeRawConnectionPtr upstream_conn_;
 };
+
+class ListenerFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                      public BaseIntegrationTest {
+public:
+  ListenerFilterIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF") {}
+};
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFilterDrainData) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        drain: true
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  std::string data_after_drain = data.substr(2, std::string::npos);
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size() - 2, &data_after_drain));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFilterChangeMaxReadBytes) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        new_max_read_bytes: 10
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  std::string data2 = "world";
+  std::string expected_data = data + data2;
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  ASSERT_TRUE(tcp_client->write(data2));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(expected_data.size(), &expected_data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, MultipleInspectDataFilters) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, MultipleInspectDataFilters2) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, ListenerFiltersCloseConnectionOnAccept) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 0
+        close_connection: true
+        )EOF");
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersCloseConnectionAfterGetData) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: true
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  auto result = tcp_client->write(data);
+  // The connection could be closed when writing or after write.
+  if (result == true) {
+    tcp_client->waitForDisconnect();
+  }
+}
+
+TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilters) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 0
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion>,
                        public BaseIntegrationTest {
 public:
   RebalancerTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    listener_filters:
+    # The inspect data filter is used for test the file event reset after
+    # rebalance the request.
+    - name: envoy.filters.listener.inspect_data
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
     filter_chains:
     - filters:
       - name: envoy.filters.network.tcp_proxy

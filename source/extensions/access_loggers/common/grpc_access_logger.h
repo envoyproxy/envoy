@@ -11,7 +11,9 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger_utils.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -75,8 +77,9 @@ public:
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                      const Protobuf::MethodDescriptor& service_method)
-      : client_(client), service_method_(service_method) {}
+                      const Protobuf::MethodDescriptor& service_method,
+                      OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
+      : client_(client), service_method_(service_method), grpc_stream_retry_policy_(retry_policy) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -108,8 +111,7 @@ public:
     }
 
     if (stream_->stream_ == nullptr) {
-      stream_->stream_ =
-          client_->start(service_method_, *stream_, Http::AsyncClient::StreamOptions());
+      stream_->stream_ = client_->start(service_method_, *stream_, createStreamOptionsForRetry());
     }
 
     if (stream_->stream_ != nullptr) {
@@ -124,9 +126,24 @@ public:
     return true;
   }
 
+  Http::AsyncClient::StreamOptions createStreamOptionsForRetry() {
+    auto opt = Http::AsyncClient::StreamOptions();
+
+    if (!grpc_stream_retry_policy_) {
+      return opt;
+    }
+
+    const auto retry_policy =
+        Http::Utility::convertCoreToRouteRetryPolicy(*grpc_stream_retry_policy_, "connect-failure");
+    opt.setBufferBodyForRetry(true);
+    opt.setRetryPolicy(retry_policy);
+    return opt;
+  }
+
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
+  const absl::optional<envoy::config::core::v3::RetryPolicy> grpc_stream_retry_policy_;
 };
 
 } // namespace Detail
@@ -156,17 +173,19 @@ class GrpcAccessLogger : public Detail::GrpcAccessLogger<HttpLogProto, TcpLogPro
 public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
 
-  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
-                   std::chrono::milliseconds buffer_flush_interval_msec,
-                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                   Stats::Scope& scope, std::string access_log_prefix,
-                   const Protobuf::MethodDescriptor& service_method)
-      : client_(client, service_method), buffer_flush_interval_msec_(buffer_flush_interval_msec),
+  GrpcAccessLogger(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
+      const Protobuf::MethodDescriptor& service_method)
+      : client_(client, service_method, GrpcCommon::optionalRetryPolicy(config)),
+        buffer_flush_interval_msec_(
+            PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
           flush_timer_->enableTimer(buffer_flush_interval_msec_);
         })),
-        max_buffer_size_bytes_(max_buffer_size_bytes),
+        max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)),
         stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, access_log_prefix))}) {
     flush_timer_->enableTimer(buffer_flush_interval_msec_);
   }
@@ -272,10 +291,7 @@ public:
     // the main thread if necessary.
     auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
                       ->createUncachedRawAsyncClient();
-    const auto logger = createLogger(
-        config, std::move(client),
-        std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_);
+    const auto logger = createLogger(config, std::move(client), cache.dispatcher_);
     cache.access_loggers_.emplace(cache_key, logger);
     return logger;
   }
@@ -300,7 +316,6 @@ private:
   // Create the specific logger type for this cache.
   virtual typename GrpcAccessLogger::SharedPtr
   createLogger(const ConfigProto& config, const Grpc::RawAsyncClientSharedPtr& client,
-               std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher) PURE;
 
   Grpc::AsyncClientManager& async_client_manager_;

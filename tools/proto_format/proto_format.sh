@@ -35,8 +35,8 @@ if [[ "$1" == "freeze" ]]; then
 fi
 
 # Invoke protoxform aspect.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api//versioning:active_protos ${FREEZE_ARG} \
-  @envoy_api//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos ${FREEZE_ARG} \
+  @envoy_api//versioning:active_protos @envoy_api//versioning:frozen_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 
 # Find all source protos.
 PROTO_TARGETS=()

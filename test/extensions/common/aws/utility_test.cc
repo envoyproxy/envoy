@@ -19,7 +19,8 @@ TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
       {"d", "d_value"}, {"f", "f_value"}, {"b", "b_value"},
       {"e", "e_value"}, {"c", "c_value"}, {"a", "a_value"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value"), Pair("b", "b_value"), Pair("c", "c_value"),
                                Pair("d", "d_value"), Pair("e", "e_value"), Pair("f", "f_value")));
 }
@@ -31,7 +32,8 @@ TEST(UtilityTest, CanonicalizeHeadersSkippingPseudoHeaders) {
       {":method", "GET"},
       {"normal", "normal_value"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  std::vector<Envoy::Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("normal", "normal_value")));
 }
 
@@ -42,7 +44,8 @@ TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
       {"a", "a_value2"},
       {"a", "a_value3"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value1,a_value2,a_value3")));
 }
 
@@ -51,7 +54,8 @@ TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "authority_value"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map, ElementsAre(Pair("host", "authority_value")));
 }
 
@@ -60,13 +64,14 @@ TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
   Http::TestRequestHeaderMapImpl headers_port80{
       {":authority", "example.com:80"},
   };
-  const auto map_port80 = Utility::canonicalizeHeaders(headers_port80);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map_port80 = Utility::canonicalizeHeaders(headers_port80, exclusion_list);
   EXPECT_THAT(map_port80, ElementsAre(Pair("host", "example.com")));
 
   Http::TestRequestHeaderMapImpl headers_port443{
       {":authority", "example.com:443"},
   };
-  const auto map_port443 = Utility::canonicalizeHeaders(headers_port443);
+  const auto map_port443 = Utility::canonicalizeHeaders(headers_port443, exclusion_list);
   EXPECT_THAT(map_port443, ElementsAre(Pair("host", "example.com")));
 }
 
@@ -78,20 +83,39 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
       {"internal", "internal    value"},
       {"all", "    all    value    "},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,
               ElementsAre(Pair("all", "all value"), Pair("internal", "internal value"),
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
 }
 
-// Headers that are likely to mutate are not considered canonical
-TEST(UtilityTest, CanonicalizeHeadersDropMutatingHeaders) {
+// Headers in the exclusion list are not canonicalized
+TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
-      {"x-amz-content-sha256", "e3b0c44..."},
-  };
-  const auto map = Utility::canonicalizeHeaders(headers);
+      {"x-amz-content-sha256", "e3b0c44..."}, {"x-envoy-retry-on", "5xx,reset"},
+      {"x-envoy-max-retries", "3"},           {"x-amzn-trace-id", "0123456789"}};
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  std::vector<std::string> exact_matches = {"x-amzn-trace-id", "x-forwarded-for",
+                                            "x-forwarded-proto"};
+  for (auto& str : exact_matches) {
+    envoy::type::matcher::v3::StringMatcher config;
+    config.set_exact(str);
+    exclusion_list.emplace_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config));
+  }
+  std::vector<std::string> prefixes = {"x-envoy"};
+  for (auto& match_str : prefixes) {
+    envoy::type::matcher::v3::StringMatcher config;
+    config.set_prefix(match_str);
+    exclusion_list.emplace_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config));
+  }
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,
               ElementsAre(Pair("host", "example.com"), Pair("x-amz-content-sha256", "e3b0c44..."),
                           Pair("x-amz-date", "20130708T220855Z")));

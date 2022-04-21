@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Request buffering and timeout L7 HTTP filter
-# Public docs: docs/root/configuration/http_filters/buffer_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/buffer_filter
 
 envoy_extension_package()
 
@@ -36,8 +36,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    visibility = ["//visibility:public"],
+    # Many tests need to buffer to test streaming vs buffering.
+    extra_visibility = [
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",

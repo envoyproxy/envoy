@@ -127,6 +127,35 @@ TEST(StringUtil, atoull) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
+TEST(StringUtil, hasEmptySpace) {
+  EXPECT_FALSE(StringUtil::hasEmptySpace("1234567890_-+=][|\"&*^%$#@!"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233 789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\t789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\f789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\v789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\n789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\r789"));
+
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233 \t\f789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\v\n\r789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\f\v\n789"));
+}
+
+TEST(StringUtil, replaceAllEmptySpace) {
+  EXPECT_EQ("1234567890_-+=][|\"&*^%$#@!",
+            StringUtil::replaceAllEmptySpace("1234567890_-+=][|\"&*^%$#@!"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233 789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\t789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\f789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\v789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\n789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\r789"));
+
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233 \t\f789"));
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\v\n\r789"));
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\f\v\n789"));
+}
+
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;
@@ -214,12 +243,12 @@ TEST(InputConstMemoryStream, All) {
 }
 
 TEST(StringUtil, WhitespaceChars) {
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, ' '));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\t'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\f'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\v'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\n'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), ' '));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\t'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\f'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\v'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\n'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\r'));
 }
 
 TEST(StringUtil, itoa) {
@@ -900,6 +929,41 @@ TEST(IntervalSet, testIntervalTargeted) {
   // initial setup:         [15    20)      [25   30)      [35   35)
   // insertion points:                                              [ )
   EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
+}
+
+TEST(IntervalSet, testTest) {
+  IntervalSetImpl<uint32_t> set;
+  set.insert(4, 6);
+  EXPECT_FALSE(set.test(0));
+  set.insert(0, 2);
+  EXPECT_TRUE(set.test(0));
+  EXPECT_TRUE(set.test(1));
+  EXPECT_FALSE(set.test(2));
+  EXPECT_FALSE(set.test(3));
+  EXPECT_TRUE(set.test(4));
+  EXPECT_TRUE(set.test(5));
+  EXPECT_FALSE(set.test(6));
+  EXPECT_FALSE(set.test(7));
+}
+
+TEST(IntervalSet, testTestDouble) {
+  IntervalSetImpl<double> set;
+  set.insert(4.0, 6.0);
+  EXPECT_FALSE(set.test(0));
+  EXPECT_FALSE(set.test(3.9999));
+  EXPECT_TRUE(set.test(4.0));
+  EXPECT_TRUE(set.test(4.0001));
+  EXPECT_TRUE(set.test(5.9999));
+  EXPECT_FALSE(set.test(6.0));
+  set.insert(0, 2);
+  EXPECT_TRUE(set.test(0));
+  EXPECT_TRUE(set.test(1));
+  EXPECT_TRUE(set.test(1.999));
+  EXPECT_FALSE(set.test(3));
+  EXPECT_TRUE(set.test(4));
+  EXPECT_TRUE(set.test(5));
+  EXPECT_FALSE(set.test(6));
+  EXPECT_FALSE(set.test(7));
 }
 
 TEST(WelfordStandardDeviation, AllEntriesTheSame) {

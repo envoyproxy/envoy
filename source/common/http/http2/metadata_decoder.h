@@ -52,6 +52,8 @@ public:
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
+  friend class MetadataEncoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
+  friend class MetadataEncoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
   /**
    * Decodes METADATA payload using nghttp2.
    * @param end_metadata indicates is END_METADATA is true.

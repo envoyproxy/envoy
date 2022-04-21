@@ -60,22 +60,6 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
   SUCCEED();
 }
 
-// Make sure that creating DnsResolver does not cause crash and each call to create
-// DNS resolver returns the same shared_ptr.
-TEST_F(ConfigValidation, SharedDnsResolver) {
-  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
-
-  Network::DnsResolverSharedPtr dns1 =
-      dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
-  long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 =
-      dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
-
-  EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
-  EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
-}
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

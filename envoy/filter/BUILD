@@ -13,7 +13,6 @@ envoy_cc_library(
     hdrs = ["config_provider_manager.h"],
     deps = [
         "//envoy/config:extension_config_provider_interface",
-        "//envoy/http:filter_interface",
         "//envoy/init:manager_interface",
         "//envoy/server:filter_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

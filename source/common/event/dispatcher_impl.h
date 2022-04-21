@@ -43,6 +43,11 @@ public:
   DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
+  DispatcherImpl(const std::string& name, Thread::ThreadFactory& thread_factory,
+                 TimeSource& time_source, Random::RandomGenerator& random_generator,
+                 Filesystem::Instance& file_system, Event::TimeSystem& time_system,
+                 const ScaledRangeTimerManagerFactory& scaled_timer_factory,
+                 const Buffer::WatermarkFactorySharedPtr& watermark_factory);
   ~DispatcherImpl() override;
 
   /**
@@ -54,7 +59,7 @@ public:
   const std::string& name() override { return name_; }
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                         std::chrono::milliseconds min_touch_interval) override;
-  TimeSource& timeSource() override { return api_.timeSource(); }
+  TimeSource& timeSource() override { return time_source_; }
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
   Network::ServerConnectionPtr
@@ -66,15 +71,12 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb,
-                                      bool bind_to_port) override;
+                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                      bool bind_to_port, bool ignore_global_conn_limit) override;
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;
@@ -140,11 +142,14 @@ private:
   // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
   // invoke run().
   bool isThreadSafe() const override {
-    return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
+    return run_tid_.isEmpty() || run_tid_ == thread_factory_.currentThreadId();
   }
 
   const std::string name_;
-  Api::Api& api_;
+  Thread::ThreadFactory& thread_factory_;
+  TimeSource& time_source_;
+  Random::RandomGenerator& random_generator_;
+  Filesystem::Instance& file_system_;
   std::string stats_prefix_;
   DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;

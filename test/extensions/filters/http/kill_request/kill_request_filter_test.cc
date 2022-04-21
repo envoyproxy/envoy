@@ -153,12 +153,11 @@ TEST_F(KillRequestFilterTest, DecodeTrailersReturnsContinue) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(KillRequestFilterTest, Encode100ContinueHeadersReturnsContinue) {
+TEST_F(KillRequestFilterTest, Encode1xxHeadersReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
 }
 
 TEST_F(KillRequestFilterTest, EncodeTrailersReturnsContinue) {

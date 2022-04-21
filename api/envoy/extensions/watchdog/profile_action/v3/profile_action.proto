@@ -10,6 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.watchdog.profile_action.v3";
 option java_outer_classname = "ProfileActionProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/watchdog/profile_action/v3;profile_actionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Watchdog Action that does CPU profiling.]

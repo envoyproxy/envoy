@@ -19,15 +19,7 @@ TEST(InlineCookieTest, InlineCookieTest) {
   Http::CustomInlineHeaderRegistry::registerInlineHeader<Http::RequestHeaderMap::header_map_type>(
       Http::LowerCaseString("header_for_compare"));
 
-  auto mock_snapshot = std::make_shared<testing::NiceMock<Runtime::MockSnapshot>>();
-  testing::NiceMock<Runtime::MockLoader> mock_loader;
-  Runtime::LoaderSingleton::initialize(&mock_loader);
-
   {
-    // Enable 'envoy.reloadable_features.header_map_correctly_coalesce_cookies' feature.
-    ON_CALL(mock_loader, threadsafeSnapshot()).WillByDefault(testing::Return(mock_snapshot));
-    ON_CALL(*mock_snapshot, runtimeFeatureEnabled(_)).WillByDefault(testing::Return(true));
-
     Http::TestRequestHeaderMapImpl headers{{"cookie", "key1:value1"},
                                            {"cookie", "key2:value2"},
                                            {"header_for_compare", "value1"},
@@ -36,22 +28,6 @@ TEST(InlineCookieTest, InlineCookieTest) {
     // Delimiter for inline 'cookie' header is specialized '; '.
     EXPECT_EQ("key1:value1; key2:value2", headers.get_("cookie"));
     // Delimiter for inline 'header_for_compare' header is default ','.
-    EXPECT_EQ("value1,value2", headers.get_("header_for_compare"));
-  }
-
-  {
-    // Disable 'envoy.reloadable_features.header_map_correctly_coalesce_cookies' feature.
-    ON_CALL(mock_loader, threadsafeSnapshot()).WillByDefault(testing::Return(mock_snapshot));
-    ON_CALL(*mock_snapshot, runtimeFeatureEnabled(_)).WillByDefault(testing::Return(false));
-
-    Http::TestRequestHeaderMapImpl headers{{"cookie", "key1:value1"},
-                                           {"cookie", "key2:value2"},
-                                           {"header_for_compare", "value1"},
-                                           {"header_for_compare", "value2"}};
-
-    // 'envoy.reloadable_features.header_map_correctly_coalesce_cookies' is disabled then default
-    // ',' will be used as delimiter.
-    EXPECT_EQ("key1:value1,key2:value2", headers.get_("cookie"));
     EXPECT_EQ("value1,value2", headers.get_("header_for_compare"));
   }
 }

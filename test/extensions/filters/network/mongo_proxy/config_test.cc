@@ -226,17 +226,6 @@ TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
   cb(connection);
 }
 
-// Test that the deprecated extension name is disabled by default.
-// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
-TEST(MongoFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.mongo_proxy";
-
-  ASSERT_EQ(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace MongoProxy
 } // namespace NetworkFilters
 } // namespace Extensions

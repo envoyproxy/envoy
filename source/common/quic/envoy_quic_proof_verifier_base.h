@@ -1,20 +1,10 @@
 #pragma once
 
+#include "source/common/common/logger.h"
+
 #include "absl/strings/str_cat.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 #include "quiche/quic/core/crypto/proof_verifier.h"
 #include "quiche/quic/core/quic_versions.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {

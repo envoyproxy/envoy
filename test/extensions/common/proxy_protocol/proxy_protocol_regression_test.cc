@@ -48,9 +48,9 @@ public:
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
-        .WillOnce(ReturnRef(socket_->connectionInfoProvider().localAddress()));
+        .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -72,6 +72,9 @@ public:
   Network::UdpListenerConfigOptRef udpListenerConfig() override {
     return Network::UdpListenerConfigOptRef();
   }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override {
+    return Network::InternalListenerConfigOptRef();
+  }
   ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -82,6 +85,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   Init::Manager& initManager() override { return *init_manager_; }
+  bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -176,6 +180,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 // Parameterize the listener socket address version.

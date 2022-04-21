@@ -23,7 +23,7 @@ Api::IoCallBoolResult MockFile::open(FlagSet flag) {
 Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
   Thread::LockGuard lock(write_mutex_);
   if (!is_open_) {
-    return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { NOT_REACHED_GCOVR_EXCL_LINE; })};
+    return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { PANIC("reached unexpected code"); })};
   }
 
   Api::IoCallSizeResult result = write_(buffer);

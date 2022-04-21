@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <functional>
 #include <map>
 #include <memory>
@@ -13,6 +14,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -42,6 +44,17 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 
 private:
   using HostPredicate = std::function<bool(const Host&)>;
@@ -285,6 +298,8 @@ private:
   const bool list_as_any_;
 
   TimeSource& time_source_;
+
+  const HostStatusSet override_host_status_{};
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

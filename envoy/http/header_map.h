@@ -108,6 +108,11 @@ using InlineHeaderVector = absl::InlinedVector<char, 128>;
  */
 using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
 
+// Forward declare test classes that have access to HeaderString::setCopyUnvalidatedForTestOnly()
+namespace Http2 {
+class Http2CodecImplTest;
+}
+
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
  * performance. It supports 2 different types of storage and can switch between them:
@@ -231,6 +236,11 @@ private:
 
   bool valid() const;
 
+  // Test only method that does not have validation and allows setting arbitrary values.
+  // Test code that needs access to it is declared below.
+  friend class Http2::Http2CodecImplTest;
+  void setCopyUnvalidatedForTestOnly(absl::string_view view);
+
   /**
    * @return the type of backing storage for the string.
    */
@@ -304,6 +314,7 @@ private:
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
+  HEADER_FUNC(ForwardedHost)                                                                       \
   HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
@@ -355,6 +366,7 @@ private:
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(ProxyStatus)                                                                         \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \

@@ -1,11 +1,16 @@
 #pragma once
+#include <map>
+
+#include "source/common/singleton/const_singleton.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
-enum class HeaderType {
+enum HeaderType {
   TopLine,
   CallId,
   Via,
@@ -20,8 +25,10 @@ enum class HeaderType {
   SRoute,
   WAuth,
   Auth,
+  PCookieIPMap,
   Other,
-  InvalidFormat
+  InvalidFormat,
+  HeaderMaxNum
 };
 
 enum class MsgType { Request, Response, ErrorMsg };
@@ -61,6 +68,46 @@ enum class AppExceptionType {
   ChecksumMismatch = 14,
   Interruption = 15,
 };
+
+class HeaderTypeMap {
+public:
+  HeaderType str2Header(const absl::string_view& header) const {
+    if (const auto& result = sip_header_type_map_.find(header);
+        result != sip_header_type_map_.end()) {
+      return result->second;
+    } else {
+      return HeaderType::Other;
+    }
+  }
+
+  HeaderType str2Header(const std::string& header) const {
+    if (const auto& result = sip_header_type_map_.find(header);
+        result != sip_header_type_map_.end()) {
+      return result->second;
+    } else {
+      return HeaderType::Other;
+    }
+  }
+
+private:
+  const std::map<absl::string_view, HeaderType> sip_header_type_map_{
+      {"Call-ID", HeaderType::CallId},
+      {"Via", HeaderType::Via},
+      {"To", HeaderType::To},
+      {"From", HeaderType::From},
+      {"Contact", HeaderType::Contact},
+      {"Record-Route", HeaderType::RRoute},
+      {"CSeq", HeaderType::Cseq},
+      {"Route", HeaderType::Route},
+      {"Path", HeaderType::Path},
+      {"Event", HeaderType::Event},
+      {"Service-Route", HeaderType::SRoute},
+      {"WWW-Authenticate", HeaderType::WAuth},
+      {"Authorization", HeaderType::Auth},
+      {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap}};
+};
+
+using HeaderTypes = ConstSingleton<HeaderTypeMap>;
 
 } // namespace SipProxy
 } // namespace NetworkFilters

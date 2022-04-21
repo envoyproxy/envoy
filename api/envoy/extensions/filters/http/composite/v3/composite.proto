@@ -11,10 +11,11 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
 option java_outer_classname = "CompositeProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/composite/v3;compositev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Composite]
-// Composite Filter :ref:`configuration overview <config_http_filters_cors>`.
+// Composite Filter :ref:`configuration overview <config_http_filters_composite>`.
 // [#extension: envoy.filters.http.composite]
 
 // :ref:`Composite filter <config_http_filters_composite>` config. The composite filter config

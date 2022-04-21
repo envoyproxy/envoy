@@ -7,6 +7,8 @@
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 
+#include "quic_filter_manager_connection_impl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -20,7 +22,8 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit),
+                                      send_buffer_limit,
+                                      std::make_shared<QuicSslConnectionInfo>(*this)),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
       listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
 }
@@ -69,16 +72,19 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
 quic::QuicSpdyStream*
 EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Only client side server push stream should trigger this call.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected function call");
+  return nullptr;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   // Disallow server initiated stream.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected function call");
+  return nullptr;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream() {
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected function call");
+  return nullptr;
 }
 
 void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) {
@@ -146,10 +152,42 @@ void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
                                                    /*from_self*/ false, /*is_upstream*/ false);
 }
 
+void EnvoyQuicServerSession::setHttp3Options(
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
+  if (http3_options_->has_quic_protocol_options() &&
+      http3_options_->quic_protocol_options().has_connection_keepalive()) {
+    const uint64_t initial_interval = PROTOBUF_GET_MS_OR_DEFAULT(
+        http3_options_->quic_protocol_options().connection_keepalive(), initial_interval, 0);
+    const uint64_t max_interval =
+        PROTOBUF_GET_MS_OR_DEFAULT(http3_options_->quic_protocol_options().connection_keepalive(),
+                                   max_interval, quic::kPingTimeoutSecs);
+    if (max_interval == 0) {
+      return;
+    }
+    if (initial_interval > 0) {
+      connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
+      connection()->set_initial_retransmittable_on_wire_timeout(
+          quic::QuicTime::Delta::FromMilliseconds(initial_interval));
+    }
+  }
+  set_allow_extended_connect(http3_options_->allow_extended_connect());
+}
+
 void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
                                                         const Network::FilterChain& filter_chain,
                                                         ConnectionMapIter position) {
   position_.emplace(connection_map, filter_chain, position);
+}
+
+quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
+  quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
+  config.early_data_enabled = position_.has_value()
+                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                        position_->filter_chain_.transportSocketFactory())
+                                        .earlyDataEnabled()
+                                  : true;
+  return config;
 }
 
 } // namespace Quic

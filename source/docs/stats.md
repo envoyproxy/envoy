@@ -204,9 +204,7 @@ occurring during via an admin endpoint that shows 20 recent lookups by name, at
 
 Class | Superclass | Description
 -----| ---------- | ---------
-SymbolTable | | Abstract class providing an interface for symbol tables
-SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
-SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
+SymbolTable | | Holds a table of dot-separated names with shared tokens
 StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
 StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
@@ -274,7 +272,7 @@ Developers trying to can iterate through changes in these tests locally with:
 If you are visiting this section because you saw a message like:
 
 ```bash
-[...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
+[...][16][critical][assert] [source/common/stats/symbol_table.cc:341] assert failure:
 decode_search != decode_map_.end(). Details: Please see
 https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#debugging-symbol-table-assertions
 ```

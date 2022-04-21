@@ -24,9 +24,11 @@ envoy_cc_library(
     hdrs = ["codec_impl.h"],
     external_deps = [
         "nghttp2",
+        "quiche_http2_adapter",
         "abseil_optional",
         "abseil_inlined_vector",
         "abseil_algorithm",
+        "abseil_cleanup",
     ],
     deps = [
         ":codec_stats_lib",
@@ -91,6 +93,7 @@ envoy_cc_library(
     hdrs = ["metadata_encoder.h"],
     external_deps = [
         "nghttp2",
+        "quiche_http2_adapter",
     ],
     deps = [
         "//envoy/http:codec_interface",

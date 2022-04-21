@@ -261,7 +261,7 @@ modify different aspects of the server:
 
 .. http:get:: /init_dump
 
-  Dump currently information of unready targets of various Envoy components as JSON-serialized proto
+  Dump current information of unready targets of various Envoy components as JSON-serialized proto
   messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps>` for more
   information.
 
@@ -292,10 +292,11 @@ modify different aspects of the server:
 
 .. http:post:: /logging
 
-  Enable/disable different logging levels on a particular logger or all loggers.
+  Enable/disable logging levels for different loggers.
 
   - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
   - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  - To change multiple logging levels at once, set the query parameter as paths=<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
   - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
 
   .. note::
@@ -444,6 +445,20 @@ modify different aspects of the server:
   Full-string matching can be specified with begin- and end-line anchors. (i.e.
   ``/stats?filter=^server.concurrency$``)
 
+  .. http:get:: /stats?histogram_buckets=cumulative
+
+  Changes histogram output to display cumulative buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+  All values below the upper bound are included even if they are placed into other buckets.
+  Compatible with ``usedonly`` and ``filter``.
+
+  .. http:get:: /stats?histogram_buckets=disjoint
+
+  Changes histogram output to display disjoint buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+  Buckets do not include values from other buckets with smaller upper bounds;
+  the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
+
 .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
@@ -500,6 +515,102 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once,
   gauges changed at least once, and histograms added to at least once) in JSON format.
 
+  .. http:get:: /stats?format=json&histogram_buckets=cumulative
+
+  Changes histogram output to display cumulative buckets with upper bounds.
+  All values below the upper bound are included even if they are placed into other buckets.
+  Compatible with ``usedonly`` and ``filter``.
+
+  Example histogram output:
+
+  .. code-block:: json
+
+    {
+      "histograms": [
+        {
+          "name": "example_histogram",
+          "buckets": [
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2, "interval": 0, "cumulative": 1},
+            {"upper_bound": 3, "interval": 1, "cumulative": 3},
+            {"upper_bound": 4, "interval": 1, "cumulative": 3}
+          ]
+        },
+        {
+          "name": "other_example_histogram",
+          "buckets": [
+            {"upper_bound": 0.5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 10, "interval": 0, "cumulative": 0},
+            {"upper_bound": 25, "interval": 0, "cumulative": 0},
+            {"upper_bound": 50, "interval": 0, "cumulative": 0},
+            {"upper_bound": 100, "interval": 0, "cumulative": 0},
+            {"upper_bound": 250, "interval": 0, "cumulative": 0},
+            {"upper_bound": 500, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2500, "interval": 0, "cumulative": 100},
+            {"upper_bound": 5000, "interval": 0, "cumulative": 300},
+            {"upper_bound": 10000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 30000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 60000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 300000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 600000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 1800000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 3600000, "interval": 0, "cumulative": 600}
+          ]
+        }
+      ]
+    }
+
+  .. http:get:: /stats?format=json&histogram_buckets=disjoint
+
+  Changes histogram output to display disjoint buckets with upper bounds.
+  Buckets do not include values from other buckets with smaller upper bounds;
+  the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
+
+  Example histogram output:
+
+  .. code-block:: json
+
+    {
+      "histograms": [
+        {
+          "name": "example_histogram",
+          "buckets": [
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2, "interval": 0, "cumulative": 1},
+            {"upper_bound": 3, "interval": 1, "cumulative": 2},
+            {"upper_bound": 4, "interval": 0, "cumulative": 0}
+          ]
+        },
+        {
+          "name": "other_example_histogram",
+          "buckets": [
+            {"upper_bound": 0.5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 10, "interval": 0, "cumulative": 0},
+            {"upper_bound": 25, "interval": 0, "cumulative": 0},
+            {"upper_bound": 50, "interval": 0, "cumulative": 0},
+            {"upper_bound": 100, "interval": 0, "cumulative": 0},
+            {"upper_bound": 250, "interval": 0, "cumulative": 0},
+            {"upper_bound": 500, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2500, "interval": 0, "cumulative": 100},
+            {"upper_bound": 5000, "interval": 0, "cumulative": 200},
+            {"upper_bound": 10000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 30000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 60000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 300000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 600000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1800000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 3600000, "interval": 0, "cumulative": 0}
+          ]
+        }
+      ]
+    }
+
 .. http:get:: /stats?format=prometheus
 
   or alternatively,
@@ -509,11 +620,25 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   v0.0.4 format. This can be used to integrate with a Prometheus server.
 
-  You can optionally pass the ``usedonly`` URL query argument to only get statistics that
-  Envoy has updated (counters incremented at least once, gauges changed at least once,
-  and histograms added to at least once)
+  .. http:get:: /stats?format=prometheus&usedonly
 
-  .. http:get:: /stats/recentlookups
+  You can optionally pass the ``usedonly`` URL query parameter to only get statistics that
+  Envoy has updated (counters incremented at least once, gauges changed at least once,
+  and histograms added to at least once).
+
+  .. http:get:: /stats?format=prometheus&text_readouts
+
+  Optional ``text_readouts`` query parameter is used to get all stats including text readouts.
+  Text readout stats are returned in gauge format. These gauges always have value 0. Each
+  gauge record has additional label named ``text_value`` that contains value of a text readout.
+
+  .. warning::
+    Every unique combination of key-value label pair represents a new time series
+    in Prometheus, which can dramatically increase the amount of data stored.
+    Text readout stats create a new label value every time the value
+    of the text readout stat changes, which could create an unbounded number of time series.
+
+.. http:get:: /stats/recentlookups
 
   This endpoint helps Envoy developers debug potential contention
   issues in the stats system. Initially, only the count of StatName

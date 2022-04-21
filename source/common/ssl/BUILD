@@ -32,6 +32,7 @@ envoy_cc_library(
         "//envoy/ssl:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

@@ -50,6 +50,8 @@ static_resources:
               content_type: application/grpc+proto
               withhold_grpc_frames: true
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: other
     type: LOGICAL_DNS

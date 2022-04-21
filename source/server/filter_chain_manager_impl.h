@@ -5,7 +5,10 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/typed_metadata.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -48,7 +51,7 @@ public:
   // DrainDecision
   bool drainClose() const override;
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
 
@@ -72,6 +75,7 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -88,6 +92,10 @@ public:
 
 private:
   Configuration::FactoryContext& parent_context_;
+  // The scope that has empty prefix.
+  Stats::ScopeSharedPtr scope_;
+  // filter_chain_scope_ has the same prefix as listener owners scope.
+  Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
@@ -166,6 +174,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
@@ -210,6 +219,7 @@ public:
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
   void addFilterChains(
+      const xds::type::matcher::v3::Matcher* filter_chain_matcher,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
@@ -230,6 +240,8 @@ public:
 
 private:
   void convertIPsToTries();
+  const Network::FilterChain*
+  findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
@@ -380,6 +392,9 @@ private:
   // init manager owned by the corresponding listener. The reference is valid when building the
   // filter chain.
   Init::Manager& init_manager_;
+
+  // Matcher selecting the filter chain name.
+  Matcher::MatchTreePtr<Network::MatchingData> matcher_;
 };
 } // namespace Server
 } // namespace Envoy

@@ -40,6 +40,18 @@ public:
 
   MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const override;
 
+  bool allMatchesSupportAlpn() const override {
+    if (!default_match_.factory->supportsAlpn()) {
+      return false;
+    }
+    for (const auto& match : matches_) {
+      if (!match.factory->supportsAlpn()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 protected:
   TransportSocketMatchStats generateStats(const std::string& prefix);
   Stats::Scope& stats_scope_;

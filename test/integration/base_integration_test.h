@@ -75,6 +75,10 @@ public:
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
+  absl::optional<uint64_t> waitForNextRawUpstreamConnection(
+      const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
+      std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
+
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
@@ -94,7 +98,11 @@ public:
   makeClientConnectionWithOptions(uint32_t port,
                                   const Network::ConnectionSocket::OptionsSharedPtr& options);
 
-  void registerTestServerPorts(const std::vector<std::string>& port_names);
+  void registerTestServerPorts(const std::vector<std::string>& port_names) {
+    registerTestServerPorts(port_names, test_server_);
+  }
+  void registerTestServerPorts(const std::vector<std::string>& port_names,
+                               IntegrationTestServerPtr& test_server);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names,
                                     Server::FieldValidationConfig validator_config,
@@ -103,6 +111,12 @@ public:
                            const std::vector<std::string>& port_names,
                            Server::FieldValidationConfig validator_config,
                            bool allow_lds_rejection);
+
+  void createGeneratedApiTestServer(const std::string& bootstrap_path,
+                                    const std::vector<std::string>& port_names,
+                                    Server::FieldValidationConfig validator_config,
+                                    bool allow_lds_rejection,
+                                    IntegrationTestServerPtr& test_server);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -145,7 +159,8 @@ public:
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
@@ -157,10 +172,10 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "") {
+      const std::string& expected_error_message = "", bool expect_node = true) {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
                                         expected_resource_unsubscriptions, xds_stream_,
-                                        expected_error_code, expected_error_message);
+                                        expected_error_code, expected_error_message, expect_node);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
@@ -168,7 +183,7 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", bool expect_node = true);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -331,7 +346,12 @@ public:
     return *fake_upstreams_.back();
   }
 
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
+
 protected:
+  static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
+                                             bool use_lds);
+
   void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
   }
@@ -343,7 +363,7 @@ protected:
 
   bool enableHalfClose() { return upstream_config_.enable_half_close_; }
 
-  const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
+  FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
   void setMaxRequestHeadersKb(uint32_t value) { upstream_config_.max_request_headers_kb_ = value; }
   void setMaxRequestHeadersCount(uint32_t value) {
     upstream_config_.max_request_headers_count_ = value;
@@ -361,10 +381,11 @@ protected:
   void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
     upstream_config_.http2_options_.MergeFrom(options);
   }
+  void mergeOptions(envoy::config::listener::v3::QuicProtocolOptions& options) {
+    upstream_config_.quic_options_.MergeFrom(options);
+  }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
-
-  Thread::TestThread test_thread_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and

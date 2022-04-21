@@ -6,6 +6,7 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
@@ -39,6 +40,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
                                        encoded_secret, encoded_cb_url);
   request->body().add(body);
+  request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
 
@@ -95,8 +97,12 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   }
 
   const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
+  const std::string id_token{PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, id_token, EMPTY_STRING)};
+  const std::string refresh_token{
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, refresh_token, EMPTY_STRING)};
   const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
-  parent_->onGetAccessTokenSuccess(access_token, expires_in);
+
+  parent_->onGetAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
 }
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,

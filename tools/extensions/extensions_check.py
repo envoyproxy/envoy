@@ -2,23 +2,27 @@
 
 # Validate extension metadata
 
+import json
 import pathlib
 import re
 import sys
 from functools import cached_property
-from importlib.abc import Loader
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
-from envoy.base import checker, utils
+from aio.run import checker
 
-BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
-CONTRIB_BUILD_CONFIG_PATH = "contrib/contrib_build_config.bzl"
+from envoy.base import utils
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
-    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic")
+    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic",
+    "envoy.matching.inputs.request_headers", "envoy.matching.inputs.request_trailers",
+    "envoy.matching.inputs.response_headers", "envoy.matching.inputs.response_trailers",
+    "envoy.matching.inputs.destination_ip", "envoy.matching.inputs.destination_port",
+    "envoy.matching.inputs.source_ip", "envoy.matching.inputs.source_port",
+    "envoy.matching.inputs.direct_source_ip", "envoy.matching.inputs.source_type",
+    "envoy.matching.inputs.server_name", "envoy.matching.inputs.transport_protocol",
+    "envoy.matching.inputs.application_protocol")
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -44,18 +48,21 @@ EXTENSION_SECURITY_POSTURES = (
 # Extension categories as defined by factories
 EXTENSION_CATEGORIES = (
     "envoy.access_loggers", "envoy.bootstrap", "envoy.clusters", "envoy.compression.compressor",
-    "envoy.compression.decompressor", "envoy.filters.http", "envoy.filters.http.cache",
-    "envoy.filters.listener", "envoy.filters.network", "envoy.filters.udp_listener",
-    "envoy.formatter", "envoy.grpc_credentials", "envoy.guarddog_actions", "envoy.health_checkers",
-    "envoy.http.stateful_header_formatters", "envoy.internal_redirect_predicates",
-    "envoy.io_socket", "envoy.http.original_ip_detection", "envoy.matching.common_inputs",
-    "envoy.matching.input_matchers", "envoy.tls.key_providers", "envoy.quic.proof_source",
-    "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors", "envoy.request_id",
-    "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
-    "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.sip_proxy.filters",
-    "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
-    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value",
-    "envoy.rbac.matchers")
+    "envoy.compression.decompressor", "envoy.config.validators", "envoy.filters.http",
+    "envoy.filters.http.cache", "envoy.filters.listener", "envoy.filters.network",
+    "envoy.filters.udp_listener", "envoy.formatter", "envoy.grpc_credentials",
+    "envoy.guarddog_actions", "envoy.health_checkers", "envoy.http.stateful_header_formatters",
+    "envoy.internal_redirect_predicates", "envoy.io_socket", "envoy.http.original_ip_detection",
+    "envoy.matching.common_inputs", "envoy.matching.input_matchers", "envoy.tls.key_providers",
+    "envoy.quic.proof_source", "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors",
+    "envoy.request_id", "envoy.resource_monitors", "envoy.retry_host_predicates",
+    "envoy.retry_priorities", "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers",
+    "envoy.sip_proxy.filters", "envoy.transport_sockets.downstream",
+    "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
+    "envoy.wasm.runtime", "envoy.common.key_value", "envoy.network.dns_resolver",
+    "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session",
+    "envoy.matching.http.input", "envoy.matching.network.input",
+    "envoy.matching.network.custom_matchers")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
@@ -92,13 +99,11 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def configured_extensions(self) -> dict:
-        return ExtensionsChecker._load_build_config(
-            "extensions_build_config", BUILD_CONFIG_PATH, "EXTENSIONS")
+        return json.loads(pathlib.Path(self.args.build_config).read_text())
 
     @cached_property
     def configured_contrib_extensions(self) -> dict:
-        return ExtensionsChecker._load_build_config(
-            "contrib_build_config", CONTRIB_BUILD_CONFIG_PATH, "CONTRIB_EXTENSIONS")
+        return json.loads(pathlib.Path(self.args.contrib_build_config).read_text())
 
     @property
     def fuzzed_count(self) -> int:
@@ -124,24 +129,13 @@ class ExtensionsChecker(checker.Checker):
             if "network" in ext and data["security_posture"] == "robust_to_untrusted_downstream"
         ])
 
-    @staticmethod
-    def _load_build_config(name, build_config_path, dictionary_name) -> dict:
-        # build configs must have a .bzl suffix for Starlark import, so we are forced to do this
-        # workaround.
-        _extensions_build_config_spec = spec_from_loader(
-            name, SourceFileLoader(name, build_config_path))
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument("--build_config")
+        parser.add_argument("--contrib_build_config")
+        parser.add_argument("--core_extensions")
 
-        if not isinstance(_extensions_build_config_spec, ModuleSpec):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {build_config_path}")
-        extensions_build_config = module_from_spec(_extensions_build_config_spec)
-
-        if not isinstance(_extensions_build_config_spec.loader, Loader):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {build_config_path}")
-
-        _extensions_build_config_spec.loader.exec_module(extensions_build_config)
-        return getattr(extensions_build_config, dictionary_name)
-
-    def check_fuzzed(self) -> None:
+    async def check_fuzzed(self) -> None:
         if self.robust_to_downstream_count == self.fuzzed_count:
             return
         self.error(
@@ -150,13 +144,13 @@ class ExtensionsChecker(checker.Checker):
                 f"downstreams are fuzzed by adding them to filterNames() in {FUZZ_TEST_PATH}"
             ])
 
-    def check_metadata(self) -> None:
+    async def check_metadata(self) -> None:
         for extension in self.metadata:
             errors = self._check_metadata(extension)
             if errors:
                 self.error("metadata", errors)
 
-    def check_registered(self) -> None:
+    async def check_registered(self) -> None:
         only_metadata = set(self.metadata.keys()) - self.all_extensions
         missing_metadata = self.all_extensions - set(self.metadata.keys())
 
@@ -202,9 +196,9 @@ class ExtensionsChecker(checker.Checker):
             yield f"Unknown status for {extension}: {status}"
 
 
-def main() -> int:
-    return ExtensionsChecker().run()
+def main(*args) -> int:
+    return ExtensionsChecker(*args)()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(*sys.argv[1:]))

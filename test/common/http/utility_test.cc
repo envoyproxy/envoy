@@ -364,6 +364,92 @@ TEST(HttpUtility, appendVia) {
   }
 }
 
+TEST(HttpUtility, updateAuthority) {
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "dns.name", true);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "dns.name", false);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "", true);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "", false);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", true);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", false);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "", true);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "", false);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "newhost.com", false);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", true);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", false);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+}
+
 TEST(HttpUtility, createSslRedirectPath) {
   {
     TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
@@ -1579,6 +1665,36 @@ TEST(CheckRequiredHeaders, Response) {
       absl::InvalidArgumentError("missing required header: :status"),
       HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
+
+TEST(Utility, isSafeRequest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("PUT");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("DELETE");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("PATCH");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+
+  request_headers.setMethod("GET");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("HEAD");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("OPTIONS");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("TRACE");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+
+  request_headers.removePath();
+  request_headers.setMethod("CONNECT");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+
+  request_headers.removeMethod();
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+};
 
 } // namespace Http
 } // namespace Envoy

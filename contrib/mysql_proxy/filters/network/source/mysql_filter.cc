@@ -115,7 +115,8 @@ void MySQLFilter::onCommand(Command& command) {
                                                         decoder_->getAttributes(), metadata);
 
   ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}, result {}, cmd type {}",
-                 read_callbacks_->connection(), command.getData(), result, command.getCmd());
+                 read_callbacks_->connection(), command.getData(), result,
+                 static_cast<int>(command.getCmd()));
 
   if (!result) {
     config_->stats_.queries_parse_error_.inc();

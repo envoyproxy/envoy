@@ -36,6 +36,17 @@ public:
   virtual const std::string& privateKeyPath() const PURE;
 
   /**
+   * @return a string of pkcs12 data.
+   */
+  virtual const std::string& pkcs12() const PURE;
+
+  /**
+   * @return path of the pkcs12 file used to identify the local side or "<inline>" if the pkcs12
+   * data was inlined.
+   */
+  virtual const std::string& pkcs12Path() const PURE;
+
+  /**
    * @return private key method provider.
    */
   virtual Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const PURE;

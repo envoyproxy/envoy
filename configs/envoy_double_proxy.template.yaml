@@ -61,6 +61,8 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         {% if tracing %}
         tracing:
           provider:
@@ -149,8 +151,10 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-              exact: "front-proxy.yourcompany.net"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "front-proxy.yourcompany.net"
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -188,8 +192,10 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-              exact: "collector-grpc.lightstep.com"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "collector-grpc.lightstep.com"
 flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.stat_sinks.statsd

@@ -1,22 +1,11 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -169,6 +158,27 @@ TEST(EnvoyQuicUtilsTest, deduceSignatureAlgorithmFromNullPublicKey) {
   std::string error;
   EXPECT_EQ(0, deduceSignatureAlgorithmFromPublicKey(nullptr, &error));
   EXPECT_EQ("Invalid leaf cert, bad public key", error);
+}
+
+TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
+  envoy::config::core::v3::QuicProtocolOptions config;
+  quic::QuicConfig quic_config;
+
+  // Test defaults.
+  convertQuicConfig(config, quic_config);
+  EXPECT_EQ(100, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(100, quic_config.GetMaxUnidirectionalStreamsToSend());
+  EXPECT_EQ(16777216, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(25165824, quic_config.GetInitialSessionFlowControlWindowToSend());
+
+  // Test converting values.
+  config.mutable_max_concurrent_streams()->set_value(2);
+  config.mutable_initial_stream_window_size()->set_value(3);
+  config.mutable_initial_connection_window_size()->set_value(50);
+  convertQuicConfig(config, quic_config);
+  EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
+  EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
 }
 
 } // namespace Quic

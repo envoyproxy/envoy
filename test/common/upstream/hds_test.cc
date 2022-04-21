@@ -211,6 +211,8 @@ transport_socket_matches:
     %s: "true"
   transport_socket:
     name: "envoy.transport_sockets.raw_buffer"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
 )EOF",
         match);
     cluster_health_check->MergeFrom(
@@ -258,6 +260,7 @@ transport_socket_match_criteria:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   Server::MockOptions options_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly
@@ -311,6 +314,36 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
       EXPECT_EQ(host->address()->ip()->port(), 1234 + j);
     }
   }
+}
+
+TEST_F(HdsTest, TestHdsCluster) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message = std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
+  message->mutable_interval()->set_seconds(1);
+
+  auto* health_check = message->add_cluster_health_checks();
+  health_check->set_cluster_name("test_cluster");
+  auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
+  address->mutable_socket_address()->set_address("127.0.0.2");
+  address->mutable_socket_address()->set_port_value(1234);
+
+  // Process message
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+
+  EXPECT_EQ(hds_delegate_->hdsClusters()[0]->initializePhase(),
+            Upstream::Cluster::InitializePhase::Primary);
+
+  // HdsCluster uses health_checkers_ instead.
+  EXPECT_TRUE(hds_delegate_->hdsClusters()[0]->healthChecker() == nullptr);
+
+  // outlier detector is always null for HdsCluster.
+  EXPECT_TRUE(hds_delegate_->hdsClusters()[0]->outlierDetector() == nullptr);
+  const auto* hds_cluster = hds_delegate_->hdsClusters()[0].get();
+  EXPECT_TRUE(hds_cluster->outlierDetector() == nullptr);
 }
 
 // Test if processMessage processes health checks from a HealthCheckSpecifier
@@ -548,12 +581,12 @@ TEST_F(HdsTest, TestSocketContext) {
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
-        Envoy::Stats::ScopePtr scope =
+        Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
             params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-            params.validation_visitor_, params.api_, params.options_);
+            params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
@@ -1000,12 +1033,12 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
-        Envoy::Stats::ScopePtr scope =
+        Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
             params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-            params.validation_visitor_, params.api_, params.options_);
+            params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =

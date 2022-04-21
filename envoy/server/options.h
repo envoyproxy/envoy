@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
@@ -259,6 +260,12 @@ public:
    * @return the mode of socket file.
    */
   virtual mode_t socketMode() const PURE;
+
+  /**
+   * @return the stats tags provided by the cli. Tags may contain duplicates. It is the
+   * responsibility of the caller to handle the duplicates.
+   */
+  virtual const Stats::TagVector& statsTags() const PURE;
 };
 
 } // namespace Server

@@ -28,7 +28,11 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
+  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                  const Stats::TagVector& cli_tags);
+
   TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config);
+
   TagProducerImpl() = default;
 
   /**

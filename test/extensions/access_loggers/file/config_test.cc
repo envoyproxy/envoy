@@ -34,12 +34,13 @@ TEST(FileAccessLogNegativeTest, InvalidNameFail) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
+                            "Didn't find a registered implementation for '' with type URL: ''");
 
   config.set_name("INVALID");
 
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+      "Didn't find a registered implementation for 'INVALID' with type URL: ''");
 }
 
 class FileAccessLogTest : public testing::Test {
@@ -62,7 +63,7 @@ public:
     absl::Time abslStartTime =
         TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
     stream_info_.start_time_ = absl::ToChronoTime(abslStartTime);
-    EXPECT_CALL(stream_info_, upstreamHost()).WillRepeatedly(Return(nullptr));
+    stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info_.response_code_ = 200;
 
     EXPECT_CALL(*file, write(_)).WillOnce(Invoke([expected, is_json](absl::string_view got) {

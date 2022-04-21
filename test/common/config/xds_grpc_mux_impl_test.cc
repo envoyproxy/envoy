@@ -16,6 +16,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -50,6 +51,7 @@ class GrpcMuxImplTestBase : public testing::Test {
 public:
   GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
+        config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
         control_plane_stats_(Utility::generateControlPlaneStats(stats_)),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
@@ -61,8 +63,7 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
-        local_info_, true);
+        random_, stats_, rate_limit_settings_, local_info_, true, std::move(config_validators_));
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
@@ -70,8 +71,8 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, custom_rate_limit_settings,
-        local_info_, true);
+        random_, stats_, custom_rate_limit_settings, local_info_, true,
+        std::move(config_validators_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -118,6 +119,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  CustomConfigValidatorsPtr config_validators_;
   std::unique_ptr<XdsMux::GrpcMuxSotw> grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -890,8 +892,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
-          local_info_, true),
+          random_, stats_, rate_limit_settings_, local_info_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -904,8 +906,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
-          local_info_, true),
+          random_, stats_, rate_limit_settings_, local_info_, true,
+          std::make_unique<NiceMock<MockCustomConfigValidators>>()),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -932,6 +934,57 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   // only destruction of foo watch is going to result in an unsubscribe message.
   // bar watch is empty and its destruction doesn't change it resource list.
   expectSendMessage("foo", {}, "", false);
+}
+
+TEST_F(GrpcMuxImplTest, AllMuxesStateTest) {
+  setup();
+  auto grpc_mux_1 = std::make_unique<XdsMux::GrpcMuxSotw>(
+      std::unique_ptr<Grpc::MockAsyncClient>(), dispatcher_,
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+      random_, stats_, rate_limit_settings_, local_info_, true,
+      std::make_unique<NiceMock<MockCustomConfigValidators>>());
+
+  Config::XdsMux::GrpcMuxSotw::shutdownAll();
+
+  EXPECT_TRUE(grpc_mux_->isShutdown());
+  EXPECT_TRUE(grpc_mux_1->isShutdown());
+}
+
+class NullGrpcMuxImplTest : public testing::Test {
+public:
+  NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}
+  Config::GrpcMuxPtr null_mux_;
+  NiceMock<MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
+};
+
+TEST_F(NullGrpcMuxImplTest, StartImplemented) { EXPECT_NO_THROW(null_mux_->start()); }
+
+TEST_F(NullGrpcMuxImplTest, PauseImplemented) {
+  ScopedResume scoped;
+  EXPECT_NO_THROW(scoped = null_mux_->pause("ignored"));
+}
+
+TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
+  ScopedResume scoped;
+  const std::vector<std::string> params = {"ignored", "another_ignored"};
+  EXPECT_NO_THROW(scoped = null_mux_->pause(params));
+}
+
+TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_ENVOY_BUG(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}),
+                   "unexpected request for on demand update");
+}
+
+TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder{"cluster_name"};
+
+  EXPECT_THROW_WITH_REGEX(null_mux_->addWatch("type_url", {}, callbacks, resource_decoder, {}),
+                          EnvoyException, "ADS must be configured to support an ADS config source");
 }
 
 } // namespace

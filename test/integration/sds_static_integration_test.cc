@@ -67,7 +67,7 @@ public:
       tls_certificate->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     });
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     HttpIntegrationTest::initialize();
 
     registerTestServerPorts({"http"});

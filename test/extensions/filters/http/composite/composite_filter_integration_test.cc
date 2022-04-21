@@ -14,8 +14,6 @@ public:
   CompositeFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api",
-                                      "true");
     config_helper_.prependFilter(R"EOF(
   name: composite
   typed_config:

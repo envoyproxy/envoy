@@ -28,7 +28,6 @@ envoy_cc_library(
         "wasm.h",
         "wasm_vm.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -67,7 +66,11 @@ envoy_cc_library(
             "-DWASM_USE_CEL_PARSER",
         ],
     }),
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test/extensions:__subpackages__",
+        "//test/test_common:__subpackages__",
+    ],
     deps = [
         ":wasm_hdr",
         ":wasm_runtime_factory_interface",
@@ -82,6 +85,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
         "//source/extensions/filters/common/expr:context_lib",

@@ -25,7 +25,7 @@ public:
       Server::Configuration::ResourceMonitorFactoryContext& context);
 
   // Server::ResourceMonitor
-  void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 protected:
   virtual void onFileChanged();

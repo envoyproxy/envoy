@@ -45,6 +45,7 @@ public:
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                    RecvMsgOutput& output) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override { return false; }
@@ -71,6 +72,8 @@ public:
   void enableFileEvents(uint32_t events) override { file_event_->setEnabled(events); }
   void resetFileEvents() override;
   IoHandlePtr duplicate() override;
+
+  absl::optional<std::string> interfaceName() override { return absl::nullopt; }
 
   void cb(uint32_t events) { cb_(events); }
   void setCb(Event::FileReadyCb cb) { cb_ = cb; }

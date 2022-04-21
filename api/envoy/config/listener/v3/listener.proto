@@ -13,7 +13,9 @@ import "envoy/config/listener/v3/udp_listener_config.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
@@ -24,6 +26,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3;listenerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listener configuration]
@@ -35,7 +38,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 33]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -119,6 +122,25 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
+  // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
+  // network properties. This matcher is used as a replacement for the filter chain match condition
+  // :ref:`filter_chain_match
+  // <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>`. If specified, all
+  // :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must have a
+  // non-empty and unique :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` field
+  // and not specify :ref:`filter_chain_match
+  // <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>` field.
+  //
+  // .. note::
+  //
+  //  Once matched, each connection is permanently bound to its filter chain.
+  //  If the matcher changes but the filter chain remains the same, the
+  //  connections bound to the filter chain are not drained. If, however, the
+  //  filter chain is removed or structurally modified, then the drain for its
+  //  connections is initiated.
+  xds.type.matcher.v3.Matcher filter_chain_matcher = 32
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
   // true, the listener hands off redirected connections to the listener associated with the
@@ -153,7 +175,6 @@ message Listener {
   // UDP Listener filters can be specified when the protocol in the listener socket address in
   // :ref:`protocol <envoy_v3_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
   // <envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`.
-  // UDP listeners currently support a single filter.
   repeated ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
@@ -315,4 +336,12 @@ message Listener {
     // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
+
+  // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
+  // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
+  bool enable_mptcp = 30;
+
+  // Whether the listener should limit connections based upon the value of
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
+  bool ignore_global_conn_limit = 31;
 }

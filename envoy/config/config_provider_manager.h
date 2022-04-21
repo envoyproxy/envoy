@@ -71,7 +71,7 @@ public:
     UNREFERENCED_PARAMETER(config_proto);
     UNREFERENCED_PARAMETER(factory_context);
     UNREFERENCED_PARAMETER(optarg);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   /**
@@ -89,7 +89,7 @@ public:
     UNREFERENCED_PARAMETER(config_protos);
     UNREFERENCED_PARAMETER(factory_context);
     UNREFERENCED_PARAMETER(optarg);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 };
 

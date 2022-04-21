@@ -9,6 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.type.v3";
 option java_outer_classname = "HashPolicyProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/v3;typev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Hash Policy]
@@ -23,9 +24,20 @@ message HashPolicy {
     option (udpa.annotations.versioning).previous_message_type = "envoy.type.HashPolicy.SourceIp";
   }
 
+  // An Object in the :ref:`filterState <arch_overview_data_sharing_between_filters>` will be used
+  // to compute the hash used by hash-based load balancing algorithms.
+  message FilterState {
+    // The name of the Object in the filterState, which is an Envoy::Hashable object. If there is no
+    // data associated with the key, or the stored object is not Envoy::Hashable, no hash will be
+    // produced.
+    string key = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
   oneof policy_specifier {
     option (validate.required) = true;
 
     SourceIp source_ip = 1;
+
+    FilterState filter_state = 2;
   }
 }

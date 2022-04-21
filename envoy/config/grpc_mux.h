@@ -105,9 +105,6 @@ public:
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
                                      const absl::flat_hash_set<std::string>& for_update) PURE;
-
-  // TODO (dmitri-d) remove this when legacy muxes have been removed
-  virtual bool isUnified() const { return false; }
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

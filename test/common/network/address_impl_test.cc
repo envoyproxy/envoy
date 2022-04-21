@@ -49,7 +49,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  SocketImpl sock(Socket::Type::Stream, addr_port, nullptr);
+  SocketImpl sock(Socket::Type::Stream, addr_port, nullptr, {});
   EXPECT_TRUE(sock.ioHandle().isOpen()) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
@@ -74,7 +74,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    SocketImpl client_sock(Socket::Type::Stream, addr_port, nullptr);
+    SocketImpl client_sock(Socket::Type::Stream, addr_port, nullptr, {});
 
     EXPECT_TRUE(client_sock.ioHandle().isOpen()) << addr_port->asString();
 
@@ -134,6 +134,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
 
   for (const auto address : addresses) {
     sockaddr_in addr4;
+    memset(&addr4, 0, sizeof(addr4));
     addr4.sin_family = AF_INET;
     EXPECT_EQ(1, inet_pton(AF_INET, address, &addr4.sin_addr));
     addr4.sin_port = 0;
@@ -143,6 +144,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
 
 TEST(Ipv4InstanceTest, SocketAddress) {
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -232,6 +234,7 @@ TEST(Ipv4InstanceTest, BadAddress) {
 
 TEST(Ipv6InstanceTest, SocketAddress) {
   sockaddr_in6 addr6;
+  memset(&addr6, 0, sizeof(addr6));
   addr6.sin6_family = AF_INET6;
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &addr6.sin6_addr));
   addr6.sin6_port = htons(32000);
@@ -348,7 +351,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(Socket::Type::Stream, address, nullptr);
+  SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
@@ -376,7 +379,7 @@ TEST(PipeInstanceTest, PermissionFail) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(Socket::Type::Stream, address, nullptr);
+  SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
@@ -448,7 +451,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance pipe(path);
     InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-    SocketImpl sock(Socket::Type::Stream, address, nullptr);
+    SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
     EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 

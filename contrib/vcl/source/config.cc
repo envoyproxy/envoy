@@ -21,10 +21,9 @@ ProtobufTypes::MessagePtr VclSocketInterface::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::vcl::v3alpha::VclSocketInterface>();
 }
 
-Envoy::Network::IoHandlePtr VclSocketInterface::socket(Envoy::Network::Socket::Type socket_type,
-                                                       Envoy::Network::Address::Type addr_type,
-                                                       Envoy::Network::Address::IpVersion,
-                                                       bool) const {
+Envoy::Network::IoHandlePtr VclSocketInterface::socket(
+    Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
+    Envoy::Network::Address::IpVersion, bool, const Envoy::Network::SocketCreationOptions&) const {
   if (vppcom_worker_index() == -1) {
     vclInterfaceWorkerRegister();
   }
@@ -42,8 +41,10 @@ Envoy::Network::IoHandlePtr VclSocketInterface::socket(Envoy::Network::Socket::T
 
 Envoy::Network::IoHandlePtr
 VclSocketInterface::socket(Envoy::Network::Socket::Type socket_type,
-                           const Envoy::Network::Address::InstanceConstSharedPtr addr) const {
-  return socket(socket_type, addr->type(), Envoy::Network::Address::IpVersion::v4, false);
+                           const Envoy::Network::Address::InstanceConstSharedPtr addr,
+                           const Envoy::Network::SocketCreationOptions& creation_options) const {
+  return socket(socket_type, addr->type(), Envoy::Network::Address::IpVersion::v4, false,
+                creation_options);
 }
 
 bool VclSocketInterface::ipFamilySupported(int) { return true; };

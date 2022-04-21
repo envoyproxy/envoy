@@ -11,7 +11,17 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-class NullValidationVisitorImpl : public ValidationVisitor {
+class ValidationVisitorBase : public ValidationVisitor {
+public:
+  void setRuntime(Runtime::Loader& runtime) { runtime_ = runtime; }
+  void clearRuntime() { runtime_ = {}; } // for tests
+  OptRef<Runtime::Loader> runtime() override { return runtime_; }
+
+protected:
+  OptRef<Runtime::Loader> runtime_;
+};
+
+class NullValidationVisitorImpl : public ValidationVisitorBase {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
@@ -33,7 +43,7 @@ private:
   uint64_t prestats_wip_count_{};
 };
 
-class WarningValidationVisitorImpl : public ValidationVisitor,
+class WarningValidationVisitorImpl : public ValidationVisitorBase,
                                      public WipCounterBase,
                                      public Logger::Loggable<Logger::Id::config> {
 public:
@@ -55,7 +65,7 @@ private:
   uint64_t prestats_unknown_count_{};
 };
 
-class StrictValidationVisitorImpl : public ValidationVisitor, public WipCounterBase {
+class StrictValidationVisitorImpl : public ValidationVisitorBase, public WipCounterBase {
 public:
   void setCounters(Stats::Counter& wip_counter) { setWipCounter(wip_counter); }
 
@@ -106,6 +116,12 @@ public:
     strict_validation_visitor_.setCounters(wip_counter);
     static_warning_validation_visitor_.setCounters(static_unknown_counter, wip_counter);
     dynamic_warning_validation_visitor_.setCounters(dynamic_unknown_counter, wip_counter);
+  }
+
+  void setRuntime(Runtime::Loader& runtime) {
+    strict_validation_visitor_.setRuntime(runtime);
+    static_warning_validation_visitor_.setRuntime(runtime);
+    dynamic_warning_validation_visitor_.setRuntime(runtime);
   }
 
 private:

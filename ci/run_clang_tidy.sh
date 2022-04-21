@@ -38,7 +38,7 @@ function exclude_win32_impl() {
 # Do not run clang-tidy against macOS impl
 # TODO: We should run clang-tidy against macOS impl for completeness
 function exclude_macos_impl() {
-  grep -v source/common/filesystem/kqueue/ | grep -v source/common/network/apple_dns_impl | grep -v test/common/network/apple_dns_impl_test
+  grep -v source/common/filesystem/kqueue/ | grep -v source/extensions/network/dns_resolver/apple/apple_dns_impl | grep -v test/extensions/network/dns_resolver/apple/apple_dns_impl_test
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
@@ -48,7 +48,7 @@ function exclude_check_format_testdata() {
 
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
-  grep -v third_party/
+  grep -v third_party/ | grep -v bazel/external/http_parser
 }
 
 # Exclude files which are part of the Wasm emscripten environment
@@ -89,7 +89,13 @@ function run_clang_tidy() {
 }
 
 function run_clang_tidy_diff() {
-  git diff "$1" | filter_excludes | \
+  local diff
+  diff="$(git diff "${1}")"
+  if [[ -z "$diff" ]]; then
+    echo "No changes detected, skipping clang_tidy_diff"
+    return 0
+  fi
+  echo "$diff" | filter_excludes | \
     python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary="${CLANG_TIDY}" \
       -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p 1 -quiet

@@ -4,7 +4,16 @@ load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
 
+exports_files(["icu_data_filter.json"])
+
 envoy_package()
+
+configure_make(
+    name = "liburing",
+    configure_in_place = True,
+    lib_source = "@com_github_axboe_liburing//:all",
+    tags = ["skip_on_windows"],
+)
 
 # autotools packages are unusable on Windows as-is
 # TODO: Consider our own gperftools.BUILD file as we do with many other packages
@@ -103,6 +112,76 @@ configure_make(
     tags = ["skip_on_windows"],
 )
 
+configure_make(
+    name = "ragel",
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_ragel//:all",
+    out_binaries = ["ragel"],
+    tags = ["skip_on_windows"],
+)
+
+# ICU used by the language detection filter (i18n).
+# Generates a minimal configuration and reduces the size of the ICU locale data filter file.
+# https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html
+configure_make(
+    name = "unicode_icu_build",
+    build_data = ["//bazel/foreign_cc:icu_data_filter.json"],
+    configure_command = "icu4c/source/configure",
+    configure_options = [
+        "--enable-option-checking",
+        "--enable-static",
+        "--enable-tools",
+        "--disable-draft",
+        "--disable-dyload",
+        "--disable-extras",
+        "--disable-plugins",
+        "--disable-samples",
+        "--disable-shared",
+        "--disable-tests",
+        "--with-data-packaging=static",
+    ],
+    data = ["@com_github_unicode_org_icu//:all"],
+    env = {
+        "CXXFLAGS": "-fPIC",
+        "CFLAGS": "-fPIC",
+        "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
+    },
+    lib_source = "@com_github_unicode_org_icu//:all",
+    linkopts = ["-lstdc++"],
+    out_static_libs = [
+        "libicuuc.a",
+        "libicudata.a",
+    ],
+    tags = ["skip_on_windows"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "unicode_icu",
+    defines = [
+        "UCONFIG_ONLY_HTML_CONVERSION=1",
+        "U_CHARSET_IS_UTF8=1",
+        "U_USING_ICU_NAMESPACE=0",
+        "UNISTR_FROM_STRING_EXPLICIT=",
+        "UNISTR_FROM_CHAR_EXPLICIT=",
+    ] + select({
+        "//bazel:windows_x86_64": [
+            "U_STATIC_IMPLEMENTATION",
+            "UNICODE",
+            "_UNICODE",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = ["skip_on_windows"],
+    # Can not be used for the core dataplane due to security concerns
+    visibility = ["//contrib/language/filters/http/source:__pkg__"],
+    deps = ["unicode_icu_build"],
+)
+
 envoy_cmake(
     name = "libsxg",
     cache_entries = {
@@ -152,9 +231,9 @@ envoy_cmake(
         "BUILD_TESTING": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
-        "CMAKE_USE_LIBSSH2": "off",
+        "CURL_USE_LIBSSH2": "off",
         "CURL_BROTLI": "off",
-        "CMAKE_USE_GSSAPI": "off",
+        "CURL_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
         # Explicitly enable Unix sockets, once afunix.h is correctly detected
@@ -169,7 +248,7 @@ envoy_cmake(
         # FindOpenSSL.cmake which fails at what looks like version parsing
         # (the libraries are found ok).
         "CURL_CA_PATH": "none",
-        "CMAKE_USE_OPENSSL": "off",
+        "CURL_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
         # Avoid libidn2
         "USE_LIBIDN2": "off",
@@ -211,7 +290,7 @@ envoy_cmake(
         # options, and they cannot be nested.
         # If https://github.com/bazelbuild/rules_foreign_cc/issues/289 is fixed
         # this can be removed.
-        # More details https://github.com/lyft/envoy-mobile/issues/116
+        # More details https://github.com/envoyproxy/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
     lib_source = "@com_github_libevent_libevent//:all",
@@ -219,7 +298,7 @@ envoy_cmake(
         # macOS organization of libevent is different from Windows/Linux.
         # Including libevent_core is a requirement on those platforms, but
         # results in duplicate symbols when built on macOS.
-        # See https://github.com/lyft/envoy-mobile/issues/677 for details.
+        # See https://github.com/envoyproxy/envoy-mobile/issues/677 for details.
         "//bazel:apple": [
             "libevent.a",
             "libevent_pthreads.a",
@@ -277,45 +356,73 @@ envoy_cmake(
     lib_source = "@org_llvm_llvm//:all",
     out_static_libs = select({
         "//conditions:default": [
-            # Order from llvm-config --libnames asmparser core debuginfodwarf
-            # engine lto mcparser mirparser orcjit passes runtimedyld
-            # support x86asmparser x86desc
-            "libLLVMOrcJIT.a",
-            "libLLVMOrcError.a",
-            "libLLVMJITLink.a",
-            "libLLVMMIRParser.a",
-            "libLLVMLTO.a",
-            "libLLVMPasses.a",
-            "libLLVMObjCARCOpts.a",
-            "libLLVMipo.a",
-            "libLLVMInstrumentation.a",
-            "libLLVMVectorize.a",
-            "libLLVMLinker.a",
-            "libLLVMIRReader.a",
+            # This list must be updated when the bazel llvm version is updated
+            # (in `bazel/repository_locations.bzl`)
+            #
+            # The list can be regenerated by compiling the correct/updated llvm version
+            # from sources and running:
+            #
+            #  `llvm-config --libnames`
+            #
+            "libLLVMWindowsManifest.a",
+            "libLLVMXRay.a",
+            "libLLVMLibDriver.a",
+            "libLLVMDlltoolDriver.a",
+            "libLLVMCoverage.a",
+            "libLLVMLineEditor.a",
             "libLLVMX86Disassembler.a",
             "libLLVMX86AsmParser.a",
             "libLLVMX86CodeGen.a",
+            "libLLVMX86Desc.a",
+            "libLLVMX86Info.a",
+            "libLLVMOrcJIT.a",
+            "libLLVMMCJIT.a",
+            "libLLVMJITLink.a",
+            "libLLVMOrcTargetProcess.a",
+            "libLLVMOrcShared.a",
+            "libLLVMInterpreter.a",
+            "libLLVMExecutionEngine.a",
+            "libLLVMRuntimeDyld.a",
+            "libLLVMSymbolize.a",
+            "libLLVMDebugInfoPDB.a",
+            "libLLVMDebugInfoGSYM.a",
+            "libLLVMOption.a",
+            "libLLVMObjectYAML.a",
+            "libLLVMMCA.a",
+            "libLLVMMCDisassembler.a",
+            "libLLVMLTO.a",
+            "libLLVMPasses.a",
             "libLLVMCFGuard.a",
+            "libLLVMCoroutines.a",
+            "libLLVMObjCARCOpts.a",
+            "libLLVMHelloNew.a",
+            "libLLVMipo.a",
+            "libLLVMVectorize.a",
+            "libLLVMLinker.a",
+            "libLLVMInstrumentation.a",
+            "libLLVMFrontendOpenMP.a",
+            "libLLVMFrontendOpenACC.a",
+            "libLLVMExtensions.a",
+            "libLLVMDWARFLinker.a",
             "libLLVMGlobalISel.a",
-            "libLLVMSelectionDAG.a",
+            "libLLVMMIRParser.a",
             "libLLVMAsmPrinter.a",
+            "libLLVMDebugInfoDWARF.a",
+            "libLLVMSelectionDAG.a",
             "libLLVMCodeGen.a",
+            "libLLVMIRReader.a",
+            "libLLVMAsmParser.a",
+            "libLLVMInterfaceStub.a",
+            "libLLVMFileCheck.a",
+            "libLLVMFuzzMutate.a",
+            "libLLVMTarget.a",
             "libLLVMScalarOpts.a",
             "libLLVMInstCombine.a",
             "libLLVMAggressiveInstCombine.a",
             "libLLVMTransformUtils.a",
             "libLLVMBitWriter.a",
-            "libLLVMX86Desc.a",
-            "libLLVMMCDisassembler.a",
-            "libLLVMX86Utils.a",
-            "libLLVMX86Info.a",
-            "libLLVMMCJIT.a",
-            "libLLVMExecutionEngine.a",
-            "libLLVMTarget.a",
             "libLLVMAnalysis.a",
             "libLLVMProfileData.a",
-            "libLLVMRuntimeDyld.a",
-            "libLLVMDebugInfoDWARF.a",
             "libLLVMObject.a",
             "libLLVMTextAPI.a",
             "libLLVMMCParser.a",
@@ -323,7 +430,6 @@ envoy_cmake(
             "libLLVMDebugInfoCodeView.a",
             "libLLVMDebugInfoMSF.a",
             "libLLVMBitReader.a",
-            "libLLVMAsmParser.a",
             "libLLVMCore.a",
             "libLLVMRemarks.a",
             "libLLVMBitstreamReader.a",
@@ -358,10 +464,11 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
-        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAMR_BUILD_INTERP": "0",
-        "WAMR_BUILD_JIT": "1",
-        "WAMR_BUILD_AOT": "1",
+        "WAMR_BUILD_INTERP": "1",
+        "WAMR_BUILD_FAST_INTERP": "1",
+        "WAMR_BUILD_JIT": "0",
+        "WAMR_BUILD_LAZY_JIT": "0",
+        "WAMR_BUILD_AOT": "0",
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_MULTI_MODULE": "1",
         "WAMR_BUILD_LIBC_WASI": "0",
@@ -370,7 +477,6 @@ envoy_cmake(
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],
     tags = ["skip_on_windows"],
-    deps = [":llvm"],
 )
 
 envoy_cmake(
@@ -440,4 +546,20 @@ envoy_cmake(
         "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
+)
+
+envoy_cmake(
+    name = "zstd",
+    build_data = ["@com_github_facebook_zstd//:all"],
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZSTD_BUILD_SHARED": "off",
+        "ZSTD_BUILD_STATIC": "on",
+    },
+    lib_source = "@com_github_facebook_zstd//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["zstd_static.lib"],
+        "//conditions:default": ["libzstd.a"],
+    }),
+    working_directory = "build/cmake",
 )

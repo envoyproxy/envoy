@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
@@ -80,8 +81,32 @@ public:
     }
 
     ServerSslOptions&
-    setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
+    setSanMatchers(std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+                       san_matchers) {
       san_matchers_ = san_matchers;
+      return *this;
+    }
+
+    ServerSslOptions& setClientWithIntermediateCert(bool client_intermediate_cert) {
+      client_with_intermediate_cert_ = client_intermediate_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setVerifyDepth(absl::optional<uint32_t> depth) {
+      max_verify_depth_ = depth;
+      return *this;
+    }
+
+    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool local_negative,
+                                         bool remote_negative, std::string log_path,
+                                         bool multiple_ips, Network::Address::IpVersion version) {
+      keylog_local_filter_ = local;
+      keylog_remote_filter_ = remote;
+      keylog_local_negative_ = local_negative;
+      keylog_remote_negative_ = remote_negative;
+      keylog_path_ = log_path;
+      keylog_multiple_ips_ = multiple_ips;
+      ip_version_ = version;
       return *this;
     }
 
@@ -94,7 +119,17 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
-    std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
+    bool keylog_local_filter_{false};
+    bool keylog_remote_filter_{false};
+    bool keylog_local_negative_{false};
+    bool keylog_remote_negative_{false};
+    bool keylog_multiple_ips_{false};
+    std::string keylog_path_;
+    Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
+    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+        san_matchers_{};
+    bool client_with_intermediate_cert_{false};
+    absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
@@ -109,6 +144,9 @@ public:
   initializeTls(const ServerSslOptions& options,
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
+  static void initializeTlsKeyLog(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+      const ServerSslOptions& options);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
@@ -119,7 +157,10 @@ public:
   static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter();
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
+
+  // A string for the test inspector filter.
+  static std::string testInspectorFilter();
 
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
@@ -149,6 +190,11 @@ public:
   static envoy::config::cluster::v3::Cluster
   buildStaticCluster(const std::string& name, int port, const std::string& address,
                      const std::string& lb_policy = "ROUND_ROBIN");
+
+  static envoy::config::cluster::v3::Cluster
+  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
+                                              const std::string& address,
+                                              const std::string& lb_policy = "ROUND_ROBIN");
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
@@ -188,6 +234,9 @@ public:
   // order they are stored in |bootstrap_|
   void finalize(const std::vector<uint32_t>& ports);
 
+  // Called by finalize to set up the ports.
+  void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
+
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
 
@@ -211,6 +260,10 @@ public:
 
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
+
+  // Disable delay close. This is especially useful for tests doing raw TCP for
+  // HTTP/1.1 which functionally frame by connection close.
+  void disableDelayClose();
 
   // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
   void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
@@ -244,14 +297,15 @@ public:
   void configDownstreamTransportSocketWithTls(
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-          configure_tls_context);
+          configure_tls_context,
+      bool enable_quic_early_data = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig();
+  void addQuicDownstreamTransportSocketConfig(bool enable_early_data);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -311,7 +365,10 @@ public:
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
   // Add this key value pair to the static runtime.
-  void addRuntimeOverride(const std::string& key, const std::string& value);
+  void addRuntimeOverride(absl::string_view key, absl::string_view value);
+
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

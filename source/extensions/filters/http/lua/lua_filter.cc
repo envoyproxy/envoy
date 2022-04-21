@@ -27,29 +27,6 @@ struct HttpResponseCodeDetailValues {
 };
 using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
 
-const std::string DEPRECATED_LUA_NAME = "envoy.lua";
-
-std::atomic<bool>& deprecatedNameLogged() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
-}
-
-// Checks if deprecated metadata names are allowed. On the first check only it will log either
-// a warning (indicating the name should be updated) or an error (the feature is off and the
-// name is not allowed). When warning, the deprecated feature stat is incremented. Subsequent
-// checks do not log since this check is done in potentially high-volume request paths.
-bool allowDeprecatedMetadataName() {
-  if (!deprecatedNameLogged().exchange(true)) {
-    // Have not logged yet, so use the logging test.
-    return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-        "http filter", DEPRECATED_LUA_NAME, "envoy.filters.http.lua");
-  }
-
-  // We have logged (or another thread will do so momentarily), so just check whether the
-  // deprecated name is allowed.
-  auto status = Extensions::Common::Utility::ExtensionNameUtil::deprecatedExtensionNameStatus();
-  return status == Extensions::Common::Utility::ExtensionNameUtil::Status::Warn;
-}
-
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
@@ -60,17 +37,6 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
-    }
-  }
-
-  // TODO(zuercher): Remove this block when deprecated filter names are removed.
-  {
-    const auto& filter_it = metadata.filter_metadata().find(DEPRECATED_LUA_NAME);
-    if (filter_it != metadata.filter_metadata().end()) {
-      // Use the non-throwing check here because this happens at request time.
-      if (allowDeprecatedMetadataName()) {
-        return filter_it->second;
-      }
     }
   }
 
@@ -191,8 +157,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 }
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
-                                         Http::HeaderMap& headers, bool end_stream, Filter& filter,
-                                         FilterCallbacks& callbacks, TimeSource& time_source)
+                                         Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                         Filter& filter, FilterCallbacks& callbacks,
+                                         TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
@@ -224,7 +191,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(trace, "resuming for next body chunk");
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
-        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), data), true);
+        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
     coroutine_.resume(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
@@ -458,9 +425,10 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
           callbacks_.addData(body);
         }
 
-        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
-                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
-                            true);
+        body_wrapper_.reset(
+            Filters::Common::Lua::BufferWrapper::create(
+                state, headers_, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+            true);
       }
       return 1;
     }
@@ -720,11 +688,10 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
-                                            Filters::Common::Lua::CoroutinePtr& coroutine,
-                                            FilterCallbacks& callbacks, int function_ref,
-                                            PerLuaCodeSetup* setup, Http::HeaderMap& headers,
-                                            bool end_stream) {
+Http::FilterHeadersStatus
+Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& coroutine,
+                  FilterCallbacks& callbacks, int function_ref, PerLuaCodeSetup* setup,
+                  Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -804,10 +771,10 @@ void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view messag
     ENVOY_LOG(critical, "script log: {}", message);
     return;
   case spdlog::level::off:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unsupported");
     return;
   case spdlog::level::n_levels:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unsupported");
   }
 }
 

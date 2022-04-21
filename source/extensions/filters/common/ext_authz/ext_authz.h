@@ -34,6 +34,17 @@ struct TracingConstantValues {
 using TracingConstants = ConstSingleton<TracingConstantValues>;
 
 /**
+ * Possible constant response code details values for a check call.
+ */
+struct ResponseCodeDetailsValues {
+  // The ext_authz filter denied the downstream request/connection.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+};
+using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailsValues>;
+
+/**
  * Constant auth related HTTP headers. All lower case. This group of headers can
  * contain prefix override headers.
  */

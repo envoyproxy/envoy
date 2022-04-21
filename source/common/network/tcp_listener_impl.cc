@@ -20,14 +20,9 @@ namespace Network {
 const absl::string_view TcpListenerImpl::GlobalMaxCxRuntimeKey =
     "overload.global_downstream_max_connections";
 
-bool TcpListenerImpl::rejectCxOverGlobalLimit() {
+bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   // Enforce the global connection limit if necessary, immediately closing the accepted connection.
-  Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
-
-  if (runtime == nullptr) {
-    // The runtime singleton won't exist in most unit tests that do not need global downstream limit
-    // enforcement. Therefore, there is no need to enforce limits if the singleton doesn't exist.
-    // TODO(tonya11en): Revisit this once runtime is made globally available.
+  if (ignore_global_conn_limit_) {
     return false;
   }
 
@@ -36,7 +31,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() {
   // use a listener and do not run in a worker thread. In practice, this code path will always be
   // run on a worker thread, but to prevent failed assertions in test environments, threadsafe
   // snapshots must be used. This must be revisited.
-  const uint64_t global_cx_limit = runtime->threadsafeSnapshot()->getInteger(
+  const uint64_t global_cx_limit = runtime_.threadsafeSnapshot()->getInteger(
       GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
   return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
 }
@@ -97,10 +92,12 @@ void TcpListenerImpl::onSocketEvent(short flags) {
 }
 
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
-                                 SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                                 bool bind_to_port)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random),
-      bind_to_port_(bind_to_port), reject_fraction_(0.0) {
+                                 Runtime::Loader& runtime, SocketSharedPtr socket,
+                                 TcpListenerCallbacks& cb, bool bind_to_port,
+                                 bool ignore_global_conn_limit)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random), runtime_(runtime),
+      bind_to_port_(bind_to_port), reject_fraction_(0.0),
+      ignore_global_conn_limit_(ignore_global_conn_limit) {
   if (bind_to_port) {
     // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
     // loss of the trigger due to transient accept errors.

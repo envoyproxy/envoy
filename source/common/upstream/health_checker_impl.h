@@ -103,7 +103,7 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::ResponseDecoder
-    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
+    void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override { onResponseComplete(); }
     void dumpState(std::ostream& os, int indent_level) const override {
@@ -341,7 +341,7 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::ResponseDecoder
-    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
+    void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override;
     void dumpState(std::ostream& os, int indent_level) const override {
@@ -386,6 +386,7 @@ private:
     Http::RequestEncoder* request_encoder_;
     Grpc::Decoder decoder_;
     std::unique_ptr<grpc::health::v1::HealthCheckResponse> health_check_response_;
+    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     // If true, stream reset was initiated by us (GrpcActiveHealthCheckSession), not by HTTP stack,
     // e.g. remote reset. In this case healthcheck status has already been reported, only state
     // cleanup is required.
@@ -412,6 +413,7 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;
+  Router::HeaderParserPtr request_headers_parser_;
 };
 
 /**

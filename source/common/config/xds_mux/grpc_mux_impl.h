@@ -17,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/pausable_ack_queue.h"
 #include "source/common/config/watch_map.h"
@@ -57,11 +58,11 @@ class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
                     Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
-              const LocalInfo::LocalInfo& local_info,
-              envoy::config::core::v3::ApiVersion transport_api_version,
-              Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-              const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
-              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings);
+              const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
+              Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+              Random::RandomGenerator& random, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings,
+              CustomConfigValidatorsPtr&& config_validators);
 
   ~GrpcMuxImpl() override;
 
@@ -73,6 +74,7 @@ public:
   static void shutdownAll();
 
   void shutdown() override { shutdown_ = true; }
+  bool isShutdown() { return shutdown_; }
 
   // TODO (dmitri-d) return a naked pointer instead of the wrapper once the legacy mux has been
   // removed and the mux interface can be changed
@@ -92,7 +94,6 @@ public:
   const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
   }
-  bool isUnified() const override { return true; }
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override { handleEstablishedStream(); }
@@ -151,9 +152,6 @@ protected:
     any_request_sent_yet_in_current_stream_ = value;
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
-  const envoy::config::core::v3::ApiVersion& transportApiVersion() const {
-    return transport_api_version_;
-  }
 
 private:
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
@@ -204,7 +202,7 @@ private:
   // this one is up to GrpcMux.
   const LocalInfo::LocalInfo& local_info_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
+  CustomConfigValidatorsPtr config_validators_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
@@ -216,11 +214,10 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-               const Protobuf::MethodDescriptor& service_method,
-               envoy::config::core::v3::ApiVersion transport_api_version,
-               Random::RandomGenerator& random, Stats::Scope& scope,
-               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
-               bool skip_subsequent_node);
+               const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
+               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+               CustomConfigValidatorsPtr&& config_validators);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -232,15 +229,14 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-              const Protobuf::MethodDescriptor& service_method,
-              envoy::config::core::v3::ApiVersion transport_api_version,
-              Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
-              bool skip_subsequent_node);
+              const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
+              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+              CustomConfigValidatorsPtr&& config_validators);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 };
 
@@ -259,9 +255,8 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoder&,
                                    const SubscriptionOptions&) override;
 
-  // legacy mux interface not implemented by unified mux.
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 };
 

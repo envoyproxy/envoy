@@ -372,15 +372,16 @@ class HeaderMapImplTest : public testing::TestWithParam<uint32_t> {
 public:
   HeaderMapImplTest() {
     // Set the lazy map threshold using the test parameter.
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.http.headermap.lazy_map_min_size", absl::StrCat(GetParam())}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.deprecate_global_ints", "false"},
+         {"envoy.http.headermap.lazy_map_min_size", absl::StrCat(GetParam())}});
   }
 
   static std::string testParamsToString(const ::testing::TestParamInfo<uint32_t>& params) {
     return absl::StrCat(params.param);
   }
 
-  TestScopedRuntime runtime;
+  TestScopedRuntime scoped_runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(HeaderMapThreshold, HeaderMapImplTest,
@@ -751,10 +752,6 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
 }
 
 TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
-    return;
-  }
   TestRequestHeaderMapImpl headers;
   const std::string foo("foo=1");
   const std::string bar("bar=2");

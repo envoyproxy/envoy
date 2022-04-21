@@ -41,7 +41,7 @@ public:
 
   // ResponseDecoderCallbacks
   StreamHandler& newStream() override { return *this; }
-  void onHeartbeat(MessageMetadataSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onHeartbeat(MessageMetadataSharedPtr) override {}
 
   uint64_t requestId() const { return metadata_ ? metadata_->requestId() : 0; }
 
@@ -201,8 +201,6 @@ private:
 
   std::list<ActiveMessageEncoderFilterPtr> encoder_filters_;
   std::function<FilterStatus(DubboFilters::EncoderFilter*)> encoder_filter_action_;
-
-  int32_t request_id_;
 
   // This value is used in the calculation of the weighted cluster.
   uint64_t stream_id_;

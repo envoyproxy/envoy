@@ -27,10 +27,6 @@ AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
       const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  const auto service_config = proto_config.common_config().grpc_service();
-  if (service_config.has_envoy_grpc()) {
-    context.clusterManager().checkActiveStaticCluster(service_config.envoy_grpc().cluster_name());
-  }
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
                                             GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
 }

@@ -3,10 +3,10 @@
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/filters/http/common/utility.h"
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/registry.h"
 
 // This file contains any filter-specific setup and input clean-up needed in the generic filter fuzz
 // target.
@@ -93,13 +93,11 @@ void cleanTapConfig(Protobuf::Message* message) {
 
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
-  const std::string name = Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(
-      std::string(filter_name));
   // Map filter name to clean-up function.
   if (filter_name == "envoy.filters.http.grpc_json_transcoder") {
     // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
-  } else if (name == "envoy.filters.http.tap") {
+  } else if (filter_name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
   }
@@ -125,7 +123,9 @@ void UberFilterFuzzer::perFilterSetup() {
   encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   // Prepare expectations for dynamic forward proxy.
-  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  ON_CALL(dns_resolver_factory, createDnsResolver(_, _, _))
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.

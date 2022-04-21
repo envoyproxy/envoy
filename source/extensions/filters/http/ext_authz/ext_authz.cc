@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -12,14 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
-
-struct RcDetailsValues {
-  // The ext_authz filter denied the downstream request.
-  const std::string AuthzDenied = "ext_authz_denied";
-  // The ext_authz filter encountered a failure, and was configured to fail-closed.
-  const std::string AuthzError = "ext_authz_error";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   // We only merge context extensions here, and leave boolean flags untouched since those flags are
@@ -49,14 +43,27 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
-  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service.
   envoy::config::core::v3::Metadata metadata_context;
+
+  // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_authz
+  // service.
   const auto& request_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
-    const auto& metadata_it = request_metadata.find(context_key);
-    if (metadata_it != request_metadata.end()) {
+    if (const auto& metadata_it = request_metadata.find(context_key);
+        metadata_it != request_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
+  // ext_authz service.
+  const auto& request_typed_metadata =
+      decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
+    if (const auto& metadata_it = request_typed_metadata.find(context_key);
+        metadata_it != request_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
@@ -66,6 +73,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
       config_->includePeerCertificate(), config_->destinationLabels());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
+  // Store start time of ext_authz filter call
+  start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
@@ -91,8 +101,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
-                                         absl::nullopt, RcDetails::get().AuthzError);
+      decoder_callbacks_->sendLocalReply(
+          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
@@ -154,7 +165,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -217,6 +228,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
+    // Add duration of call to dynamic metadata if applicable
+    if (start_time_.has_value() && response->status == CheckStatus::OK) {
+      ProtobufWkt::Value ext_authz_duration_value;
+      auto duration =
+          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
+      ext_authz_duration_value.set_number_value(
+          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+          ext_authz_duration_value;
+    }
     decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
                                                         response->dynamic_metadata);
   }
@@ -353,6 +374,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->httpContext().codeStats().chargeResponseStat(info, false);
     }
 
+    // setResponseFlag must be called before sendLocalReply
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
@@ -371,9 +395,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(header.first, header.second);
           }
         },
-        absl::nullopt, RcDetails::get().AuthzDenied);
-    decoder_callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+        absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
     break;
   }
 
@@ -396,15 +418,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
-                                         absl::nullopt, RcDetails::get().AuthzError);
+      decoder_callbacks_->sendLocalReply(
+          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-    break;
   }
 }
 

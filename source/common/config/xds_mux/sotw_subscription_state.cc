@@ -44,7 +44,7 @@ void SotwSubscriptionState::markStreamFresh() {
 
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> non_heartbeat_resources;
+  std::vector<DecodedResourcePtr> non_heartbeat_resources;
   std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(
       message.resources().size());
 
@@ -65,7 +65,7 @@ void SotwSubscriptionState::handleGoodResponse(
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
         continue;
       }
-      non_heartbeat_resources.Add()->CopyFrom(any);
+      non_heartbeat_resources.push_back(std::move(decoded_resource));
     }
   }
 

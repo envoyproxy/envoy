@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/network/address.h"
+#include "envoy/network/listener.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
@@ -17,6 +18,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
@@ -24,11 +26,13 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -38,6 +42,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
+using testing::EndsWith;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -53,6 +58,11 @@ using testing::StrictMock;
 namespace Envoy {
 namespace Network {
 namespace {
+
+class MockInternalListenerManager : public InternalListenerManager {
+public:
+  MOCK_METHOD(InternalListenerOptRef, findByAddress, (const Address::InstanceConstSharedPtr&), ());
+};
 
 TEST(RawBufferSocket, TestBasics) {
   TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
@@ -111,7 +121,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
   StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
   EXPECT_DEATH(
       ConnectionImpl(*dispatcher,
@@ -131,16 +141,27 @@ protected:
   ConnectionImplTest()
       : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
+  ~ConnectionImplTest() override {
+    EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
+    if (!timer_destroyed_) {
+      delete timer_;
+    }
+  }
+
+  virtual TransportSocketPtr createTransportSocket() {
+    return Network::Test::createRawBufferSocket();
+  }
+
   void setUpBasicConnection() {
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
-        Network::Test::createRawBufferSocket(), socket_options_);
+        createTransportSocket(), socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -232,11 +253,11 @@ protected:
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
-    Event::MockTimer* timer = nullptr;
     if (create_timer) {
       // This timer will be returned (transferring ownership) to the ConnectionImpl when
       // createTimer() is called to allocate the delayed close timer.
-      timer = new Event::MockTimer(dispatcher.get());
+      timer_ = new Event::MockTimer(dispatcher.get());
+      timer_->timer_destroyed_ = &timer_destroyed_;
     }
 
     NiceMock<Event::MockFileEvent>* file_event = new NiceMock<Event::MockFileEvent>;
@@ -246,19 +267,22 @@ protected:
     auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
     EXPECT_CALL(*transport_socket, canFlushClose()).WillRepeatedly(Return(true));
 
-    return ConnectionMocks{std::move(dispatcher), timer, std::move(transport_socket), file_event,
+    return ConnectionMocks{std::move(dispatcher), timer_, std::move(transport_socket), file_event,
                            &file_ready_cb_};
   }
-  Network::TestClientConnectionImpl* testClientConnection() {
+  Network::TestClientConnectionImpl* testClientConnection() const {
     return dynamic_cast<Network::TestClientConnectionImpl*>(client_connection_.get());
   }
 
+  Event::MockTimer* timer_{nullptr};
+  bool timer_destroyed_{false};
   Event::FileReadyCb file_ready_cb_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
   Network::MockTcpListenerCallbacks listener_callbacks_;
+  NiceMock<Runtime::MockLoader> runtime_;
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;
@@ -284,6 +308,23 @@ TEST_P(ConnectionImplTest, UniqueId) {
   disconnect(false);
 }
 
+TEST_P(ConnectionImplTest, GetCongestionWindow) {
+  setUpBasicConnection();
+  connect();
+
+// Congestion window is available on Posix(guarded by TCP_INFO) and Windows(guarded by
+// SIO_TCP_INFO).
+#if defined(TCP_INFO) || defined(SIO_TCP_INFO)
+  EXPECT_GT(client_connection_->congestionWindowInBytes().value(), 500);
+  EXPECT_GT(server_connection_->congestionWindowInBytes().value(), 500);
+#else
+  EXPECT_FALSE(client_connection_->congestionWindowInBytes().has_value());
+  EXPECT_FALSE(server_connection_->congestionWindowInBytes().has_value());
+#endif
+
+  disconnect(true);
+}
+
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   setUpBasicConnection();
 
@@ -293,9 +334,14 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   EXPECT_TRUE(client_connection_->connecting());
 
   StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
-  // Make sure removed connections don't get events.
+  // Make sure removed callbacks don't get events.
   client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
   client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
+
+  // Make sure later callbacks don't receive a connected event if an earlier callback closed
+  // the connection during its callback.
+  StrictMock<MockConnectionCallbacks> later_callbacks;
+  client_connection_->addConnectionCallbacks(later_callbacks);
 
   std::shared_ptr<MockReadFilter> add_and_remove_filter =
       std::make_shared<StrictMock<MockReadFilter>>();
@@ -305,6 +351,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
         client_connection_->close(ConnectionCloseType::NoFlush);
       }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(later_callbacks, onEvent(ConnectionEvent::LocalClose));
 
   read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
@@ -400,7 +447,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   ConnectionMocks mocks = createConnectionMocks(false);
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
 
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(*mocks.dispatcher_,
@@ -425,7 +472,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
   ConnectionMocks mocks = createConnectionMocks(false);
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
@@ -445,7 +492,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
 TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
   ConnectionMocks mocks = createConnectionMocks(false);
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
 
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(*mocks.dispatcher_,
@@ -466,7 +513,9 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   EXPECT_TRUE(timer_destroyed);
-
+  if (!timer_destroyed) {
+    delete mock_timer;
+  }
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
@@ -676,7 +725,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 // against actual enabling twice in a row.
 TEST_P(ConnectionImplTest, ReadDisable) {
   ConnectionMocks mocks = createConnectionMocks(false);
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1352,7 +1401,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
-  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -1636,7 +1685,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
                                 std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::make_unique<NiceMock<MockTransportSocket>>(), stream_info_, true));
@@ -1667,7 +1716,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
 TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) {
   ConnectionMocks mocks = createConnectionMocks();
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1728,7 +1777,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
 TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) {
   ConnectionMocks mocks = createConnectionMocks();
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1820,7 +1869,7 @@ TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) 
 TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
   ConnectionMocks mocks = createConnectionMocks();
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1856,7 +1905,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
 TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   ConnectionMocks mocks = createConnectionMocks();
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1896,7 +1945,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   Address::InstanceConstSharedPtr server_addr;
   Address::InstanceConstSharedPtr local_addr;
   if (GetParam() == Network::Address::IpVersion::v4) {
@@ -1943,7 +1992,7 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ConnectionMocks mocks = createConnectionMocks(false);
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
@@ -2008,7 +2057,7 @@ public:
         .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
           transport_socket_callbacks_ = &callbacks;
         }));
-    IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+    IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
     connection_ = std::make_unique<ConnectionImpl>(
         dispatcher_, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
         TransportSocketPtr(transport_socket_), stream_info_, true);
@@ -2625,7 +2674,7 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
 }
 
 // Test the interface used by external consumers.
-TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
+TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
   InSequence s;
 
   // Queue up some data in write buffer.
@@ -2635,6 +2684,9 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(buffer, false);
+
+  // Make sure calling the rtt function doesn't cause problems.
+  connection_->lastRoundTripTime();
 
   // A read event triggers underlying socket to ask for more data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
@@ -2823,7 +2875,7 @@ public:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
 
     client_connection_ =
         dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
@@ -2931,6 +2983,22 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   EXPECT_THAT(connection->transportFailureReason(), StartsWith("delayed connect error"));
 }
 
+TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
+  // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
+  // path from other errors. Test this also.
+  auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
+  EXPECT_CALL(*transport_socket, failureReason()).WillRepeatedly(Return("custom error"));
+  ClientConnectionPtr connection = dispatcher_->createClientConnection(
+      Utility::resolveUrl(
+          fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+  connection->connect();
+  connection->noDelay(true);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_THAT(connection->transportFailureReason(), StartsWith("delayed connect error"));
+  EXPECT_THAT(connection->transportFailureReason(), EndsWith("custom error"));
+}
+
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
   PipeClientConnectionImplTest()
@@ -2959,6 +3027,69 @@ TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
       Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
       Network::Test::createRawBufferSocket(), nullptr);
   connection->close(ConnectionCloseType::NoFlush);
+}
+
+class InternalClientConnectionImplTest : public testing::Test {
+protected:
+  InternalClientConnectionImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  StrictMock<MockConnectionCallbacks> client_callbacks_;
+};
+
+// The internal address is passed to Envoy by EDS. If this Envoy instance is configured as internal
+// address disabled, the EDS subscription should reject the config before dispatcher attempt to
+// establish connection to such address.
+TEST_F(InternalClientConnectionImplTest,
+       CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
+  auto runtime = std::make_unique<TestScopedRuntime>();
+  runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
+
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+
+  ASSERT_DEATH(
+      {
+        ClientConnectionPtr connection =
+            dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
+      },
+      "");
+}
+
+class ClientConnectionWithCustomRawBufferSocketTest : public ConnectionImplTest {
+protected:
+  class TestRawBufferSocket : public RawBufferSocket {
+  public:
+    bool compareCallbacks(TransportSocketCallbacks* callback) const {
+      return this->transportSocketCallbacks() == callback;
+    }
+  };
+
+  TransportSocketPtr createTransportSocket() override {
+    return std::make_unique<TestRawBufferSocket>();
+  }
+
+  TestRawBufferSocket* getTransportSocket() const {
+    Network::TestClientConnectionImpl* client_conn_impl = testClientConnection();
+    return dynamic_cast<TestRawBufferSocket*>(client_conn_impl->transportSocket().get());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClientConnectionWithCustomRawBufferSocketTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) {
+  setUpBasicConnection();
+
+  EXPECT_TRUE(getTransportSocket()->compareCallbacks(testClientConnection()));
+
+  disconnect(false);
 }
 
 } // namespace

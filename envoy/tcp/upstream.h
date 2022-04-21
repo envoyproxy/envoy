@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -17,6 +18,24 @@ namespace TcpProxy {
 
 class GenericConnectionPoolCallbacks;
 class GenericUpstream;
+
+/**
+ * A configuration for an individual tunneling TCP over HTTP protocols.
+ */
+class TunnelingConfigHelper {
+public:
+  virtual ~TunnelingConfigHelper() = default;
+  // The host name of the tunneling upstream HTTP request.
+  virtual const std::string& hostname() const PURE;
+
+  // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
+  virtual bool usePost() const PURE;
+
+  // The evaluator to add additional HTTP request headers to the upstream request.
+  virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
+};
+
+using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;
 
 // An API for wrapping either a TCP or an HTTP connection pool.
 class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
@@ -113,9 +132,6 @@ class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
   ~GenericConnPoolFactory() override = default;
 
-  using TunnelingConfig =
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
-
   /*
    * @param thread_local_cluster the thread local cluster to use for conn pool creation.
    * @param config the tunneling config, if doing connect tunneling.
@@ -125,7 +141,7 @@ public:
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        const absl::optional<TunnelingConfig>& config,
+                        TunnelingConfigHelperOptConstRef config,
                         Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
 };

@@ -28,6 +28,7 @@
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
+using testing::ContainsRegex;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
@@ -158,6 +159,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// On OSX this is flaky as we can end up with connection imbalance.
+#if !defined(__APPLE__)
 // Make sure all workers pick up connections
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
@@ -204,6 +207,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   EXPECT_TRUE(w0_ctr > 1);
   EXPECT_TRUE(w1_ctr > 1);
 }
+#endif
 
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
@@ -407,16 +411,52 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingEarly1xxWithEncoderFilter) {
   testEnvoyProxying1xx(true, true);
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingLate1xxWithEncoderFilter) {
   testEnvoyProxying1xx(false, true);
 }
 
+// When the runtime feature `http_100_continue_case_insensitive` is disabled, the "100-Continue"
+// (upper case C) is not counted as "100-continue". As a consequence, the response does not contain
+// the `100` status code as if Envoy does not see `expect` header.
+TEST_P(IntegrationTest, RuntimeFeature100ContinueCaseInsensitiveDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_100_continue_case_insensitive",
+                                    "false");
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(false); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"expect", "100-Continue"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Send all of the request data and wait for it to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  codec_client_->sendData(*request_encoder_, 10, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  // The response contains the status code 200 but does not contain the status code 100.
+  EXPECT_EQ(nullptr, response->informationalHeaders());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
-TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
+TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
@@ -429,7 +469,6 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -458,12 +497,12 @@ typed_config:
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+    codec_client_->close();
   }
 
   {
@@ -496,7 +535,6 @@ typed_config:
 // that we are able to skip filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -525,12 +563,12 @@ typed_config:
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+    codec_client_->close();
   }
 
   {
@@ -561,8 +599,6 @@ typed_config:
 
 // Verifies routing via the match tree API.
 TEST_P(IntegrationTest, MatchTreeRouting) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
-
   const std::string vhost_yaml = R"EOF(
     name: vhost
     domains: ["matcher.com"]
@@ -576,6 +612,53 @@ TEST_P(IntegrationTest, MatchTreeRouting) {
         exact_match_map:
           map:
             "route":
+              action:
+                name: route
+                typed_config:
+                  "@type": type.googleapis.com/envoy.config.route.v3.Route
+                  match:
+                    prefix: /
+                  route:
+                    cluster: cluster_0
+  )EOF";
+
+  envoy::config::route::v3::VirtualHost virtual_host;
+  TestUtility::loadFromYaml(vhost_yaml, virtual_host);
+
+  config_helper_.addVirtualHost(virtual_host);
+  autonomous_upstream_ = true;
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/whatever"},
+                                         {":scheme", "http"},
+                                         {"match-header", "route"},
+                                         {":authority", "matcher.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+}
+
+// Verifies routing via the match tree API with prefix matching.
+TEST_P(IntegrationTest, PrefixMatchTreeRouting) {
+  const std::string vhost_yaml = R"EOF(
+    name: vhost
+    domains: ["matcher.com"]
+    matcher:
+      matcher_tree:
+        input:
+          name: request-headers
+          typed_config:
+            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            header_name: match-header
+        prefix_match_map:
+          map:
+            "r":
               action:
                 name: route
                 typed_config:
@@ -670,6 +753,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
+  config_helper_.disableDelayClose();
   initialize();
 
   // Make sure the http parser rejects having content-length and transfer-encoding: chunked
@@ -1059,13 +1143,13 @@ TEST_P(IntegrationTest, Pipeline) {
       });
   // First response should be success.
   while (response.find("200") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
 
   // Second response should be 400 (no host)
   while (response.find("400") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   connection->close();
@@ -1108,14 +1192,14 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
   // First response should be success.
   size_t pos;
   while ((pos = response.find("200")) == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
   while (response.find("200", pos + 1) == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   while (response.find("400") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
 
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
@@ -1141,12 +1225,12 @@ TEST_P(IntegrationTest, PipelineInline) {
       });
 
   while (response.find("400") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 
   while (response.find("426") == std::string::npos) {
-    connection->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(connection->run(Event::Dispatcher::RunType::NonBlock));
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
   connection->close();
@@ -1239,7 +1323,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
 
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
 TEST_P(IntegrationTest, TestHostWithAddress) {
-  useAccessLog("%REQ(Host)%\n");
+  useAccessLog("%REQ(Host)%");
   std::string address_string;
   if (GetParam() == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
@@ -1395,7 +1479,7 @@ TEST_P(IntegrationTest, TestBind) {
     address_string = "::1";
   }
   config_helper_.setSourceAddress(address_string);
-  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%\n");
+  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1424,6 +1508,7 @@ TEST_P(IntegrationTest, TestBind) {
 
 TEST_P(IntegrationTest, TestFailedBind) {
   config_helper_.setSourceAddress("8.8.8.8");
+  config_helper_.addConfigModifier(configureProxyStatus());
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1439,6 +1524,10 @@ TEST_P(IntegrationTest, TestFailedBind) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("503"));
+  EXPECT_THAT(
+      response->headers().getProxyStatusValue(),
+      ContainsRegex(
+          R"(envoy; error=connection_refused; details="upstream_reset_before_response_started\{.*\}; UF")"));
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 
@@ -1472,9 +1561,9 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 
 // Validate that 100-continue works as expected with via header addition on both request and
 // response path.
-TEST_P(IntegrationTest, ViaAppendWith100Continue) {
+TEST_P(IntegrationTest, ViaAppendWith1xx) {
   config_helper_.addConfigModifier(setVia("foo"));
-  testEnvoyHandling100Continue(false, "foo");
+  testEnvoyHandling1xx(false, "foo");
 }
 
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is
@@ -1486,8 +1575,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1519,8 +1607,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1553,8 +1640,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
-  config_helper_.prependFilter("{ name: clear-route-cache, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: clear-route-cache }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -1591,8 +1677,7 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectHealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: process-context-filter }");
 
   ProcessObjectForFilter healthy_object(true);
   process_object_ = healthy_object;
@@ -1612,8 +1697,7 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectUnealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: process-context-filter }");
 
   ProcessObjectForFilter unhealthy_object(false);
   process_object_ = unhealthy_object;
@@ -2199,7 +2283,7 @@ TEST_P(IntegrationTest, RetryOptionsPredicate) {
 // successfully overrides the cached route, and subsequently, the request's upstream cluster
 // selection.
 TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
-  useAccessLog("%UPSTREAM_CLUSTER%\n");
+  useAccessLog("%UPSTREAM_CLUSTER%");
 
   config_helper_.prependFilter(R"EOF(
     name: set-route-filter

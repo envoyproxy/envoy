@@ -12,7 +12,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
@@ -121,12 +121,13 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
           absl::flat_hash_set<std::string> all_new_hosts;
           for (const auto& resp : response) {
+            const auto& addrinfo = resp.addrInfo();
             // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
             // make a new address that has port in it. We need to both support IPv6 as well as
             // potentially move port handling into the DNS interface itself, which would work better
             // for SRV.
-            ASSERT(resp.address_ != nullptr);
-            auto address = Network::Utility::getAddressWithPort(*(resp.address_), port_);
+            ASSERT(addrinfo.address_ != nullptr);
+            auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
             if (all_new_hosts.count(address->asString()) > 0) {
               continue;
             }
@@ -139,7 +140,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
             all_new_hosts.emplace(address->asString());
-            ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
+            ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }
 
           HostVector hosts_added;
@@ -197,7 +198,7 @@ std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StrictDnsClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
+    Stats::ScopeSharedPtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
   return std::make_pair(std::make_shared<StrictDnsClusterImpl>(

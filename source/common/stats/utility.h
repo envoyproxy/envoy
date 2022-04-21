@@ -6,7 +6,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
@@ -31,6 +31,24 @@ public:
 };
 
 /**
+ * Represents a dynamically created stat name token based on std::string.
+ * This class wrapper is used in the 'Element' variant so that call-sites
+ * can express explicit intent to create dynamic stat names, which are more
+ * expensive than symbolic stat names. We use dynamic stat names only for
+ * building stats based on names discovered in the line of a request.
+ *
+ * Specifically, this class should be used only when the content of the string
+ * can be changed between the object creation and usage.
+ */
+class DynamicSavedName : public std::string {
+public:
+  // This is intentionally left as an implicit conversion from string_view to
+  // make call-sites easier to read, e.g.
+  //    Utility::counterFromElements(*scope, {DynamicSavedName("a"), DynamicSavedName("b")});
+  explicit DynamicSavedName(absl::string_view str) : std::string(str.begin(), str.end()) {}
+};
+
+/**
  * Holds either a symbolic StatName or a dynamic string, for the purpose of
  * composing a vector to pass to Utility::counterFromElements, etc. This is
  * a programming convenience to create joined stat names. It is easier to
@@ -38,7 +56,7 @@ public:
  * hide the memory management of the joined storage, and they allow easier
  * co-mingling of symbolic and dynamic stat-name components.
  */
-using Element = absl::variant<StatName, DynamicName>;
+using Element = absl::variant<StatName, DynamicName, DynamicSavedName>;
 using ElementVec = absl::InlinedVector<Element, 8>;
 
 /**
@@ -74,7 +92,7 @@ absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
  * @param elements The vector of mixed DynamicName and StatName
  * @return A scope named using the joined elements.
  */
-ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
+ScopeSharedPtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
 
 /**
  * Creates a counter from a vector of tokens which are used to create the

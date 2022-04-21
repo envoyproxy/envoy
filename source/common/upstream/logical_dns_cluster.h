@@ -36,7 +36,7 @@ public:
   LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                     Network::DnsResolverSharedPtr dns_resolver,
                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                    Stats::ScopePtr&& stats_scope, bool added_via_api);
+                    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   ~LogicalDnsCluster() override;
 
@@ -70,6 +70,7 @@ private:
   std::string dns_url_;
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
+  std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
   LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
@@ -84,7 +85,7 @@ private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override;
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 DECLARE_FACTORY(LogicalDnsClusterFactory);

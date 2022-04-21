@@ -137,6 +137,16 @@ public:
    *         connection.
    **/
   virtual const std::string& tlsVersion() const PURE;
+
+  /**
+   * @return std::string the protocol negotiated via ALPN.
+   **/
+  virtual const std::string& alpn() const PURE;
+
+  /**
+   * @return std::string the SNI used to establish the connection.
+   **/
+  virtual const std::string& sni() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

@@ -6,6 +6,7 @@
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Server {
@@ -24,6 +25,22 @@ std::string sanitizeName(const absl::string_view name) {
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
   return promRegex().replaceAll(name, "_");
+}
+
+/**
+ * Take tag values and sanitize it for text serialization, according to
+ * Prometheus conventions.
+ */
+std::string sanitizeValue(const absl::string_view value) {
+  // Removes problematic characters from Prometheus tag values to prevent
+  // text serialization issues. This matches the prometheus text formatting code:
+  // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
+  // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
+  return absl::StrReplaceAll(value, {
+                                        {R"(\)", R"(\\)"},
+                                        {"\n", R"(\n)"},
+                                        {R"(")", R"(\")"},
+                                    });
 }
 
 /*
@@ -147,6 +164,21 @@ std::string generateNumericOutput(const StatType& metric,
 }
 
 /*
+ * Returns the prometheus output for a TextReadout in gauge format.
+ * It is a workaround of a limitation of prometheus which stores only numeric metrics.
+ * The output is a gauge named the same as a given text-readout. The value of returned gauge is
+ * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
+ * tag {"text_value":"textReadout.value"}.
+ */
+std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
+                                      const std::string& prefixed_tag_extracted_name) {
+  auto tags = text_readout.tags();
+  tags.push_back(Stats::Tag{"text_value", text_readout.value()});
+  const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
+  return fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags);
+}
+
+/*
  * Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
  * newlines) that contains all the individual bucket counts and sum/count for a single histogram
  * (metric_name plus all tags).
@@ -188,7 +220,7 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   std::vector<std::string> buf;
   buf.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
   }
   return absl::StrJoin(buf, ",");
 }
@@ -219,11 +251,11 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
   return absl::StrCat("envoy_", sanitizeName(extracted_name));
 }
 
-// TODO(efimki): Add support of text readouts stats.
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts, Buffer::Instance& response,
     const bool used_only, const absl::optional<std::regex>& regex,
     const Stats::CustomStatNamespaces& custom_namespaces) {
 
@@ -235,6 +267,11 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count +=
       outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
                                    generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
+
+  // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
+  metric_name_count +=
+      outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
+                                         generateTextReadoutOutput, "gauge", custom_namespaces);
 
   metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
                                                               histograms, generateHistogramOutput,

@@ -17,6 +17,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.auth";
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/auth";
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.transport_sockets.tls.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
@@ -41,8 +42,7 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
-  // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_0`` for
-  // servers.
+  // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_3`` for

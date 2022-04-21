@@ -60,6 +60,8 @@ The following sandboxes are available:
     jaeger_native_tracing
     jaeger_tracing
     load_reporting_service
+    locality_load_balancing
+    local_ratelimit
     lua
     mysql
     postgres
@@ -73,3 +75,4 @@ The following sandboxes are available:
     websocket
     win32_front_proxy
     zipkin_tracing
+    zstd

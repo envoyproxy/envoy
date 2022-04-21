@@ -157,7 +157,8 @@ def envoy_cc_test(
         local = False,
         size = "medium",
         flaky = False,
-        env = {}):
+        env = {},
+        exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
     cc_test(
@@ -184,6 +185,7 @@ def envoy_cc_test(
         size = size,
         flaky = flaky,
         env = env,
+        exec_properties = exec_properties,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -258,10 +260,11 @@ def envoy_benchmark_test(
         benchmark_binary,
         data = [],
         tags = [],
+        repository = "",
         **kargs):
     native.sh_test(
         name = name,
-        srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
+        srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
         tags = tags + ["nocoverage"],

@@ -27,8 +27,13 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
+        "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -52,6 +57,7 @@ envoy_cc_library(
     deps = [
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -63,8 +69,11 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
+        "@com_google_absl//absl/status",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

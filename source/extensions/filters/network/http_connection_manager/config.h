@@ -27,6 +27,7 @@
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/local_reply/local_reply.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -39,7 +40,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-using FilterConfigProviderManager = Filter::FilterConfigProviderManager;
+using FilterConfigProviderManager = Filter::FilterConfigProviderManager<Http::FilterFactoryCb>;
 
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
@@ -99,12 +100,17 @@ public:
       return unix_sockets_;
     }
 
-    // TODO(snowp): Make internal subnets configurable.
+    // TODO: cleanup isInternalAddress and default to initializing cidr_ranges_
+    // based on RFC1918 / RFC4193, if config is unset.
+    if (cidr_ranges_.getIpListSize() != 0 && address.type() == Network::Address::Type::Ip) {
+      return cidr_ranges_.contains(address);
+    }
     return Network::Utility::isInternalAddress(address);
   }
 
 private:
   const bool unix_sockets_;
+  const Network::Address::IpList cidr_ranges_;
 };
 
 /**
@@ -125,7 +131,7 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr>;
+  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr<Http::FilterFactoryCb>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -220,6 +226,9 @@ public:
     return original_ip_detection_extensions_;
   }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -315,6 +324,7 @@ private:
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
   const bool strip_trailing_host_dot_;
   const uint64_t max_requests_per_connection_;
+  const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 /**

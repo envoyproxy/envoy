@@ -52,6 +52,10 @@ public:
   MOCK_METHOD(void, onConfigUpdate,
               (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                const std::string& version_info));
+
+  MOCK_METHOD(void, onConfigUpdate,
+              (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info));
+
   MOCK_METHOD(
       void, onConfigUpdate,
       (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,

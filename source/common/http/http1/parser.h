@@ -73,6 +73,14 @@ public:
   virtual Status onHeaderValue(const char* data, size_t length) PURE;
 
   /**
+   * Called when response status data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   * @return Status representing success or failure.
+   */
+  virtual Status onStatus(const char* data, size_t length) PURE;
+
+  /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked. Note that this only applies to headers and NOT trailers. End of
    * trailers are signaled via onMessageCompleteBase().

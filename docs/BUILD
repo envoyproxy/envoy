@@ -2,8 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_pkg//:mappings.bzl", "pkg_filegroup", "pkg_files")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,7 +12,6 @@ exports_files([
     "v2_mapping.json",
     "empty_extensions.json",
     "redirects.txt",
-    "VERSION",
 ])
 
 envoy_package()
@@ -87,20 +86,28 @@ genrule(
 
 genrule(
     name = "external_deps_rst",
-    srcs = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations.bzl",
-        "@envoy_api//bazel:repository_locations_utils.bzl",
-    ],
     outs = ["external_deps_rst.tar"],
-    cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
-    tools = ["//tools/docs:generate_external_deps_rst"],
+    cmd = """
+    $(location //tools/docs:generate_external_deps_rst) \
+        $(location //bazel:all_repository_locations) \
+        $@
+    """,
+    tools = [
+        "//bazel:all_repository_locations",
+        "//tools/docs:generate_external_deps_rst",
+    ],
 )
 
 genquery(
     name = "v3_proto_srcs",
     expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
     scope = ["@envoy_api//:v3_protos"],
+)
+
+genquery(
+    name = "xds_proto_srcs",
+    expression = "labels(srcs, labels(deps, @envoy_api//:xds_protos))",
+    scope = ["@envoy_api//:xds_protos"],
 )
 
 genrule(
@@ -124,6 +131,20 @@ genrule(
     cmd = """
     $(location //tools/docs:generate_api_rst) \\
         $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
+    """,
+    tools = ["//tools/docs:generate_api_rst"],
+)
+
+genrule(
+    name = "xds_rst",
+    srcs = [
+        "//tools/protodoc:xds_protodoc",
+        ":xds_proto_srcs",
+    ],
+    outs = ["xds_rst.tar"],
+    cmd = """
+    $(location //tools/docs:generate_api_rst) \\
+        $(location xds_proto_srcs) $(locations //tools/protodoc:xds_protodoc) $@
     """,
     tools = ["//tools/docs:generate_api_rst"],
 )
@@ -178,6 +199,7 @@ pkg_tar(
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
+        ":xds_rst",
     ],
 )
 
@@ -188,7 +210,7 @@ genrule(
     $(location //tools/docs:sphinx_runner) \\
          --build_sha="$${BUILD_SHA:-}" \\
          --docs_tag="$${DOCS_TAG:-}" \\
-         --version_file=$(location //:VERSION) \\
+         --version_file=$(location //:VERSION.txt) \\
          --validator_path=$(location //tools/config_validation:validate_fragment) \\
          --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \\
          $(location rst) \\
@@ -199,6 +221,6 @@ genrule(
         ":rst",
         "//tools/config_validation:validate_fragment",
         "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
-        "//:VERSION",
+        "//:VERSION.txt",
     ],
 )

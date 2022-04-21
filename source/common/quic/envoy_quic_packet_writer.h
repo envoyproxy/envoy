@@ -1,18 +1,8 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/network/udp_packet_writer_handler.h"
 
 #include "quiche/quic/core/quic_packet_writer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "envoy/network/udp_packet_writer_handler.h"
 
 namespace Envoy {
 namespace Quic {
@@ -33,6 +23,7 @@ public:
   // Currently this writer doesn't support pacing offload.
   bool SupportsReleaseTime() const override { return false; }
 
+  absl::optional<int> MessageTooBigErrorCode() const override;
   quic::QuicByteCount GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const override;
   quic::QuicPacketBuffer GetNextWriteLocation(const quic::QuicIpAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address) override;

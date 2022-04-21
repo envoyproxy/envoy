@@ -22,7 +22,8 @@ namespace Envoy {
 
 class XdsFuzzTest : public HttpIntegrationTest {
 public:
-  XdsFuzzTest(const test::server::config_validation::XdsTestCase& input);
+  XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
+              bool use_unified_mux = false);
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 

@@ -27,8 +27,15 @@ void SinkDelegate::logWithStableName(absl::string_view, absl::string_view, absl:
 
 SinkDelegate::~SinkDelegate() {
   // The previous delegate should have never been set or should have been reset by now via
-  // restoreDelegate();
+  // restoreDelegate()/restoreTlsDelegate();
   assert(previous_delegate_ == nullptr);
+  assert(previous_tls_delegate_ == nullptr);
+}
+
+void SinkDelegate::setTlsDelegate() {
+  assert(previous_tls_delegate_ == nullptr);
+  previous_tls_delegate_ = log_sink_->tlsDelegate();
+  log_sink_->setTlsDelegate(this);
 }
 
 void SinkDelegate::setDelegate() {
@@ -36,6 +43,13 @@ void SinkDelegate::setDelegate() {
   assert(previous_delegate_ == nullptr);
   previous_delegate_ = log_sink_->delegate();
   log_sink_->setDelegate(this);
+}
+
+void SinkDelegate::restoreTlsDelegate() {
+  // Ensures stacked allocation of delegates.
+  assert(log_sink_->tlsDelegate() == this);
+  log_sink_->setTlsDelegate(previous_tls_delegate_);
+  previous_tls_delegate_ = nullptr;
 }
 
 void SinkDelegate::restoreDelegate() {
@@ -52,7 +66,7 @@ StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
 
 StderrSinkDelegate::~StderrSinkDelegate() { restoreDelegate(); }
 
-void StderrSinkDelegate::log(absl::string_view msg) {
+void StderrSinkDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
   Thread::OptionalLockGuard guard(lock_);
   std::cerr << msg;
 }
@@ -80,6 +94,19 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
   lock.Release();
 
+  auto log_to_sink = [this, msg_view, msg](SinkDelegate& sink) {
+    if (should_escape_) {
+      sink.log(escapeLogLine(msg_view), msg);
+    } else {
+      sink.log(msg_view, msg);
+    }
+  };
+  auto* tls_sink = tlsDelegate();
+  if (tls_sink != nullptr) {
+    log_to_sink(*tls_sink);
+    return;
+  }
+
   // Hold the sink mutex while performing the actual logging. This prevents the sink from being
   // swapped during an individual log event.
   // TODO(mattklein123): In production this lock will never be contended. In practice, thread
@@ -87,11 +114,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   // mechanism for this that does not require extra locking that we don't explicitly need in the
   // prod code.
   absl::ReaderMutexLock sink_lock(&sink_mutex_);
-  if (should_escape_) {
-    sink_->log(escapeLogLine(msg_view));
-  } else {
-    sink_->log(msg_view);
-  }
+  log_to_sink(*sink_);
 }
 
 std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
@@ -110,6 +133,26 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
   return delegating_sink;
 }
+
+void DelegatingLogSink::flush() {
+  auto* tls_sink = tlsDelegate();
+  if (tls_sink != nullptr) {
+    tls_sink->flush();
+    return;
+  }
+  absl::ReaderMutexLock lock(&sink_mutex_);
+  sink_->flush();
+}
+
+SinkDelegate** DelegatingLogSink::tlsSink() {
+  static thread_local SinkDelegate* tls_sink = nullptr;
+
+  return &tls_sink;
+}
+
+void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
+
+SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
 
 static Context* current_context = nullptr;
 

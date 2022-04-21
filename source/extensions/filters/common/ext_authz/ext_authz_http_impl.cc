@@ -13,6 +13,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -276,10 +277,12 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
     callbacks_ = nullptr;
   } else {
+    // Do not enforce a sampling decision on this span; instead keep the parent's sampling status.
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
-                       .setChildSpanName(config_->tracingName());
+                       .setChildSpanName(config_->tracingName())
+                       .setSampled(absl::nullopt);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }

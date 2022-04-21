@@ -7,6 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.cache.simple_http_cache.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/cache/simple_http_cache/v3;simple_http_cachev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: SimpleHttpCache CacheFilter storage plugin]

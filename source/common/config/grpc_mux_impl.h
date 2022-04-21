@@ -17,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
@@ -35,7 +36,8 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
+              CustomConfigValidatorsPtr&& config_validators);
 
   ~GrpcMuxImpl() override;
 
@@ -61,7 +63,6 @@ public:
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void handleDiscoveryResponse(
@@ -84,7 +85,7 @@ public:
 private:
   void drainRequests();
   void setRetryTimer();
-  void sendDiscoveryRequest(const std::string& type_url);
+  void sendDiscoveryRequest(absl::string_view type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
@@ -169,6 +170,7 @@ private:
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
+  CustomConfigValidatorsPtr config_validators_;
   bool first_stream_request_;
 
   // Helper function for looking up and potentially allocating a new ApiState.
@@ -214,7 +216,7 @@ public:
   }
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
   void onWriteable() override {}

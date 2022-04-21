@@ -1,15 +1,19 @@
 #include "source/server/admin/stats_handler.h"
 
+#include <functional>
+#include <vector>
+
 #include "envoy/admin/v3/mutex_stats.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/server/admin/prometheus_stats.h"
-#include "source/server/admin/utils.h"
+#include "source/server/admin/stats_request.h"
 
 namespace Envoy {
+
 namespace Server {
 
 const uint64_t RecentLookupsCapacity = 100;
@@ -67,82 +71,88 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStats(absl::string_view url,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream& admin_stream) {
+Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream& /*admin_stream*/) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
 
-  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path);
 
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
+  Buffer::OwnedImpl response;
   if (!Utility::filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
+    return Admin::makeStaticTextRequest(response, Http::Code::BadRequest);
+  }
+
+  // If the histogram_buckets query param does not exist histogram output should contain quantile
+  // summary data. Using histogram_buckets will change output to show bucket data. The
+  // histogram_buckets query param has two possible values: cumulative or disjoint.
+  Utility::HistogramBucketsMode histogram_buckets_mode = Utility::HistogramBucketsMode::NoBuckets;
+  absl::Status histogram_buckets_status =
+      Utility::histogramBucketsParam(params, histogram_buckets_mode);
+  if (!histogram_buckets_status.ok()) {
+    return Admin::makeStaticTextRequest(histogram_buckets_status.message(), Http::Code::BadRequest);
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
-  if (format_value.has_value() && format_value.value() == "prometheus") {
-    return handlerPrometheusStats(url, response_headers, response, admin_stream);
-  }
-
-  std::map<std::string, uint64_t> all_stats;
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (shouldShowMetric(*counter, used_only, regex)) {
-      all_stats.emplace(counter->name(), counter->value());
+  bool json = false;
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      // TODO(#16139): modify streaming algorithm to cover Prometheus.
+      //
+      // This may be easiest to accomplish by populating the set
+      // with tagExtractedName(), and allowing for vectors of
+      // stats as multiples will have the same tag-extracted names.
+      // Ideally we'd find a way to do this without slowing down
+      // the non-Prometheus implementations.
+      Buffer::OwnedImpl response;
+      Http::Code code = prometheusStats(path, response);
+      return Admin::makeStaticTextRequest(response, code);
+    } else if (format_value.value() == "json") {
+      json = true;
+    } else {
+      return Admin::makeStaticTextRequest(
+          "usage: /stats?format=json  or /stats?format=prometheus \n\n", Http::Code::BadRequest);
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (shouldShowMetric(*gauge, used_only, regex)) {
-      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-      all_stats.emplace(gauge->name(), gauge->value());
-    }
-  }
+  return makeRequest(server_.stats(), used_only, json, histogram_buckets_mode, regex);
+}
 
-  std::map<std::string, std::string> text_readouts;
-  for (const auto& text_readout : server_.stats().textReadouts()) {
-    if (shouldShowMetric(*text_readout, used_only, regex)) {
-      text_readouts.emplace(text_readout->name(), text_readout->value());
-    }
-  }
-
-  if (!format_value.has_value()) {
-    // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only, regex, response);
-    return Http::Code::OK;
-  }
-
-  if (format_value.value() == "json") {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
-    return Http::Code::OK;
-  }
-
-  response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-  response.add("\n");
-  return Http::Code::NotFound;
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, bool used_only, bool json,
+                                            Utility::HistogramBucketsMode histogram_buckets_mode,
+                                            const absl::optional<std::regex>& regex) {
+  return std::make_unique<StatsRequest>(stats, used_only, json, histogram_buckets_mode, regex);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
+  return prometheusStats(path_and_query, response);
+}
+
+Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
+                                         Buffer::Instance& response) {
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+  const bool text_readouts = params.find("text_readouts") != params.end();
+
+  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+      text_readouts ? server_.stats().textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
     return Http::Code::BadRequest;
   }
-  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only,
-                                              regex, server_.api().customStatNamespaces());
+
+  PrometheusStatsFormatter::statsAsPrometheus(
+      server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
+      text_readouts_vec, response, used_only, regex, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 
-// TODO(ambuc) Export this as a server (?) stat for monitoring.
 Http::Code StatsHandler::handlerContention(absl::string_view,
                                            Http::ResponseHeaderMap& response_headers,
                                            Buffer::Instance& response, AdminStream&) {
@@ -160,112 +170,6 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
                  "--enable-mutex-tracing.");
   }
   return Http::Code::OK;
-}
-
-void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                               const std::map<std::string, std::string>& text_readouts,
-                               const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, const absl::optional<std::regex>& regex,
-                               Buffer::Instance& response) {
-  // Display plain stats if format query param is not there.
-  for (const auto& text_readout : text_readouts) {
-    response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                             Html::Utility::sanitize(text_readout.second)));
-  }
-  for (const auto& stat : all_stats) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
-  }
-  std::map<std::string, std::string> all_histograms;
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
-      auto insert = all_histograms.emplace(histogram->name(), histogram->quantileSummary());
-      ASSERT(insert.second); // No duplicates expected.
-    }
-  }
-  for (const auto& histogram : all_histograms) {
-    response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
-  }
-}
-
-std::string
-StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                          const std::map<std::string, std::string>& text_readouts,
-                          const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                          const bool used_only, const absl::optional<std::regex>& regex,
-                          const bool pretty_print) {
-
-  ProtobufWkt::Struct document;
-  std::vector<ProtobufWkt::Value> stats_array;
-  for (const auto& text_readout : text_readouts) {
-    ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
-    (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
-    stats_array.push_back(ValueUtil::structValue(stat_obj));
-  }
-  for (const auto& stat : all_stats) {
-    ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
-    (*stat_obj_fields)["value"] = ValueUtil::numberValue(stat.second);
-    stats_array.push_back(ValueUtil::structValue(stat_obj));
-  }
-
-  ProtobufWkt::Struct histograms_obj;
-  auto* histograms_obj_fields = histograms_obj.mutable_fields();
-
-  ProtobufWkt::Struct histograms_obj_container;
-  auto* histograms_obj_container_fields = histograms_obj_container.mutable_fields();
-  std::vector<ProtobufWkt::Value> computed_quantile_array;
-
-  bool found_used_histogram = false;
-  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
-      if (!found_used_histogram) {
-        // It is not possible for the supported quantiles to differ across histograms, so it is ok
-        // to send them once.
-        Stats::HistogramStatisticsImpl empty_statistics;
-        std::vector<ProtobufWkt::Value> supported_quantile_array;
-        for (double quantile : empty_statistics.supportedQuantiles()) {
-          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
-        }
-        (*histograms_obj_fields)["supported_quantiles"] =
-            ValueUtil::listValue(supported_quantile_array);
-        found_used_histogram = true;
-      }
-
-      ProtobufWkt::Struct computed_quantile;
-      auto* computed_quantile_fields = computed_quantile.mutable_fields();
-      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
-
-      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
-        ProtobufWkt::Struct computed_quantile_value;
-        auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
-        const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
-        const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
-        (*computed_quantile_value_fields)["interval"] =
-            std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
-        (*computed_quantile_value_fields)["cumulative"] =
-            std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
-
-        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
-      }
-      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
-      computed_quantile_array.push_back(ValueUtil::structValue(computed_quantile));
-    }
-  }
-
-  if (found_used_histogram) {
-    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
-    (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj);
-    stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
-  }
-
-  auto* document_fields = document.mutable_fields();
-  (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
-
-  return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
 }
 
 } // namespace Server

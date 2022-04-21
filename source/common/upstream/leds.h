@@ -55,8 +55,6 @@ public:
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>&, const std::string&) override {
-    // LEDS is not used in SotW mode.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -67,7 +65,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   // LEDS stats scope must outlive the subscription.
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   LedsStats stats_;
   // A map between a LEDS resource name to the LbEndpoint data.
   LbEndpointsMap endpoints_map_;

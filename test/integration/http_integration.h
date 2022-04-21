@@ -5,7 +5,6 @@
 #include <string>
 
 #include "source/common/http/codec_client.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
@@ -17,6 +16,12 @@ namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
 
+enum class Http2Impl {
+  Nghttp2,
+  WrappedNghttp2,
+  Oghttp2,
+};
+
 /**
  * HTTP codec client used during integration testing.
  */
@@ -26,6 +31,10 @@ public:
                          Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecType type);
+  IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                         Network::ClientConnectionPtr&& conn,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
+                         Http::CodecType type, bool wait_till_connected);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
@@ -42,7 +51,7 @@ public:
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
-  startRequest(const Http::RequestHeaderMap& headers);
+  startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
   waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
   Network::ClientConnection* connection() const { return connection_.get(); }
@@ -52,7 +61,8 @@ public:
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
-    ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
+    ConnectionCallbacks(IntegrationCodecClient& parent, bool block_till_connected)
+        : parent_(parent), block_till_connected_(block_till_connected) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -60,6 +70,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
+    bool block_till_connected_;
   };
 
   struct CodecCallbacks : public Http::ConnectionCallbacks {
@@ -110,6 +121,7 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
+  void setupHttp2Overrides(Http2Impl implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
@@ -135,6 +147,9 @@ protected:
 
   // Enable the encoding/decoding of Http1 trailers upstream
   ConfigHelper::ConfigModifierFunction setEnableUpstreamTrailersHttp1();
+
+  // Enable Proxy-Status response header.
+  ConfigHelper::HttpModifierFunction configureProxyStatus();
 
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
@@ -199,7 +214,7 @@ protected:
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                                     int upstream_index,
                                                     const std::string& path = "/test/long/url",
-                                                    const std::string& authority = "host");
+                                                    const std::string& overwrite_authority = "");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterVirtualClusters();
@@ -212,8 +227,7 @@ protected:
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
-                                              const std::string& authority = "host");
-  void testRequestAndResponseShutdownWithActiveConnection();
+                                              const std::string& overwrite_authority = "");
 
   // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();
@@ -242,11 +256,12 @@ protected:
   void testRetryAttemptCountHeader();
   void testGrpcRetry();
 
-  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
-                                    const std::string& via = "", bool disconnect_after_100 = false);
+  void testEnvoyHandling1xx(bool additional_continue_from_upstream = false,
+                            const std::string& via = "", bool disconnect_after_100 = false);
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
-                            bool with_multiple_1xx_headers = false);
+                            bool with_multiple_1xx_headers = false,
+                            absl::string_view initial_code = "100");
   void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                            uint32_t response1_bytes, uint32_t response2_bytes);
 
@@ -280,14 +295,17 @@ protected:
   Http::RequestEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestResponseHeaderMapImpl default_response_headers_{{":status", "200"}};
-  Http::TestRequestHeaderMapImpl default_request_headers_{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl default_request_headers_{{":method", "GET"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "sni.lyft.com"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecType downstream_protocol_{Http::CodecType::HTTP1};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
+  bool enable_quic_early_data_{true};
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

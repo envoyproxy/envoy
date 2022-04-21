@@ -192,7 +192,7 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   case State::InSyncState:
     return onDataInSync(data, frontend);
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 

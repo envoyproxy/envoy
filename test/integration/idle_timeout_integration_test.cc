@@ -12,6 +12,7 @@ namespace {
 class IdleTimeoutIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    config_helper_.disableDelayClose();
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -44,7 +45,7 @@ public:
             retry_policy->mutable_per_try_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
           }
 
-          // For validating encode100ContinueHeaders() timer kick.
+          // For validating encode1xxHeaders() timer kick.
           hcm.set_proxy_100_continue(true);
         });
     HttpProtocolIntegrationTest::initialize();
@@ -357,7 +358,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   auto response = setupPerStreamIdleTimeoutTest();
 
   sleep();
-  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
 
   sleep();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -472,11 +473,11 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsDisarmedByPrematureEncodeHead
   EXPECT_NE("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100ContinueHeaders) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode1xxHeaders) {
   enable_request_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
-  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
 
   waitForTimeout(*response, "downstream_rq_timeout");
 

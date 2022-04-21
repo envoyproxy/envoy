@@ -6,30 +6,18 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_types.h"
-#include "quiche/quic/core/quic_config.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
+#include "openssl/ssl.h"
 #include "quiche/quic/core/http/quic_header_list.h"
+#include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "source/common/http/header_utility.h"
-
-#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -169,7 +157,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
 Network::ConnectionSocketPtr
-createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -189,6 +177,10 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
                              const quic::QuicSocketAddress& self_address,
                              const quic::QuicSocketAddress& peer_address,
                              const std::string& hostname, absl::string_view alpn);
+
+// Alter QuicConfig based on all the options in the supplied config.
+void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,
+                       quic::QuicConfig& quic_config);
 
 // Set initial flow control windows in quic_config according to the given Envoy config.
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

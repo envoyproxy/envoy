@@ -34,6 +34,8 @@
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/http2_adapter.h"
+#include "quiche/http2/adapter/oghttp2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -44,6 +46,7 @@ class Http2CodecImplTestFixture;
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
+constexpr uint64_t H2_FRAME_HEADER_SIZE = 9;
 
 class ReceivedSettingsImpl : public ReceivedSettings {
 public:
@@ -73,33 +76,58 @@ public:
 
 class ConnectionImpl;
 
-// Abstract nghttp2_session factory. Used to enable injection of factories for testing.
-class Nghttp2SessionFactory {
+// Abstract factory. Used to enable injection of factories for testing.
+class Http2SessionFactory {
 public:
   using ConnectionImplType = ConnectionImpl;
-  virtual ~Nghttp2SessionFactory() = default;
+  virtual ~Http2SessionFactory() = default;
 
   // Returns a new nghttp2_session to be used with |connection|.
-  virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
-                                  ConnectionImplType* connection,
-                                  const nghttp2_option* options) PURE;
+  virtual nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks,
+                                     ConnectionImplType* connection,
+                                     const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
-  virtual void init(nghttp2_session* session, ConnectionImplType* connection,
+  virtual void initOld(nghttp2_session* session, ConnectionImplType* connection,
+                       const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
+
+  // Returns a new HTTP/2 session to be used with |connection|.
+  virtual std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
+         const http2::adapter::OgHttp2Adapter::Options& options) PURE;
+
+  // Returns a new HTTP/2 session to be used with |connection|.
+  virtual std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
+         const nghttp2_option* options) PURE;
+
+  // Initializes the |session|.
+  virtual void init(ConnectionImplType* connection,
                     const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 };
 
-class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
+class ProdNghttp2SessionFactory : public Http2SessionFactory {
 public:
-  nghttp2_session* create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
-                          const nghttp2_option* options) override;
+  nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+                             const nghttp2_option* options) override;
 
-  void init(nghttp2_session* session, ConnectionImpl* connection,
+  void initOld(nghttp2_session* session, ConnectionImpl* connection,
+               const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+
+  std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+         const http2::adapter::OgHttp2Adapter::Options& options) override;
+
+  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
+                                                       ConnectionImpl* connection,
+                                                       const nghttp2_option* options) override;
+
+  void init(ConnectionImpl* connection,
             const envoy::config::core::v3::Http2ProtocolOptions& options) override;
 
-  // Returns a global factory instance. Note that this is possible because no internal state is
-  // maintained; the thread safety of create() and init()'s side effects is guaranteed by Envoy's
-  // worker based threading model.
+  // Returns a global factory instance. Note that this is possible because no
+  // internal state is maintained; the thread safety of create() and init()'s
+  // side effects is guaranteed by Envoy's worker based threading model.
   static ProdNghttp2SessionFactory& get() {
     static ProdNghttp2SessionFactory* instance = new ProdNghttp2SessionFactory();
     return *instance;
@@ -127,7 +155,13 @@ public:
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   Status protocolErrorForTest(); // Used in tests to simulate errors.
-  bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
+  bool wantsToWrite() override {
+    if (use_new_codec_wrapper_) {
+      return adapter_->want_write();
+    } else {
+      return nghttp2_session_want_write(session_);
+    }
+  }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
     for (auto& stream : active_streams_) {
@@ -138,6 +172,10 @@ public:
     for (auto& stream : active_streams_) {
       stream->runLowWatermarkCallbacks();
     }
+  }
+
+  void setVisitor(std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor) {
+    visitor_ = std::move(visitor);
   }
 
   // ScopeTrackedObject
@@ -151,7 +189,7 @@ protected:
    */
   class Http2Callbacks {
   public:
-    Http2Callbacks();
+    explicit Http2Callbacks(bool use_new_codec_wrapper);
     ~Http2Callbacks();
 
     const nghttp2_session_callbacks* callbacks() { return callbacks_; }
@@ -165,18 +203,22 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
+    Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                 uint32_t max_headers_kb);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
+    const http2::adapter::OgHttp2Adapter::Options& ogOptions() { return og_options_; }
 
   protected:
     nghttp2_option* options_;
+    http2::adapter::OgHttp2Adapter::Options og_options_;
   };
 
   class ClientHttp2Options : public Http2Options {
   public:
-    ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
+    ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                       uint32_t max_headers_kb);
   };
 
   /**
@@ -199,11 +241,13 @@ protected:
     void onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
+    static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
     virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
+    // Called iff use_new_codec_wrapper_ is false.
     void submitMetadata(uint8_t flags);
     // Returns true if the stream should defer the local reset stream until after the next call to
     // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
@@ -225,7 +269,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
+    uint32_t bufferLimit() const override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.connectionInfoProvider().localAddress();
     }
@@ -269,36 +313,54 @@ protected:
     // to the decoder_.
     virtual void decodeHeaders() PURE;
     virtual void decodeTrailers() PURE;
+    bool maybeDeferDecodeTrailers();
+    // Consumes any decoded data, buffering if backed up.
+    void decodeData();
 
     // Get MetadataEncoder for this stream.
-    MetadataEncoder& getMetadataEncoder();
+    MetadataEncoder& getMetadataEncoderOld();
+    NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     bool buffersOverrun() const { return read_disable_count_ > 0; }
+    bool shouldAllowPeerAdditionalStreamWindow() const {
+      return !buffersOverrun() && !pending_recv_data_->highWatermarkTriggered();
+    }
 
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
+    // Called from either process_buffered_data_callback_.
+    void processBufferedData();
 
+    const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+    StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
     // never called. The watermark value is set to the size of the stream window. As a result this
     // watermark can never overflow because the peer can never send more bytes than the stream
-    // window without triggering protocol error and this buffer is drained after each DATA frame was
-    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
+    // window without triggering protocol error. This buffer is drained after each DATA frame was
+    // dispatched through the filter chain unless
+    // envoy.reloadable_features.defer_processing_backedup_streams is enabled,
+    // in which case this buffer may accumulate data.
+    // See source/docs/flow_control.md for more information.
     Buffer::InstancePtr pending_recv_data_;
     Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
-    std::unique_ptr<MetadataEncoder> metadata_encoder_;
+    std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
+    std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
+    // Holds the reset reason for this stream. Useful if we have buffered data
+    // to determine whether we should continue processing that data.
+    absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
@@ -307,13 +369,54 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    bool defer_processing_backedup_streams_ : 1;
     absl::string_view details_;
+
+    /**
+     * Tracks buffering that may occur for a stream if it is backed up.
+     */
+    struct BufferedStreamManager {
+      bool body_buffered_{false};
+      bool trailers_buffered_{false};
+
+      // We received a call to onStreamClose for the stream, but deferred it
+      // as the stream had pending data to process and the stream was not reset.
+      bool buffered_on_stream_close_{false};
+
+      bool hasBufferedBodyOrTrailers() const { return body_buffered_ || trailers_buffered_; }
+    };
+
+    BufferedStreamManager stream_manager_;
+    Event::SchedulableCallbackPtr process_buffered_data_callback_;
 
   protected:
     // Http::MultiplexedStreamImplBase
     bool hasPendingData() override {
       return pending_send_data_->length() > 0 || pending_trailers_to_encode_ != nullptr;
     }
+    bool continueProcessingBufferedData() const {
+      // We should stop processing buffered data if either
+      // 1) Buffers become overrun
+      // 2) The stream ends up getting reset
+      // Both of these can end up changing as a result of processing buffered data.
+      return !buffersOverrun() && !reset_reason_.has_value();
+    }
+
+    // Avoid inversion in the case where we saw trailers, acquiring the
+    // remote_end_stream_ being set to true, but the trailers ended up being
+    // buffered.
+    // All buffered body must be consumed before we send end stream.
+    bool sendEndStream() const {
+      return remote_end_stream_ && !stream_manager_.trailers_buffered_ &&
+             !stream_manager_.body_buffered_;
+    }
+
+    // Schedules a callback to process buffered data.
+    void scheduleProcessingOfBufferedData();
+
+    // Marks data consumed by the stream, granting the peer additional stream
+    // window.
+    void grantPeerAdditionalStreamWindow();
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -408,7 +511,7 @@ protected:
     void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder
-    void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+    void encode1xxHeaders(const ResponseHeaderMap& headers) override;
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
@@ -458,6 +561,10 @@ protected:
   bool sendPendingFramesAndHandleError();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
+  void sendSettingsHelper(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                          bool disable_push);
+  void sendSettingsHelperOld(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                             bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
   virtual void onSettings(const nghttp2_settings& settings) {
     ReceivedSettingsImpl received_settings(settings);
@@ -489,13 +596,25 @@ protected:
   void scheduleProtocolConstraintViolationCallback();
   void onProtocolConstraintViolation();
 
-  static Http2Callbacks http2_callbacks_;
+  // Uses a new wrapper API around the underlying HTTP/2 codec. Guarded by the
+  // "envoy.reloadable_features.http2_new_codec_wrapper" runtime feature flag.
+  const bool use_new_codec_wrapper_;
+  // Whether to use the new HTTP/2 library. Only has an effect if `use_new_codec_wrapper` is true.
+  const bool use_oghttp2_library_;
+  // TODO(birenroy): Make this static again when removing
+  // use_new_codec_wrapper_.
+  Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
   // Tracks the stream id of the current stream we're processing.
   // This should only be set while we're in the context of dispatching to nghttp2.
   absl::optional<int32_t> current_stream_id_;
+  // Used iff use_new_codec_wrapper_ is false.
   nghttp2_session* session_{};
+  // Used iff use_new_codec_wrapper_ is true.
+  std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor_;
+  std::unique_ptr<http2::adapter::Http2Adapter> adapter_;
+
   CodecStats& stats_;
   Network::Connection& connection_;
   const uint32_t max_headers_kb_;
@@ -545,15 +664,18 @@ private:
   int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
-  int onStreamClose(int32_t stream_id, uint32_t error_code);
+  // Pass through invoking with the actual stream.
+  Status onStreamClose(int32_t stream_id, uint32_t error_code);
+  // Should be invoked directly in buffered onStreamClose scenarios
+  // where nghttp2 might have already forgotten about the stream.
+  Status onStreamClose(StreamImpl* stream, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
+  // Called iff use_new_codec_wrapper_ is false.
   ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   void addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual ProtocolConstraints::ReleasorProc
-  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
@@ -584,7 +706,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  using SessionFactory = Nghttp2SessionFactory;
+  using SessionFactory = Http2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        CodecStats& stats, Random::RandomGenerator& random_generator,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
@@ -600,19 +722,11 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-
-  // Tracking of frames for flood and abuse mitigation for upstream connections is presently enabled
-  // by the `envoy.reloadable_features.upstream_http2_flood_checks` flag.
-  // TODO(yanavlasov): move to the base class once the runtime flag is removed.
-  ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override;
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
-
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
   std::chrono::milliseconds idle_session_requires_ping_interval_;
-  // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
-  bool enable_upstream_http2_flood_checks_;
 };
 
 /**
@@ -633,8 +747,6 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  ProtocolConstraints::ReleasorProc
-  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {

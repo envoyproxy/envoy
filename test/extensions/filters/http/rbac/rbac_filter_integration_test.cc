@@ -573,7 +573,10 @@ typed_config:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 
@@ -636,7 +639,7 @@ typed_config:
         - or_rules:
             rules:
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                name: envoy.rbac.matchers.upstream_ip_port
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
@@ -679,21 +682,21 @@ typed_config:
         - or_rules:
             rules:
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                name: envoy.rbac.matchers.upstream_ip_port
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
                     address_prefix: 127.2.1.1
                     prefix_len: 24
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                name: envoy.rbac.matchers.upstream_ip_port
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
                     address_prefix: 127.0.0.1
                     prefix_len: 24
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                name: envoy.rbac.matchers.upstream_ip_port
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:

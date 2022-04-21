@@ -126,16 +126,10 @@ class StatefulProcessor:
                         r'^\s*$', '', without_comments, flags=re.MULTILINE)
                     # Windows support: see PR 10542 for details.
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
-                    # Kafka JSON files are malformed. See KAFKA-12794.
-                    if input_file == 'external/kafka_source/DescribeProducersRequest.json':
-                        amended = amended[:-6]
                     message_spec = json.loads(amended)
-                    # Adopt publicly available messages only:
-                    # https://kafka.apache.org/28/protocol.html#protocol_api_keys
                     api_key = message_spec['apiKey']
-                    if api_key <= 51 or api_key in [56, 57, 60, 61]:
-                        message = self.parse_top_level_element(message_spec)
-                        messages.append(message)
+                    message = self.parse_top_level_element(message_spec)
+                    messages.append(message)
             except Exception as e:
                 print('could not process %s' % input_file)
                 raise
@@ -206,7 +200,8 @@ class StatefulProcessor:
                 if child is not None:
                     fields.append(child)
             # Some structures share the same name, use request/response as prefix.
-            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'TopicData']:
+            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot',
+                             'SnapshotId', 'TopicData', 'TopicSnapshot']:
                 type_name = self.type.capitalize() + type_name
             # Some of the types repeat multiple times (e.g. AlterableConfig).
             # In such a case, every second or later occurrence of the same name is going to be prefixed
@@ -539,13 +534,15 @@ class Primitive(TypeSpecification):
     # Custom values that make test code more readable.
     KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST = {
         'string':
-            '"string"',
+            'static_cast<std::string>("string")',
         'bool':
             'false',
         'int8':
             'static_cast<int8_t>(8)',
         'int16':
             'static_cast<int16_t>(16)',
+        'uint16':
+            'static_cast<uint16_t>(17)',
         'int32':
             'static_cast<int32_t>(32)',
         'int64':

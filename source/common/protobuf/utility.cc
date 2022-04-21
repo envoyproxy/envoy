@@ -18,6 +18,7 @@
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
+#include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
 
@@ -187,16 +188,15 @@ bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint6
 uint64_t fractionalPercentDenominatorToInt(
     const envoy::type::v3::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::type::v3::FractionalPercent::HUNDRED:
     return 100;
   case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
     return 10000;
   case envoy::type::v3::FractionalPercent::MILLION:
     return 1000000;
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 } // namespace ProtobufPercentHelper
@@ -240,6 +240,25 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
+  bool has_unknown_field;
+  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
+  if (status.ok()) {
+    return;
+  }
+  if (has_unknown_field) {
+    // If the parsing failure is caused by the unknown fields.
+    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                      status.ToString());
+  } else {
+    // If the error has nothing to do with unknown field.
+    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+  }
+}
+
+Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
+                                                        Protobuf::Message& message,
+                                                        bool& has_unknown_fileld) {
+  has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;
   // Let's first try and get a clean parse when checking for unknown fields;
@@ -248,7 +267,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (strict_status.ok()) {
     // Success, no need to do any extra work.
-    return;
+    return strict_status;
   }
   // If we fail, we see if we get a clean parse when allowing unknown fields.
   // This is essentially a workaround
@@ -259,15 +278,11 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   // If we still fail with relaxed unknown field checking, the error has nothing
   // to do with unknown fields.
-  if (!relaxed_status.ok()) {
-    throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                         "): " + json);
+  if (relaxed_status.ok()) {
+    has_unknown_fileld = true;
+    return strict_status;
   }
-  // We know it's an unknown field at this point. If we're at the latest
-  // version, then it's definitely an unknown field, otherwise we try to
-  // load again at a later version.
-  validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                    strict_status.ToString());
+  return relaxed_status;
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
@@ -358,8 +373,7 @@ public:
                               Runtime::Loader* runtime)
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  const void* onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-                      const void*) override {
+  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
     const Protobuf::Reflection* reflection = message.GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
 
@@ -371,7 +385,7 @@ public:
     // If this field is not in use, continue.
     if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
         (!field.is_repeated() && !reflection->HasField(message, &field))) {
-      return nullptr;
+      return;
     }
 
     const auto& field_status = field.options().GetExtension(xds::annotations::v3::field_status);
@@ -382,21 +396,6 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
-      if (absl::StartsWith(field.name(), "hidden_envoy_deprecated_")) {
-        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
-        // unless it is part of an explicit test that needs access to the deprecated field
-        // when we enable runtime deprecation override to allow point field overrides for tests.
-        if (!runtime_ ||
-            !runtime_->snapshot().deprecatedFeatureEnabled(
-                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
-          const std::string fatal_error = absl::StrCat(
-              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
-              "' from file ", filename,
-              " while using the latest V3 configuration. This field has been removed from the "
-              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-          throw ProtoValidationException(fatal_error, message);
-        }
-      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -407,10 +406,10 @@ public:
                             absl::StrCat("envoy.deprecated_features:", field.full_name()), warning,
                             message, validation_visitor_);
     }
-    return nullptr;
   }
 
-  void onMessage(const Protobuf::Message& message, const void*) override {
+  void onMessage(const Protobuf::Message& message,
+                 absl::Span<const Protobuf::Message* const> parents, bool) override {
     if (message.GetDescriptor()
             ->options()
             .GetExtension(xds::annotations::v3::message_status)
@@ -434,11 +433,18 @@ public:
     if (!unknown_fields.empty()) {
       std::string error_msg;
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
-        error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+        absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        validation_visitor_.onUnknownField("type " + message.GetTypeName() +
-                                           " with unknown field set {" + error_msg + "}");
+        validation_visitor_.onUnknownField(
+            fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
+                        !parents.empty()
+                            ? absl::StrJoin(parents, "::",
+                                            [](std::string* out, const Protobuf::Message* const m) {
+                                              absl::StrAppend(out, m->GetTypeName());
+                                            })
+                            : "root",
+                        error_msg));
       }
     }
   }
@@ -452,9 +458,37 @@ private:
 
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           Runtime::Loader* runtime) {
+                                           bool recurse_into_any) {
+  Runtime::Loader* runtime = validation_visitor.runtime().has_value()
+                                 ? &validation_visitor.runtime().value().get()
+                                 : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
-  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, nullptr);
+  ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+}
+
+namespace {
+
+class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
+                 bool was_any_or_top_level) override {
+    std::string err;
+    // PGV verification is itself recursive up to the point at which it hits an Any message. As
+    // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
+    // at which PGV would have stopped because it does not itself check within Any messages.
+    if (was_any_or_top_level && !pgv::BaseValidator::AbstractCheckMessage(message, &err)) {
+      ProtoExceptionUtil::throwProtoValidationException(err, message);
+    }
+  }
+
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+};
+
+} // namespace
+
+void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
+  PgvCheckVisitor visitor;
+  ProtobufMessage::traverseMessage(visitor, message, true);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
@@ -541,8 +575,20 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
   jsonConvertInternal(source, validation_visitor, dest);
 }
 
-void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
+bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  std::string json;
+  auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  if (!status.ok()) {
+    return false;
+  }
+  bool has_unknow_field;
+  status = MessageUtil::loadFromJsonNoThrow(json, dest, has_unknow_field);
+  if (status.ok() || has_unknow_field) {
+    return true;
+  }
+  return false;
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -812,10 +858,8 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
     }
     return true;
   }
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  return false;
 }
 
 const ProtobufWkt::Value& ValueUtil::nullValue() {

@@ -7,6 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.admin.v3";
 option java_outer_classname = "InitDumpProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/admin/v3;adminv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: InitDump]

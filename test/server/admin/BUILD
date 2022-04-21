@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -49,6 +50,7 @@ envoy_cc_test(
     srcs = ["admin_filter_test.cc"],
     deps = [
         "//source/server/admin:admin_filter_lib",
+        "//source/server/admin:admin_lib",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
     ],
@@ -60,10 +62,59 @@ envoy_cc_test(
     deps = [
         ":admin_instance_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//source/server/admin:stats_handler_lib",
+        "//source/server/admin:utils_lib",
         "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:real_threads_test_helper_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_render_test",
+    srcs = ["stats_render_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_render_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_request_test",
+    srcs = ["stats_request_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_request_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "stats_handler_speed_test",
+    srcs = ["stats_handler_speed_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:admin_lib",
+        "//source/server/admin:stats_handler_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "utils_test",
+    srcs = ["utils_test.cc"],
+    deps = [
+        "//source/server/admin:utils_lib",
     ],
 )
 

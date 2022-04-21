@@ -93,7 +93,7 @@ public:
   // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
@@ -564,7 +564,7 @@ public:
   }
   void onConfigUpdate(const std::vector<DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {

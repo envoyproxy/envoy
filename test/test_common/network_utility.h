@@ -8,14 +8,22 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
 namespace Test {
+
+#if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
+using IoSocketHandlePlatformImpl = Win32SocketHandleImpl;
+#else
+using IoSocketHandlePlatformImpl = IoSocketHandleImpl;
+#endif
 
 /**
  * Determines if the passed in address and port is available for binding. If the port is zero,

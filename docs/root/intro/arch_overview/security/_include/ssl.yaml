@@ -50,7 +50,9 @@ static_resources:
             private_key: {"filename": "certs/serverkey.pem"}
             ocsp_staple: {"filename": "certs/server_ocsp_resp.der"}
           validation_context:
-            match_subject_alt_names:
-            - exact: "foo"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "foo"
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bitset>
+
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -88,9 +90,20 @@ public:
   void initialize() override;
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { return nullptr; }
   // Preconnect not implemented for hash based load balancing
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 
 protected:
   ThreadAwareLoadBalancerBase(
@@ -98,7 +111,7 @@ protected:
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
+        factory_(new LoadBalancerFactoryImpl(stats, random, override_host_status_)) {}
 
 private:
   struct PerPriorityState {
@@ -115,9 +128,19 @@ private:
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnect not implemented for hash based load balancing
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
+    HostStatusSet override_host_status_{};
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
@@ -127,14 +150,16 @@ private:
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
+                            HostStatusSet status)
+        : stats_(stats), random_(random), override_host_status_(status) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
+    HostStatusSet override_host_status_{};
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.

@@ -96,6 +96,24 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::test
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+
+  EXPECT_EQ(nullptr, lb_->factory()->create()->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->factory()->create()->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->factory()
+                   ->create()
+                   ->selectExistingConnection(nullptr, *mock_host, hash_key)
+                   .has_value());
+}
+
+TEST_P(RingHashLoadBalancerTest, BaseMethods) {
+  init();
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 };
 
 TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
@@ -106,9 +124,7 @@ TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
 
-  LoadBalancerContext::OverrideHost expected_host{
-      "1.2.3.4", 1u << static_cast<size_t>(Host::Health::Healthy) |
-                     1u << static_cast<size_t>(Host::Health::Degraded)};
+  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
   EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
 
   // Mock membership update and update host map shared pointer in the lb.

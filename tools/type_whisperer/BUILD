@@ -56,7 +56,7 @@ py_binary(
 
 label_flag(
     name = "api_type_db_target",
-    build_setting_default = "@envoy_api//versioning:active_protos",
+    build_setting_default = "@envoy_api//:all_protos",
     visibility = ["//visibility:public"],
 )
 

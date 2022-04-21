@@ -49,8 +49,8 @@ bool validatedLowerCaseString(absl::string_view str) {
   return lower_case_str == str;
 }
 
-absl::string_view delimiterByHeader(const LowerCaseString& key, bool correctly_coalesce_cookies) {
-  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
+absl::string_view delimiterByHeader(const LowerCaseString& key) {
+  if (key == Http::Headers::get().Cookie) {
     return DelimiterForInlineCookies;
   }
   return DelimiterForInlineHeaders;
@@ -76,7 +76,7 @@ HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { A
 HeaderString::HeaderString(HeaderString&& move_value) noexcept
     : buffer_(std::move(move_value.buffer_)) {
   move_value.clear();
-  ASSERT(valid());
+  // Move constructor does not validate and relies on the source object validating its mutations.
 }
 
 bool HeaderString::valid() const { return validHeaderString(getStringView()); }
@@ -167,6 +167,16 @@ void HeaderString::setInteger(uint64_t value) {
 void HeaderString::setReference(absl::string_view ref_value) {
   buffer_ = ref_value;
   ASSERT(valid());
+}
+
+void HeaderString::setCopyUnvalidatedForTestOnly(absl::string_view view) {
+  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
+    // Switching from Type::Reference to Type::Inline
+    buffer_ = InlineHeaderVector();
+  }
+
+  getInVec(buffer_).reserve(view.size());
+  getInVec(buffer_).assign(view.data(), view.data() + view.size());
 }
 
 uint32_t HeaderString::size() const {
@@ -378,8 +388,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
-      const auto delimiter =
-          delimiterByHeader(*lookup.value().key_, header_map_correctly_coalesce_cookies_);
+      const auto delimiter = delimiterByHeader(*lookup.value().key_);
       const uint64_t added_size =
           appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
@@ -446,7 +455,7 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const auto delimiter = delimiterByHeader(key, header_map_correctly_coalesce_cookies_);
+    const auto delimiter = delimiterByHeader(key);
     const uint64_t added_size = appendToHeader(entry[0]->value(), value, delimiter);
     addSize(added_size);
   } else {

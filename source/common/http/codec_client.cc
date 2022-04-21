@@ -44,11 +44,8 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
   connection_->noDelay(true);
 }
 
-CodecClient::~CodecClient() {
-  ASSERT(connect_called_, "CodecClient::connect() is not called through out the life time.");
-}
-
 void CodecClient::connect() {
+  ASSERT(!connect_called_);
   connect_called_ = true;
   ASSERT(codec_ != nullptr);
   // In general, codecs are handed new not-yet-connected connections, but in the
@@ -79,6 +76,10 @@ RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   LinkedList::moveIntoList(std::move(request), active_requests_);
+
+  auto upstream_info = connection_->streamInfo().upstreamInfo();
+  upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
+
   disableIdleTimer();
   return *active_requests_.front()->encoder_;
 }
@@ -113,9 +114,6 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
         reason = StreamResetReason::ProtocolError;
         connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
-    } else {
-      ENVOY_CONN_LOG(warn, "Connection is closed by {} during connecting.", *connection_,
-                     (event == Network::ConnectionEvent::RemoteClose ? "peer" : "self"));
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
@@ -171,6 +169,15 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
+    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator) {
+  connect();
+}
+
+NoConnectCodecClientProd::NoConnectCodecClientProd(CodecType type,
+                                                   Network::ClientConnectionPtr&& connection,
+                                                   Upstream::HostDescriptionConstSharedPtr host,
+                                                   Event::Dispatcher& dispatcher,
+                                                   Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case CodecType::HTTP1: {
@@ -198,11 +205,10 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
 #endif
   }
   }
-  connect();
 }
 
 } // namespace Http

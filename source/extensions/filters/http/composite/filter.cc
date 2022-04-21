@@ -49,8 +49,8 @@ void Filter::decodeComplete() {
   }
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode1xxHeaders,
                                 Http::FilterHeadersStatus::Continue, headers);
 }
 
@@ -147,8 +147,8 @@ void Filter::StreamFilterWrapper::decodeComplete() {
 }
 
 Http::FilterHeadersStatus
-Filter::StreamFilterWrapper::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
+Filter::StreamFilterWrapper::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode1xxHeaders,
                                 Http::FilterHeadersStatus::Continue, headers);
 }
 Http::FilterHeadersStatus

@@ -56,7 +56,7 @@ public:
     auto config = plugin_->wasmConfig();
     config.allowedCapabilities() = allowed_capabilities_;
     config.environmentVariables() = envs_;
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_, *api_,
                                                              cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(
@@ -85,21 +85,24 @@ public:
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
 };
 
-class WasmTest : public WasmTestBase, public testing::TestWithParam<std::string> {
+class WasmTest : public WasmTestBase,
+                 public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  void createWasm() { WasmTestBase::createWasm(GetParam()); }
+  void createWasm() { WasmTestBase::createWasm(std::get<0>(GetParam())); }
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTest);
 
-class WasmNullTest : public WasmTestBase, public testing::TestWithParam<std::string> {
+class WasmNullTest : public WasmTestBase,
+                     public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
   void createWasm() {
-    WasmTestBase::createWasm(GetParam());
+    WasmTestBase::createWasm(std::get<0>(GetParam()));
     const auto code =
-        GetParam() != "null"
+        std::get<0>(GetParam()) != "null"
             ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
                   "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/stats_cpp.wasm"))
             : "WasmStatsCpp";
@@ -109,7 +112,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, Envoy::Extensions::Common::Wasm::runtime_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
 
 class WasmTestMatrix : public WasmTestBase,
                        public testing::TestWithParam<std::tuple<std::string, std::string>> {
@@ -130,8 +134,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
-                         testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
-                                          Envoy::Extensions::Common::Wasm::language_values));
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_language_values);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
@@ -170,12 +173,6 @@ TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
 }
 
 TEST_P(WasmTest, BadSignature) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/bad_signature_cpp.wasm"));
@@ -186,12 +183,6 @@ TEST_P(WasmTest, BadSignature) {
 }
 
 TEST_P(WasmTest, Segv) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
@@ -205,12 +196,6 @@ TEST_P(WasmTest, Segv) {
 }
 
 TEST_P(WasmTest, DivByZero) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
@@ -224,12 +209,6 @@ TEST_P(WasmTest, DivByZero) {
 }
 
 TEST_P(WasmTest, IntrinsicGlobals) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/emscripten_cpp.wasm"));
@@ -249,12 +228,6 @@ TEST_P(WasmTest, IntrinsicGlobals) {
 // change this behavior by providing non-trapping instructions, but in the mean time we support the
 // default Emscripten behavior.
 TEST_P(WasmTest, Asm2Wasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/asm2wasm_cpp.wasm"));
@@ -267,12 +240,6 @@ TEST_P(WasmTest, Asm2Wasm) {
 }
 
 TEST_P(WasmNullTest, Stats) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
 
@@ -292,12 +259,6 @@ TEST_P(WasmNullTest, Stats) {
 }
 
 TEST_P(WasmNullTest, StatsHigherLevel) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
 
@@ -323,12 +284,6 @@ TEST_P(WasmNullTest, StatsHigherLevel) {
 }
 
 TEST_P(WasmNullTest, StatsHighLevel) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   createWasm();
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
 

@@ -19,7 +19,7 @@ SipFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoType
 
   return [&context, stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(
-        std::make_shared<Router>(context.clusterManager(), stat_prefix, context.scope()));
+        std::make_shared<Router>(context.clusterManager(), stat_prefix, context.scope(), context));
   };
 }
 

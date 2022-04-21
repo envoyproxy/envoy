@@ -7,13 +7,22 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
+
+/**
+ * Runtime representation of an encoded stat name.
+ */
+class StatName;
+
+/**
+ * Holds a set of symbols used to compose hierarhical names.
+ */
+class SymbolTable;
 
 /**
  * General interface for all stats objects.
@@ -189,6 +198,16 @@ public:
 };
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
+
+/**
+ * Callback invoked to provide size of stats container.
+ */
+using SizeFn = std::function<void(std::size_t)>;
+
+/**
+ * Callback invoked for each stat during iteration.
+ */
+template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
 } // namespace Stats
 } // namespace Envoy
