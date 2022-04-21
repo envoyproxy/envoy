@@ -53,6 +53,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
+        "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

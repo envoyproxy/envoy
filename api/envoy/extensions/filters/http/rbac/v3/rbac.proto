@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.rbac.v3;
 
 import "envoy/config/rbac/v3/rbac.proto";
 
+import "xds/annotations/v3/migrate.proto";
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
@@ -26,32 +27,30 @@ message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rbac.v2.RBAC";
 
-  oneof rules_specifier {
-    // Specify the RBAC rules to be applied globally.
-    // If absent, no enforcing RBAC policy will be applied.
-    // If present and empty, DENY.
-    config.rbac.v3.RBAC rules = 1;
+  // Specify the RBAC rules to be applied globally.
+  // If absent, no enforcing RBAC policy will be applied.
+  // If present and empty, DENY.
+  config.rbac.v3.RBAC rules = 1;
 
-    // The match tree to use when resolving RBAC action for incoming requests. Requests do not
-    // match any matcher will be denied.
-    // If absent, no enforcing RBAC matcher will be applied.
-    // If present and empty, deny all requests.
-    xds.type.matcher.v3.Matcher matcher = 4
-        [(xds.annotations.v3.field_status).work_in_progress = true];
-  }
+  // The match tree to use when resolving RBAC action for incoming requests. Requests do not
+  // match any matcher will be denied.
+  // If absent, no enforcing RBAC matcher will be applied.
+  // If present and empty, deny all requests.
+  // If both rules and matcher are configured, the matcher will be ignored.
+  xds.type.matcher.v3.Matcher matcher = 4
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  oneof shadow_rules_specifier {
-    // Shadow rules are not enforced by the filter (i.e., returning a 403)
-    // but will emit stats and logs and can be used for rule testing.
-    // If absent, no shadow RBAC policy will be applied.
-    config.rbac.v3.RBAC shadow_rules = 2;
+  // Shadow rules are not enforced by the filter (i.e., returning a 403)
+  // but will emit stats and logs and can be used for rule testing.
+  // If absent, no shadow RBAC policy will be applied.
+  config.rbac.v3.RBAC shadow_rules = 2;
 
-    // The match tree to use for emitting stats and logs which can be used for rule testing for
-    // incoming requests.
-    // If absent, no shadow matcher will be applied.
-    xds.type.matcher.v3.Matcher shadow_matcher = 5
-        [(xds.annotations.v3.field_status).work_in_progress = true];
-  }
+  // The match tree to use for emitting stats and logs which can be used for rule testing for
+  // incoming requests.
+  // If absent, no shadow matcher will be applied.
+  // If both shadow rules and shadow matcher are configured, the shadow matcher will be ignored.
+  xds.type.matcher.v3.Matcher shadow_matcher = 5
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // If specified, shadow rules will emit stats with the given prefix.
   // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with

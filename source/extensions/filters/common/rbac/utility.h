@@ -42,17 +42,19 @@ std::unique_ptr<RoleBasedAccessControlEngine>
 createEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
              ProtobufMessage::ValidationVisitor& validation_visitor,
              ActionValidationVisitor& action_validation_visitor) {
-  switch (config.rules_specifier_case()) {
-  case ConfigType::kRules:
+  if (config.has_rules()) {
+    if (config.has_matcher()) {
+      ENVOY_LOG_MISC(warn, "matcher is ignored");
+    }
     return std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), validation_visitor,
                                                               EnforcementMode::Enforced);
-  case ConfigType::kMatcher:
+  }
+  if (config.has_matcher()) {
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
         config.matcher(), context, action_validation_visitor, EnforcementMode::Enforced);
-  case ConfigType::RULES_SPECIFIER_NOT_SET:
-    return nullptr;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+
+  return nullptr;
 }
 
 template <class ConfigType>
@@ -60,17 +62,19 @@ std::unique_ptr<RoleBasedAccessControlEngine>
 createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    ActionValidationVisitor& action_validation_visitor) {
-  switch (config.shadow_rules_specifier_case()) {
-  case ConfigType::kShadowRules:
+  if (config.has_shadow_rules()) {
+    if (config.has_shadow_matcher()) {
+      ENVOY_LOG_MISC(warn, "shadow matcher is ignored");
+    }
     return std::make_unique<RoleBasedAccessControlEngineImpl>(
         config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
-  case ConfigType::kShadowMatcher:
+  }
+  if (config.has_shadow_matcher()) {
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
         config.shadow_matcher(), context, action_validation_visitor, EnforcementMode::Shadow);
-  case ConfigType::SHADOW_RULES_SPECIFIER_NOT_SET:
-    return nullptr;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+
+  return nullptr;
 }
 
 std::string responseDetail(const std::string& policy_id);
