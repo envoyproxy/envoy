@@ -1,3 +1,4 @@
+load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("//bazel:swift_header_collector.bzl", "swift_header_collector")
@@ -64,7 +65,7 @@ ios_static_framework(
     name = "ios_framework",
     hdrs = ["ios_lib_headers"],
     bundle_name = "Envoy",
-    minimum_os_version = "12.0",
+    minimum_os_version = MINIMUM_IOS_VERSION,
     # Currently the framework is over 2GB, and is not worth caching
     tags = [
         "no-cache",
