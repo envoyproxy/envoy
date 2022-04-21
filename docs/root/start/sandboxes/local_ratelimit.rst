@@ -41,16 +41,15 @@ Step 2: Test rate limiting of upstream service
 
 The sandbox is configured with ``10000`` port for upstream service.
 
-If a request reaches the rate limit, Envoy will add ``x-local-rate-limit`` header and refuse the connection with a 429 HTTP response code and with the content ``local_rate_limited``.
+Two descriptors with generic_key are set in this example, and the route will match the descriptor with generic_key ``test1``.
+
+If a request reaches the descriptor ``test1's`` rate limit, Envoy will add ``x-local-rate-limit`` header and refuse the connection with a 429 HTTP response code and with the content ``local_rate_limited``.
 
 Now, use ``curl`` to make a request five times for the limited upsteam service:
 
 .. code-block:: console
 
     $ for i in {1..5}; do curl -si localhost:10000 | grep -E "x-local-rate-limit|429|local_rate_limited"; done
-    HTTP/1.1 429 Too Many Requests
-    x-local-rate-limit: true
-    local_rate_limited
     HTTP/1.1 429 Too Many Requests
     x-local-rate-limit: true
     local_rate_limited
