@@ -842,6 +842,11 @@ envoy.matching.inputs.application_protocol:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
+envoy.matching.inputs.authenticated:
+  categories:
+  - envoy.matching.ssl.input
+  security_posture: unknown
+  status: alpha
 envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.network.custom_matchers
