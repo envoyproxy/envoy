@@ -3,6 +3,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -102,14 +103,39 @@ TEST_P(UdpaXdsIntegrationTestListCollection, RouterRequestAndResponseWithBodyNoB
 }
 
 class LdsInplaceUpdateTcpProxyIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public BaseIntegrationTest {
 public:
   LdsInplaceUpdateTcpProxyIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::baseConfig() +
+                                                         (std::get<1>(GetParam()) ? R"EOF(
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn0'":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+            "'alpn1'":
+              action:
+                name: bar
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: bar
+)EOF"
+                                                                                  : "") +
+                                                         R"EOF(
     filter_chains:
     - filter_chain_match:
         application_protocols: ["alpn0"]
+      name: foo
       filters:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
@@ -118,6 +144,7 @@ public:
           cluster: cluster_0
     - filter_chain_match:
         application_protocols: ["alpn1"]
+      name: bar
       filters:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
@@ -136,12 +163,12 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF") {}
+)EOF"),
+        matcher_(std::get<1>(GetParam())) {}
 
   void initialize() override {
     config_helper_.renameListener("tcp");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
 
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -168,6 +195,7 @@ public:
                                                                 const std::string& request,
                                                                 std::string& response) {
     Buffer::OwnedImpl buffer(request);
+    TestListenerFilter::setAlpn(alpn);
     return std::make_unique<RawConnectionDriver>(
         lookupPort("tcp"), buffer,
         [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
@@ -181,6 +209,7 @@ public:
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
+  bool matcher_;
 };
 
 // Verify that tcp connection 1 is closed while client 0 survives when deleting filter chain 1.
@@ -205,6 +234,24 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         listener->mutable_filter_chains()->RemoveLast();
+        if (matcher_) {
+          TestUtility::loadFromYaml(R"EOF(
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn0'":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+          )EOF",
+                                    *listener->mutable_filter_chain_matcher());
+        }
       });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -220,7 +267,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -250,6 +297,25 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
         *listener->mutable_filter_chains(2)
              ->mutable_filter_chain_match()
              ->mutable_application_protocols(0) = "alpn2";
+        listener->mutable_filter_chains(2)->set_name("baz");
+        if (matcher_) {
+          TestUtility::loadFromYaml(R"EOF(
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn2'":
+              action:
+                name: baz
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: baz
+          )EOF",
+                                    *listener->mutable_filter_chain_matcher());
+        }
       });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -266,7 +332,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_2->write("world2"));
   while (response_2.find("world2") == std::string::npos) {
-    client_conn_2->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_2->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_2->close();
   while (!client_conn_2->closed()) {
@@ -279,7 +345,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -288,18 +354,19 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 }
 
 class LdsInplaceUpdateHttpIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  LdsInplaceUpdateHttpIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())),
+        matcher_(std::get<1>(GetParam())) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
     setUpstreamCount(2);
 
     config_helper_.renameListener("http");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -316,6 +383,7 @@ public:
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       *filter_chain_0->mutable_filter_chain_match()->mutable_application_protocols()->Add() =
           "alpn0";
+      filter_chain_0->set_name("alpn0");
       auto* filter_chain_1 = bootstrap.mutable_static_resources()
                                  ->mutable_listeners(0)
                                  ->mutable_filter_chains()
@@ -325,6 +393,7 @@ public:
       // filter chain 1
       // alpn1, route to cluster_1
       *filter_chain_1->mutable_filter_chain_match()->mutable_application_protocols(0) = "alpn1";
+      filter_chain_1->set_name("alpn1");
 
       auto* config_blob = filter_chain_1->mutable_filters(0)->mutable_typed_config();
 
@@ -349,6 +418,39 @@ public:
                                         ->mutable_listeners(0)
                                         ->mutable_default_filter_chain();
         default_filter_chain->MergeFrom(*filter_chain_0);
+        default_filter_chain->set_name("default");
+      }
+      if (matcher_) {
+        TestUtility::loadFromYaml(R"EOF(
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn0'":
+              action:
+                name: alpn0
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: alpn0
+            "'alpn1'":
+              action:
+                name: alpn1
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: alpn1
+            "'alpn2'":
+              action:
+                name: alpn2
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: alpn2
+          )EOF",
+                                  *bootstrap.mutable_static_resources()
+                                       ->mutable_listeners(0)
+                                       ->mutable_filter_chain_matcher());
       }
     });
 
@@ -361,6 +463,7 @@ public:
   }
 
   IntegrationCodecClientPtr createHttpCodec(const std::string& alpn) {
+    TestListenerFilter::setAlpn(alpn);
     auto ssl_conn = dispatcher_->createClientConnection(
         address_, Network::Address::InstanceConstSharedPtr(),
         context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -396,6 +499,7 @@ public:
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::Address::InstanceConstSharedPtr address_;
   bool use_default_balancer_{false};
+  bool matcher_;
 };
 
 // Verify that http response on filter chain 1 and default filter chain have "Connection: close"
@@ -456,10 +560,12 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
     *listener->mutable_filter_chains(2)
          ->mutable_filter_chain_match()
          ->mutable_application_protocols(0) = "alpn2";
+    listener->mutable_filter_chains(2)->set_name("alpn2");
 
     auto default_filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
     default_filter_chain->MergeFrom(*listener->mutable_filter_chains(1));
+    default_filter_chain->set_name("default");
   });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -533,13 +639,15 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
 
 // Verify default filter chain update is filter chain only update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, DefaultFilterChainUpdate) {}
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndMatcher, LdsInplaceUpdateHttpIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateTcpProxyIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndMatcher, LdsInplaceUpdateTcpProxyIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 
 using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
@@ -550,6 +658,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
+  config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   initialize();
   // Given we're using LDS in this test, initialize() will not complete until
@@ -625,9 +734,10 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
 class LdsStsIntegrationTest : public Event::SimulatedTimeSystem,
                               public LdsInplaceUpdateTcpProxyIntegrationTest {};
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsStsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndMatcher, LdsStsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 
 // Verify that the listener in place update will accomplish anyway if the listener is removed.
 TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
@@ -669,7 +779,7 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {

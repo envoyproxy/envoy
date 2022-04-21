@@ -15,6 +15,21 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "test_listener_filter_lib",
+    srcs = [
+        "test_listener_filter.cc",
+    ],
+    hdrs = [
+        "test_listener_filter.h",
+    ],
+    deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_body_filter_config_lib",
     srcs = [
         "add_body_filter.cc",
@@ -632,6 +647,26 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "inspect_data_listener_filter_config_proto",
+    srcs = [":inspect_data_listener_filter_config.proto"],
+)
+
+envoy_cc_test_library(
+    name = "inspect_data_listener_filter_lib",
+    srcs = [
+        "inspect_data_listener_filter.cc",
+    ],
+    deps = [
+        ":inspect_data_listener_filter_config_proto_cc_proto",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

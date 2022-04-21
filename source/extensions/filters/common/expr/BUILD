@@ -51,7 +51,6 @@ envoy_cc_library(
     hdrs = [
         "cel_state.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
         "//source/common/protobuf",

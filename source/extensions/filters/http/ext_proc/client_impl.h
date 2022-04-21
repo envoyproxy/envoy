@@ -23,16 +23,14 @@ using ProcessingResponsePtr = std::unique_ptr<ProcessingResponse>;
 
 class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
-  ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager,
-                              const envoy::config::core::v3::GrpcService& grpc_service,
-                              Stats::Scope& scope);
+  ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
   ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
+                                   const envoy::config::core::v3::GrpcService& grpc_service,
                                    const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   Grpc::AsyncClientManager& client_manager_;
-  const envoy::config::core::v3::GrpcService grpc_service_;
   Stats::Scope& scope_;
 };
 

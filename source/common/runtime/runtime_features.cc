@@ -29,6 +29,7 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_replies);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
@@ -45,12 +46,14 @@ RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding)
 RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
 RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
+RUNTIME_GUARD(envoy_reloadable_features_http_100_continue_case_insensitive);
 RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_internal_address);
 RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
+RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_102_103);
@@ -73,6 +76,8 @@ RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// TODO(alyssawilk) flip true once H2 caching is on by default.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 // TODO(adisuissa) reset to true to enable unified mux by default
@@ -82,6 +87,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 // TODO(rgs1): Make this enabled after Pinterest tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
+// TODO(birenroy) flip after a burn-in period
+// Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT

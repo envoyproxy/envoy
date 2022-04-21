@@ -29,9 +29,9 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/subscription_factory_impl.h"
-#include "source/common/http/alternate_protocols_cache_impl.h"
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/load_stats_reporter.h"
@@ -114,8 +114,8 @@ protected:
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
   Quic::QuicStatNames& quic_stat_names_;
-  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
-  Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
+  Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
+  Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
   const Server::Instance& server_;
 };
 

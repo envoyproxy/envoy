@@ -92,6 +92,11 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
+    route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
+        vhost, route_config, optional_http_filters, factory_context, validator);
+    break;
+  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
   }
@@ -1417,6 +1422,40 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
   return nullptr;
 }
 
+PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      prefix_(route.match().path_separated_prefix()),
+      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+
+void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                          bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+}
+
+absl::optional<std::string> PathSeparatedPrefixRouteEntryImpl::currentUrlPathAfterRewrite(
+    const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
+}
+
+RouteConstSharedPtr
+PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                           const StreamInfo::StreamInfo& stream_info,
+                                           uint64_t random_value) const {
+  if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    return nullptr;
+  }
+  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
+      (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
 VirtualHostImpl::VirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const OptionalHttpFilters& optional_http_filters, const ConfigImpl& global_route_config,
@@ -1616,7 +1655,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   }
 
   if (matcher_) {
-    Http::Matching::HttpMatchingDataImpl data;
+    Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
     data.onRequestHeaders(headers);
 
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);

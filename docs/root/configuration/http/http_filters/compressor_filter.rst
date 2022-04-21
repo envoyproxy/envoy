@@ -19,8 +19,9 @@ determine whether or not the content should be compressed. The content is
 compressed and then sent to the client with the appropriate headers, if
 response and request allow.
 
-Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
-and :ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
+Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`,
+:ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
+and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd>`
 compression only. Other compression libraries can be supported as extensions.
 
 An example configuration of the filter may look like the following:

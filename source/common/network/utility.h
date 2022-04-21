@@ -9,6 +9,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
+#include "source/common/common/statusor.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -99,6 +101,14 @@ public:
    * @throw EnvoyException if url is invalid.
    */
   static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
+
+  /**
+   * Determine the socket type for a URL.
+   *
+   * @param url supplies the url to resolve.
+   * @return StatusOr<Socket::Type> of the socket type, or an error status if url is invalid.
+   */
+  static StatusOr<Socket::Type> socketTypeFromUrl(const std::string& url);
 
   /**
    * Match a URL to the TCP scheme
@@ -217,7 +227,7 @@ public:
    * Determine whether this is a local connection.
    * @return bool the address is a local connection.
    */
-  static bool isSameIpOrLoopback(const ConnectionSocket& socket);
+  static bool isSameIpOrLoopback(const ConnectionInfoProvider& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
