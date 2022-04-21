@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
     ],
 )
 

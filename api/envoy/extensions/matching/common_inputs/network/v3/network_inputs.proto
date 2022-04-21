@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.matching.common_inputs.network.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.network.v3";
 option java_outer_classname = "NetworkInputsProto";
@@ -94,4 +95,23 @@ message TransportProtocolInput {
 //   unless all connecting clients are known to use ALPN.
 // [#extension: envoy.matching.inputs.application_protocol]
 message ApplicationProtocolInput {
+}
+
+// Input that matches the authentication attributes for a downstream.
+message AuthenticatedInput {
+  enum Field {
+    // The URIs in the SAN field of the certificate. Certificate with multiple URIs will be
+    // concatenated into a ','-delimited list.
+    UriSan = 0;
+
+    // The DNS entries in the SAN field of the certificate. Certificate with multiple DNS
+    // entires will be concatenated into a ','-delimited list.
+    DnsSan = 1;
+
+    // The subject field of the certificate in RFC 2253 format.
+    Subject = 2;
+  }
+
+  // The field in the peer certificate which should be matched on.
+  Field field = 1 [(validate.rules).enum = {defined_only: true}];
 }
