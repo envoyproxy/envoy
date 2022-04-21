@@ -43,7 +43,7 @@ message RouteConfiguration {
   // :ref:`trds
   // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.trds>`
   // option. Users may wish to override the default behavior in certain cases (for example when
-  // using TRDS with a static route table).
+  // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 3;
 }
 
