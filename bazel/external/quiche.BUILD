@@ -158,8 +158,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_adapter_interface_lib",
     hdrs = [
-        "quiche/http2/adapter/http2_session.h",
         "quiche/http2/adapter/http2_adapter.h",
+        "quiche/http2/adapter/http2_session.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
@@ -203,8 +203,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_adapter_nghttp2_callbacks",
-    hdrs = ["quiche/http2/adapter/nghttp2_callbacks.h"],
     srcs = ["quiche/http2/adapter/nghttp2_callbacks.cc"],
+    hdrs = ["quiche/http2/adapter/nghttp2_callbacks.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
@@ -237,8 +237,8 @@ envoy_cc_library(
     name = "http2_adapter_nghttp2_include",
     hdrs = ["quiche/http2/adapter/nghttp2.h"],
     copts = quiche_copts,
-    repository = "@envoy",
     external_deps = ["nghttp2"],
+    repository = "@envoy",
 )
 
 envoy_cc_library(
@@ -267,10 +267,10 @@ envoy_cc_library(
         "quiche/http2/adapter/oghttp2_adapter.h",
         "quiche/http2/adapter/oghttp2_session.h",
     ],
+    copts = quiche_copts,
     external_deps = [
         "abseil_algorithm",
     ],
-    copts = quiche_copts,
     repository = "@envoy",
     deps = [
         ":http2_adapter_callback_visitor",
