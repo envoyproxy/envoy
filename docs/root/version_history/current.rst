@@ -24,7 +24,7 @@ Removed Config or Runtime
 New Features
 ------------
 * ext_proc: added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
-* rbac added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
+* rbac: added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
 
 Deprecated
 ----------
