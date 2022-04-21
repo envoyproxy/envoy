@@ -3699,6 +3699,27 @@ TEST_P(Http2CodecImplTest,
     InSequence seq;
     EXPECT_CALL(request_decoder_, decodeData(_, false));
     process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
+
+  // Enable and disable, since no data nothing should be scheduled.
+  server_->getStream(1)->readDisable(true);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(true);
+  // Send trailers, when we transition to read enabled we should schedule.
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+    process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
   }
 }
 
