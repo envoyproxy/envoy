@@ -69,13 +69,11 @@ message StreamConfig {
   BufferBehavior behavior = 1;
 
   // The amount stored in the memory buffer before buffering to disk.
-  // If unset in route, vhost and listener config, defaults to a hardcoded value
-  // ``default_memory_buffer_bytes_limit`` == 1024*1024
+  // If unset in route, vhost and listener config, defaults to a hardcoded value of 1MiB
   google.protobuf.UInt64Value memory_buffer_bytes_limit = 2;
 
   // The maximum storage (excluding memory) to be buffered in this filter.
-  // If unset in route, vhost and listener config, defaults to a hardcoded value
-  // ``default_storage_buffer_bytes_limit`` == 32*1024*1024
+  // If unset in route, vhost and listener config, defaults to a hardcoded value of 32MiB
   google.protobuf.UInt64Value storage_buffer_bytes_limit = 3;
 
   // The maximum amount that can be queued for writing to storage, above which the
@@ -83,13 +81,13 @@ message StreamConfig {
   // ``memory_buffer_bytes_limit``.
   //
   // For example, assuming the recipient is not consuming data at all, if
-  // ``memory_buffer_bytes_limit`` was 32*1024, and ``storage_buffer_queue_high_watermark_bytes``
-  // was 64*1024, and the filesystem is backed up so writes are not occurring promptly,
+  // ``memory_buffer_bytes_limit`` was 32MiB, and ``storage_buffer_queue_high_watermark_bytes``
+  // was 64MiB, and the filesystem is backed up so writes are not occurring promptly,
   // then:
-  // * Any request less than 32*1024 will eventually pass through without ever attempting
+  // * Any request less than 32MiB will eventually pass through without ever attempting
   //   to write to disk.
-  // * Any request with over 32*1024 buffered will start trying to write to disk.
-  //   * If it reaches (32+64)*1024 buffered and not yet written to disk, a high
+  // * Any request with over 32MiB buffered will start trying to write to disk.
+  //   * If it reaches (32+64)MiB buffered and not yet written to disk, a high
   //     watermark signal is sent to the source.
   // * Any stream whose total size exceeds
   //   ``memory_buffer_bytes_limit + storage_buffer_bytes_limit`` will provoke an error.
@@ -98,7 +96,7 @@ message StreamConfig {
   //   isn't consuming data too slowly.)
   //
   // The low watermark signal is sent when the memory buffer is at size
-  //  ``memory_buffer_bytes_limit + (storage_buffer_bytes_limit / 2)``.
+  //  ``memory_buffer_bytes_limit + (storage_buffer_queue_high_watermark_bytes / 2)``.
   google.protobuf.UInt64Value storage_buffer_queue_high_watermark_bytes = 4;
 }
 
@@ -111,21 +109,23 @@ message StreamConfig {
 message FileSystemBufferFilterConfig {
   // A configuration for an AsyncFileManager.
   //
-  // If unspecified in route, vhost and listener, an exception will be thrown.
+  // If unset in route, vhost and listener, an exception will be thrown.
   common.async_files.v3.AsyncFileManagerConfig manager_config = 1;
 
   // An optional path to which the unlinked files should be written - this may
   // determine which physical storage device will be used.
   //
-  // If unspecified in route, vhost and listener, will use the environment variable
-  // ``TMPDIR``, or, if that's unset, will use ``/tmp``.
+  // If unset in route, vhost and listener, will use the environment variable
+  // ``TMPDIR``, or, if that's also unset, will use ``/tmp``.
   google.protobuf.StringValue storage_buffer_path = 2;
 
   // Optional configuration for how to buffer (or not) requests.
-  // See ``StreamConfig`` definition for defaults.
+  // If unset in route, vhost and listener, ``StreamConfig`` default values will be used
+  // (with behavior ``stream_when_possible``)
   StreamConfig request = 3;
 
   // Optional configuration for how to buffer (or not) responses.
-  // See ``StreamConfig`` definition for defaults.
+  // If unset in route, vhost and listener, ``StreamConfig`` default values will be used
+  // (with behavior ``stream_when_possible``)
   StreamConfig response = 4;
 }
