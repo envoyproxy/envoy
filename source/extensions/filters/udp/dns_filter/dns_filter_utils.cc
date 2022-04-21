@@ -46,19 +46,6 @@ absl::string_view getServiceFromName(const absl::string_view name) {
   return EMPTY_STRING;
 }
 
-absl::string_view getProtoFromName(const absl::string_view name) {
-  size_t start = name.find_first_of('.');
-  if (start != std::string::npos && ++start < name.size() - 1) {
-    if (name[start] == '_') {
-      const size_t offset = name.find_first_of('.', ++start);
-      if (start != std::string::npos && offset < name.size()) {
-        return name.substr(start, offset - start);
-      }
-    }
-  }
-  return EMPTY_STRING;
-}
-
 std::string buildServiceName(const std::string& name, const std::string& proto,
                              const std::string& domain) {
   std::string result{};
