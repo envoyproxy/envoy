@@ -127,26 +127,26 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
-                                                                jclass // class
-) {
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_configTemplate(JNIEnv* env, jclass) {
   jstring result = env->NewStringUTF(config_template);
   return result;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_platformFilterTemplateString(JNIEnv* env,
-                                                                              jclass // class
-) {
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_platformFilterTemplate(JNIEnv* env, jclass) {
   jstring result = env->NewStringUTF(platform_filter_template);
   return result;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_nativeFilterTemplateString(JNIEnv* env,
-                                                                            jclass // class
-) {
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_nativeFilterTemplate(JNIEnv* env, jclass) {
   jstring result = env->NewStringUTF(native_filter_template);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_altProtocolCacheFilterInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(alternate_protocols_cache_filter_insert);
   return result;
 }
 

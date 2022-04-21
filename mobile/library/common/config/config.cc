@@ -30,6 +30,14 @@ const char* route_cache_reset_filter_insert = R"(
               "@type": type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset
 )";
 
+const char* alternate_protocols_cache_filter_insert = R"(
+          - name: alternate_protocols_cache
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
+              alternate_protocols_cache_options:
+                name: default_alternate_protocols_cache
+)";
+
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
@@ -100,6 +108,17 @@ R"(
       validation_context:
         trusted_ca:
           inline_string: *tls_root_certs
+- &base_h3_socket
+  name: envoy.transport_sockets.quic
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+    upstream_tls_context:
+      common_tls_context:
+        tls_params:
+          tls_maximum_protocol_version: TLSv1_3
+        validation_context:
+          trusted_ca:
+             inline_string: *tls_root_certs
 )";
 
 const char* config_template = R"(
@@ -114,7 +133,7 @@ const char* config_template = R"(
             name: preserve_case
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig
-    upstream_http_protocol_options:
+    upstream_http_protocol_options: &upstream_http_protocol_options
       auto_sni: true
       auto_san_validation: true
 - &h2_protocol_options
@@ -126,18 +145,24 @@ const char* config_template = R"(
           connection_idle_interval: *h2_connection_keepalive_idle_interval
           timeout: *h2_connection_keepalive_timeout
         max_concurrent_streams: 100
-    upstream_http_protocol_options:
-      auto_sni: true
-      auto_san_validation: true
+    upstream_http_protocol_options: *upstream_http_protocol_options
 - &alpn_protocol_options
   envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
     "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
     auto_config:
       http2_protocol_options: *h2_config
       http_protocol_options: *h1_config
-    upstream_http_protocol_options:
-      auto_sni: true
-      auto_san_validation: true
+    upstream_http_protocol_options: *upstream_http_protocol_options
+- &h3_protocol_options
+  envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+    "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+    auto_config:
+      alternate_protocols_cache_options:
+        name: default_alternate_protocols_cache
+      http3_protocol_options: {}
+      http2_protocol_options: *h2_config
+      http_protocol_options: *h1_config
+    upstream_http_protocol_options: *upstream_http_protocol_options
 
 !ignore custom_listener_defs:
   fake_remote_listener: &fake_remote_listener
@@ -378,6 +403,14 @@ R"(
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     typed_extension_protocol_options: *h2_protocol_options
+  - name: base_h3
+    connect_timeout: *connect_timeout
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type: *base_cluster_type
+    transport_socket: *base_h3_socket
+    upstream_connection_options: *upstream_opts
+    circuit_breakers: *circuit_breakers_settings
+    typed_extension_protocol_options: *h3_protocol_options
 stats_flush_interval: *stats_flush_interval
 stats_sinks: *stats_sinks
 stats_config:
