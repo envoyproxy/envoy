@@ -396,8 +396,8 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   }
   for (const auto& tag : tracing.custom_tags()) {
     const auto custom_tag = Tracing::CustomTagUtility::createCustomTag(tag);
-    if (custom_tag.has_value()) {
-      custom_tags_.emplace(tag.tag(), std::move(custom_tag.value()));
+    if (custom_tag != nullptr) {
+      custom_tags_.emplace(tag.tag(), std::move(custom_tag));
     }
   }
 }

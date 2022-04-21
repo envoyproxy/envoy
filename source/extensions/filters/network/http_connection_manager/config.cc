@@ -500,8 +500,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::CustomTagMap custom_tags;
     for (const auto& tag : tracing_config.custom_tags()) {
       auto custom_tag = Tracing::CustomTagUtility::createCustomTag(tag);
-      if (custom_tag.has_value()) {
-        custom_tags.emplace(tag.tag(), std::move(custom_tag.value()));
+      if (custom_tag != nullptr) {
+        custom_tags.emplace(tag.tag(), std::move(custom_tag));
       }
     }
 

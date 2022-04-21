@@ -111,7 +111,7 @@ protected:
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
       auto tag = CustomTagUtility::createCustomTag(custom_tag);
-      config.custom_tags_.emplace(custom_tag.tag(), tag.value());
+      config.custom_tags_.emplace(custom_tag.tag(), std::move(tag));
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {

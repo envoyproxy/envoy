@@ -189,7 +189,11 @@ public:
       : ActionWithFileResult(manager, on_complete), filename_(filename), mode_(mode) {}
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
-    auto open_result = posix().open(filename_.c_str(), openFlags());
+    auto flags = openFlags();
+    if (!flags.has_value()) {
+      return absl::UnknownError("bad file mode");
+    }
+    auto open_result = posix().open(filename_.c_str(), flags.value());
     if (open_result.return_value_ == -1) {
       return statusAfterFileError(open_result);
     }
@@ -197,16 +201,17 @@ public:
   }
 
 private:
-  int openFlags() const {
+  absl::optional<int> openFlags() const {
     switch (mode_) {
     case AsyncFileManager::Mode::ReadOnly:
-      return O_RDONLY;
+      return absl::make_optional(O_RDONLY);
     case AsyncFileManager::Mode::WriteOnly:
-      return O_WRONLY;
+      return absl::make_optional(O_WRONLY);
     case AsyncFileManager::Mode::ReadWrite:
-      return O_RDWR;
+      return absl::make_optional(O_RDWR);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    IS_ENVOY_BUG("unexpected file mode");
+    return absl::nullopt;
   }
   const std::string filename_;
   const AsyncFileManager::Mode mode_;

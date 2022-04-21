@@ -299,8 +299,8 @@ void Utility::extractCommonAccessLogProperties(
   Tracing::CustomTagContext ctx{&request_header, stream_info};
   for (const auto& custom_tag : config.custom_tags()) {
     const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
-    if (tag_applier.has_value()) {
-      tag_applier.value()->applyLog(common_access_log, ctx);
+    if (tag_applier != nullptr) {
+      tag_applier->applyLog(common_access_log, ctx);
     }
   }
 }
