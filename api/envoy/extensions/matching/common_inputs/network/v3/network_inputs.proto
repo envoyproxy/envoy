@@ -98,6 +98,7 @@ message ApplicationProtocolInput {
 }
 
 // Input that matches the authentication attributes for a downstream.
+// [#extension: envoy.matching.inputs.authenticated]
 message AuthenticatedInput {
   enum Field {
     // The URIs in the SAN field of the certificate. Certificate with multiple URIs will be
