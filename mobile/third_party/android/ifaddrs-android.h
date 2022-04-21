@@ -198,7 +198,7 @@ inline int getifaddrs(ifaddrs** result) {
                     rtattr* rta = IFA_RTA(address);
                     size_t ifaPayloadLength = IFA_PAYLOAD(hdr);
                     while (RTA_OK(rta, ifaPayloadLength)) {
-                        if (rta->rta_type == IFA_ADDRESS) {
+                        if (rta->rta_type == IFA_LOCAL) {
                             int family = address->ifa_family;
                             if (family == AF_INET || family == AF_INET6) {
                                 *result = new ifaddrs(*result);
