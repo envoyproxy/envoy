@@ -206,7 +206,7 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
-  bool header_keys_case_sensitive_;
+  bool header_keys_case_sensitive_{false};
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;
