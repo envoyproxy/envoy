@@ -18,6 +18,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/router/cluster_provider.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
@@ -594,6 +595,27 @@ public:
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
+};
+
+class MockClusterProvider : public ClusterProvider {
+public:
+  MockClusterProvider();
+
+  MOCK_METHOD(RouteConstSharedPtr, route,
+              (const RouteEntry& parent, const Http::RequestHeaderMap& header), (const));
+};
+
+class MockClusterProviderFactoryConfig : public ClusterProviderFactoryConfig {
+public:
+  MockClusterProviderFactoryConfig();
+  MOCK_METHOD(ClusterProviderSharedPtr, createClusterProvider,
+              (const Protobuf::Message& config,
+               Server::Configuration::CommonFactoryContext& context));
+
+  // Envoy::Config::TypedFactory
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(std::string, configType, ());
+  MOCK_METHOD(std::string, name, (), (const));
 };
 
 } // namespace Router
