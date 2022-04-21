@@ -24,6 +24,7 @@ Removed Config or Runtime
 New Features
 ------------
 * ext_proc: added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
+* thrift: introduced thrift configurable encoder and bidirection filters
 
 Deprecated
 ----------

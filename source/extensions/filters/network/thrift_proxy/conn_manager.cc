@@ -129,7 +129,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   }
 }
 
-void ConnectionManager::continueDispatch() {
+void ConnectionManager::continueDecoding() {
   ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
@@ -142,9 +142,9 @@ void ConnectionManager::continueDispatch() {
   }
 }
 
-void ConnectionManager::continueEncoding() { continueDispatch(); }
-
-void ConnectionManager::continueDecoding() { continueDispatch(); }
+void ConnectionManager::continueEncoding() {
+  throw EnvoyException(fmt::format("should not be called"));
+}
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));

@@ -130,11 +130,7 @@ public:
   ~EncoderFilterCallbacks() override = default;
 
   /**
-   * Continue iterating through the filter chain with buffered data. This routine can only be
-   * called if the filter has previously returned StopIteration from one of the EncoderFilter
-   * methods. The connection manager will callbacks to the next filter in the chain. Further note
-   * that if the request is not complete, the calling filter may receive further callbacks and must
-   * return an appropriate status code depending on what the filter needs to do.
+   * Currently throw given we don't support StopIteration from EncoderFilter yet.
    */
   virtual void continueEncoding() PURE;
 };
