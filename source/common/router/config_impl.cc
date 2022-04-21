@@ -526,11 +526,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        total_cluster_weight_));
     }
   } else if (route.route().cluster_specifier_case() ==
-             envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kClusterPlugin) {
+             envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
+                 kInlineClusterSpecifierPlugin) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
-        route.route().cluster_plugin().extension());
+        route.route().inline_cluster_specifier_plugin().extension());
     auto config = Envoy::Config::Utility::translateToFactoryConfig(
-        route.route().cluster_plugin().extension(), validator, factory);
+        route.route().inline_cluster_specifier_plugin().extension(), validator, factory);
     cluster_provider_ = factory.createClusterProvider(*config, factory_context);
   } else if (route.route().has_cluster_specifier_plugin()) {
     cluster_provider_ =

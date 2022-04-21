@@ -931,7 +931,7 @@ message RouteAction {
 
     // Custom cluster specifier plugin configuration to use to determine the cluster for requests
     // on this route.
-    ClusterSpecifierPlugin cluster_plugin = 39
+    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
