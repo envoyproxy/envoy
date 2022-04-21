@@ -1,0 +1,21 @@
+name: release_validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  cocoapods_lib_lint:
+    name: cocoapods_lib_lint
+    runs-on: macos-11
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - name: 'Lint CocoaPods podspec'
+        run: bundle exec pod spec lint
