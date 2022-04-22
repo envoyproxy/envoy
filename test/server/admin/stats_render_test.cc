@@ -256,7 +256,6 @@ TEST_F(StatsRenderTest, JsonHistogramCumulative) {
 
 TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
   params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Disjoint;
-  ;
   StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF(
 {
