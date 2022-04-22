@@ -90,17 +90,8 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
     // stats as multiples will have the same tag-extracted names.
     // Ideally we'd find a way to do this without slowing down
     // the non-Prometheus implementations.
-    Stats::Store& store = server_.stats();
-    std::vector<Stats::ParentHistogramSharedPtr> histograms = store.histograms();
-    store.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
-        histograms.begin(), histograms.end(),
-        [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.prometheus_text_readouts_ ? store.textReadouts()
-                                         : std::vector<Stats::TextReadoutSharedPtr>();
-    PrometheusStatsFormatter::statsAsPrometheus(
-        store.counters(), store.gauges(), histograms, text_readouts_vec, response,
-        params.used_only_, params.filter_, server_.api().customStatNamespaces());
+    Buffer::OwnedImpl response;
+    Http::Code code = prometheusStats(path, response);
     return Admin::makeStaticTextRequest(response, code);
   }
   return makeRequest(server_.stats(), params);
