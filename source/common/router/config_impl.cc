@@ -163,6 +163,36 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
   }
 }
 
+// If the implementation of an cluster specifier plugin is not provided in current Envoy and the
+// plugin is set to optional, then this null plugin will be used as a placeholder.
+class NullClusterProvider : public ClusterProvider {
+public:
+  RouteConstSharedPtr route(const RouteEntry&, const Http::RequestHeaderMap&) const override {
+    return nullptr;
+  }
+};
+
+ClusterProviderSharedPtr
+getClusterProviderByTheProto(const envoy::config::route::v3::ClusterSpecifierPlugin& plugin,
+                             ProtobufMessage::ValidationVisitor& validator,
+                             Server::Configuration::ServerFactoryContext& factory_context) {
+  auto* factory =
+      Envoy::Config::Utility::getFactory<ClusterProviderFactoryConfig>(plugin.extension());
+  if (factory == nullptr) {
+    if (plugin.is_optional()) {
+      return std::make_shared<NullClusterProvider>();
+    }
+    throw EnvoyException(
+        fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                    plugin.extension().name(),
+                    Envoy::Config::Utility::getFactoryType(plugin.extension().typed_config())));
+  }
+  ASSERT(factory != nullptr);
+  auto config =
+      Envoy::Config::Utility::translateToFactoryConfig(plugin.extension(), validator, factory);
+  return factory->createClusterProvider(*config, factory_context);
+}
+
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
@@ -533,11 +563,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
                  kInlineClusterSpecifierPlugin) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
-        route.route().inline_cluster_specifier_plugin().extension());
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(
-        route.route().inline_cluster_specifier_plugin().extension(), validator, factory);
-    cluster_provider_ = factory.createClusterProvider(*config, factory_context);
+    cluster_provider_ = getClusterProviderByTheProto(
+        route.route().inline_cluster_specifier_plugin(), validator, factory_context);
   } else if (route.route().has_cluster_specifier_plugin()) {
     cluster_provider_ =
         vhost_.globalRouteConfig().clusterProvider(route.route().cluster_specifier_plugin());
@@ -1806,13 +1833,9 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
 
   // Initialize all cluster providers before creating route matcher. Because the route may reference
   // it by name.
-  for (const auto& cluster_specifier_plugin : config.cluster_specifier_plugins()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
-        cluster_specifier_plugin.extension());
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(
-        cluster_specifier_plugin.extension(), validator, factory);
-    cluster_providers_.emplace(cluster_specifier_plugin.extension().name(),
-                               factory.createClusterProvider(*config, factory_context));
+  for (const auto& plugin_proto : config.cluster_specifier_plugins()) {
+    auto plugin = getClusterProviderByTheProto(plugin_proto, validator, factory_context);
+    cluster_providers_.emplace(plugin_proto.extension().name(), std::move(plugin));
   }
 
   route_matcher_ = std::make_unique<RouteMatcher>(
