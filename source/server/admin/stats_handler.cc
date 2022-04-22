@@ -78,10 +78,6 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
     return Admin::makeStaticTextRequest(response, code);
   }
 
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
   if (params.format_ == StatsFormat::Prometheus) {
     // TODO(#16139): modify streaming algorithm to cover Prometheus.
     //
@@ -91,9 +87,14 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
     // Ideally we'd find a way to do this without slowing down
     // the non-Prometheus implementations.
     Buffer::OwnedImpl response;
-    Http::Code code = prometheusStats(path, response);
+    prometheusStats(params, response);
     return Admin::makeStaticTextRequest(response, code);
   }
+
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
   return makeRequest(server_.stats(), params);
 }
 
@@ -114,7 +115,11 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
   if (code != Http::Code::OK) {
     return code;
   }
+  prometheusStats(params, response);
+  return Http::Code::OK;
+}
 
+void StatsHandler::prometheusStats(const StatsParams& params, Buffer::Instance& response) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
@@ -126,7 +131,6 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
                                               text_readouts_vec, response, params.used_only_,
                                               params.filter_, server_.api().customStatNamespaces());
-  return Http::Code::OK;
 }
 
 Http::Code StatsHandler::handlerContention(absl::string_view,

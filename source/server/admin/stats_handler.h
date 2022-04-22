@@ -42,6 +42,7 @@ public:
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
   Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response);
+  void prometheusStats(const StatsParams& params, Buffer::Instance& response);
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
