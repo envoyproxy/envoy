@@ -73,17 +73,19 @@ public:
 private:
   struct ActiveRpc;
 
-  struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
+  struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
-        : parent_(parent),
-          decoder_(std::make_unique<Decoder>(transport, protocol, *this)), complete_{false},
+        : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
+          protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
           passthrough_{false}, pending_transport_end_{false} {
-      initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
+      ;
+      protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
+                                                 parent_.response_buffer_);
     }
 
     bool onData(Buffer::Instance& data);
 
-    // ProtocolConverter
+    // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
     FilterStatus passthroughData(Buffer::Instance& data) override;
@@ -118,6 +120,7 @@ private:
     DecoderPtr decoder_;
     Buffer::OwnedImpl upstream_buffer_;
     MessageMetadataSharedPtr metadata_;
+    ProtocolConverterSharedPtr protocol_converter_;
     absl::optional<bool> success_;
     bool complete_ : 1;
     bool passthrough_ : 1;
@@ -268,7 +271,7 @@ private:
       return parent_.read_callbacks_->connection().dispatcher();
     }
     void continueDecoding() override { parent_.continueDecoding(); }
-    void continueEncoding() override { parent_.continueEncoding(); }
+    void continueEncoding() override { throw EnvoyException("not supported"); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
       return parent_.decoder_->transportType();
@@ -318,15 +321,22 @@ private:
 
     bool passthroughSupported() const;
 
-    // apply filters to the decoder_event.
+    // Apply filters to the decoder_event.
     // @param filter    the last filter which is already applied to the decoder_event.
     //                  nullptr indicates none is applied and the decoder_event is applied from the
     //                  first filter.
-    FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter = nullptr);
-    FilterStatus applyEncoderFilters(ActiveRpcEncoderFilter* filter = nullptr);
+    FilterStatus applyDecoderFilters(DecoderEvent state, absl::any data,
+                                     ActiveRpcDecoderFilter* filter = nullptr);
+    FilterStatus applyEncoderFilters(DecoderEvent state, absl::any data,
+                                     ProtocolConverterSharedPtr protocol_converter,
+                                     ActiveRpcEncoderFilter* filter = nullptr);
     template <typename FilterType>
     FilterStatus applyFilters(FilterType* filter,
-                              std::list<std::unique_ptr<FilterType>>& filter_list);
+                              std::list<std::unique_ptr<FilterType>>& filter_list,
+                              ProtocolConverterSharedPtr protocol_converter = nullptr);
+
+    void prepareFilterAction(DecoderEvent event, absl::any data);
+
     void finalizeRequest();
 
     void createFilterChain();
@@ -357,8 +367,6 @@ private:
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
 
   void continueDecoding();
-  void continueEncoding();
-  void continueDispatch();
   void dispatch();
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);

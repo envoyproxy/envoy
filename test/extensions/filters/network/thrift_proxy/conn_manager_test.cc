@@ -1652,7 +1652,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
   FramedTransportImpl transport;
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
-  EXPECT_DEATH(callbacks->upstreamData(write_buffer_), "");
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 }
 
 // Tests stop iteration/resume with multiple filters when iteration is stopped during

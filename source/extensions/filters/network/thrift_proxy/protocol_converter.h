@@ -30,6 +30,10 @@ public:
     return FilterStatus::Continue;
   }
 
+  FilterStatus transportBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
+
+  FilterStatus transportEnd() override { return FilterStatus::Continue; }
+
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
     return FilterStatus::Continue;
@@ -132,6 +136,7 @@ private:
   Buffer::Instance* buffer_{};
 };
 
+using ProtocolConverterSharedPtr = std::shared_ptr<ProtocolConverter>;
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions
