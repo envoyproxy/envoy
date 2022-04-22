@@ -21,8 +21,7 @@ namespace ExternalProcessing {
 
 using ProcessingResponsePtr = std::unique_ptr<ProcessingResponse>;
 
-class ExternalProcessorClientImpl : public ExternalProcessorClient,
-                                    public Logger::Loggable<Logger::Id::ext_proc> {
+class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
@@ -42,7 +41,6 @@ public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
                               ExternalProcessorCallbacks& callbacks,
                               const StreamInfo::StreamInfo& stream_info);
-  ~ExternalProcessorStreamImpl() override;
 
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we

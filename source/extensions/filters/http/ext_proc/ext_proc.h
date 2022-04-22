@@ -122,7 +122,6 @@ public:
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(grpc_service), decoding_state_(*this, config->processingMode()),
         encoding_state_(*this, config->processingMode()) {}
-  ~Filter() override;
 
   const FilterConfig& config() const { return *config_; }
 
