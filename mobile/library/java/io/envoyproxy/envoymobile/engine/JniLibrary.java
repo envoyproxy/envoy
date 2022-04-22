@@ -191,7 +191,7 @@ public class JniLibrary {
    * @return A template that may be used as a starting point for constructing
    * configurations.
    */
-  public static native String configTemplate();
+  public static native String templateString();
 
   /**
    * Increment a counter with the given count.
@@ -287,7 +287,7 @@ public class JniLibrary {
    * @return A template that may be used as a starting point for constructing
    * platform filter configuration.
    */
-  public static native String platformFilterTemplate();
+  public static native String platformFilterTemplateString();
 
   /**
    * Provides a configuration template that may be used for building native
@@ -296,14 +296,7 @@ public class JniLibrary {
    * @return A template that may be used as a starting point for constructing
    * native filter configuration.
    */
-  public static native String nativeFilterTemplate();
-
-  /**
-   * Provides a configuration insert that may be used to include an instance
-   * of the AlternateProtocolsCacheFilter in the filter chain. Needed only
-   * when (experimental) QUIC/H3 support is enabled.
-   */
-  public static native String altProtocolCacheFilterInsert();
+  public static native String nativeFilterTemplateString();
 
   /**
    * Register a string accessor to get strings from the platform.

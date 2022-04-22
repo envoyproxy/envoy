@@ -4,7 +4,6 @@ EXTENSION_PACKAGE_VISIBILITY = ["//visibility:public"]
 EXTENSIONS = {
     "envoy.clusters.dynamic_forward_proxy":                "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.filters.connection_pools.http.generic":         "//source/extensions/upstreams/http/generic:config",
-    "envoy.filters.http.alternate_protocols_cache":        "//source/extensions/filters/http/alternate_protocols_cache:config",
     "envoy.filters.http.assertion":                        "@envoy_mobile//library/common/extensions/filters/http/assertion:config",
     "envoy.filters.http.buffer":                           "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.decompressor":                     "//source/extensions/filters/http/decompressor:config",

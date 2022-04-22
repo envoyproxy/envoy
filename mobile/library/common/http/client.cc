@@ -588,7 +588,7 @@ void Client::removeStream(envoy_stream_t stream_handle) {
 namespace {
 
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
-const LowerCaseString ProtocolHeader{"x-envoy-mobile-upstream-protocol"};
+const LowerCaseString H2UpstreamHeader{"x-envoy-mobile-upstream-protocol"};
 
 // Alternate clusters included here are a stopgap to make it less likely for a given connection
 // class to suffer "catastrophic" failure of all outbound requests due to a network blip, by
@@ -598,7 +598,6 @@ const LowerCaseString ProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
 const char* BaseCluster = "base";
 const char* H2Cluster = "base_h2";
-const char* H3Cluster = "base_h3";
 const char* ClearTextCluster = "base_clear";
 
 } // namespace
@@ -609,18 +608,14 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
   // - Use http/2 or ALPN if requested explicitly via x-envoy-mobile-upstream-protocol.
   // - Force http/1.1 if request scheme is http (cleartext).
   const char* cluster{};
-  auto protocol_header = headers.get(ProtocolHeader);
+  auto h2_header = headers.get(H2UpstreamHeader);
   if (headers.getSchemeValue() == Headers::get().SchemeValues.Http) {
     cluster = ClearTextCluster;
-  } else if (!protocol_header.empty()) {
-    ASSERT(protocol_header.size() == 1);
-    const auto value = protocol_header[0]->value().getStringView();
-    // NOTE: This cluster *forces* H2-Raw and does not use ALPN.
+  } else if (!h2_header.empty()) {
+    ASSERT(h2_header.size() == 1);
+    const auto value = h2_header[0]->value().getStringView();
     if (value == "http2") {
       cluster = H2Cluster;
-      // NOTE: This cluster will attempt to negotiate H3, but defaults to ALPN over TCP.
-    } else if (value == "http3") {
-      cluster = H3Cluster;
       // FIXME(goaway): No cluster actually forces H1 today except cleartext!
     } else if (value == "alpn" || value == "http1") {
       cluster = BaseCluster;
@@ -631,8 +626,8 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
     cluster = BaseCluster;
   }
 
-  if (!protocol_header.empty()) {
-    headers.remove(ProtocolHeader);
+  if (!h2_header.empty()) {
+    headers.remove(H2UpstreamHeader);
   }
 
   headers.addCopy(ClusterHeader, std::string{cluster});
