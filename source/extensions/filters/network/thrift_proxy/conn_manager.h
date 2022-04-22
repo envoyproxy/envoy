@@ -240,30 +240,6 @@ private:
     FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
     FilterStatus setEnd() override;
 
-    // Helper to setup filter_action_ and filter_context_
-    void transportBeginSetup(MessageMetadataSharedPtr metadata);
-    void transportEndSetup();
-    void passthroughDataSetup(Buffer::Instance& data);
-    void messageBeginSetup(MessageMetadataSharedPtr metadata);
-    void messageEndSetup();
-    void structBeginSetup(absl::string_view name);
-    void structEndSetup();
-    void fieldBeginSetup(absl::string_view name, FieldType& field_type, int16_t& field_id);
-    void fieldEndSetup();
-    void boolValueSetup(bool& value);
-    void byteValueSetup(uint8_t& value);
-    void int16ValueSetup(int16_t& value);
-    void int32ValueSetup(int32_t& value);
-    void int64ValueSetup(int64_t& value);
-    void doubleValueSetup(double& value);
-    void stringValueSetup(absl::string_view value);
-    void mapBeginSetup(FieldType& key_type, FieldType& value_type, uint32_t& size);
-    void mapEndSetup();
-    void listBeginSetup(FieldType& elem_type, uint32_t& size);
-    void listEndSetup();
-    void setBeginSetup(FieldType& elem_type, uint32_t& size);
-    void setEndSetup();
-
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
@@ -335,6 +311,7 @@ private:
                               std::list<std::unique_ptr<FilterType>>& filter_list,
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
+    // Helper to setup filter_action_ and filter_context_
     void prepareFilterAction(DecoderEvent event, absl::any data);
 
     void finalizeRequest();
