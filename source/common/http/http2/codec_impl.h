@@ -168,11 +168,7 @@ public:
       stream->runHighWatermarkCallbacks();
     }
   }
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runLowWatermarkCallbacks();
-    }
-  }
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
   void setVisitor(std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor) {
     visitor_ = std::move(visitor);
@@ -605,7 +601,12 @@ protected:
   // use_new_codec_wrapper_.
   Http2Callbacks http2_callbacks_;
 
+  // If deferred processing, the streams will be in LRU order based on when the
+  // stream encoded to the http2 connection. The LRU property is used when
+  // raising low watermark on the http2 connection to prioritize how streams get
+  // notified, prefering those that haven't recently written.
   std::list<StreamImplPtr> active_streams_;
+
   // Tracks the stream id of the current stream we're processing.
   // This should only be set while we're in the context of dispatching to nghttp2.
   absl::optional<int32_t> current_stream_id_;
@@ -642,6 +643,14 @@ protected:
   ssize_t onSend(const uint8_t* data, size_t length);
 
   const bool skip_dispatching_frames_for_closed_connection_;
+
+  // Called when a stream encodes to the http2 connection which enables us to
+  // keep the active_streams list in LRU if deferred processing.
+  void updateActiveStreamsOnEncode(StreamImpl& stream) {
+    if (stream.defer_processing_backedup_streams_) {
+      LinkedList::moveIntoList(stream.removeFromList(active_streams_), active_streams_);
+    }
+  }
 
   // dumpState helper method.
   virtual void dumpStreams(std::ostream& os, int indent_level) const;
