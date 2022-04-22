@@ -91,6 +91,8 @@ static_resources:
                   cluster: generic_service
           http_filters:
           - name: envoy.filters.http.cors
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
           - name: envoy.filters.http.csrf
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
@@ -99,6 +101,8 @@ static_resources:
                   numerator: 0
                   denominator: HUNDRED
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: generic_service
     type: STRICT_DNS

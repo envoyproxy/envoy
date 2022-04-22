@@ -61,11 +61,17 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
   if (config.has_overrides()) {
     processing_mode_ = config.overrides().processing_mode();
   }
+  if (config.overrides().has_grpc_service()) {
+    grpc_service_ = config.overrides().grpc_service();
+  }
 }
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   disabled_ = src.disabled_;
   processing_mode_ = src.processing_mode_;
+  if (src.grpcService().has_value()) {
+    grpc_service_ = src.grpcService();
+  }
 }
 
 Filter::~Filter() { ENVOY_LOG(trace, "~Filter"); }
@@ -84,7 +90,7 @@ Filter::StreamOpenState Filter::openStream() {
   ENVOY_BUG(!processing_complete_, "openStream should not have been called");
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, decoder_callbacks_->streamInfo());
+    stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
     stats_.streams_started_.inc();
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -707,19 +713,26 @@ void Filter::mergePerRouteConfig() {
   auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
       FilterName, decoder_callbacks_->route(),
       [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
-  if (merged_config) {
-    if (merged_config->disabled()) {
-      // Rather than introduce yet another flag, use the processing mode
-      // structure to disable all the callbacks.
-      ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
-      const auto all_disabled = allDisabledMode();
-      decoding_state_.setProcessingMode(all_disabled);
-      encoding_state_.setProcessingMode(all_disabled);
-    } else if (merged_config->processingMode()) {
-      ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
-      decoding_state_.setProcessingMode(*(merged_config->processingMode()));
-      encoding_state_.setProcessingMode(*(merged_config->processingMode()));
-    }
+  if (!merged_config) {
+    return;
+  }
+  if (merged_config->disabled()) {
+    // Rather than introduce yet another flag, use the processing mode
+    // structure to disable all the callbacks.
+    ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
+    const auto all_disabled = allDisabledMode();
+    decoding_state_.setProcessingMode(all_disabled);
+    encoding_state_.setProcessingMode(all_disabled);
+    return;
+  }
+  if (merged_config->processingMode()) {
+    ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
+    decoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    encoding_state_.setProcessingMode(*(merged_config->processingMode()));
+  }
+  if (merged_config->grpcService()) {
+    ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
+    grpc_service_ = *merged_config->grpcService();
   }
 }
 

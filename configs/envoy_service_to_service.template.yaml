@@ -48,6 +48,8 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         access_log:
         - name: envoy.access_loggers.file
           filter:
@@ -165,7 +167,11 @@ static_resources:
                     envoy_grpc:
                        cluster_name: ratelimit
           - name: envoy.filters.http.grpc_http1_bridge
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   - address:
       socket_address:
         protocol: TCP
@@ -226,7 +232,11 @@ static_resources:
                     envoy_grpc:
                        cluster_name: ratelimit
           - name: envoy.filters.http.grpc_http1_bridge
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   {% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %}{% endif -%}
   {% for mapping in external_virtual_hosts -%}
   - name: "{{ mapping['address']}}"
@@ -265,8 +275,12 @@ static_resources:
           http_filters:
           {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
           - name: envoy.filters.http.dynamo
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamo.v3.Dynamo
           {% endif -%}
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           access_log:
           - name: envoy.access_loggers.file
             filter:

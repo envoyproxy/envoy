@@ -187,6 +187,10 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
+# support library for filesystem based extensions
+/*/extensions/common/async_files @mattklein123 @ravenblack
+# Google Cloud Platform Authentication Filter
+/*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
@@ -200,6 +204,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/compression/gzip/decompressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/compressor @rojkov @kbaichoo
 /*/extensions/compression/gzip/common @rojkov @kbaichoo
+/*/extensions/compression/zstd @rojkov @rainingmaster
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
 # health cehck
@@ -274,3 +279,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/cryptomb/ @rojkov @ipuustin
 /contrib/vcl/ @florincoras @rojkov @KfreeZ
 /contrib/hyperscan/ @rojkov @zhxie
+/contrib/language/ @diceride @diceride

@@ -7,10 +7,9 @@ namespace ExternalProcessing {
 
 static constexpr char kExternalMethod[] = "envoy.service.ext_proc.v3.ExternalProcessor.Process";
 
-ExternalProcessorClientImpl::ExternalProcessorClientImpl(
-    Grpc::AsyncClientManager& client_manager,
-    const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope)
-    : client_manager_(client_manager), grpc_service_(grpc_service), scope_(scope) {}
+ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager,
+                                                         Stats::Scope& scope)
+    : client_manager_(client_manager), scope_(scope) {}
 
 ExternalProcessorClientImpl::~ExternalProcessorClientImpl() {
   ENVOY_LOG(trace, "~ExternalProcessorClientImpl");
@@ -18,9 +17,10 @@ ExternalProcessorClientImpl::~ExternalProcessorClientImpl() {
 
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
+                                   const envoy::config::core::v3::GrpcService& grpc_service,
                                    const StreamInfo::StreamInfo& stream_info) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      client_manager_.getOrCreateRawAsyncClient(grpc_service_, scope_, true,
+      client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true,
                                                 Grpc::CacheOption::AlwaysCache));
   return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks,
                                                        stream_info);
