@@ -20,9 +20,7 @@ fi
 bazel_platform="$bazel_os-$bazel_arch"
 case "$bazel_platform" in
   darwin-arm64)
-    # TODO: Support M1 once this is resolved: https://github.com/envoyproxy/envoy-mobile/issues/2101
-    bazel_platform="darwin-amd64"
-    readonly bazel_version_sha="e485bbf84532d02a60b0eb23c702610b5408df3a199087a4f2b5e0995bbf2d5a"
+    readonly bazel_version_sha="c22d48601466d9d3b043ccd74051f2f4230f9b9f4509f097017c97303aa88d13"
     ;;
   darwin-amd64)
     readonly bazel_version_sha="e485bbf84532d02a60b0eb23c702610b5408df3a199087a4f2b5e0995bbf2d5a"
