@@ -15,11 +15,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace FileSystemBuffer {
 
-// TODO: using StatusHelpers::HasStatus;
-// TODO: using StatusHelpers::HasStatusMessage;
 using Extensions::Common::AsyncFiles::CancelFunction;
 using Extensions::Common::AsyncFiles::MockAsyncFileContext;
 using Extensions::Common::AsyncFiles::MockAsyncFileHandle;
+using StatusHelpers::HasStatusMessage;
 using StatusHelpers::IsOk;
 using ::testing::_;
 using ::testing::Eq;
@@ -155,8 +154,9 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteIncomplete) {
         return []() {};
       });
   // Request the fragment be moved to storage.
-  EXPECT_OK(frag.toStorage(handle_, 123, storageFailureCallback(Not(IsOk()))));
-  // TODO: EXPECT_CALL(callback, Call(HasStatusMessage(HasSubstr("wrote 2 bytes, wanted 5"))));
+  EXPECT_OK(frag.toStorage(
+      handle_, 123,
+      storageFailureCallback(HasStatusMessage(HasSubstr("wrote 2 bytes, wanted 5")))));
 
   // Fake file says it wrote 2 bytes when the fragment was of size 5 - this should
   // provoke the expected error in the callback above.
@@ -198,8 +198,8 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnReadIncomplete) {
             return []() {};
           });
   // Request the fragment be moved from storage.
-  EXPECT_OK(frag.fromStorage(handle_, storageFailureCallback(Not(IsOk()))));
-  // TODO: EXPECT_CALL(callback, Call(HasStatusMessage(HasSubstr("read got 2 bytes, wanted 5"))));
+  EXPECT_OK(frag.fromStorage(
+      handle_, storageFailureCallback(HasStatusMessage(HasSubstr("read got 2 bytes, wanted 5")))));
 
   // Fake file system declares a read error. This should
   // provoke the expected error in the callback above.
