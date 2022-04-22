@@ -24,7 +24,7 @@ public:
    *
    * @param parent related route entry.
    * @param header request headers.
-   * @return ClusterProvider cluster provider use to create final route from request headers.
+   * @return RouteConstSharedPtr final route with specific cluster.
    */
   virtual RouteConstSharedPtr route(const RouteEntry& parent,
                                     const Http::RequestHeaderMap& header) const PURE;
@@ -41,7 +41,8 @@ public:
    * Creates a particular cluster provider factory implementation.
    *
    * @param config supplies the configuration for the cluster provider factory extension.
-   * @return ClusterProviderFactorySharedPtr the cluster provider factory.
+   * @return ClusterProviderSharedPtr cluster provider use to create final route from request
+   * headers.
    */
   virtual ClusterProviderSharedPtr
   createClusterProvider(const Protobuf::Message& config,
