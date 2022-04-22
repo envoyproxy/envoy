@@ -62,7 +62,7 @@ EXTENSION_CATEGORIES = (
     "envoy.wasm.runtime", "envoy.common.key_value", "envoy.network.dns_resolver",
     "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session",
     "envoy.matching.http.input", "envoy.matching.network.input",
-    "envoy.matching.network.custom_matchers", "envoy.route.early_data_option")
+    "envoy.matching.network.custom_matchers", "envoy.route.early_data_policy")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
