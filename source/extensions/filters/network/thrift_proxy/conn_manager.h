@@ -271,7 +271,7 @@ private:
       return parent_.read_callbacks_->connection().dispatcher();
     }
     void continueDecoding() override { parent_.continueDecoding(); }
-    void continueEncoding() override { throw EnvoyException("not supported"); }
+    void continueEncoding() override {}
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
       return parent_.decoder_->transportType();

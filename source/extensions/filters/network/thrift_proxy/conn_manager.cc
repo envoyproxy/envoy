@@ -425,7 +425,7 @@ void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
 }
 
 void ConnectionManager::ActiveRpcEncoderFilter::continueEncoding() {
-  throw EnvoyException("Not supported.");
+  // Not supported.
 }
 
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(DecoderEvent state, absl::any data,
