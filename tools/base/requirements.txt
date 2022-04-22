@@ -746,9 +746,9 @@ six==1.16.0 \
     #   pynacl
     #   sphinxcontrib-httpdomain
     #   thrift
-slackclient==2.9.3 \
-    --hash=sha256:07ec8fa76f6aa64852210ae235ff9e637ba78124e06c0b07a7eeea4abb955965 \
-    --hash=sha256:2d68d668c02f4038299897e5c4723ab85dd40a3548354924b24f333a435856f8
+slackclient==2.9.4 \
+    --hash=sha256:a8cab9146795e23d66a03473b80dd23df8c500829dfa9d06b3e3d5aec0a2b293 \
+    --hash=sha256:ab79fefb5412d0595bc01d2f195a787597f2a617b6766562932ab9ffbe5cb173
     # via -r requirements.in
 smmap==4.0.0 \
     --hash=sha256:7e65386bd122d45405ddf795637b7f7d2b532e7e401d46bbe3fb49b9986d5182 \
