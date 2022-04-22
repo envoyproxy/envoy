@@ -18,6 +18,7 @@ envoy_cc_library(
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
+        "@envoy//source/extensions/filters/http/alternate_protocols_cache:config",
         "@envoy//source/extensions/filters/http/buffer:config",
         "@envoy//source/extensions/filters/http/decompressor:config",
         "@envoy//source/extensions/filters/http/dynamic_forward_proxy:config",
