@@ -43,8 +43,8 @@ Note: This last step is slated to be automated in :issue:`#624 <624>`.
 Pre-release versioning
 ======================
 
-Pre-releases are published on a weekly basis. The versioning scheme we use is ``X.Y.Z.{mmddyy}``.
-For example: January 25, 2020: ``0.3.1.012520``.
+Pre-releases are published on a weekly basis. The versioning scheme we use is ``X.Y.Z.{yyyymmdd}``.
+For example: January 25, 2020: ``0.3.1.20200125``.
 
 
 GPG Key
