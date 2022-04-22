@@ -174,9 +174,6 @@ MockClusterProvider::MockClusterProvider() {
 
 MockClusterProviderFactoryConfig::MockClusterProviderFactoryConfig() {
   ON_CALL(*this, createClusterProvider(_, _)).WillByDefault(Return(nullptr));
-  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Return(testing::ByMove(nullptr)));
-  ON_CALL(*this, configType()).WillByDefault(Return(""));
-  ON_CALL(*this, name()).WillByDefault(Return(""));
 }
 
 } // namespace Router

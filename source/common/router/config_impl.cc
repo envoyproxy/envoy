@@ -1804,6 +1804,17 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
     }
   }
 
+  // Initialize all cluster providers before creating route matcher. Because the route may reference
+  // it by name.
+  for (const auto& cluster_specifier_plugin : config.cluster_specifier_plugins()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
+        cluster_specifier_plugin.extension());
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(
+        cluster_specifier_plugin.extension(), validator, factory);
+    cluster_providers_.emplace(cluster_specifier_plugin.extension().name(),
+                               factory.createClusterProvider(*config, factory_context));
+  }
+
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, optional_http_filters, *this, factory_context, validator,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
@@ -1816,20 +1827,11 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
-
-  for (const auto& cluster_specifier_plugin : config.cluster_specifier_plugins()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ClusterProviderFactoryConfig>(
-        cluster_specifier_plugin.extension());
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(
-        cluster_specifier_plugin.extension(), validator, factory);
-    cluster_providers_.emplace(cluster_specifier_plugin.extension().name(),
-                               factory.createClusterProvider(*config, factory_context));
-  }
 }
 
 ClusterProviderSharedPtr ConfigImpl::clusterProvider(absl::string_view provider) const {
   auto iter = cluster_providers_.find(provider);
-  if (iter == cluster_providers_.end()) {
+  if (iter == cluster_providers_.end() || iter->second == nullptr) {
     throw EnvoyException(
         fmt::format("Unknown cluster provider name: {} is used in the route", provider));
   }

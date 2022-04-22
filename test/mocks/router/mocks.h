@@ -612,10 +612,11 @@ public:
               (const Protobuf::Message& config,
                Server::Configuration::CommonFactoryContext& context));
 
-  // Envoy::Config::TypedFactory
-  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
-  MOCK_METHOD(std::string, configType, ());
-  MOCK_METHOD(std::string, name, (), (const));
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return "envoy.route.cluster_provider.mock"; }
 };
 
 } // namespace Router
