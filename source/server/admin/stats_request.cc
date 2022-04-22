@@ -15,6 +15,7 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     render_ = std::make_unique<StatsTextRender>(params_);
     break;
   case StatsFormat::Prometheus:
+    // TODO(#16139): once Prometheus shares this algorithm here, this becomes a legitimate choice.
     ASSERT(false);
     return Http::Code::BadRequest;
   }

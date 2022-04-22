@@ -11,14 +11,6 @@
 namespace Envoy {
 namespace Server {
 
-namespace Labels {
-constexpr absl::string_view All = "All";
-constexpr absl::string_view Counters = "Counters";
-constexpr absl::string_view Gauges = "Gauges";
-constexpr absl::string_view Histograms = "Histograms";
-constexpr absl::string_view TextReadouts = "TextReadouts";
-} // namespace Labels
-
 enum class StatsFormat {
   Json,
   Prometheus,

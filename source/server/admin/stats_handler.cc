@@ -12,8 +12,6 @@
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_request.h"
 
-#include "absl/strings/numbers.h"
-
 namespace Envoy {
 namespace Server {
 

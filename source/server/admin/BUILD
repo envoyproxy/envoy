@@ -98,7 +98,6 @@ envoy_cc_library(
     deps = [
         ":utils_lib",
         "//envoy/buffer:buffer_interface",
-        "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
         "//source/common/stats:histogram_lib",
     ],
