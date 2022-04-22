@@ -27,7 +27,7 @@ public:
   MatchingDataImpl data_;
   NiceMock<Envoy::Network::MockConnection> conn_;
   Envoy::Http::TestRequestHeaderMapImpl headers_;
-  NiceMock<StreamInfo::MockStreamInfo> info_;
+  StreamInfo::MockStreamInfo info_;
 
   Network::ConnectionInfoSetterImpl provider_;
 };
@@ -193,6 +193,10 @@ TEST_F(InputsTest, HttpRequestHeadersInput) {
     EXPECT_EQ(result.data_, header);
   }
 }
+
+// Test stream info get be get from the stream info since we do not have any input which gets
+// data from the stream info.
+TEST_F(InputsTest, StreamInfo) { EXPECT_EQ(&data_.streamInfo(), &info_); }
 
 } // namespace Matching
 } // namespace RBAC

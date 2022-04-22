@@ -33,7 +33,7 @@ matcher:
 )EOF";
   TestUtility::loadFromYaml(yaml, config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  Server::Configuration::MockServerFactoryContext factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
   EXPECT_LOG_CONTAINS("warn", "matcher is ignored",
                       createEngine(config, factory_context,
@@ -57,7 +57,7 @@ shadow_matcher:
 )EOF";
   TestUtility::loadFromYaml(yaml, config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  Server::Configuration::MockServerFactoryContext factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
   EXPECT_LOG_CONTAINS("warn", "shadow matcher is ignored",
                       createShadowEngine(config, factory_context,
