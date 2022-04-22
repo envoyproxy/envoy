@@ -962,7 +962,7 @@ ServerConnectionImpl::ServerConnectionImpl(
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
-          []() -> void { /* todo(adisuissa): handle overflow watermark */ })),
+          []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
       headers_with_underscores_action_(headers_with_underscores_action),
       runtime_lazy_read_disable_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {
@@ -1280,7 +1280,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
-          []() -> void { /* todo(adisuissa): handle overflow watermark */ })) {
+          []() -> void { /* TODO(adisuissa): handle overflow watermark */ })) {
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
 }
