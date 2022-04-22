@@ -16,9 +16,8 @@ public:
 
 class MemoryFragment : public FragmentData {
 public:
-  explicit MemoryFragment(Buffer::Instance& buffer); // NOLINT(runtime/references)
-  explicit MemoryFragment(Buffer::Instance& buffer,
-                          size_t size); // NOLINT(runtime/references)
+  explicit MemoryFragment(Buffer::Instance& buffer);
+  explicit MemoryFragment(Buffer::Instance& buffer, size_t size);
   std::unique_ptr<Buffer::Instance> extract();
   bool isMemory() const override { return true; }
 
@@ -40,23 +39,22 @@ private:
   const off_t offset_;
 };
 
-Fragment::Fragment(Buffer::Instance& buffer) // NOLINT(runtime/references)
+Fragment::Fragment(Buffer::Instance& buffer)
     : size_(buffer.length()), data_(std::make_unique<MemoryFragment>(buffer)) {}
 
-Fragment::Fragment(Buffer::Instance& buffer, size_t size) // NOLINT(runtime/references)
+Fragment::Fragment(Buffer::Instance& buffer, size_t size)
     : size_(size), data_(std::make_unique<MemoryFragment>(buffer, size)) {}
 
 Fragment::~Fragment() = default;
 bool Fragment::isMemory() const { return data_->isMemory(); }
 bool Fragment::isStorage() const { return data_->isStorage(); }
 
-MemoryFragment::MemoryFragment(Buffer::Instance& buffer) // NOLINT(runtime/references)
+MemoryFragment::MemoryFragment(Buffer::Instance& buffer)
     : buffer_(std::make_unique<Buffer::OwnedImpl>()) {
   buffer_->move(buffer);
 }
 
-MemoryFragment::MemoryFragment(Buffer::Instance& buffer,
-                               size_t size) // NOLINT(runtime/references)
+MemoryFragment::MemoryFragment(Buffer::Instance& buffer, size_t size)
     : buffer_(std::make_unique<Buffer::OwnedImpl>()) {
   buffer_->move(buffer, size);
 }

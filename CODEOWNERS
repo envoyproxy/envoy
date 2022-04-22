@@ -187,7 +187,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
-# filesystem based extensions
+# File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblack
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblack
 # Google Cloud Platform Authentication Filter
