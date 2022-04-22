@@ -7,7 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.early_data.v3";
 option java_outer_classname = "DefaultEarlyDataPolicyProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/early_data/v3;early_data_policyv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/early_data/v3;early_datav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP request early data policy]
