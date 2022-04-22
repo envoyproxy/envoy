@@ -34,8 +34,11 @@ public:
    * Issues an admin request against the stats saved in store_.
    */
   uint64_t handlerStats(bool used_only, bool json, const absl::optional<std::regex>& filter) {
-    Admin::RequestPtr request = StatsHandler::makeRequest(
-        store_, used_only, json, Utility::HistogramBucketsMode::NoBuckets, filter);
+    StatsParams params;
+    params.used_only_ = used_only;
+    params.format_ = json ? StatsFormat::Json : StatsFormat::Text;
+    params.filter_ = filter;
+    Admin::RequestPtr request = StatsHandler::makeRequest(store_, params);
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     request->start(*response_headers);
     Buffer::OwnedImpl data;

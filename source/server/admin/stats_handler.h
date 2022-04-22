@@ -10,6 +10,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/stats_request.h"
 #include "source/server/admin/utils.h"
 
 #include "absl/strings/string_view.h"
@@ -44,11 +45,21 @@ public:
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
-
   Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
-  static Admin::RequestPtr makeRequest(Stats::Store& stats, bool used_only, bool json,
-                                       Utility::HistogramBucketsMode histogram_buckets_mode,
-                                       const absl::optional<std::regex>& regex);
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params);
+
+private:
+  class Context;
+  class HtmlRender;
+  class JsonRender;
+  class Render;
+  class TextRender;
+
+  friend class StatsHandlerTest;
+
+  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
+                                    Stats::Store& stats,
+                                    Stats::CustomStatNamespaces& custom_namespaces);
 };
 
 } // namespace Server

@@ -92,6 +92,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stats_params_lib",
+    srcs = ["stats_params.cc"],
+    hdrs = ["stats_params.h"],
+    deps = [
+        ":utils_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/server:admin_interface",
+        "//source/common/stats:histogram_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_request_lib",
     srcs = ["stats_request.cc"],
     hdrs = ["stats_request.h"],
@@ -114,6 +127,7 @@ envoy_cc_library(
     srcs = ["stats_render.cc"],
     hdrs = ["stats_render.h"],
     deps = [
+        ":stats_params_lib",
         ":utils_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/html:utility_lib",

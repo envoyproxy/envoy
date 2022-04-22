@@ -144,7 +144,10 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
   const std::string url = "/stats";
+  Buffer::OwnedImpl data, used_data;
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -177,10 +180,6 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
                               "h2: P0(100,100) P25(102.5,102.5) P50(105,105) P75(107.5,107.5) "
                               "P90(109,109) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
                               "P99.9(109.99,109.99) P100(110,110)\n";
-  EXPECT_EQ(expected, code_response.second);
-
-  code_response = handlerStats(url + "?usedonly");
-  EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_EQ(expected, code_response.second);
 }
 
@@ -1137,8 +1136,7 @@ protected:
   }
 
   void statsEndpoint() {
-    StatsRequest request(*store_, false, false, Utility::HistogramBucketsMode::NoBuckets,
-                         absl::nullopt);
+    StatsRequest request(*store_, StatsParams());
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;
