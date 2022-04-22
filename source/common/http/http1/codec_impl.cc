@@ -1281,6 +1281,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })) {
+  owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
 }
