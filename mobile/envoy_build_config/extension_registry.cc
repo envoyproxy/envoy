@@ -6,6 +6,7 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
+#include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 #include "source/extensions/filters/http/buffer/config.h"
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
@@ -35,6 +36,8 @@ void ExtensionRegistry::registerFactories() {
       forceRegisterBrotliDecompressorLibraryFactory();
   Envoy::Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
   Envoy::Extensions::Http::OriginalIPDetection::Xff::forceRegisterXffIPDetectionFactory();
+  Envoy::Extensions::HttpFilters::AlternateProtocolsCache::
+      forceRegisterAlternateProtocolsCacheFilterFactory();
   Envoy::Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
   Envoy::Extensions::HttpFilters::Decompressor::forceRegisterDecompressorFilterFactory();
   Envoy::Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
