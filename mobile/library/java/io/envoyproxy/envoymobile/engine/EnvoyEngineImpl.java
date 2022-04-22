@@ -87,10 +87,11 @@ public class EnvoyEngineImpl implements EnvoyEngine {
                                         new JvmStringAccessorContext(entry.getValue()));
     }
 
-    return runWithResolvedYAML(envoyConfiguration.resolveTemplate(
-                                   configurationYAML, JniLibrary.platformFilterTemplateString(),
-                                   JniLibrary.nativeFilterTemplateString()),
-                               logLevel);
+    return runWithResolvedYAML(
+        envoyConfiguration.resolveTemplate(configurationYAML, JniLibrary.platformFilterTemplate(),
+                                           JniLibrary.nativeFilterTemplate(),
+                                           JniLibrary.altProtocolCacheFilterInsert()),
+        logLevel);
   }
 
   /**
@@ -102,7 +103,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    return runWithTemplate(JniLibrary.templateString(), envoyConfiguration, logLevel);
+    return runWithTemplate(JniLibrary.configTemplate(), envoyConfiguration, logLevel);
   }
 
   private int runWithResolvedYAML(String configurationYAML, String logLevel) {
