@@ -14,7 +14,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
-#include "envoy/router/cluster_provider.h"
+#include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -925,7 +925,7 @@ private:
   const bool append_xfh_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
-  ClusterProviderSharedPtr cluster_provider_;
+  ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
@@ -1257,7 +1257,7 @@ public:
 
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
 
-  ClusterProviderSharedPtr clusterProvider(absl::string_view provider) const;
+  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
@@ -1271,7 +1271,7 @@ private:
   const uint32_t max_direct_response_body_size_bytes_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
-  absl::flat_hash_map<std::string, ClusterProviderSharedPtr> cluster_providers_;
+  absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
 };
 
 /**

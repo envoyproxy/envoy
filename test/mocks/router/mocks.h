@@ -18,7 +18,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/router/cluster_provider.h"
+#include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
@@ -597,18 +597,18 @@ public:
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
 };
 
-class MockClusterProvider : public ClusterProvider {
+class MockClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:
-  MockClusterProvider();
+  MockClusterSpecifierPlugin();
 
   MOCK_METHOD(RouteConstSharedPtr, route,
               (const RouteEntry& parent, const Http::RequestHeaderMap& header), (const));
 };
 
-class MockClusterProviderFactoryConfig : public ClusterProviderFactoryConfig {
+class MockClusterSpecifierPluginFactoryConfig : public ClusterSpecifierPluginFactoryConfig {
 public:
-  MockClusterProviderFactoryConfig();
-  MOCK_METHOD(ClusterProviderSharedPtr, createClusterProvider,
+  MockClusterSpecifierPluginFactoryConfig();
+  MOCK_METHOD(ClusterSpecifierPluginSharedPtr, createClusterSpecifierPlugin,
               (const Protobuf::Message& config,
                Server::Configuration::CommonFactoryContext& context));
 
@@ -616,7 +616,7 @@ public:
     return std::make_unique<ProtobufWkt::Struct>();
   }
 
-  std::string name() const override { return "envoy.route.cluster_provider.mock"; }
+  std::string name() const override { return "envoy.route.cluster_specifier_plugin.mock"; }
 };
 
 } // namespace Router

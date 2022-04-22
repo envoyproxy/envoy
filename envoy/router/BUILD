@@ -136,8 +136,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cluster_provider_interface",
-    hdrs = ["cluster_provider.h"],
+    name = "cluster_specifier_plugin_interface",
+    hdrs = ["cluster_specifier_plugin.h"],
     deps = [
         ":router_interface",
         "//envoy/config:typed_config_interface",

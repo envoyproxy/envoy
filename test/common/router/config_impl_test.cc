@@ -3216,19 +3216,20 @@ virtual_hosts:
       timeout: 0s
   )EOF";
 
-  NiceMock<MockClusterProviderFactoryConfig> factory;
-  Registry::InjectFactory<ClusterProviderFactoryConfig> registered(factory);
+  NiceMock<MockClusterSpecifierPluginFactoryConfig> factory;
+  Registry::InjectFactory<ClusterSpecifierPluginFactoryConfig> registered(factory);
 
-  auto mock_cluster_provider = std::make_shared<NiceMock<MockClusterProvider>>();
+  auto mock_cluster_specifier_plugin = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
-  EXPECT_CALL(factory, createClusterProvider(_, _)).WillOnce(Return(mock_cluster_provider));
+  EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
+      .WillOnce(Return(mock_cluster_specifier_plugin));
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   auto mock_route = std::make_shared<NiceMock<MockRoute>>();
 
-  EXPECT_CALL(*mock_cluster_provider, route(_, _)).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_cluster_specifier_plugin, route(_, _)).WillOnce(Return(mock_route));
 
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/foo", "GET"), 0).get());
 }
@@ -3269,27 +3270,28 @@ virtual_hosts:
       cluster_specifier_plugin: test3
   )EOF";
 
-  NiceMock<MockClusterProviderFactoryConfig> factory;
-  Registry::InjectFactory<ClusterProviderFactoryConfig> registered(factory);
+  NiceMock<MockClusterSpecifierPluginFactoryConfig> factory;
+  Registry::InjectFactory<ClusterSpecifierPluginFactoryConfig> registered(factory);
 
-  auto mock_cluster_provider_1 = std::make_shared<NiceMock<MockClusterProvider>>();
-  auto mock_cluster_provider_2 = std::make_shared<NiceMock<MockClusterProvider>>();
-  auto mock_cluster_provider_3 = std::make_shared<NiceMock<MockClusterProvider>>();
+  auto mock_cluster_specifier_plugin_1 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
+  auto mock_cluster_specifier_plugin_2 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
+  auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
-  EXPECT_CALL(factory, createClusterProvider(_, _))
-      .WillRepeatedly(
-          Invoke([mock_cluster_provider_1, mock_cluster_provider_2, mock_cluster_provider_3](
-                     const Protobuf::Message& config,
-                     Server::Configuration::CommonFactoryContext&) -> ClusterProviderSharedPtr {
+  EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
+      .WillRepeatedly(Invoke(
+          [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
+           mock_cluster_specifier_plugin_3](
+              const Protobuf::Message& config,
+              Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
             const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
-              return mock_cluster_provider_1;
+              return mock_cluster_specifier_plugin_1;
             } else if (iter->second.string_value() == "test2") {
-              return mock_cluster_provider_2;
+              return mock_cluster_specifier_plugin_2;
             } else if (iter->second.string_value() == "test3") {
-              return mock_cluster_provider_3;
+              return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
           }));
@@ -3299,10 +3301,10 @@ virtual_hosts:
 
   auto mock_route = std::make_shared<NiceMock<MockRoute>>();
 
-  EXPECT_CALL(*mock_cluster_provider_2, route(_, _)).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_cluster_specifier_plugin_2, route(_, _)).WillOnce(Return(mock_route));
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/foo", "GET"), 0).get());
 
-  EXPECT_CALL(*mock_cluster_provider_3, route(_, _)).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_cluster_specifier_plugin_3, route(_, _)).WillOnce(Return(mock_route));
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/bar", "GET"), 0).get());
 }
 
@@ -3343,27 +3345,28 @@ virtual_hosts:
       cluster_specifier_plugin: test4
   )EOF";
 
-  NiceMock<MockClusterProviderFactoryConfig> factory;
-  Registry::InjectFactory<ClusterProviderFactoryConfig> registered(factory);
+  NiceMock<MockClusterSpecifierPluginFactoryConfig> factory;
+  Registry::InjectFactory<ClusterSpecifierPluginFactoryConfig> registered(factory);
 
-  auto mock_cluster_provider_1 = std::make_shared<NiceMock<MockClusterProvider>>();
-  auto mock_cluster_provider_2 = std::make_shared<NiceMock<MockClusterProvider>>();
-  auto mock_cluster_provider_3 = std::make_shared<NiceMock<MockClusterProvider>>();
+  auto mock_cluster_specifier_plugin_1 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
+  auto mock_cluster_specifier_plugin_2 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
+  auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
-  EXPECT_CALL(factory, createClusterProvider(_, _))
-      .WillRepeatedly(
-          Invoke([mock_cluster_provider_1, mock_cluster_provider_2, mock_cluster_provider_3](
-                     const Protobuf::Message& config,
-                     Server::Configuration::CommonFactoryContext&) -> ClusterProviderSharedPtr {
+  EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
+      .WillRepeatedly(Invoke(
+          [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
+           mock_cluster_specifier_plugin_3](
+              const Protobuf::Message& config,
+              Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
             const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
-              return mock_cluster_provider_1;
+              return mock_cluster_specifier_plugin_1;
             } else if (iter->second.string_value() == "test2") {
-              return mock_cluster_provider_2;
+              return mock_cluster_specifier_plugin_2;
             } else if (iter->second.string_value() == "test3") {
-              return mock_cluster_provider_3;
+              return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
           }));
