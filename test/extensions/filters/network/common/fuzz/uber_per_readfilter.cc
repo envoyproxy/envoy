@@ -153,7 +153,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
     if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
                                    HttpConnectionManager::HTTP2) {
-      // Sanitiy check on connection_keepalive interval and timeout.
+      // Sanity check on connection_keepalive interval and timeout.
       try {
         PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), interval);
       } catch (const DurationUtil::OutOfRangeException& e) {
