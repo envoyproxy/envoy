@@ -45,7 +45,7 @@
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
-#include "source/extensions/early_data_option/default_early_data_option.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "absl/strings/match.h"
 
@@ -598,14 +598,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               path_redirect_);
   }
 
-  if (route.route().has_early_data_option()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<EarlyDataOptionFactory>(
-        route.route().early_data_option());
+  if (route.route().has_early_data_policy()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<EarlyDataPolicyFactory>(
+        route.route().early_data_policy());
     auto message = Envoy::Config::Utility::translateToFactoryConfig(
-        route.route().early_data_option(), validator, factory);
-    early_data_option_ = factory.createEarlyDataOption(*message);
+        route.route().early_data_policy(), validator, factory);
+    early_data_policy_ = factory.createEarlyDataPolicy(*message);
   } else {
-    early_data_option_ = std::make_unique<DefaultEarlyDataOption>(/*allow_safe_request*/ true);
+    early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
 }
 

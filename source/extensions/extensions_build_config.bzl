@@ -344,7 +344,7 @@ EXTENSIONS = {
     # Early Data option
     #
 
-    "envoy.route.early_data_option.default":           "//source/extensions/early_data_option:default_early_data_option_lib",
+    "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

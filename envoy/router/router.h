@@ -758,9 +758,9 @@ class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory
 /**
  * Base class for all early data option extensions.
  */
-class EarlyDataOption {
+class EarlyDataPolicy {
 public:
-  virtual ~EarlyDataOption() = default;
+  virtual ~EarlyDataPolicy() = default;
 
   /**
    * @return bool whether the given request may be sent over early data.
@@ -768,23 +768,23 @@ public:
   virtual bool allowsEarlyDataForRequest(const Http::RequestHeaderMap& request_headers) const PURE;
 };
 
-using EarlyDataOptionPtr = std::unique_ptr<EarlyDataOption>;
+using EarlyDataPolicyPtr = std::unique_ptr<EarlyDataPolicy>;
 
 /**
  * Base class for all early data option factories.
  */
-class EarlyDataOptionFactory : public Envoy::Config::TypedFactory {
+class EarlyDataPolicyFactory : public Envoy::Config::TypedFactory {
 public:
-  ~EarlyDataOptionFactory() override = default;
+  ~EarlyDataPolicyFactory() override = default;
 
   /**
    * @param config the typed config for early data option.
-   * @return EarlyDataIOptionPtr an instance of EarlyDataOption.
+   * @return EarlyDataIOptionPtr an instance of EarlyDataPolicy.
    */
-  virtual EarlyDataOptionPtr createEarlyDataOption(const Protobuf::Message& config) PURE;
+  virtual EarlyDataPolicyPtr createEarlyDataPolicy(const Protobuf::Message& config) PURE;
 
   // Config::UntypedFactory
-  std::string category() const override { return "envoy.route.early_data_option"; }
+  std::string category() const override { return "envoy.route.early_data_policy"; }
 };
 
 /**
@@ -1022,9 +1022,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return EarlyDataOption& the configured early data option.
+   * @return EarlyDataPolicy& the configured early data option.
    */
-  virtual const EarlyDataOption& earlyDataOption() const PURE;
+  virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
 };
 
 /**

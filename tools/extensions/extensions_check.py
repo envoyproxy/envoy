@@ -22,7 +22,7 @@ BUILTIN_EXTENSIONS = (
     "envoy.matching.inputs.source_ip", "envoy.matching.inputs.source_port",
     "envoy.matching.inputs.direct_source_ip", "envoy.matching.inputs.source_type",
     "envoy.matching.inputs.server_name", "envoy.matching.inputs.transport_protocol",
-    "envoy.matching.inputs.application_protocol", "envoy.route.early_data_option.default")
+    "envoy.matching.inputs.application_protocol", "envoy.route.early_data_policy.default")
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose

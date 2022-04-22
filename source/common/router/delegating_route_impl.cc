@@ -176,8 +176,8 @@ const std::string& DelegatingRouteEntry::routeName() const {
   return base_route_->routeEntry()->routeName();
 }
 
-const EarlyDataOption& DelegatingRouteEntry::earlyDataOption() const {
-  return base_route_->routeEntry()->earlyDataOption();
+const EarlyDataPolicy& DelegatingRouteEntry::earlyDataPolicy() const {
+  return base_route_->routeEntry()->earlyDataPolicy();
 }
 
 } // namespace Router

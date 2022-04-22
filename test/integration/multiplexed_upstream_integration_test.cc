@@ -734,15 +734,15 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        auto* early_data_option = hcm.mutable_route_config()
+        auto* early_data_policy = hcm.mutable_route_config()
                                       ->mutable_virtual_hosts(0)
                                       ->mutable_routes(0)
                                       ->mutable_route()
-                                      ->mutable_early_data_option();
-        envoy::extensions::early_data_option::v3::DefaultEarlyDataOption config;
+                                      ->mutable_early_data_policy();
+        envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
         config.set_early_data_allows_safe_requests(false);
-        early_data_option->set_name("envoy.route.early_data_option.default");
-        early_data_option->mutable_typed_config()->PackFrom(config);
+        early_data_policy->set_name("envoy.route.early_data_policy.default");
+        early_data_policy->mutable_typed_config()->PackFrom(config);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

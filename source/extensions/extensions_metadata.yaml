@@ -579,9 +579,9 @@ envoy.retry_priorities.previous_priorities:
   - envoy.retry_priorities
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.route.early_data_option.default:
+envoy.route.early_data_policy.default:
   categories:
-  - envoy.route.early_data_option
+  - envoy.route.early_data_policy
   security_posture: robust_to_untrusted_downstream
   status: stable
 envoy.stat_sinks.dog_statsd:

@@ -596,7 +596,7 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-  const EarlyDataOption& earlyDataOption() const override { return *early_data_option_; }
+  const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -764,7 +764,7 @@ private:
       return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
-    const EarlyDataOption& earlyDataOption() const override { return parent_->earlyDataOption(); }
+    const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -978,7 +978,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   const std::string random_value_header_name_;
-  EarlyDataOptionPtr early_data_option_;
+  EarlyDataPolicyPtr early_data_policy_;
 };
 
 /**

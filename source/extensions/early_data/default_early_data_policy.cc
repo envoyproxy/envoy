@@ -1,11 +1,11 @@
-#include "source/extensions/early_data_option/default_early_data_option.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Router {
 
-bool DefaultEarlyDataOption::allowsEarlyDataForRequest(
+bool DefaultEarlyDataPolicy::allowsEarlyDataForRequest(
     const Http::RequestHeaderMap& request_headers) const {
   if (!allow_safe_request_) {
     return false;
@@ -13,7 +13,7 @@ bool DefaultEarlyDataOption::allowsEarlyDataForRequest(
   return Http::Utility::isSafeRequest(request_headers);
 }
 
-REGISTER_FACTORY(DefaultEarlyDataOptionFactory, EarlyDataOptionFactory);
+REGISTER_FACTORY(DefaultEarlyDataPolicyFactory, EarlyDataPolicyFactory);
 
 } // namespace Router
 } // namespace Envoy
