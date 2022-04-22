@@ -395,7 +395,7 @@ public:
     initializeFilter();
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-    expectCallFilterComplexMessage(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
+    checkDecoderEventsCalledToFilters(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
 
     ThriftFilters::DecoderFilterCallbacks* callbacks{};
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -441,8 +441,8 @@ public:
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
   }
 
-  void expectCallFilterComplexMessage(MessageType req_msg_type, int32_t req_seq_id,
-                                      MessageType resp_msg_type, int32_t resp_seq_id) {
+  void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
+                                         MessageType resp_msg_type, int32_t resp_seq_id) {
     bool one = true;
     uint8_t two = 2;
     double three = 3.0;
@@ -584,16 +584,27 @@ public:
     EXPECT_CALL(*bidirection_filter_, encodeSetEnd());
   }
 
-  void expectCallPassthroughSupported(int times = -1) {
+  void passthroughSupportedSetup(bool expected_decode_passthrough_data_called = true,
+                                 bool expected_encode_passthrough_data_called = true) {
     EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
     EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
     EXPECT_CALL(*bidirection_filter_, decodePassthroughSupported()).WillRepeatedly(Return(true));
     EXPECT_CALL(*bidirection_filter_, encodePassthroughSupported()).WillRepeatedly(Return(true));
 
-    if (times == -1) {
+    if (expected_decode_passthrough_data_called) {
       EXPECT_CALL(*decoder_filter_, passthroughData(_));
+      EXPECT_CALL(*bidirection_filter_, decodePassthroughData(_));
     } else {
-      EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(times);
+      EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
+      EXPECT_CALL(*bidirection_filter_, decodePassthroughData(_)).Times(0);
+    }
+
+    if (expected_encode_passthrough_data_called) {
+      EXPECT_CALL(*encoder_filter_, passthroughData(_));
+      EXPECT_CALL(*bidirection_filter_, encodePassthroughData(_));
+    } else {
+      EXPECT_CALL(*encoder_filter_, passthroughData(_)).Times(0);
+      EXPECT_CALL(*bidirection_filter_, encodePassthroughData(_)).Times(0);
     }
   }
 
@@ -1972,7 +1983,8 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  expectCallPassthroughSupported();
+  // No response since the decoder filter stop the iteration.
+  passthroughSupportedSetup(true, false);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, buffer_.length());
@@ -1995,7 +2007,8 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  expectCallPassthroughSupported();
+  // No response for oneway.
+  passthroughSupportedSetup(true, false);
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -2020,7 +2033,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  expectCallPassthroughSupported();
+  passthroughSupportedSetup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -2062,7 +2075,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  expectCallPassthroughSupported();
+  passthroughSupportedSetup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -2104,7 +2117,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  expectCallPassthroughSupported();
+  passthroughSupportedSetup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -2155,7 +2168,8 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  expectCallPassthroughSupported();
+  // No response since the decoder filter stop the iteration.
+  passthroughSupportedSetup(true, false);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -2198,7 +2212,8 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  expectCallPassthroughSupported(0);
+  // PassthroughData is expected to be called.
+  passthroughSupportedSetup(false, false);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))

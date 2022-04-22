@@ -130,7 +130,7 @@ public:
   ~EncoderFilterCallbacks() override = default;
 
   /**
-   * Currently throw given we don't support StopIteration from EncoderFilter yet.
+   * Currently throw given we don't support StopIteration for EncoderFilter yet.
    */
   virtual void continueEncoding() PURE;
 };
@@ -177,6 +177,19 @@ public:
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 
+/**
+ * Encoder filter interface.
+ *
+ * Currently the EncoderFilter and BidirectionFilter support
+ * a. peek the metadata and content for encoding, and
+ * b. modify the metadata and content except string value for encoding.
+ *
+ * Do not support
+ * a. pass through data separately for encode and decode, e.g., pass through data for request but
+ * not pass through data for response, and
+ * b. return StopIteration for decoder_events in for encoder filter and encode* events for
+ * bidirection filter. The filters trying to return StopIteration will reset the connection.
+ */
 class EncoderFilter : public FilterBase, public virtual DecoderEventHandler {
 public:
   ~EncoderFilter() override = default;
@@ -196,6 +209,9 @@ public:
 
 using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
 
+/**
+ * Bidirection filter interface. @see EncoderFilter.
+ */
 class BidirectionFilter : public FilterBase {
 public:
   ~BidirectionFilter() override = default;
