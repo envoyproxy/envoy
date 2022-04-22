@@ -74,7 +74,6 @@ void InstanceProfileCredentialsProvider::refresh() {
 
   // First discover the Role of this instance
   Http::RequestMessageImpl message;
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Http);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(EC2_METADATA_HOST);
   message.headers().setPath(SECURITY_CREDENTIALS_PATH);
@@ -87,7 +86,7 @@ void InstanceProfileCredentialsProvider::refresh() {
 }
 
 void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
-    const std::string& instance_role, bool async /*default = false*/) {
+    const std::string& instance_role) {
   if (instance_role.empty()) {
     return;
   }
@@ -107,21 +106,16 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
 
   // Then fetch and parse the credentials
   Http::RequestMessageImpl message;
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Http);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(EC2_METADATA_HOST);
   message.headers().setPath(credential_path);
 
-  if (!async) {
-    const auto credential_document = metadata_fetcher_(message);
-    if (!credential_document) {
-      ENVOY_LOG(error, "Could not load AWS credentials document from the instance metadata");
-      return;
-    }
-    extractCredentials(credential_document.value());
-  } else {
-    // TODO(suniltheta) async call using http_async_client
+  const auto credential_document = metadata_fetcher_(message);
+  if (!credential_document) {
+    ENVOY_LOG(error, "Could not load AWS credentials document from the instance metadata");
+    return;
   }
+  extractCredentials(credential_document.value());
 }
 
 void InstanceProfileCredentialsProvider::extractCredentials(
@@ -164,7 +158,6 @@ void TaskRoleCredentialsProvider::refresh() {
   Http::Utility::extractHostPathFromUri(credential_uri_, host, path);
 
   Http::RequestMessageImpl message;
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Http);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(host);
   message.headers().setPath(path);

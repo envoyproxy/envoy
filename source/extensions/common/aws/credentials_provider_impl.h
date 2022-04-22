@@ -69,10 +69,7 @@ private:
   bool needsRefresh() override;
   void refresh() override;
   void extractCredentials(const std::string& credential_document_value);
-  void fetchCredentialFromInstanceRole(const std::string& instance_role, bool async = false);
-  void fetchCredentialFromInstanceRoleAsync(const std::string& instance_role) {
-    fetchCredentialFromInstanceRole(instance_role, true);
-  }
+  void fetchCredentialFromInstanceRole(const std::string& instance_role);
 };
 
 /**

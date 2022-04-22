@@ -29,9 +29,9 @@ public:
   MOCK_METHOD(void, signUnsignedPayload, (Http::RequestHeaderMap&));
 };
 
-class MockFetchMetadataer {
+class MockFetchMetadata {
 public:
-  virtual ~MockFetchMetadataer() = default;
+  virtual ~MockFetchMetadata() = default;
 
   MOCK_METHOD(absl::optional<std::string>, fetch, (Http::RequestMessage&), (const));
 };

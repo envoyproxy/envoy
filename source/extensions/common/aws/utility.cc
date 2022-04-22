@@ -229,12 +229,14 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   static const std::chrono::seconds TIMEOUT{5};
 
   CURL* const curl = curl_easy_init();
-  RELEASE_ASSERT(curl != nullptr, "");
+  if (!curl) {
+    return absl::nullopt;
+  };
+
   const auto host = message.headers().getHostValue();
   const auto path = message.headers().getPathValue();
-  const auto scheme = message.headers().getSchemeValue();
 
-  const std::string url = fmt::format("{}://{}{}", scheme, host, path);
+  const std::string url = fmt::format("http://{}{}", host, path);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT.count());
   curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
