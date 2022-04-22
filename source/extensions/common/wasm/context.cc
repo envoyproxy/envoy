@@ -727,7 +727,7 @@ const Http::HeaderMap* Context::getConstMap(WasmHeaderMapType type) {
     return nullptr;
   }
   }
-  IS_ENVOY_BUG("unexpected");
+  IS_ENVOY_BUG("unexpected wasm header type");
   return nullptr;
 }
 
@@ -1184,6 +1184,7 @@ WasmResult Context::log(uint32_t level, std::string_view message) {
     PANIC("not implemented");
   }
   IS_ENVOY_BUG("unexpected wasm log level");
+  return WasmResult::Ok;
 }
 
 uint32_t Context::getLogLevel() {
