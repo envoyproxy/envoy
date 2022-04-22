@@ -4,21 +4,7 @@ namespace Envoy {
 namespace Server {
 
 StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params)
-    : params_(params), stats_(stats) {
-  switch (params_.type_) {
-  case StatsType::TextReadouts:
-  case StatsType::All:
-    phase_ = Phase::TextReadouts;
-    break;
-  case StatsType::Counters:
-  case StatsType::Gauges:
-    phase_ = Phase::CountersAndGauges;
-    break;
-  case StatsType::Histograms:
-    phase_ = Phase::Histograms;
-    break;
-  }
-}
+    : params_(params), stats_(stats) {}
 
 Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
   switch (params_.format_) {
@@ -54,10 +40,6 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   }
   while (response.length() < chunk_size_) {
     while (stat_map_.empty()) {
-      if (params_.type_ != StatsType::All) {
-        render_->finalize(response);
-        return false;
-      }
       switch (phase_) {
       case Phase::TextReadouts:
         phase_ = Phase::CountersAndGauges;
@@ -131,12 +113,8 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
     populateStatsFromScopes<Stats::TextReadout>(scope_vec);
     break;
   case Phase::CountersAndGauges:
-    if (params_.type_ != StatsType::Gauges) {
-      populateStatsFromScopes<Stats::Counter>(scope_vec);
-    }
-    if (params_.type_ != StatsType::Counters) {
-      populateStatsFromScopes<Stats::Gauge>(scope_vec);
-    }
+    populateStatsFromScopes<Stats::Counter>(scope_vec);
+    populateStatsFromScopes<Stats::Gauge>(scope_vec);
     break;
   case Phase::Histograms:
     populateStatsFromScopes<Stats::Histogram>(scope_vec);

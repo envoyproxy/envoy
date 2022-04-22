@@ -25,15 +25,6 @@ enum class StatsFormat {
   Text,
 };
 
-// The order is used to linearize the ordering of stats of all types.
-enum class StatsType {
-  TextReadouts,
-  Counters,
-  Gauges,
-  Histograms,
-  All,
-};
-
 struct StatsParams {
   /**
    * Parses the URL's query parameter, populating this.
@@ -43,17 +34,10 @@ struct StatsParams {
    */
   Http::Code parse(absl::string_view url, Buffer::Instance& response);
 
-  /**
-   * @return a string representation for a type.
-   */
-  static absl::string_view typeToString(StatsType type);
-
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
   StatsFormat format_{StatsFormat::Text};
-  StatsType type_{StatsType::All};
-  StatsType start_type_{StatsType::TextReadouts};
   std::string filter_string_;
   absl::optional<std::regex> filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
