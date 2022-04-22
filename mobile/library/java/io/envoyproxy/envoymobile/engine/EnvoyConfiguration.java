@@ -35,6 +35,7 @@ public class EnvoyConfiguration {
   public final String dnsPreresolveHostnames;
   public final List<String> dnsFallbackNameservers;
   public final Boolean dnsFilterUnroutableFamilies;
+  public final Boolean enableHttp3;
   public final Boolean enableHappyEyeballs;
   public final Boolean enableInterfaceBinding;
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -69,6 +70,7 @@ public class EnvoyConfiguration {
    * @param dnsPreresolveHostnames       hostnames to preresolve on Envoy Client construction.
    * @param dnsFallbackNameservers       addresses to use as DNS name server fallback.
    * @param dnsFilterUnroutableFamilies  whether to filter unroutable IP families or not.
+   * @param enableHttp3                  whether to enable experimental support for HTTP/3 (QUIC).
    * @param enableHappyEyeballs          whether to enable RFC 6555 handling for IPv4/IPv6.
    * @param enableInterfaceBinding       whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
@@ -92,7 +94,7 @@ public class EnvoyConfiguration {
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
       int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
       String dnsPreresolveHostnames, List<String> dnsFallbackNameservers,
-      Boolean dnsFilterUnroutableFamilies, boolean enableHappyEyeballs,
+      Boolean dnsFilterUnroutableFamilies, boolean enableHttp3, boolean enableHappyEyeballs,
       boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
       int h2ConnectionKeepaliveTimeoutSeconds, List<String> h2RawDomains, int maxConnectionsPerHost,
       int statsFlushSeconds, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
@@ -112,6 +114,7 @@ public class EnvoyConfiguration {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.dnsFallbackNameservers = dnsFallbackNameservers;
     this.dnsFilterUnroutableFamilies = dnsFilterUnroutableFamilies;
+    this.enableHttp3 = enableHttp3;
     this.enableHappyEyeballs = enableHappyEyeballs;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
@@ -135,32 +138,37 @@ public class EnvoyConfiguration {
    * Resolves the provided configuration template using properties on this
    * configuration.
    *
-   * @param templateYAML the template configuration to resolve.
-   * @param platformFilterTemplateYAML helper template to build platform http filters.
-   * @param nativeFilterTemplateYAML helper template to build native http filters.
+   * @param configTemplate the template configuration to resolve.
+   * @param platformFilterTemplate helper template to build platform http filters.
+   * @param nativeFilterTemplate helper template to build native http filters.
+   * @param altProtocolCacheFilterInsert helper insert to include the alt protocol cache filter.
    * @return String, the resolved template.
    * @throws ConfigurationException, when the template provided is not fully
    *                                 resolved.
    */
-  String resolveTemplate(final String templateYAML, final String platformFilterTemplateYAML,
-                         final String nativeFilterTemplateYAML) {
+  String resolveTemplate(final String configTemplate, final String platformFilterTemplate,
+                         final String nativeFilterTemplate,
+                         final String altProtocolCacheFilterInsert) {
     final StringBuilder customFiltersBuilder = new StringBuilder();
 
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
-      String filterConfig = platformFilterTemplateYAML.replace("{{ platform_filter_name }}",
-                                                               filterFactory.getFilterName());
+      String filterConfig = platformFilterTemplate.replace("{{ platform_filter_name }}",
+                                                           filterFactory.getFilterName());
       customFiltersBuilder.append(filterConfig);
     }
 
     for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
-      String filterConfig =
-          nativeFilterTemplateYAML.replace("{{ native_filter_name }}", filter.name)
-              .replace("{{ native_filter_typed_config }}", filter.typedConfig);
+      String filterConfig = nativeFilterTemplate.replace("{{ native_filter_name }}", filter.name)
+                                .replace("{{ native_filter_typed_config }}", filter.typedConfig);
       customFiltersBuilder.append(filterConfig);
     }
 
+    if (enableHttp3) {
+      customFiltersBuilder.append(altProtocolCacheFilterInsert);
+    }
+
     String processedTemplate =
-        templateYAML.replace("#{custom_filters}", customFiltersBuilder.toString());
+        configTemplate.replace("#{custom_filters}", customFiltersBuilder.toString());
 
     String dnsFallbackNameserversAsString = "[]";
     if (!dnsFallbackNameservers.isEmpty()) {

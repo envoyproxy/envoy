@@ -31,7 +31,7 @@ jobs:
         if: steps.check_context.outputs.run_tests == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./bazelw test --test_output=all --config=ios --build_tests_only --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/...
+        run: ./bazelw test --experimental_ui_max_stdouterr_bytes=10485760 --test_output=all --config=ios --build_tests_only --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/...
   objctests:
     name: objc_tests
     runs-on: macos-11
