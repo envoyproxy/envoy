@@ -181,7 +181,8 @@ void EnvoyQuicClientSession::setHttp3Options(
       disable_keepalive_ = true;
       return;
     }
-    connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
+    connection()->set_keep_alive_ping_timeout(
+        quic::QuicTime::Delta::FromMilliseconds(max_interval));
     if (max_interval > initial_interval && initial_interval > 0u) {
       connection()->set_initial_retransmittable_on_wire_timeout(
           quic::QuicTime::Delta::FromMilliseconds(initial_interval));

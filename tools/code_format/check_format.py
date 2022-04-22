@@ -206,6 +206,7 @@ CODE_CONVENTION_REPLACEMENTS = {
     # Times(1) noise.
     ".Times(1).WillOnce": ".WillOnce",
     ".Times(1).WillRepeatedly": ".WillOnce",
+    "Stats::ScopePtr": "Stats::ScopeSharedPtr",
 }
 
 UNSORTED_FLAGS = {
