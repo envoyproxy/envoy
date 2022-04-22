@@ -742,10 +742,10 @@ public:
   void createLdsStream() {
     AssertionResult result =
         fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, lds_connection_);
-    RELEASE_ASSERT(result, result.message());
+    EXPECT_TRUE(result);
 
-    auto result3 = lds_connection_->waitForNewStream(*dispatcher_, lds_stream_);
-    RELEASE_ASSERT(result3, result3.message());
+    auto result2 = lds_connection_->waitForNewStream(*dispatcher_, lds_stream_);
+    EXPECT_TRUE(result2);
     lds_stream_->startGrpcStream();
   }
 
@@ -757,7 +757,7 @@ public:
     for (const auto& listener_config : listener_configs) {
       response.add_resources()->PackFrom(listener_config);
     }
-    ASSERT(lds_stream_ != nullptr);
+    ASSERT_NE(nullptr, lds_stream_);
     lds_stream_->sendGrpcMessage(response);
   }
 
@@ -774,7 +774,7 @@ public:
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    if (create_grpc_lds_) {
+    if (!use_lds_) {
       // Create the LDS upstream (fake_upstreams_[1]).
       addFakeUpstream(Http::CodecType::HTTP2);
     }
@@ -783,7 +783,6 @@ public:
   envoy::config::listener::v3::Listener listener_config_;
   FakeHttpConnectionPtr lds_connection_;
   FakeStreamPtr lds_stream_{};
-  bool create_grpc_lds_{false};
 };
 
 TEST_P(ListenerFilterIntegrationTest, InspectDataFilterDrainData) {
@@ -969,8 +968,6 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
         max_read_bytes: 5
         close_connection: false
         )EOF");
-  std::string data = "hello";
-  std::string data_after_drain = data.substr(2, std::string::npos);
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Add the static cluster to serve LDS.
     auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -998,16 +995,18 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
     createLdsStream();
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
   };
-  create_grpc_lds_ = true;
   use_lds_ = false;
   initialize();
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  registerTestServerPorts({"test_listener"});
   // Workers not started, the LDS added test_listener is in active_listeners_ list.
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener"});
+
+  std::string data = "hello";
+  std::string data_after_drain = data.substr(2, std::string::npos);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
   ASSERT_TRUE(tcp_client->write(data));
   FakeRawConnectionPtr fake_upstream_connection;
@@ -1030,13 +1029,13 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   tcp_client2->waitForDisconnect();
 
   // Then ensure the whole listener works as expect with enough data.
-  std::string data2 = "helloworld";
-  std::string data_after_drain2 = data.substr(2, std::string::npos);
+  std::string long_data = "helloworld";
+  std::string long_data_after_drain = long_data.substr(2, std::string::npos);
   IntegrationTcpClientPtr tcp_client3 = makeTcpConnection(lookupPort("test_listener"));
-  ASSERT_TRUE(tcp_client3->write(data2));
+  ASSERT_TRUE(tcp_client3->write(long_data));
   FakeRawConnectionPtr fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
-  ASSERT_TRUE(fake_upstream_connection2->waitForData(data2.size() - 2, &data_after_drain2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(long_data.size() - 2, &long_data_after_drain));
   tcp_client3->close();
 }
 
