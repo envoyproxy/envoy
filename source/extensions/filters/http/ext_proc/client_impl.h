@@ -41,7 +41,6 @@ public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
                               ExternalProcessorCallbacks& callbacks,
                               const StreamInfo::StreamInfo& stream_info);
-
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
   // actually closed it.
