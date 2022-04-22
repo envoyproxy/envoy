@@ -458,7 +458,6 @@ message ClusterSpecifierPlugin {
   // The name of the plugin and its opaque configuration.
   core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
 
-  // [#not-implemented-hide:]
   // If is_optional is not set or is set to false and the plugin defined by this message is not a
   // supported type, the containing resource is NACKed. If is_optional is set to true, the resource
   // would not be NACKed for this reason. In this case, routes referencing this plugin's name would
@@ -942,8 +941,7 @@ message RouteAction {
 
     // Custom cluster specifier plugin configuration to use to determine the cluster for requests
     // on this route.
-    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39
-        [(xds.annotations.v3.field_status).work_in_progress = true];
+    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39;
   }
 
   // The HTTP status code to use when configured cluster is not found.
