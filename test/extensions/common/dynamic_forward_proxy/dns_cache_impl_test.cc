@@ -252,7 +252,7 @@ TEST_F(DnsCacheImplTest, ForceRefresh) {
   EXPECT_CALL(resolver_->active_query_,
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*timeout_timer, enabled());
+  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
   dns_cache_->forceRefreshHosts();
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
