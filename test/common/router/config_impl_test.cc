@@ -3234,6 +3234,61 @@ virtual_hosts:
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/foo", "GET"), 0).get());
 }
 
+TEST_F(RouteMatcherTest, UnknownClusterSpecifierPlugin) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      inline_cluster_specifier_plugin:
+        extension:
+          name: test
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+  - match:
+      prefix: "/bar"
+    route:
+      cluster_header: some_header
+      timeout: 0s
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Didn't find a registered implementation for.*");
+}
+
+TEST_F(RouteMatcherTest, UnknownClusterSpecifierPluginButOptional) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      inline_cluster_specifier_plugin:
+        extension:
+          name: test
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+        is_optional: true
+  - match:
+      prefix: "/bar"
+    route:
+      cluster_header: some_header
+      timeout: 0s
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_NO_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true));
+}
+
 TEST_F(RouteMatcherTest, ClusterSpecifierPlugin) {
   const std::string yaml = R"EOF(
 cluster_specifier_plugins:
@@ -3308,7 +3363,7 @@ virtual_hosts:
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/bar", "GET"), 0).get());
 }
 
-TEST_F(RouteMatcherTest, UnknownClusterSpecifierPlugin) {
+TEST_F(RouteMatcherTest, UnknownClusterSpecifierPluginName) {
   const std::string yaml = R"EOF(
 cluster_specifier_plugins:
 - extension:
