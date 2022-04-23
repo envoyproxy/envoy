@@ -100,8 +100,8 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
   tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
-  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
+  [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
+* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
