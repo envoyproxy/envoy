@@ -92,7 +92,7 @@ private:
 };
 
 testing::Matcher<Http::RequestMessage&>
-MessageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
+messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
   return testing::MakeMatcher(new MessageMatcher(expected_headers));
 }
 
@@ -108,7 +108,7 @@ public:
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
                                            {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(MessageMatches(headers))).WillOnce(Return(listing));
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
   }
 
   void expectDocument(const absl::optional<std::string>& document) {
@@ -116,7 +116,7 @@ public:
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
         {":authority", "169.254.169.254:80"},
         {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(MessageMatches(headers))).WillOnce(Return(document));
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -243,7 +243,7 @@ public:
                                            {":authority", "169.254.170.2:80"},
                                            {":method", "GET"},
                                            {"authorization", "auth_token"}};
-    EXPECT_CALL(fetch_metadata_, fetch(MessageMatches(headers))).WillOnce(Return(document));
+    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
   Event::SimulatedTimeSystem time_system_;
