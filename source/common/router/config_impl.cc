@@ -1150,7 +1150,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
       return pickClusterViaClusterHeader(cluster_header_name_, headers);
     } else {
       // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
-      // cluster provider.
+      // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
       return cluster_specifier_plugin_->route(*this, headers);
     }
@@ -1831,8 +1831,8 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
     }
   }
 
-  // Initialize all cluster providers before creating route matcher. Because the route may reference
-  // it by name.
+  // Initialize all cluster specifier plugins before creating route matcher. Because the route may
+  // reference it by name.
   for (const auto& plugin_proto : config.cluster_specifier_plugins()) {
     auto plugin = getClusterSpecifierPluginByTheProto(plugin_proto, validator, factory_context);
     cluster_specifier_plugins_.emplace(plugin_proto.extension().name(), std::move(plugin));
@@ -1857,7 +1857,7 @@ ConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
   auto iter = cluster_specifier_plugins_.find(provider);
   if (iter == cluster_specifier_plugins_.end() || iter->second == nullptr) {
     throw EnvoyException(
-        fmt::format("Unknown cluster provider name: {} is used in the route", provider));
+        fmt::format("Unknown cluster specifier plugin name: {} is used in the route", provider));
   }
   return iter->second;
 }

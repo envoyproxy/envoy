@@ -3374,7 +3374,7 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Unknown cluster provider name: test4 is used in the route");
+      "Unknown cluster specifier plugin name: test4 is used in the route");
 }
 
 TEST_F(RouteMatcherTest, ContentType) {
