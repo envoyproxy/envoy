@@ -357,12 +357,11 @@ protected:
   void applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
                                 DynamicFilterConfigProviderImplBase& provider,
                                 const std::string& filter_config_name);
-  void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
-                                               absl::string_view filter_config_name,
-                                               absl::string_view type_url) const;
-  void
-  validateProtoConfigTypeUrlHelper(absl::string_view type_url,
-                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
+  void validateProtoConfigDefaultFactory(const bool null_default_factory,
+                                         const std::string& filter_config_name,
+                                         const std::string& type_url) const;
+  void validateProtoConfigTypeUrl(const std::string& type_url,
+                                  const absl::flat_hash_set<std::string>& require_type_urls) const;
 
 private:
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
@@ -456,10 +455,9 @@ protected:
                    const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
-    validateProtoConfigDefaultFactoryHelper(default_factory == nullptr, filter_config_name,
-                                            proto_config.type_url());
-    validateProtoConfigTypeUrlHelper(Config::Utility::getFactoryType(proto_config),
-                                     require_type_urls);
+    validateProtoConfigDefaultFactory(default_factory == nullptr, filter_config_name,
+                                      proto_config.type_url());
+    validateProtoConfigTypeUrl(Config::Utility::getFactoryType(proto_config), require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         proto_config, factory_context.messageValidationVisitor(), *default_factory);
     validateFilters(filter_config_name, default_factory->name(), filter_chain_type,
