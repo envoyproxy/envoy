@@ -80,6 +80,21 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(UdpStatsdSinkTest, InvalidTagFormat) {
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  Network::Test::UdpSyncPeer server(GetParam());
+  TagFormat tf = TagFormat{";", "=", ";", static_cast<TagPosition>(123)};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, server.localAddress(), false, "", absl::nullopt, tf);
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.used_ = true;
+  counter.latch_ = 1;
+  snapshot.counters_.push_back({1, counter});
+  EXPECT_ENVOY_BUG(sink.flush(snapshot), "unexpected tag format tag position enum");
+}
+
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockMetricSnapshot> snapshot;
