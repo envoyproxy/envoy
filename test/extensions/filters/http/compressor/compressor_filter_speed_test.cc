@@ -284,12 +284,13 @@ static std::vector<CompressionParams> gzip_compression_params = {
     // Best + Standard + High window + High mem level
     {Z_BEST_COMPRESSION, Z_DEFAULT_STRATEGY, 15, 9}};
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressFullWithGzip(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -299,12 +300,13 @@ BENCHMARK(compressFullWithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks16384WithGzip(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -314,12 +316,13 @@ BENCHMARK(compressChunks16384WithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks8192WithGzip(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -329,12 +332,13 @@ BENCHMARK(compressChunks8192WithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks4096WithGzip(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -344,12 +348,13 @@ BENCHMARK(compressChunks4096WithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks1024WithGzip(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -429,13 +434,14 @@ static std::vector<CompressionParams> zstd_compression_params = {
     // level22 + default
     {22, 0, 0, 0}};
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressFullWithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
   Envoy::Extensions::HttpFilters::Compressor::Result res;
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
     res = compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -445,13 +451,14 @@ BENCHMARK(compressFullWithZstd)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks16384WithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
   Envoy::Extensions::HttpFilters::Compressor::Result res;
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
     res = compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -461,12 +468,13 @@ BENCHMARK(compressChunks16384WithZstd)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks8192WithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -476,12 +484,13 @@ BENCHMARK(compressChunks8192WithZstd)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks4096WithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -491,12 +500,13 @@ BENCHMARK(compressChunks4096WithZstd)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void compressChunks1024WithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
