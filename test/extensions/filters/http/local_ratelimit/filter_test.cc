@@ -310,7 +310,7 @@ public:
   }
 
   std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}}};
-  std::vector<RateLimit::LocalDescriptor> descriptor_first_match_{{
+  std::vector<RateLimit::LocalDescriptor> descriptor_both_match_{{
       {{
           {"hello", "world"},
           {"foo", "bar"},
@@ -406,21 +406,21 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
-TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
-  // Request  should not be rate  limited as it should match first descriptor with 10 req/min
+TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {
+  // Request should also be rate limited as it should match both descriptors
   setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
-      .WillOnce(testing::SetArgReferee<0>(descriptor_first_match_));
+      .WillOnce(testing::SetArgReferee<0>(descriptor_both_match_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
