@@ -32,14 +32,14 @@ DefaultCertificateProvider::DefaultCertificateProvider(
   std::list<Envoy::CertificateProvider::Certpair> identity_certpairs;
   Envoy::CertificateProvider::Certpair identity_certpair = {icert, ikey};
   identity_certpairs.emplace_back(identity_certpair);
-  cert_pairs_.emplace("IDENTITY_CERTPAIR", identity_certpairs);
+  cert_pairs_.emplace("DEFAULT_IDENTITY_CERTPAIR", identity_certpairs);
 
   std::string ccert = Config::DataSource::read(message.ca_cert(), true, api);
   std::string ckey = Config::DataSource::read(message.ca_key(), true, api);
   std::list<Envoy::CertificateProvider::Certpair> ca_certpairs;
   Envoy::CertificateProvider::Certpair ca_certpair = {ccert, ckey};
   ca_certpairs.emplace_back(ca_certpair);
-  cert_pairs_.emplace("CA_CERTPAIR", ca_certpairs);
+  cert_pairs_.emplace("DEFAULT_CA_CERTPAIR", ca_certpairs);
 
   trusted_ca_ = Config::DataSource::read(message.trusted_ca(), true, api);
 }
@@ -51,7 +51,7 @@ DefaultCertificateProvider::certPairs(absl::string_view cert_name, bool generate
     return it->second;
   }
   if (generate) {
-    generateCertpair(cert_name);
+    return generateCertpair(cert_name);
   }
   std::list<Envoy::CertificateProvider::Certpair> empty_list;
   return empty_list;
@@ -59,7 +59,7 @@ DefaultCertificateProvider::certPairs(absl::string_view cert_name, bool generate
 
 Common::CallbackHandlePtr
 DefaultCertificateProvider::addUpdateCallback(absl::string_view cert_name,
-                                             std::function<void()> callback) {
+                                              std::function<void()> callback) {
   if (!update_callback_managers_.contains(cert_name)) {
     Common::CallbackManager<> update_callback_manager;
     update_callback_managers_.emplace(cert_name, update_callback_manager);
@@ -68,7 +68,8 @@ DefaultCertificateProvider::addUpdateCallback(absl::string_view cert_name,
   return it->second.add(callback);
 }
 
-void DefaultCertificateProvider::generateCertpair(absl::string_view cert_name) {
+std::list<Envoy::CertificateProvider::Certpair>
+DefaultCertificateProvider::generateCertpair(absl::string_view cert_name) {
   auto ca_certpairs = cert_pairs_.at("CA_CERTPAIR");
   auto ca_cert_str = ca_certpairs.begin()->certificate_;
   auto ca_key_str = ca_certpairs.begin()->private_key_;
@@ -133,22 +134,14 @@ void DefaultCertificateProvider::generateCertpair(absl::string_view cert_name) {
   Envoy::CertificateProvider::Certpair certpair{cert_pem, key_pem};
   std::list<Envoy::CertificateProvider::Certpair> generate_certpairs;
   generate_certpairs.emplace_back(certpair);
-  onCertpairsUpdated(cert_name, generate_certpairs);
-}
-
-void DefaultCertificateProvider::onCertpairsUpdated(
-    absl::string_view cert_name, std::list<Envoy::CertificateProvider::Certpair> certpairs) {
   auto cert_it = cert_pairs_.find(cert_name);
   if (cert_it != cert_pairs_.end()) {
     cert_it->second.clear();
-    for (auto it : certpairs) {
+    for (auto it : generate_certpairs) {
       cert_it->second.emplace_back(it);
     }
   }
-  auto callback_it = update_callback_managers_.find(cert_name);
-  if (callback_it != update_callback_managers_.end()) {
-    callback_it->second.runCallbacks();
-  }
+  return generate_certpairs;
 }
 
 } // namespace CertificateProviders

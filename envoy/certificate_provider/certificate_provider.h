@@ -16,22 +16,6 @@ struct Certpair {
   const std::string& private_key_;
 };
 
-/**
- * This is used to implement asynchronous certificate provider.
- */
-class CertificateSubscriptionCallbacks {
-public:
-  virtual ~CertificateSubscriptionCallbacks() = default;
-
-  /* Called when the certpairs update of cert name is received */
-  virtual void onCertpairsUpdated(absl::string_view cert_name, std::list<Certpair> certpairs) PURE;
-  /* Called when the ca cert update of cert name is received */
-  virtual void onCACertUpdated(absl::string_view cert_name, const std::string cert) PURE;
-  /* Called when the subscription is unable to fetch the update or
-   * onCertpairsUpdated/onCACertUpdated throws the exception */
-  virtual void onUpatedFail() PURE;
-};
-
 class CertificateProvider {
 public:
   struct Capabilites {

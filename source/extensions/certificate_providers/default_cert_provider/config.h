@@ -11,11 +11,10 @@ namespace Envoy {
 namespace Extensions {
 namespace CertificateProviders {
 
-class DefaultCertificateProvider : public CertificateProvider::CertificateProvider,
-                                  public CertificateProvider::CertificateSubscriptionCallbacks {
+class DefaultCertificateProvider : public CertificateProvider::CertificateProvider {
 public:
   DefaultCertificateProvider(const envoy::config::core::v3::TypedExtensionConfig& config,
-                            Api::Api& api);
+                             Api::Api& api);
 
   Capabilites capabilities() const override { return capabilities_; };
 
@@ -27,12 +26,7 @@ public:
   Common::CallbackHandlePtr addUpdateCallback(absl::string_view cert_name,
                                               std::function<void()> callback) override;
 
-  void onCertpairsUpdated(absl::string_view cert_name,
-                          std::list<Envoy::CertificateProvider::Certpair> certpairs) override;
-  void onCACertUpdated(absl::string_view /*cert_name*/, const std::string /*cert*/) override{};
-  void onUpatedFail() override{};
-
-  void generateCertpair(absl::string_view cert_name);
+  std::list<Envoy::CertificateProvider::Certpair> generateCertpair(absl::string_view cert_name);
 
 private:
   Capabilites capabilities_;
