@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <regex>
 
 #include "absl/strings/match.h"
 #include "absl/types/optional.h"
@@ -16,10 +17,12 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
   if (absl::StartsWith(name, ".")) {
     name.remove_prefix(1);
   }
+
   std::string stats_name = std::string(name);
   std::replace(stats_name.begin(), stats_name.end(), ':', '_');
   std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-  absl::c_replace(stats_name, "//", "__");
+  stats_name = std::regex_replace(stats_name, std::regex("_//"), "_");
+  stats_name = std::regex_replace(stats_name, std::regex("_/"), "_");
   return stats_name;
 }
 
