@@ -132,7 +132,8 @@ STD_STRING_VIEW_ALLOWLIST = (
 # valid situation identified so far is template functions used for config
 # processing.
 EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h",
-    "./source/common/network/matching/inputs.h")
+    "./source/common/network/matching/inputs.h",
+)
 
 # We want all URL references to exist in repository_locations.bzl files and have
 # metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
