@@ -519,12 +519,15 @@ TEST(PathMatcher, ValidPathInHeader) {
 
 TEST(Matcher, InvalidPermissionRule) {
   envoy::config::rbac::v3::Permission perm;
-  EXPECT_THROW_WITH_MESSAGE(RBAC::Matcher::create(perm, ProtobufMessage::getStrictValidationVisitor()), EnvoyException, "Invalid permission rule case: 0");
+  EXPECT_THROW_WITH_MESSAGE(
+      RBAC::Matcher::create(perm, ProtobufMessage::getStrictValidationVisitor()), EnvoyException,
+      "Invalid permission rule case: 0");
 }
 
 TEST(Matcher, InvalidPrincipal) {
   envoy::config::rbac::v3::Principal principal;
-  EXPECT_THROW_WITH_MESSAGE(RBAC::Matcher::create(principal), EnvoyException, "Invalid principal identifier case: 0");
+  EXPECT_THROW_WITH_MESSAGE(RBAC::Matcher::create(principal), EnvoyException,
+                            "Invalid principal identifier case: 0");
 }
 
 } // namespace
