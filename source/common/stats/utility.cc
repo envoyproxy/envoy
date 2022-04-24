@@ -5,6 +5,7 @@
 #include <string>
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -21,8 +22,12 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
   std::string stats_name = std::string(name);
   std::replace(stats_name.begin(), stats_name.end(), ':', '_');
   std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-  stats_name = std::regex_replace(stats_name, std::regex("_//"), "_");
-  stats_name = std::regex_replace(stats_name, std::regex("_/"), "_");
+  absl::StrReplaceAll(
+      {
+          {"_//", "_"},
+          {"_/", "_"},
+      },
+      &stats_name);
   return stats_name;
 }
 
