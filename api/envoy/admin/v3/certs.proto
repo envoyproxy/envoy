@@ -58,7 +58,7 @@ message CertificateDetails {
   repeated SubjectAlternateName subject_alt_names = 3;
 
   // Minimum of days until expiration of certificate and it's chain.
-  uint64 days_until_expiration = 4;
+  int64 days_until_expiration = 4;
 
   // Indicates the time from which the certificate is valid.
   google.protobuf.Timestamp valid_from = 5;
