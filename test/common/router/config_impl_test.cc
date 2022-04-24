@@ -3614,6 +3614,135 @@ virtual_hosts:
   EXPECT_EQ("foo", boz_shadow_policies[1]->runtimeKey());
 }
 
+// Test if the higher level mirror policies are properly applied when routes
+// don't have one and not applied when they do.
+// In this test case, request_mirror_policies is set in route config level.
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesRouteConfiguration) {
+  const std::string yaml = R"EOF(
+name: RequestMirrorPoliciesRouteConfiguration
+request_mirror_policies:
+  - cluster: rc_cluster
+virtual_hosts:
+- name: www
+  request_mirror_policies:
+    - cluster: vh_cluster
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: route_cluster
+      cluster: www
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www
+- name: www2
+  domains:
+  - www2.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: route_cluster
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www", "www2", "rc_cluster", "vh_cluster", "route_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  const auto& rc_vh_route_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_vh_route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", rc_vh_route_shadow_policies[0]->cluster());
+
+  const auto& rc_vh_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_vh_shadow_policies.size());
+  EXPECT_EQ("vh_cluster", rc_vh_shadow_policies[0]->cluster());
+
+  const auto& rc_route_shadow_policies =
+      config.route(genHeaders("www2.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", rc_route_shadow_policies[0]->cluster());
+
+  const auto& rc_policies =
+      config.route(genHeaders("www2.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, rc_policies.size());
+  EXPECT_EQ("rc_cluster", rc_policies[0]->cluster());
+}
+
+// Test if the higher level mirror policies are properly applied when routes
+// don't have one and not applied when they do.
+// In this test case, request_mirror_policies is *not* set in route config level.
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesVirtualHost) {
+  const std::string yaml = R"EOF(
+name: RequestMirrorPoliciesVirtualHost
+virtual_hosts:
+- name: www
+  request_mirror_policies:
+    - cluster: vh_cluster
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: route_cluster
+      cluster: www
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www
+- name: www2
+  domains:
+  - www2.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: route_cluster
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www", "www2", "vh_cluster", "route_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  const auto& vh_route_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, vh_route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", vh_route_shadow_policies[0]->cluster());
+
+  const auto& vh_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, vh_shadow_policies.size());
+  EXPECT_EQ("vh_cluster", vh_shadow_policies[0]->cluster());
+
+  const auto& route_shadow_policies =
+      config.route(genHeaders("www2.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, route_shadow_policies.size());
+  EXPECT_EQ("route_cluster", route_shadow_policies[0]->cluster());
+
+  const auto& no_policies =
+      config.route(genHeaders("www2.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_TRUE(no_policies.empty());
+}
+
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatcherTest, Retry) {
@@ -6702,6 +6831,8 @@ virtual_hosts:
         route: { cluster: ww2 }
       - match: { path: "/exact-path" }
         route: { cluster: ww2 }
+      - match: { path_separated_prefix: "/path/separated"}
+        route: { cluster: ww2 }
       - match: { prefix: "/"}
         route: { cluster: www2 }
         metadata: { filter_metadata: { com.bar.foo: { baz: test_value }, baz: {name: bluh} } }
@@ -6715,6 +6846,9 @@ virtual_hosts:
                           "/rege[xy]", PathMatchType::Regex);
   checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/exact-path", "GET"), 0).get(),
                           "/exact-path", PathMatchType::Exact);
+  checkPathMatchCriterion(
+      config.route(genHeaders("www.foo.com", "/path/separated", "GET"), 0).get(), "/path/separated",
+      PathMatchType::PathSeparatedPrefix);
   const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
   checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
 
@@ -7585,6 +7719,255 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api"
+          case_sensitive: false
+        route: { cluster: path-separated-cluster}
+      - match:
+          prefix: "/"
+        route: { cluster: default-cluster}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"path-separated-cluster", "case-sensitive-cluster", "default-cluster", "rewrite-cluster"},
+      {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Exact matches
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api#fragment", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  // Prefix matches
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-separated-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  // Non-matching prefixes
+  EXPECT_EQ("default-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/apithing", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchRewrite) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rewrite"
+        route:
+          prefix_rewrite: "/new/api"
+          cluster: rewrite-cluster
+      - match:
+          prefix: "/"
+        route: { cluster: default-cluster}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"default-cluster", "rewrite-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  { // Prefix rewrite exact match
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("path.prefix.com", "/rewrite?param=true#fragment", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("/new/api?param=true#fragment", route->currentUrlPathAfterRewrite(headers));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("rewrite-cluster", route->clusterName());
+    EXPECT_EQ("/new/api?param=true#fragment", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+  }
+
+  { // Prefix rewrite long match
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("path.prefix.com", "/rewrite/this?param=true#fragment", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("/new/api/this?param=true#fragment", route->currentUrlPathAfterRewrite(headers));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("rewrite-cluster", route->clusterName());
+    EXPECT_EQ("/new/api/this?param=true#fragment", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+  }
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchCaseSensitivity) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/API"
+        route: { cluster: case-sensitive}
+      - match:
+          path_separated_prefix: "/REST/api"
+          case_sensitive: true
+        route: { cluster: case-sensitive-explicit}
+      - match:
+          path_separated_prefix: "/rest/api"
+          case_sensitive: false
+        route: { cluster: case-insensitive}
+      - match:
+          prefix: "/"
+        route: { cluster: default}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"case-sensitive", "case-sensitive-explicit", "case-insensitive", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_EQ("case-sensitive", config.route(genHeaders("path.prefix.com", "/rest/API", "GET"), 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  EXPECT_EQ("case-sensitive",
+            config.route(genHeaders("path.prefix.com", "/rest/API?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("case-sensitive", config.route(genHeaders("path.prefix.com", "/rest/API/", "GET"), 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  EXPECT_EQ("case-sensitive",
+            config.route(genHeaders("path.prefix.com", "/rest/API/thing?param=true", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("case-sensitive-explicit",
+            config.route(genHeaders("path.prefix.com", "/REST/api", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("case-insensitive", config.route(genHeaders("path.prefix.com", "/REST/API", "GET"), 0)
+                                    ->routeEntry()
+                                    ->clusterName());
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchTrailingSlash) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api/"
+        route: { cluster: some-cluster }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchQueryParam) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api?query=1"
+        route: { cluster: some-cluster }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchFragment) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api#fragment"
+        route: { cluster: some-cluster }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
+TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchBaseCondition) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_prefix
+    domains: ["*"]
+    routes:
+      - match:
+          path_separated_prefix: "/rest/api"
+          query_parameters:
+            - name: param
+              string_match:
+                exact: test
+          headers:
+            - name: cookies
+        route: { cluster: some-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    auto headers = genHeaders("path.prefix.com", "/rest/api?param=test", "GET");
+    headers.addCopy("cookies", "");
+
+    EXPECT_EQ("some-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("path.prefix.com", "/rest/api?param=test", "GET");
+    headers.addCopy("pizza", "");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    auto headers = genHeaders("path.prefix.com", "/rest/api?param=testing", "GET");
+    headers.addCopy("cookies", "");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
   // Setup regex route entry. the regex is trivial, that's ok as we only want to test that
@@ -7851,6 +8234,9 @@ virtual_hosts:
 // Verifies that we're creating a new instance of the retry plugins on each call instead of
 // always returning the same one.
 TEST_F(RouteConfigurationV2, RetryPluginsAreNotReused) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: regex

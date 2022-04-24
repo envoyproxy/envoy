@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 
+#include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
@@ -115,9 +116,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   // reference passed to ConfigImpl valid even after the local variable goes out of scope.
   return [route_config_provider_manager, filter_config,
           &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.mainThreadDispatcher().timeSource()));
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.api().randomGenerator(),
+        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
   };
 }
 
@@ -142,6 +143,8 @@ ConfigImpl::ConfigImpl(
 
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter router;
     router.set_name("envoy.filters.thrift.router");
+    envoy::extensions::filters::network::thrift_proxy::router::v3::Router default_router;
+    router.mutable_typed_config()->PackFrom(default_router);
     processFilter(router);
   } else {
     for (const auto& filter : config.thrift_filters()) {

@@ -30,6 +30,7 @@ enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
   Connected,
+  ConnectedZeroRtt,
 };
 
 /**
@@ -194,6 +195,7 @@ public:
   /**
    * @return the connection info provider backing this connection.
    */
+  virtual ConnectionInfoSetter& connectionInfoSetter() PURE;
   virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
   virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 

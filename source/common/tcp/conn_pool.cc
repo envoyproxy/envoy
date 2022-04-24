@@ -39,7 +39,7 @@ ActiveTcpClient::~ActiveTcpClient() {
   // TcpConnectionData. Make sure the TcpConnectionData will not refer to this ActiveTcpClient
   // and handle clean up normally done in clearCallbacks()
   if (tcp_connection_data_) {
-    ASSERT(state() == ActiveClient::State::CLOSED);
+    ASSERT(state() == ActiveClient::State::Closed);
     tcp_connection_data_->release();
     parent_.onStreamClosed(*this, true);
     parent_.checkForIdleAndCloseIdleConnsIfDraining();
@@ -47,7 +47,7 @@ ActiveTcpClient::~ActiveTcpClient() {
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+  if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
     pool->scheduleOnUpstreamReady();
   }
@@ -65,12 +65,15 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     connection_->readDisable(true);
   }
+  ENVOY_BUG(event != Network::ConnectionEvent::ConnectedZeroRtt,
+            "Unexpected 0-RTT event from the underlying TCP connection.");
   parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.
     // Consumers of connection pool connections assume they are receiving already connected
     // connections.
-    if (event != Network::ConnectionEvent::Connected) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
       if (tcp_connection_data_) {
         Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
       }

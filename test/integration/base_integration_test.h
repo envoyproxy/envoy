@@ -75,6 +75,10 @@ public:
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
+  absl::optional<uint64_t> waitForNextRawUpstreamConnection(
+      const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
+      std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
+
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
@@ -341,6 +345,8 @@ public:
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
     return *fake_upstreams_.back();
   }
+
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
 
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,

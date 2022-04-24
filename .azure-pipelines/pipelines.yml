@@ -212,6 +212,8 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - bash: .azure-pipelines/cleanup.sh
+      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
@@ -232,6 +234,74 @@ stages:
         rbe: false
         artifactSuffix: ".arm64"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+- stage: distribution
+  dependsOn: ["linux_arm64", "linux_x64"]
+  jobs:
+  - job: package_x64
+    dependsOn: []
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - template: bazel.yml
+      parameters:
+        ciTarget: bazel.distribution
+  - job: package_arm64
+    dependsOn: []
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - template: bazel.yml
+      parameters:
+        managedAgent: false
+        ciTarget: bazel.distribution
+        rbe: false
+        artifactSuffix: ".arm64"
+        bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+  - job: verify_x64
+    dependsOn: ["package_x64"]
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.distribution"
+        itemPattern: "bazel.distribution/packages.x64.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verify packages"
+  - job: verify_arm64
+    dependsOn: ["package_arm64"]
+    timeoutInMinutes: 120
+    pool: "arm-large"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.distribution.arm64"
+        itemPattern: "bazel.distribution.arm64/packages.arm64.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verify packages"
 
 - stage: check
   dependsOn: ["linux_x64"]
@@ -453,7 +523,7 @@ stages:
   - job: test
     timeoutInMinutes: 180
     pool:
-      vmImage: "macos-latest"
+      vmImage: "macos-11"
     steps:
     - script: ./ci/mac_ci_setup.sh
       displayName: "Install dependencies"

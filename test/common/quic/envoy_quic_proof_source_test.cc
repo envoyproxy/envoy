@@ -144,7 +144,7 @@ public:
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
-        listener_config_.listenerScope(),
+        true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));

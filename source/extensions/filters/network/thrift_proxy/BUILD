@@ -57,6 +57,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/router:rds_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -76,6 +77,7 @@ envoy_cc_library(
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:timespan_interface",

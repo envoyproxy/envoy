@@ -46,9 +46,12 @@ DNSServiceErrorType DnsService::dnsServiceGetAddrInfo(DNSServiceRef* sdRef, DNSS
   return DNSServiceGetAddrInfo(sdRef, flags, interfaceIndex, protocol, hostname, callBack, context);
 }
 
-AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher, Stats::Scope& root_scope)
+AppleDnsResolverImpl::AppleDnsResolverImpl(
+    const envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig& proto_config,
+    Event::Dispatcher& dispatcher, Stats::Scope& root_scope)
     : dispatcher_(dispatcher), scope_(root_scope.createScope("dns.apple.")),
-      stats_(generateAppleDnsResolverStats(*scope_)) {}
+      stats_(generateAppleDnsResolverStats(*scope_)),
+      include_unroutable_families_(proto_config.include_unroutable_families()) {}
 
 AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats::Scope& scope) {
   return {ALL_APPLE_DNS_RESOLVER_STATS(POOL_COUNTER(scope))};
@@ -78,7 +81,8 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   auto pending_resolution = std::make_unique<PendingResolution>(*this, callback, dispatcher_,
                                                                 dns_name, dns_lookup_family);
 
-  DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo();
+  DNSServiceErrorType error =
+      pending_resolution->dnsServiceGetAddrInfo(include_unroutable_families_);
   if (error != kDNSServiceErr_NoError) {
     ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
     chargeGetAddrInfoErrorStats(error);
@@ -219,7 +223,8 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
                                             pending_response_.v6_responses_.end());
     return pending_response_.all_responses_;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected DnsLookupFamily enum");
+  return pending_response_.all_responses_;
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
@@ -237,7 +242,8 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   }
 }
 
-DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo() {
+DNSServiceErrorType
+AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(bool include_unroutable_families) {
   DNSServiceProtocol protocol;
   switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:
@@ -249,6 +255,11 @@ DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrIn
   case DnsLookupFamily::Auto:
   case DnsLookupFamily::V4Preferred:
   case DnsLookupFamily::All:
+    if (include_unroutable_families) {
+      protocol = kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6;
+      break;
+    }
+
     /* We want to make sure we don't get any address that is not routable. Passing 0
      * to apple's `DNSServiceGetAddrInfo` will make a best attempt to filter out IPv6
      * or IPv4 addresses depending on what's routable, per Apple's documentation:
@@ -279,7 +290,7 @@ DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrIn
        * that DNSServiceRef.
        */
 
-      // Therefore, much like the c-ares implementation All calls and callbacks to the API need to
+      // Therefore, much like the c-ares implementation, all calls and callbacks to the API need to
       // happen on the thread that owns the creating dispatcher. This is the case as callbacks are
       // driven by processing bytes in onEventCallback which run on the passed in dispatcher's event
       // loop.
@@ -379,7 +390,9 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
     address_in6.sin6_addr = reinterpret_cast<const sockaddr_in6*>(address)->sin6_addr;
     return {std::make_shared<const Address::Ipv6Instance>(address_in6), std::chrono::seconds(ttl)};
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected DnsLookupFamily enum");
+  sockaddr_in address_in;
+  return {std::make_shared<const Address::Ipv4Instance>(&address_in), std::chrono::seconds(ttl)};
 }
 
 // apple DNS resolver factory
@@ -390,11 +403,14 @@ public:
     return ProtobufTypes::MessagePtr{
         new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
   }
-  DnsResolverSharedPtr
-  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
+
+  DnsResolverSharedPtr createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
+                                         const envoy::config::core::v3::TypedExtensionConfig&
+                                             typed_dns_resolver_config) const override {
     ASSERT(dispatcher.isThreadSafe());
-    return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
+    envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
+    Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), apple);
+    return std::make_shared<Network::AppleDnsResolverImpl>(apple, dispatcher, api.rootScope());
   }
 };
 

@@ -6,7 +6,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/alternate_protocols_cache.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -52,9 +52,7 @@ protected:
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(factory_->sslCtx()),
-        std::make_unique<quic::QuicClientSessionCache>());
+    crypto_config_ = factory_->getCryptoConfig();
   }
 
   uint32_t highWatermark(EnvoyQuicClientSession* session) {
@@ -97,7 +95,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
 TEST_P(QuicNetworkConnectionTest, Srtt) {
   initialize();
 
-  Http::MockAlternateProtocolsCache rtt_cache;
+  Http::MockHttpServerPropertiesCache rtt_cache;
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
@@ -108,9 +106,9 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
 
-  EXPECT_EQ(info.quic_config_.GetInitialRoundTripTimeUsToSend(), 5);
-
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+
+  EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());

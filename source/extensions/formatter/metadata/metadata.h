@@ -11,12 +11,13 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-// Access log handler for METADATA( command.
+// Access log handler for METADATA() command.
 class MetadataFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   MetadataFormatterCommandParser();
-  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& token, size_t,
-                                                 size_t) const override;
+  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& command,
+                                                 const std::string& subcommand,
+                                                 absl::optional<size_t>& max_length) const override;
 
 private:
   // Map used to dispatch types of metadata to individual handlers which will

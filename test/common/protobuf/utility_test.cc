@@ -1732,7 +1732,7 @@ protected:
 };
 
 TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
-  loader_.reset();
+  runtime_.reset();
 
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");

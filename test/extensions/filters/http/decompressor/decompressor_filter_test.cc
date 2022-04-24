@@ -210,11 +210,11 @@ decompressor_library:
                                 const std::string& final_accept_encoding) {
     TestScopedRuntime scoped_runtime;
     if (legacy) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
+      scoped_runtime.mergeValues(
           {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
 
     } else {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
+      scoped_runtime.mergeValues(
           {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
     }
     setUpFilter(R"EOF(

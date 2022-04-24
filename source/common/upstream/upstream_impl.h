@@ -606,7 +606,7 @@ public:
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
-                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
+                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope,
@@ -736,6 +736,9 @@ public:
     return connection_pool_per_downstream_connection_;
   }
   bool warmHosts() const override { return warm_hosts_; }
+  bool setLocalInterfaceNameOnUpstreamConnections() const override {
+    return set_local_interface_name_on_upstream_connections_;
+  }
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
     return http_protocol_options_->upstream_http_protocol_options_;
@@ -801,7 +804,7 @@ private:
   const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
@@ -829,6 +832,7 @@ private:
   const bool drain_connections_on_host_removal_;
   const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
+  const bool set_local_interface_name_on_upstream_connections_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
@@ -913,7 +917,7 @@ public:
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source);
+                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -1055,8 +1059,6 @@ protected:
  */
 Network::DnsLookupFamily
 getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster);
-Network::DnsLookupFamily
-getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family);
 
 /**
  * Utility function to report upstream cx destroy metrics

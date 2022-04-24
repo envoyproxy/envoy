@@ -23,6 +23,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/http:utility_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
@@ -53,5 +55,25 @@ envoy_cc_fuzz_test(
     deps = [
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "http_inspector_integration_test",
+    srcs = [
+        "http_inspector_integration_test.cc",
+    ],
+    extension_names = ["envoy.filters.listener.http_inspector"],
+    deps = [
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/listener/http_inspector:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/integration:base_integration_test_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/http_inspector/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )

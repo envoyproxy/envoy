@@ -4,6 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener_filter_buffer.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/host_description.h"
@@ -330,6 +331,22 @@ public:
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
+
+  /**
+   * Called when data read from the connection. If the filter chain doesn't get
+   * enough data, the filter chain can be stopped, then waiting for more data.
+   * @param buffer the buffer of data.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
+
+  /**
+   * Return the size of data the filter want to inspect from the connection.
+   * The size can be increased after filter need to inspect more data.
+   * @return maximum number of bytes of the data consumed by the filter. 0 means filter does not
+   * need any data.
+   */
+  virtual size_t maxReadBytes() const PURE;
 };
 
 using ListenerFilterPtr = std::unique_ptr<ListenerFilter>;
@@ -529,6 +546,23 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
+
+  const ConnectionInfoProvider& connectionInfoProvider() const {
+    return socket().connectionInfoProvider();
+  }
+};
+
+/**
+ * UDP listener filter matching context data for unified matchers.
+ */
+class UdpMatchingData {
+public:
+  static absl::string_view name() { return "network"; }
+
+  virtual ~UdpMatchingData() = default;
+
+  virtual const Address::Instance& localAddress() const PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
 };
 
 } // namespace Network

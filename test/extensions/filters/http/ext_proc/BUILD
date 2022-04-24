@@ -39,6 +39,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -65,6 +66,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -100,9 +102,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_proc_integration_test",
-    size = "medium",
+    size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    shard_count = 2,
     deps = [
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",

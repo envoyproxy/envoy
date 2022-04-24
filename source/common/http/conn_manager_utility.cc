@@ -388,7 +388,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
       config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
     if (!uri_sans_local_cert.empty()) {
-      client_cert_details.push_back(absl::StrCat("By=", uri_sans_local_cert[0]));
+      for (const std::string& uri : uri_sans_local_cert) {
+        client_cert_details.push_back(absl::StrCat("By=", uri));
+      }
     }
     const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
@@ -418,8 +420,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
       case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
         const auto sans = connection.ssl()->uriSanPeerCertificate();
-        const auto& uri_san = sans.empty() ? "" : sans[0];
-        client_cert_details.push_back(absl::StrCat("URI=", uri_san));
+        if (!sans.empty()) {
+          for (const std::string& uri : sans) {
+            client_cert_details.push_back(absl::StrCat("URI=", uri));
+          }
+        } else {
+          client_cert_details.push_back("URI=");
+        }
         break;
       }
       case ClientCertDetailsType::DNS: {

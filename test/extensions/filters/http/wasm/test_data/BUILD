@@ -42,9 +42,9 @@ wasm_rust_binary(
     name = "grpc_call_rust.wasm",
     srcs = ["grpc_call_rust.rs"],
     deps = [
+        "//bazel/external/cargo:protobuf",
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
-        "//bazel/external/cargo:protobuf",
     ],
 )
 
@@ -52,9 +52,9 @@ wasm_rust_binary(
     name = "grpc_stream_rust.wasm",
     srcs = ["grpc_stream_rust.rs"],
     deps = [
+        "//bazel/external/cargo:protobuf",
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
-        "//bazel/external/cargo:protobuf",
     ],
 )
 
@@ -154,11 +154,11 @@ envoy_wasm_cc_binary(
         "test_shared_data_cpp.cc",
         "test_shared_queue_cpp.cc",
     ],
+    protobuf = "lite",
     deps = [
         ":test_cc_proto",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics_lite",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )

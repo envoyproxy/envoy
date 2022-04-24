@@ -42,6 +42,14 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   auto details = std::make_shared<ActiveListenerDetails>();
   if (config.internalListenerConfig().has_value()) {
+    // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
+    // should be done only once. However, an extra phase and interface is overkill.
+    Network::InternalListenerRegistry& internal_listener_registry =
+        config.internalListenerConfig()->internalListenerRegistry();
+    Network::LocalInternalListenerRegistry* local_registry =
+        internal_listener_registry.getLocalRegistry();
+    RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry.");
+    local_registry->setInternalListenerManager(*this);
     if (overridden_listener.has_value()) {
       if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
           iter != listener_map_by_tag_.end()) {
@@ -313,27 +321,17 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
-    std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
-                               ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
-                               : Network::Address::Ipv6Instance(address.ip()->port()).asString();
 
-    auto iter = tcp_listener_map_by_address_.find(addr_str);
-    if (iter != tcp_listener_map_by_address_.end() &&
-        iter->second->listener_->listener() != nullptr) {
-      details = *iter->second;
-    }
-  } else {
-    for (auto& iter : tcp_listener_map_by_address_) {
-      if (iter.second->listener_->listener() != nullptr &&
-          iter.second->address_->type() == Network::Address::Type::Ip &&
-          iter.second->address_->ip()->port() == address.ip()->port() &&
-          iter.second->address_->ip()->isAnyAddress()) {
-        details = *iter.second;
-      }
-    }
+  std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
+                             ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
+                             : Network::Address::Ipv6Instance(address.ip()->port()).asString();
+
+  auto iter = tcp_listener_map_by_address_.find(addr_str);
+  if (iter != tcp_listener_map_by_address_.end() &&
+      iter->second->listener_->listener() != nullptr) {
+    details = *iter->second;
   }
+
   return (details.has_value())
              ? Network::BalancedConnectionHandlerOptRef(
                    ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(

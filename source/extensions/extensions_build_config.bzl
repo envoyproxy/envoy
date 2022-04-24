@@ -28,6 +28,8 @@ EXTENSIONS = {
     "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
     "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
     "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
+    "envoy.compression.zstd.compressor":                "//source/extensions/compression/zstd/compressor:config",
+    "envoy.compression.zstd.decompressor":              "//source/extensions/compression/zstd/decompressor:config",
 
     #
     # Config validators
@@ -90,6 +92,7 @@ EXTENSIONS = {
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
+    "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
@@ -268,6 +271,7 @@ EXTENSIONS = {
     #
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+    "envoy.bootstrap.internal_listener":                "//source/extensions/bootstrap/internal_listener:config",
 
     #
     # TLS peer certification validators
@@ -330,12 +334,18 @@ EXTENSIONS = {
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
 
+    #
+    # Custom matchers
+    #
+
+    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+
     # Certificate Providers
     "envoy.cert_providers.default_cert_provider":                   "//source/extensions/certificate_providers/default_cert_provider:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
-EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
-EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:examples_library"]
+EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:examples_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]

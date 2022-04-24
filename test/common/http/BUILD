@@ -95,6 +95,7 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -159,6 +160,7 @@ envoy_cc_test_library(
         "//envoy/http:conn_pool_interface",
         "//envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:http3_status_tracker_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
     ],
@@ -447,32 +449,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http3_status_tracker_test",
-    srcs = ["http3_status_tracker_test.cc"],
+    name = "http3_status_tracker_impl_test",
+    srcs = ["http3_status_tracker_impl_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:http3_status_tracker",
+        "//source/common/http:http3_status_tracker_impl_lib",
         "//test/mocks:common_lib",
     ],
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_cache_impl_test",
-    srcs = ["alternate_protocols_cache_impl_test.cc"],
+    name = "http_server_properties_cache_impl_test",
+    srcs = ["http_server_properties_cache_impl_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols_cache",
+        "//source/common/http:http_server_properties_cache",
         "//test/mocks:common_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_cache_manager_test",
-    srcs = ["alternate_protocols_cache_manager_test.cc"],
+    name = "http_server_properties_cache_manager_test",
+    srcs = ["http_server_properties_cache_manager_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols_cache",
+        "//source/common/http:http_server_properties_cache",
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:factory_context_mocks",

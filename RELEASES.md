@@ -56,6 +56,7 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    |
 
 ## Release schedule
 
@@ -75,6 +76,7 @@ deadline of 3 weeks.
 | 1.19.0  | 2021/06/30 | 2021/07/13 |  +13 days  | 2022/07/13  |
 | 1.20.0  | 2021/09/30 | 2021/10/05 |   +5 days  | 2022/10/05  |
 | 1.21.0  | 2022/01/15 | 2022/01/12 |   -3 days  | 2023/01/12  |
-| 1.22.0  | 2022/04/15 |            |            |             |
+| 1.22.0  | 2022/04/15 | 2022/04/15 |    0 days  | 2023/04/15  |
+| 1.23.0  | 2022/07/15 |            |            |             |
 
 [repokitteh]: https://github.com/repokitteh

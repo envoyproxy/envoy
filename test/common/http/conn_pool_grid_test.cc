@@ -1,7 +1,9 @@
-#include "envoy/http/alternate_protocols_cache.h"
+#include <memory>
 
-#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "envoy/http/http_server_properties_cache.h"
+
 #include "source/common/http/conn_pool_grid.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -34,6 +36,10 @@ class ConnectivityGridForTest : public ConnectivityGrid {
 public:
   using ConnectivityGrid::ConnectivityGrid;
 
+  static bool hasHttp3FailedRecently(const ConnectivityGrid& grid) {
+    return grid.getHttp3StatusTracker().hasHttp3FailedRecently();
+  }
+
   static absl::optional<PoolIterator> forceCreateNextPool(ConnectivityGrid& grid) {
     return grid.createNextPool();
   }
@@ -46,9 +52,13 @@ public:
     setupPool(*instance);
     pools_.push_back(ConnectionPool::InstancePtr{instance});
     ON_CALL(*instance, newStream(_, _, _))
-        .WillByDefault(Invoke(
-            [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
-                const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+        .WillByDefault(
+            Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+                                      const ConnectionPool::Instance::StreamOptions& options)
+                       -> ConnectionPool::Cancellable* {
+              if (ConnectivityGridForTest::hasHttp3FailedRecently(grid)) {
+                EXPECT_FALSE(options.can_send_early_data_);
+              }
               if (immediate_success_) {
                 callbacks.onPoolReady(*encoder_, host(), *info_, absl::nullopt);
                 return nullptr;
@@ -89,7 +99,14 @@ public:
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
 
-  bool isHttp3Confirmed() const { return http3_status_tracker_.isHttp3Confirmed(); }
+  bool isHttp3Confirmed() const {
+    ASSERT(host_->address()->type() == Network::Address::Type::Ip);
+    HttpServerPropertiesCache::Origin origin{"https", host_->hostname(),
+                                             host_->address()->ip()->port()};
+    HttpServerPropertiesCache::Http3StatusTracker& http3_status_tracker =
+        alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
+    return http3_status_tracker.isHttp3Confirmed();
+  }
 
   StreamInfo::MockStreamInfo* info_;
   NiceMock<MockRequestEncoder>* encoder_;
@@ -105,40 +122,52 @@ namespace {
 class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   ConnectivityGridTest()
-      : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
+      : transport_socket_options_(
+            std::make_shared<Network::TransportSocketOptionsImpl>("hostname")),
+        options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
+        alternate_protocols_(
+            std::make_shared<HttpServerPropertiesCacheImpl>(dispatcher_, nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {}
 
   void initialize() {
+    quic_connection_persistent_info_ =
+#ifdef ENVOY_ENABLE_QUIC
+        std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher_, 0);
+#else
+        std::make_unique<PersistentQuicInfo>();
+#endif
+
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_,
         Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
         Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-        simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+        simTime(), alternate_protocols_, options_, quic_stat_names_, store_,
+        *quic_connection_persistent_info_);
     host_ = grid_->host();
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
   }
 
-  AlternateProtocolsCacheSharedPtr
-  maybeCreateAlternateProtocolsCacheImpl(bool use_alternate_protocols) {
-    AlternateProtocolsCacheSharedPtr cache;
+  HttpServerPropertiesCacheSharedPtr
+  maybeCreateHttpServerPropertiesCacheImpl(bool use_alternate_protocols) {
+    HttpServerPropertiesCacheSharedPtr cache;
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10);
+    return std::make_shared<HttpServerPropertiesCacheImpl>(dispatcher_, nullptr, 10);
   }
 
   void addHttp3AlternateProtocol(absl::optional<std::chrono::microseconds> rtt = {}) {
-    AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-    std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-        {"h3", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
-    alternate_protocols_->setAlternatives(origin, protocols);
+    std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols = {
+        {"h3", "", origin_.port_, dispatcher_.timeSource().monotonicTime() + Seconds(5)}};
+    alternate_protocols_->setAlternatives(origin_, protocols);
     if (rtt.has_value()) {
-      alternate_protocols_->setSrtt(origin, rtt.value());
+      alternate_protocols_->setSrtt(origin_, rtt.value());
     }
+    alternate_protocols_->getOrCreateHttp3StatusTracker(origin_);
   }
 
+  HttpServerPropertiesCacheImpl::Origin origin_{"https", "hostname", 9000};
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   ConnectivityGrid::ConnectivityOptions options_;
@@ -146,9 +175,10 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
-  AlternateProtocolsCacheSharedPtr alternate_protocols_;
+  HttpServerPropertiesCacheSharedPtr alternate_protocols_;
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_;
+  PersistentQuicInfoPtr quic_connection_persistent_info_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -348,6 +378,53 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
+  EXPECT_TRUE(grid_->isHttp3Broken());
+}
+
+// Test both connections happening in parallel and the second connecting before
+// the first eventually fails.
+TEST_F(ConnectivityGridTest, Http3BrokenWithExpiredHttpServerPropertiesCacheEntry) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->first(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data_=*/false,
+                    /*can_use_http3_=*/true});
+  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_->second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  EXPECT_NE(grid_->callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // Advance time so that the cache entry expires and alternatives removed by a following fetching.
+  simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
+  EXPECT_FALSE(alternate_protocols_->findAlternatives(origin_).has_value());
+
+  // onPoolFailure should not be passed up the first time. Instead the grid
+  // should wait on the other pool
+  EXPECT_NE(grid_->callbacks(0), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "reason", host_);
+  // The Broken state should be cached.
+  EXPECT_TRUE(grid_->isHttp3Broken());
+  EXPECT_FALSE(alternate_protocols_->findAlternatives(origin_).has_value());
+
+  // Updating the alternatives of the same origin shouldn't change its HTTP/3 status.
+  std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols = {
+      {"h3-29", "", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin_, protocols);
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
@@ -612,7 +689,9 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   initialize();
   addHttp3AlternateProtocol();
-  grid_->markHttp3Broken();
+  alternate_protocols_
+      ->getOrCreateHttp3StatusTracker(HttpServerPropertiesCache::Origin("https", "hostname", 9000))
+      .markHttp3Broken();
   EXPECT_EQ(grid_->first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'hostname', skipping.",
@@ -673,10 +752,9 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3) {
 // Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessWithExpiredHttp3) {
   initialize();
-  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
-  alternate_protocols_->setAlternatives(origin, protocols);
+  std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols = {
+      {"h3-29", "", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin_, protocols);
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
 
   EXPECT_EQ(grid_->first(), nullptr);
@@ -700,10 +778,9 @@ TEST_F(ConnectivityGridTest, SuccessWithExpiredHttp3) {
 // skipped.
 TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingHostname) {
   initialize();
-  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "otherhostname", origin.port_, simTime().monotonicTime() + Seconds(5)}};
-  alternate_protocols_->setAlternatives(origin, protocols);
+  std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols = {
+      {"h3-29", "otherhostname", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin_, protocols);
 
   EXPECT_EQ(grid_->first(), nullptr);
 
@@ -725,10 +802,9 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingHostname) {
 // skipped.
 TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingPort) {
   initialize();
-  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "", origin.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
-  alternate_protocols_->setAlternatives(origin, protocols);
+  std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols = {
+      {"h3-29", "", origin_.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin_, protocols);
 
   EXPECT_EQ(grid_->first(), nullptr);
 
@@ -749,10 +825,9 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingPort) {
 // Test that when the alternate protocol specifies an invalid ALPN, then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingAlpn) {
   initialize();
-  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
-  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"http/2", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
-  alternate_protocols_->setAlternatives(origin, protocols);
+  std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols = {
+      {"http/2", "", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin_, protocols);
 
   EXPECT_EQ(grid_->first(), nullptr);
 
@@ -768,6 +843,69 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingAlpn) {
   ASSERT_NE(grid_->callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_->callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test the TCP pool will be immediately attempted if HTTP/3 has failed before.
+TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenSucceeds) {
+  initialize();
+  addHttp3AlternateProtocol();
+  grid_->onZeroRttHandshakeFailed();
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+  EXPECT_EQ(grid_->first(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
+  EXPECT_CALL(*failover_timer, enabled()).WillOnce(Return(false)).WillOnce(Return(true));
+  EXPECT_CALL(*failover_timer, enableTimer(_, _));
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/true,
+                              /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->first(), nullptr);
+  // The 2nd pool should be TCP pool and it should have been created together with h3 pool.
+  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_EQ(2u, grid_->callbacks_.size());
+
+  // If failover timer expires, as no more pool to try on.
+  failover_timer->invokeCallback();
+  EXPECT_EQ(2u, grid_->callbacks_.size());
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_->callbacks(0), nullptr);
+  ASSERT_NE(grid_->callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  EXPECT_CALL(grid_->cancel_, cancel(_));
+  grid_->callbacks(0)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  // Getting onPoolReady() from HTTP/3 pool doesn't change H3 status.
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+}
+
+// Test the TCP pool will be immediately attempted if HTTP/3 has failed before.
+TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
+  initialize();
+  addHttp3AlternateProtocol();
+  grid_->onZeroRttHandshakeFailed();
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+  EXPECT_EQ(grid_->first(), nullptr);
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/true,
+                              /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_->callbacks(0), nullptr);
+  ASSERT_NE(grid_->callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  // Getting onPoolReady() from TCP pool alone doesn't change H3 status.
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+  // Getting onPoolFailure() from Http3 pool later should mark H3 broken.
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "reason", host_);
+  EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -798,10 +936,11 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
@@ -820,7 +959,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
@@ -842,10 +981,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
@@ -891,7 +1031,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
@@ -913,10 +1053,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, options_, quic_stat_names_, store_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

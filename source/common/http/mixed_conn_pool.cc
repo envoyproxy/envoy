@@ -4,14 +4,25 @@
 #include "source/common/http/http1/conn_pool.h"
 #include "source/common/http/http2/conn_pool.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
 
 namespace Envoy {
 namespace Http {
 
 Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveClient() {
-  return std::make_unique<Tcp::ActiveTcpClient>(*this,
-                                                Envoy::ConnectionPool::ConnPoolImplBase::host(), 1);
+  uint32_t initial_streams = 1;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+    // For now, use the hard-coded setting. Eventually use the cached setting if available.
+    initial_streams = host()->cluster().http2Options().max_concurrent_streams().value();
+    auto max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
+        host()->cluster().maxRequestsPerConnection());
+    if (max_requests < initial_streams) {
+      initial_streams = max_requests;
+    }
+  }
+  return std::make_unique<Tcp::ActiveTcpClient>(
+      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams);
 }
 
 CodecClientPtr
@@ -47,6 +58,14 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
     }
   }
 
+  uint32_t old_effective_limit = client.effectiveConcurrentStreamLimit();
+  if (protocol_ == Http::Protocol::Http11 && client.concurrent_stream_limit_ != 1) {
+    // The estimates were all based on assuming HTTP/2 would be negotiated. Adjust down.
+    uint32_t delta = client.concurrent_stream_limit_ - 1;
+    client.concurrent_stream_limit_ = 1;
+    decrConnectingAndConnectedStreamCapacity(delta, client);
+  }
+
   Upstream::Host::CreateConnectionData data{std::move(tcp_client->connection_),
                                             client.real_host_description_};
   // As this connection comes from the tcp connection pool, it will be
@@ -70,11 +89,11 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   // The global capacity is not adjusted in onConnectionEvent, so simply update
   // it to reflect any difference between the TCP stream limits and HTTP/2
   // stream limits.
-  if (new_client->effectiveConcurrentStreamLimit() > 1) {
+  if (new_client->effectiveConcurrentStreamLimit() > old_effective_limit) {
     state_.incrConnectingAndConnectedStreamCapacity(new_client->effectiveConcurrentStreamLimit() -
-                                                    1);
+                                                    old_effective_limit);
   }
-  new_client->setState(ActiveClient::State::CONNECTING);
+  new_client->setState(ActiveClient::State::Connecting);
   LinkedList::moveIntoList(std::move(new_client), owningList(new_client->state()));
 }
 

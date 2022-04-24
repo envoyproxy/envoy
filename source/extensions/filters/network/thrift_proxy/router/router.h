@@ -146,7 +146,8 @@ public:
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
         upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
-        zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()) {}
+        zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()),
+        upstream_cx_drain_close_(stat_name_set_->add("thrift.upstream_cx_drain_close")) {}
 
   /**
    * Increment counter for request calls.
@@ -170,6 +171,14 @@ public:
    */
   void incRequestInvalid(const Upstream::ClusterInfo& cluster) const {
     incClusterScopeCounter(cluster, nullptr, upstream_rq_invalid_type_);
+  }
+
+  /**
+   * Increment counter for connections that were closed due to draining.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incCloseDrain(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, upstream_cx_drain_close_);
   }
 
   /**
@@ -344,6 +353,7 @@ private:
   const Stats::StatName upstream_resp_size_;
   const Stats::StatName zone_;
   const Stats::StatName local_zone_name_;
+  const Stats::StatName upstream_cx_drain_close_;
 };
 
 /**
