@@ -270,7 +270,7 @@ public:
 
     switch (field_) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::UriSan: {
+    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::URI_SAN: {
       const auto& uri = ssl->uriSanPeerCertificate();
       if (!uri.empty()) {
         return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -278,7 +278,7 @@ public:
       }
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::DnsSan: {
+    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::DNS_SAN: {
       const auto& dns = ssl->dnsSansPeerCertificate();
       if (!dns.empty()) {
         return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -286,13 +286,17 @@ public:
       }
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::Subject: {
+    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::SUBJECT: {
       const auto& subject = ssl->subjectPeerCertificate();
       if (!subject.empty()) {
         return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
                 ssl->subjectPeerCertificate()};
       }
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::
+        FIELD_TYPE_UNSPECIFIED: {
+      PANIC("unhandled value");
     }
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
@@ -321,9 +325,13 @@ public:
         const envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput&>(
         config, validation_visitor);
 
-    return [field = typed_config.field()] {
-      return std::make_unique<AuthenticatedInput<MatchingDataType>>(field);
-    };
+    auto field = typed_config.field();
+    if (field == envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::
+                     FIELD_TYPE_UNSPECIFIED) {
+      throw EnvoyException("Field type unspecified.");
+    }
+
+    return [field] { return std::make_unique<AuthenticatedInput<MatchingDataType>>(field); };
   };
 };
 

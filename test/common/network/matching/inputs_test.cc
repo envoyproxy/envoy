@@ -390,14 +390,14 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
 }
 
 TEST(AuthenticatedInput, UriSan) {
-  AuthenticatedInput<Envoy::Network::MockConnection> uri_san_input(
-      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::UriSan);
+  AuthenticatedInput<Envoy::Network::MockConnection> input(
+      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::URI_SAN);
 
   {
     Envoy::Network::MockConnection conn;
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
 
-    const auto result = uri_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -410,7 +410,7 @@ TEST(AuthenticatedInput, UriSan) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = uri_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -423,7 +423,7 @@ TEST(AuthenticatedInput, UriSan) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = uri_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "bar");
@@ -436,7 +436,7 @@ TEST(AuthenticatedInput, UriSan) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = uri_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo,baz");
@@ -444,14 +444,14 @@ TEST(AuthenticatedInput, UriSan) {
 }
 
 TEST(AuthenticatedInput, DnsSan) {
-  AuthenticatedInput<Envoy::Network::MockConnection> dns_san_input(
-      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::DnsSan);
+  AuthenticatedInput<Envoy::Network::MockConnection> input(
+      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::DNS_SAN);
 
   {
     Envoy::Network::MockConnection conn;
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
 
-    const auto result = dns_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -464,7 +464,7 @@ TEST(AuthenticatedInput, DnsSan) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = dns_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -477,7 +477,7 @@ TEST(AuthenticatedInput, DnsSan) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = dns_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "bar");
@@ -490,7 +490,7 @@ TEST(AuthenticatedInput, DnsSan) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = dns_san_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo,baz");
@@ -498,14 +498,14 @@ TEST(AuthenticatedInput, DnsSan) {
 }
 
 TEST(AuthenticatedInput, Subject) {
-  AuthenticatedInput<Envoy::Network::MockConnection> subject_input(
-      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::Subject);
+  AuthenticatedInput<Envoy::Network::MockConnection> input(
+      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::SUBJECT);
 
   {
     Envoy::Network::MockConnection conn;
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
 
-    const auto result = subject_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -518,7 +518,7 @@ TEST(AuthenticatedInput, Subject) {
     EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-    const auto result = subject_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
@@ -532,7 +532,7 @@ TEST(AuthenticatedInput, Subject) {
     EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
     subject = "subject";
-    const auto result = subject_input.get(conn);
+    const auto result = input.get(conn);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "subject");
