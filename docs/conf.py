@@ -106,7 +106,7 @@ extlinks = {
 
 # Only lookup intersphinx for explicitly prefixed in cross-references
 # This makes docs versioning work
-intersphinx_disabled_domains = ['std']
+intersphinx_disabled_domains = ['*']
 
 # Setup global substitutions
 if 'pre-release' in release_level:
