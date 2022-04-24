@@ -16,24 +16,6 @@
 namespace Envoy {
 namespace Filter {
 
-void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
-                                             absl::string_view filter_config_name,
-                                             absl::string_view type_url) {
-  if (null_default_factory) {
-    throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                     "configuration with type URL {}.",
-                                     filter_config_name, type_url));
-  }
-}
-
-void validateProtoConfigTypeUrlHelper(absl::string_view type_url,
-                                      const absl::flat_hash_set<std::string>& require_type_urls) {
-  if (!require_type_urls.contains(type_url)) {
-    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls, ", ")));
-  }
-}
-
 DynamicFilterConfigProviderImplBase::DynamicFilterConfigProviderImplBase(
     FilterConfigSubscriptionSharedPtr& subscription,
     const absl::flat_hash_set<std::string>& require_type_urls, bool last_filter_in_filter_chain,
@@ -58,7 +40,10 @@ DynamicFilterConfigProviderImplBase::~DynamicFilterConfigProviderImplBase() {
 }
 
 void DynamicFilterConfigProviderImplBase::validateTypeUrl(const std::string& type_url) const {
-  validateProtoConfigTypeUrlHelper(type_url, require_type_urls_);
+  if (!require_type_urls_.contains(type_url)) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls_, ", ")));
+  }
 }
 
 const std::string& DynamicFilterConfigProviderImplBase::name() { return subscription_->name(); }
@@ -234,6 +219,24 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   // Apply the default config if none has been applied.
   if (!last_config_valid) {
     provider.applyDefaultConfiguration();
+  }
+}
+
+void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactoryHelper(
+    const bool null_default_factory, absl::string_view filter_config_name,
+    absl::string_view type_url) const {
+  if (null_default_factory) {
+    throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
+                                     "configuration with type URL {}.",
+                                     filter_config_name, type_url));
+  }
+}
+
+void FilterConfigProviderManagerImplBase::validateProtoConfigTypeUrlHelper(
+    absl::string_view type_url, const absl::flat_hash_set<std::string>& require_type_urls) const {
+  if (!require_type_urls.contains(type_url)) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls, ", ")));
   }
 }
 

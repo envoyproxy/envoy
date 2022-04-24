@@ -29,10 +29,6 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
-// These helper functions throw exceptions. Thus can not be defined in .h files.
-void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
-                                             absl::string_view filter_config_name,
-                                             absl::string_view type_url);
 void validateProtoConfigTypeUrlHelper(absl::string_view type_url,
                                       const absl::flat_hash_set<std::string>& require_type_urls);
 
@@ -363,6 +359,12 @@ protected:
   void applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
                                 DynamicFilterConfigProviderImplBase& provider,
                                 const std::string& filter_config_name);
+  void validateProtoConfigDefaultFactoryHelper(const bool null_default_factory,
+                                               absl::string_view filter_config_name,
+                                               absl::string_view type_url) const;
+  void
+  validateProtoConfigTypeUrlHelper(absl::string_view type_url,
+                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
 
 private:
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
@@ -372,7 +374,7 @@ private:
 /**
  * An implementation of FilterConfigProviderManager.
  */
-template <class Factory, class FactoryCb, class FactoryCtx, class ListenerDynamicFilterConfig>
+template <class Factory, class FactoryCb, class FactoryCtx, class DynamicFilterConfigImpl>
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBase,
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
@@ -474,7 +476,7 @@ private:
       const absl::flat_hash_set<std::string>& require_type_urls, FactoryCtx& factory_context,
       ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type, absl::string_view stat_prefix) {
-    return std::make_unique<ListenerDynamicFilterConfig>(
+    return std::make_unique<DynamicFilterConfigImpl>(
         subscription, require_type_urls, factory_context, std::move(default_config),
         last_filter_in_filter_chain, filter_chain_type, stat_prefix);
   }
