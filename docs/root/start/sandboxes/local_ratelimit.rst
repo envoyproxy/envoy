@@ -41,7 +41,7 @@ Step 2: Test rate limiting of upstream service
 
 The sandbox is configured with ``10000`` port for upstream service.
 
-Two descriptors with generic_key are set in this example, and the route will match the descriptor with generic_key ``test1``.
+Two descriptors with ``generic_key`` are set in this example, and the route will match the descriptor with ``generic_key`` ``test1``.
 
 If a request reaches the rate limit of descriptor ``test1``, Envoy will add ``x-local-rate-limit`` header and refuse the connection with a 429 HTTP response code and with the content ``local_rate_limited``.
 
