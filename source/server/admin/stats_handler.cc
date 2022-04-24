@@ -129,8 +129,8 @@ void StatsHandler::prometheusStats(const StatsParams& params, Buffer::Instance& 
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params.used_only_,
-                                              params.filter_, server_.api().customStatNamespaces());
+                                              text_readouts_vec, response, params,
+                                              server_.api().customStatNamespaces());
 }
 
 Http::Code StatsHandler::handlerContention(absl::string_view,

@@ -159,6 +159,7 @@ envoy_cc_library(
     srcs = ["prometheus_stats.cc"],
     hdrs = ["prometheus_stats.h"],
     deps = [
+        ":stats_params_lib",
         ":utils_lib",
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",
