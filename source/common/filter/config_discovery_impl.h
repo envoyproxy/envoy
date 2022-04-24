@@ -225,6 +225,7 @@ private:
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
             getFactoryByType(message.GetTypeName());
+    // TODO(yanjunxiang): Change nullptr to actuall listener filter matcher.
     return factory->createListenerFilterFactoryFromProto(message, nullptr, factory_context_);
   }
 };
