@@ -29,9 +29,6 @@ class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
 
-void validateProtoConfigTypeUrlHelper(absl::string_view type_url,
-                                      const absl::flat_hash_set<std::string>& require_type_urls);
-
 /**
  * Base class for a filter config provider using discovery subscriptions.
  **/
@@ -225,7 +222,7 @@ private:
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
             getFactoryByType(message.GetTypeName());
-    // TODO(yanjunxiang): Change nullptr to actuall listener filter matcher.
+    // TODO(yanjunxiang): Change nullptr to actual listener filter matcher.
     return factory->createListenerFilterFactoryFromProto(message, nullptr, factory_context_);
   }
 };
