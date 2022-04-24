@@ -44,9 +44,9 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return factory.create(permission.matcher(), validation_visitor);
   }
   case envoy::config::rbac::v3::Permission::RuleCase::RULE_NOT_SET:
-    throw EnvoyException(absl::StrCat("Permission not set"));
+    break;
   }
-  throw EnvoyException(absl::StrCat("Unexpected permission rule case:", permission.rule_case()));
+  throw EnvoyException(absl::StrCat("Invalid permission rule case: ", permission.rule_case()));
 }
 
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal) {
@@ -77,10 +77,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
     return std::make_shared<const PathMatcher>(principal.url_path());
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
-    break; // Fall through to PANIC.
+    break; // Fall through to throw.
   }
   throw EnvoyException(
-      absl::StrCat("Unexpected principal identifier case:", principal.identifier_case()));
+      absl::StrCat("Invalid principal identifier case: ", principal.identifier_case()));
 }
 
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,

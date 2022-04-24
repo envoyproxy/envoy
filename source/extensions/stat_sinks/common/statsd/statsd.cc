@@ -65,6 +65,10 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
       absl::optional<const std::string> counter_str =
           buildMessage(counter.counter_.get(), counter.delta_, "|c");
       if (!counter_str) {
+        std::cout << "[HERE?!?!?!?!?!?!]\n";
+        std::cout << "[HERE?!?!?!?!?!?!]\n";
+        std::cout << "[HERE?!?!?!?!?!?!]\n";
+        std::cout << "[HERE?!?!?!?!?!?!]\n";
         return;
       }
       writeBuffer(buffer, writer, counter_str.value());
@@ -76,6 +80,12 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
       absl::optional<const std::string> gauge_str =
           buildMessage(gauge.get(), gauge.get().value(), "|g");
       if (!gauge_str) {
+        std::cout << "[HERE!!!]\n";
+        std::cout << "[HERE!!!]\n";
+        std::cout << "[HERE!!!]\n";
+        std::cout << "[HERE!!!]\n";
+        std::cout << "[HERE!!!]\n";
+        std::cout << "[HERE!!!]\n";
         return;
       }
       writeBuffer(buffer, writer, gauge_str.value());

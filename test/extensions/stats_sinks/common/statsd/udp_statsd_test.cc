@@ -92,6 +92,11 @@ TEST_P(UdpStatsdSinkTest, InvalidTagFormat) {
   counter.used_ = true;
   counter.latch_ = 1;
   snapshot.counters_.push_back({1, counter});
+  NiceMock<Stats::MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  gauge.value_ = 1;
+  gauge.used_ = true;
+  snapshot.gauges_.push_back(gauge);
   EXPECT_ENVOY_BUG(sink.flush(snapshot), "unexpected tag format tag position enum");
 }
 
