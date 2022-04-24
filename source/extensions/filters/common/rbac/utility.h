@@ -42,16 +42,16 @@ std::unique_ptr<RoleBasedAccessControlEngine>
 createEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
              ProtobufMessage::ValidationVisitor& validation_visitor,
              ActionValidationVisitor& action_validation_visitor) {
-  if (config.has_rules()) {
-    if (config.has_matcher()) {
-      ENVOY_LOG_MISC(warn, "matcher is ignored");
-    }
-    return std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), validation_visitor,
-                                                              EnforcementMode::Enforced);
-  }
   if (config.has_matcher()) {
+    if (config.has_rules()) {
+      ENVOY_LOG_MISC(warn, "rules are ignored");
+    }
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
         config.matcher(), context, action_validation_visitor, EnforcementMode::Enforced);
+  }
+  if (config.has_rules()) {
+    return std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), validation_visitor,
+                                                              EnforcementMode::Enforced);
   }
 
   return nullptr;
@@ -62,16 +62,16 @@ std::unique_ptr<RoleBasedAccessControlEngine>
 createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    ActionValidationVisitor& action_validation_visitor) {
-  if (config.has_shadow_rules()) {
-    if (config.has_shadow_matcher()) {
-      ENVOY_LOG_MISC(warn, "shadow matcher is ignored");
-    }
-    return std::make_unique<RoleBasedAccessControlEngineImpl>(
-        config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
-  }
   if (config.has_shadow_matcher()) {
+    if (config.has_shadow_rules()) {
+      ENVOY_LOG_MISC(warn, "shadow rules are ignored");
+    }
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
         config.shadow_matcher(), context, action_validation_visitor, EnforcementMode::Shadow);
+  }
+  if (config.has_shadow_rules()) {
+    return std::make_unique<RoleBasedAccessControlEngineImpl>(
+        config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
   }
 
   return nullptr;

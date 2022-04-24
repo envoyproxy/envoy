@@ -17,7 +17,7 @@ TEST(ResponseDetail, ResponseDetail) {
   EXPECT_EQ(RBAC::responseDetail("a \t\f\v\n\ry"), "rbac_access_denied_matched_policy[a______y]");
 }
 
-TEST(CreateEngine, IgnoreMatcher) {
+TEST(CreateEngine, IgnoreRules) {
   envoy::extensions::filters::http::rbac::v3::RBAC config;
   std::string yaml = R"EOF(
 rules:
@@ -33,15 +33,15 @@ matcher:
 )EOF";
   TestUtility::loadFromYaml(yaml, config);
 
-  Server::Configuration::MockServerFactoryContext factory_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
-  EXPECT_LOG_CONTAINS("warn", "matcher is ignored",
+  EXPECT_LOG_CONTAINS("warn", "rules are ignored",
                       createEngine(config, factory_context,
                                    ProtobufMessage::getStrictValidationVisitor(),
                                    validation_visitor));
 }
 
-TEST(CreateShadowEngine, IgnoreShadowMatcher) {
+TEST(CreateShadowEngine, IgnoreShadowRules) {
   envoy::extensions::filters::http::rbac::v3::RBAC config;
   std::string yaml = R"EOF(
 shadow_rules:
@@ -57,9 +57,9 @@ shadow_matcher:
 )EOF";
   TestUtility::loadFromYaml(yaml, config);
 
-  Server::Configuration::MockServerFactoryContext factory_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
-  EXPECT_LOG_CONTAINS("warn", "shadow matcher is ignored",
+  EXPECT_LOG_CONTAINS("warn", "shadow rules are ignored",
                       createShadowEngine(config, factory_context,
                                          ProtobufMessage::getStrictValidationVisitor(),
                                          validation_visitor));

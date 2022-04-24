@@ -45,6 +45,7 @@ message RBAC {
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.
   // If present and empty, DENY.
+  // If both rules and matcher are configured, rules will be ignored.
   config.rbac.v3.RBAC rules = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "rules_specifier"];
 
@@ -52,7 +53,6 @@ message RBAC {
   // not match any matcher will be denied.
   // If absent, no enforcing RBAC matcher will be applied.
   // If present and empty, deny all connections.
-  // If both rules and matcher are configured, the matcher will be ignored.
   xds.type.matcher.v3.Matcher matcher = 6 [
     (udpa.annotations.field_migrate).oneof_promotion = "rules_specifier",
     (xds.annotations.v3.field_status).work_in_progress = true
@@ -61,13 +61,13 @@ message RBAC {
   // Shadow rules are not enforced by the filter but will emit stats and logs
   // and can be used for rule testing.
   // If absent, no shadow RBAC policy will be applied.
+  // If both shadow rules and shadow matcher are configured, shadow rules will be ignored.
   config.rbac.v3.RBAC shadow_rules = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier"];
 
   // The match tree to use for emitting stats and logs which can be used for rule testing for
   // incoming connections.
   // If absent, no shadow matcher will be applied.
-  // If both shadow rules and shadow matcher are configured, the shadow matcher will be ignored.
   xds.type.matcher.v3.Matcher shadow_matcher = 7 [
     (udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier",
     (xds.annotations.v3.field_status).work_in_progress = true
