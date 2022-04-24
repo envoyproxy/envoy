@@ -36,8 +36,6 @@
 #include "source/common/quic/udp_gso_batch_writer.h"
 #endif
 
-#include "absl/strings/str_replace.h"
-
 namespace Envoy {
 namespace Server {
 
