@@ -141,6 +141,7 @@ New Features
 * stats: histogram_buckets query parameter added to stats endpoint to change histogram output to show buckets.
 * thrift: add support for connection draining. This can be enabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to true.
 * thrift: added support for dynamic routing through aggregated discovery service.
+* thrift: added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.close_downstream_on_upstream_error>`.
 * tls: add support for tls key log :ref:`key_log<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.key_log>`.
 * tools: the project now ships a :ref:`tools docker image <install_tools>` which contains tools
   useful in support systems such as CI, CD, etc. The
