@@ -144,8 +144,6 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-
   const std::string url = "/stats";
   Buffer::OwnedImpl data, used_data;
 
