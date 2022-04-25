@@ -265,24 +265,6 @@ TEST_F(DnsCacheImplTest, ForceRefresh) {
   EXPECT_CALL(resolver_->active_query_,
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   EXPECT_CALL(*timeout_timer, disableTimer());
-<<<<<<< HEAD
-=======
-  EXPECT_CALL(update_callbacks_,
-              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
-  EXPECT_CALL(callbacks,
-              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
-  EXPECT_CALL(update_callbacks_,
-              onDnsResolutionComplete("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
-                                      Network::DnsResolver::ResolutionStatus::Success));
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(6000), _));
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse({"10.0.0.1"}));
-
-  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
-             1 /* added */, 0 /* removed */, 1 /* num hosts */);
-
-  // Should force a refresh. Ignore strict mock failures on the enabled() call.
->>>>>>> origin/main
   EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
   dns_cache_->forceRefreshHosts();

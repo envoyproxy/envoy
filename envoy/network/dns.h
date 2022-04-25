@@ -106,7 +106,7 @@ public:
 
   /**
    * Tell the resolver to reset networking, typically in response to a network switch (e.g., from
-   * WiFi to cellular). What the resolver does is resolver independent but might involve creating
+   * WiFi to cellular). What the resolver does is resolver dependent but might involve creating
    * new resolver connections, re-reading resolver targets, etc.
    */
   virtual void resetNetworking() PURE;
