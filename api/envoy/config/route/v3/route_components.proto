@@ -1799,8 +1799,16 @@ message RateLimit {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
 
-      // Length of prefix, e.g. 0, 32. Defaults to -1 when unset.
-      google.protobuf.UInt32Value prefix_len = 1 [(validate.rules).uint32 = {lte: 128}];
+      // Length of prefix mask len(e.g. 0, 32), enable rate limit base on cidr format.
+      // Defaults to 32 when unset.
+      // For example, trusted address from x-forwarded-for is `192.168.1.1`,
+      // the descriptor entry is ("remote_address", "192.168.1.1");
+      // if mask len is 24, the descriptor entry is ("remote_address", "192.168.1.0/24").
+      google.protobuf.UInt32Value v4_prefix_mask_len = 1 [(validate.rules).uint32 = {lte: 32}];
+
+      // Length of prefix mask len for ipv6(e.g. 0, 128), enable rate limit base on cidr format.
+      // Defaults to 128 when unset.
+      google.protobuf.UInt32Value v6_prefix_mask_len = 2 [(validate.rules).uint32 = {lte: 128}];
     }
 
     // The following descriptor entry is appended to the descriptor:

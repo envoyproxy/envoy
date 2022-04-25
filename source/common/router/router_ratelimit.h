@@ -89,7 +89,10 @@ private:
 class RemoteAddressAction : public RateLimit::DescriptorProducer {
 public:
   RemoteAddressAction(const envoy::config::route::v3::RateLimit::Action::RemoteAddress& action)
-      : prefix_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, prefix_len, PREFIX_LEN_UNSET)) {}
+      : v4_prefix_mask_len_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, V4_PREFIX_LEN_UNSET)),
+        v6_prefix_mask_len_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, V6_PREFIX_LEN_UNSET)) {}
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -98,8 +101,10 @@ public:
                           const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const uint32_t prefix_len_;
-  static const uint32_t PREFIX_LEN_UNSET = -1;
+  const uint32_t v4_prefix_mask_len_;
+  const uint32_t v6_prefix_mask_len_;
+  static const uint32_t V4_PREFIX_LEN_UNSET = 32;
+  static const uint32_t V6_PREFIX_LEN_UNSET = 128;
 };
 
 /**
