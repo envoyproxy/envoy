@@ -327,4 +327,5 @@ intersphinx_mapping = {
     'v1.17': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', None),
     'v1.18': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', None),
     'v1.19': ('https://www.envoyproxy.io/docs/envoy/v1.19.1', None),
+    'v1.20': ('https://www.envoyproxy.io/docs/envoy/v1.20.1', None),
 }
