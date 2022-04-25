@@ -82,6 +82,7 @@ public:
    *             if no host was involved in the failure (for example overflow).
    */
   virtual void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                    absl::string_view failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
