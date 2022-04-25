@@ -30,12 +30,6 @@ QuicheMemSliceImpl::QuicheMemSliceImpl(quiche::QuicheBuffer buffer) {
   ASSERT(this->length() == length);
 }
 
-QuicheMemSliceImpl::QuicheMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
-  ASSERT(firstSliceLength(buffer) == length);
-  single_slice_buffer_.move(buffer, length);
-  ASSERT(single_slice_buffer_.getRawSlices().size() == 1);
-}
-
 QuicheMemSliceImpl::QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length)
     : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
           buffer.release(), length,

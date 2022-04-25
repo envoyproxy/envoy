@@ -29,11 +29,6 @@ public:
   QuicheMemSliceImpl(quiche::QuicheBuffer buffer);
   QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
 
-  // Constructs a QuicheMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
-  // Data will be moved from |buffer| to this mem slice.
-  // Prerequisite: |buffer| has at least |length| bytes of data and not empty.
-  explicit QuicheMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length);
-
   QuicheMemSliceImpl(const QuicheMemSliceImpl& other) = delete;
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
