@@ -22,8 +22,8 @@ namespace Http {
 
 // A cache of HTTP server properties.
 // This caches
-//   - alternate protocol entries as documented here: source/docs/http3_upstream.md
-//   - Quic round trip time used for TCP failover
+//   - Alternate protocol entries as documented here: source/docs/http3_upstream.md.
+//   - QUIC round trip time used for TCP failover.
 //   - The last connectivity status of HTTP/3, if available.
 //   - Expected concurrent streams allowed.
 class HttpServerPropertiesCacheImpl : public HttpServerPropertiesCache,

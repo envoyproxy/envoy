@@ -133,8 +133,8 @@ HttpServerPropertiesCacheImpl::HttpServerPropertiesCacheImpl(
         if (origin_data->protocols.has_value()) {
           protocols = *origin_data->protocols;
         }
-        OriginDataWithOptRef data{protocols, origin_data->srtt, nullptr,
-                                  origin_data->concurrent_streams};
+        OriginDataWithOptRef data(protocols, origin_data->srtt, nullptr,
+                                  origin_data->concurrent_streams);
         setPropertiesImpl(*origin, data);
       } else {
         ENVOY_LOG(warn,
