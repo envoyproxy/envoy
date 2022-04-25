@@ -8,17 +8,16 @@ Active development is happening on the `main` branch, and a new version is relea
 
 Stable releases of Envoy include:
 
-TODO(RyanTheOptimist): It seems to me that we have two kinds of releases and it would be helpful for
-this doc to make a clear distinction between them. For the sake of argument, I've called them
-"Major Release" (v1.22) and "Security Releases" (v1.22.1, etc). Does this terminology work?
-
 * Major releases in which a new version a created directly from the `main` branch.
-* Extended maintenance window (any version released in the last 12 months).
-* Security fixes backported from the `main` branch (including those deemed not worthy
-  of creating a CVE).
-* Stability fixes backported from the `main` branch (anything that can result in a crash,
-  including crashes triggered by a trusted control plane).
-* Bugfixes, deemed worthwhile by the maintainers of stable releases.
+* Minor releases for versions covered by the extended maintenance window (any version released in the last 12 months).
+  * Security fixes backported from the `main` branch (including those deemed not worthy
+    of creating a CVE).
+  * Stability fixes backported from the `main` branch (anything that can result in a crash,
+    including crashes triggered by a trusted control plane).
+  * Bugfixes, deemed worthwhile by the maintainers of stable releases.
+
+Major release and security fixes both happen quartely whereas other releases are ad-hoc and
+best-effort.
 
 ### Hand-off
 
@@ -32,7 +31,6 @@ to execute tests on it.
 Critical security fixes are owned by the Envoy security team, which provides fixes for the
 `main` branch. Once those fixes are ready, the maintainers
 of stable releases backport them to the remaining supported stable releases.
-TODO(RyanTheOptimist): Should this perhaps mention that this process is not "in-the-clear"?
 
 ### Backports
 
@@ -48,9 +46,8 @@ schedule, initially aiming for the bi-weekly releases.
 
 ### Release management
 
-Major releases are handled by Matt Klein ([mattklein123](https://github.com/mattklein123))
-or Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) and do not involve any backports.
-The details are outlined in the "Cutting a release" section of [GOVERNANCE.md](GOVERNANCE.md).
+Major releases are handled by the maintainer on-call and do not involve any backports.
+The details are outlined in the "Cutting a major release" section below.
 Security releases are handled by a Release Manager and a Fix Lead. The Release Manager is
 responsible for approving and merging backports. The Fix Lead is a member of the security
 team and is responsible for coordinating the overall release. This includes identifying
@@ -90,6 +87,83 @@ deadline of 3 weeks.
 | 1.21.0  | 2022/01/15 | 2022/01/12 |   -3 days  | 2023/01/12  |
 | 1.22.0  | 2022/04/15 | 2022/04/15 |    0 days  | 2023/04/15  |
 | 1.23.0  | 2022/07/15 |            |            |             |
+
+### Cutting a major release
+
+* Take a look at open issues tagged with the current release, by
+  [searching](https://github.com/envoyproxy/envoy/issues) for
+  "is:open is:issue milestone:[current milestone]" and either hold off until
+  they are fixed or bump them to the next milestone.
+* Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
+  particularly risky PRs until after the release is tagged. This is because we aim for main to be
+  at release candidate quality at all times.
+* Do a final check of the [release notes](docs/root/version_history/current.rst):
+  * Make any needed corrections (grammar, punctuation, formatting, etc.).
+  * Check to see if any security/stable version release notes are duplicated in
+    the major version release notes. These should not be duplicated.
+  * If the "Deprecated" section is empty, delete it.
+  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
+  * Switch the [VERSION.txt](VERSION.txt) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+    "1.6.0".
+  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
+    release, please also make sure there's a stable maintainer signed up for next quarter,
+    and the deadline for the next release is documented in the release schedule.
+  * Get a review and merge.
+* Wait for tests to pass on [main](https://dev.azure.com/cncf/envoy/_build).
+* Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
+  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
+  [VERSION](VERSION).**
+* From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
+  from the tagged release, e.g. "release/v1.6". It will be used for the
+  [stable releases](RELEASES.md#stable-releases).
+* Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
+  tag build to make sure that the final docker images get pushed along with
+  the final docs. The final documentation will end up in the
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
+* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
+* Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
+* Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
+  post.
+* Do a new PR to setup the next version
+  * Update [VERSION.txt](VERSION.txt) to the next development release. E.g., "1.7.0-dev".
+  * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
+    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
+    Add an entry for the new file in the `toctree` in
+    [version_history.rst](docs/root/version_history/version_history.rst).
+  * Create a new "current" version history file at the [release
+  notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
+  this text as the template for the new file:
+```
+1.7.0 (Pending)
+===============
+
+Incompatible Behavior Changes
+-----------------------------
+*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+Minor Behavior Changes
+----------------------
+*Changes that may cause incompatibilities for some users, but should not for most*
+
+Bug Fixes
+---------
+*Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+Removed Config or Runtime
+-------------------------
+*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+New Features
+------------
+
+Deprecated
+----------
+```
+* Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
+  to file tracking issues for runtime guarded code which can be removed.
+* Check source/common/runtime/runtime_features.cc and see if any runtime guards in
+  disabled_runtime_features should be reassessed, and ping on the relevant issues.
+
 
 ## Security release schedule
 
