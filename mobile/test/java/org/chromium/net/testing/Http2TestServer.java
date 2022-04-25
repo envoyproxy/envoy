@@ -32,11 +32,10 @@ import io.netty.handler.ssl.SslContext;
  */
 public final class Http2TestServer {
   private static Channel sServerChannel;
+  private static int sPort = -1;
   private static final String TAG = Http2TestServer.class.getSimpleName();
 
   private static final String HOST = "127.0.0.1";
-  // Server port.
-  private static final int PORT = 8443;
 
   private static ReportingCollector sReportingCollector;
 
@@ -45,6 +44,7 @@ public final class Http2TestServer {
       sServerChannel.close().sync();
       sServerChannel = null;
       sReportingCollector = null;
+      sPort = -1;
       return true;
     }
     return false;
@@ -52,9 +52,9 @@ public final class Http2TestServer {
 
   public static String getServerHost() { return HOST; }
 
-  public static int getServerPort() { return PORT; }
+  public static int getServerPort() { return sPort; }
 
-  public static String getServerUrl() { return "https://" + HOST + ":" + PORT; }
+  public static String getServerUrl() { return "https://" + HOST + ":" + sPort; }
 
   public static ReportingCollector getReportingCollector() { return sReportingCollector; }
 
@@ -179,7 +179,9 @@ public final class Http2TestServer {
                 .handler(new LoggingHandler(LogLevel.INFO))
                 .childHandler(new Http2ServerInitializer(mSslCtx, mHangingUrlLatch));
 
-            sServerChannel = b.bind(PORT).sync().channel();
+            sServerChannel = b.bind(0).sync().channel();
+            String localAddress = sServerChannel.localAddress().toString();
+            sPort = Integer.parseInt(localAddress.substring(localAddress.lastIndexOf(':') + 1));
             Log.i(TAG, "Netty HTTP/2 server started on " + getServerUrl());
             mBlock.open();
             sServerChannel.closeFuture().sync();

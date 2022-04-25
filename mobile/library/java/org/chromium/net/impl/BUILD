@@ -10,6 +10,7 @@ android_library(
     name = "cronvoy",
     srcs = [
         "Annotations.java",
+        "AtomicCombinatoryState.java",
         "BidirectionalStreamBuilderImpl.java",
         "CallbackExceptionImpl.java",
         "CronetEngineBase.java",
