@@ -4755,7 +4755,7 @@ envoy_cc_test(
 )
 
 envoy_cc_library(
-    name = "quiche_common_platform_lower_case_string_lib",
+    name = "quiche_common_platform_lower_case_string",
     hdrs = ["quiche/common/platform/api/quiche_lower_case_string.h"],
     repository = "@envoy",
     tags = ["nofips"],
@@ -4763,7 +4763,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quiche_common_platform_header_policy_lib",
+    name = "quiche_common_platform_header_policy",
     hdrs = ["quiche/common/platform/api/quiche_header_policy.h"],
     repository = "@envoy",
     tags = ["nofips"],
