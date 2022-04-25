@@ -23,6 +23,14 @@
 namespace Envoy {
 namespace Network {
 
+namespace {
+// Treat responses with ARES_ENODATA or ARES_ENOTFOUND status as DNS response with no records.
+// @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for details.
+bool isResponseWithNoRecords(int status) {
+  return status == ARES_ENODATA || status == ARES_ENOTFOUND;
+}
+} // namespace
+
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
     Event::Dispatcher& dispatcher,
@@ -32,7 +40,8 @@ DnsResolverImpl::DnsResolverImpl(
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
-      filter_unroutable_families_(config.filter_unroutable_families()) {
+      filter_unroutable_families_(config.filter_unroutable_families()),
+      accept_nodata_(config.accept_nodata()) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
 }
@@ -129,8 +138,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
   pending_resolutions_--;
 
   if (status != ARES_SUCCESS) {
-    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
-                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    if (!parent_.accept_nodata_ || !isResponseWithNoRecords(status)) {
+      ENVOY_LOG_EVENT(critical, "cares_resolution_failure",
+                      "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    }
   }
 
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
@@ -208,6 +219,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
+  } else if (parent_.accept_nodata_ && isResponseWithNoRecords(status) && !dual_resolution_) {
+    // Treat ARES_ENODATA or ARES_ENOTFOUND here as success for last attempt to populate back the
+    // "empty records" response.
+    pending_response_.status_ = ResolutionStatus::Success;
   }
 
   if (timeouts > 0) {
@@ -228,8 +243,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // that the first lookup failed to return any addresses. Note that DnsLookupFamily::All issues
     // both lookups concurrently so there is no need to fire a second lookup here.
     if (dns_lookup_family_ == DnsLookupFamily::Auto) {
+      family_ = AF_INET;
       startResolutionImpl(AF_INET);
     } else if (dns_lookup_family_ == DnsLookupFamily::V4Preferred) {
+      family_ = AF_INET6;
       startResolutionImpl(AF_INET6);
     }
 

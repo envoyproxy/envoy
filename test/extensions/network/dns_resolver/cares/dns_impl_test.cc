@@ -685,6 +685,7 @@ public:
     }
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
+    cares.set_accept_nodata(acceptNodata());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -875,6 +876,7 @@ protected:
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
+  virtual bool acceptNodata() const { return false; }
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
@@ -1307,6 +1309,69 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   EXPECT_CALL(*timer, enableTimer(_, _));
   EXPECT_NE(nullptr, resolveWithUnreferencedParameters("some.bad.domain.invalid",
                                                        DnsLookupFamily::V4Only, true));
+}
+
+class DnsImplAcceptEnodataTest : public DnsImplTest {
+protected:
+  bool acceptNodata() const override { return true; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAcceptEnodataTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV6) {
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
+                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledAuto) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV4Preferred) {
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledNoDataV4) {
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Success, {}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledNoDataV6) {
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
+                                    DnsResolver::ResolutionStatus::Success, {}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledNoDataAuto) {
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                    DnsResolver::ResolutionStatus::Success, {}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {
