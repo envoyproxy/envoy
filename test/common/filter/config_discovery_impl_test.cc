@@ -247,7 +247,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
 
   // Initial request.
   {
-    auto response = config_discovery_test.createResponse("1", "foo");
+    const auto response = config_discovery_test.createResponse("1", "foo");
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
@@ -400,7 +400,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   InSequence s;
   TypeParam config_discovery_test;
   config_discovery_test.setup();
-  auto provider2 = config_discovery_test.createProvider("foo", true, false);
+  const auto provider2 = config_discovery_test.createProvider("foo", true, false);
   EXPECT_EQ("foo", provider2->name());
   EXPECT_EQ(absl::nullopt, provider2->config());
   const auto response = config_discovery_test.createResponse("1", "foo");
@@ -420,7 +420,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
   config_discovery_test.setup();
-  auto provider2 = config_discovery_test.createProvider("foo", true, false);
+  const auto provider2 = config_discovery_test.createProvider("foo", true, false);
 
   // Create a response with a random type AddBodyFilterConfig not matching with providers.
   auto add_body_filter_config = test::integration::filters::AddBodyFilterConfig();
