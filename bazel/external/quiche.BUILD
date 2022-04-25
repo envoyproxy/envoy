@@ -410,6 +410,39 @@ envoy_cc_test(
     ],
 )
 
+# envoy_cc_library(
+#     name = "http2_adapter_oghttp2_adapter",
+#     srcs = [
+#         "quiche/http2/adapter/oghttp2_adapter.cc",
+#         "quiche/http2/adapter/oghttp2_session.cc",
+#     ],
+#     hdrs = [
+#         "quiche/http2/adapter/oghttp2_adapter.h",
+#         "quiche/http2/adapter/oghttp2_session.h",
+#     ],
+#     external_deps = [
+#         "abseil_algorithm",
+#     ],
+#     copts = quiche_copts,
+#     repository = "@envoy",
+#     deps = [
+#         ":http2_adapter_callback_visitor",
+#         ":http2_adapter_data_source",
+#         ":http2_adapter_http2_protocol",
+#         ":http2_adapter_http2_util",
+#         ":http2_adapter_http2_visitor_interface",
+#         ":http2_adapter_interface_lib",
+#         ":http2_adapter_nghttp2_callbacks",
+#         ":http2_adapter_nghttp2_data_provider",
+#         ":http2_adapter_nghttp2_include",
+#         ":http2_adapter_nghttp2_util",
+#         ":http2_adapter_window_manager",
+#         ":http2_core_http2_trace_logging_lib",
+#         ":http2_core_priority_write_scheduler_lib",
+#         ":quiche_common_platform_export",
+#     ],
+# )
+
 envoy_cc_library(
     name = "http2_adapter_oghttp2_adapter",
     srcs = [
@@ -420,10 +453,10 @@ envoy_cc_library(
         "quiche/http2/adapter/oghttp2_adapter.h",
         "quiche/http2/adapter/oghttp2_session.h",
     ],
+    copts = quiche_copts,
     external_deps = [
         "abseil_algorithm",
     ],
-    copts = quiche_copts,
     repository = "@envoy",
     deps = [
         ":http2_adapter_callback_visitor",
@@ -1283,6 +1316,9 @@ envoy_cc_library(
     hdrs = ["quiche/http2/hpack/huffman/huffman_spec_tables.h"],
     copts = quiche_copts,
     repository = "@envoy",
+    deps = [
+        ":quiche_common_platform",
+    ],
 )
 
 envoy_cc_library(
@@ -1475,6 +1511,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":http2_hpack_huffman_hpack_huffman_encoder_lib",
+        ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
         ":spdy_core_protocol_lib",
     ],
@@ -2482,6 +2519,7 @@ envoy_cc_library(
         ":quic_core_packet_writer_lib",
         ":quic_core_packets_lib",
         ":quic_core_path_validator_lib",
+        ":quic_core_ping_manager_lib",
         ":quic_core_proto_cached_network_parameters_proto_header",
         ":quic_core_sent_packet_manager_lib",
         ":quic_core_time_lib",
@@ -3480,6 +3518,23 @@ envoy_cc_library(
         ":quic_core_packet_writer_lib",
         ":quic_core_types_lib",
         ":quic_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_ping_manager_lib",
+    srcs = ["quiche/quic/core/quic_ping_manager.cc"],
+    hdrs = ["quiche/quic/core/quic_ping_manager.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_alarm_factory_lib",
+        ":quic_core_alarm_lib",
+        ":quic_core_constants_lib",
+        ":quic_core_one_block_arena_lib",
+        ":quic_core_time_lib",
+        ":quic_platform_export",
     ],
 )
 
