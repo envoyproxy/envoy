@@ -15,7 +15,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* docker: update Docker images to resolve CVE issues in container packages (#20760)
+* docker: update Docker images to resolve CVE issues in container packages (#20760).
 
 Removed Config or Runtime
 -------------------------
