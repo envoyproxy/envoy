@@ -22,6 +22,8 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* conn pool: removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
+
 New Features
 ------------
 * dns_resolver: added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
