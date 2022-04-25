@@ -112,7 +112,7 @@ private:
   // This allows calling setPropertiesImpl without creating an additional copy
   // of the protocols vector.
   struct OriginDataWithOptRef {
-    OriginDataWithOptRef() : srtt(std::chrono::milliseconds(0)), concurrent_streams(0) {}
+    OriginDataWithOptRef() : srtt(std::chrono::milliseconds(0)) {}
     OriginDataWithOptRef(OptRef<std::vector<AlternateProtocol>> protocols,
                          std::chrono::microseconds srtt, Http3StatusTrackerPtr&& h3_status_tracker,
                          uint32_t concurrent_streams)
@@ -125,7 +125,7 @@ private:
     // The last connectivity status of HTTP/3, if available else nullptr.
     Http3StatusTrackerPtr h3_status_tracker;
     // The number of concurrent streams expected to be allowed.
-    uint32_t concurrent_streams;
+    uint32_t concurrent_streams{0};
   };
 
   ProtocolsMap::iterator setPropertiesImpl(const Origin& origin, OriginDataWithOptRef& origin_data);
