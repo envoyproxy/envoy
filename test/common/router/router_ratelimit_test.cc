@@ -344,7 +344,7 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddressWithPrefixLen) {
   const std::string yaml = R"EOF(
 actions:
 - remote_address:
-    prefix_len: 16
+    v4_prefix_mask_len: 16
   )EOF";
 
   setupTest(yaml);
