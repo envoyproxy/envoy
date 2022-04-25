@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.rate_limit_quota.v3;
 
+import "envoy/extensions/common/ratelimit/v3/ratelimit_quota.proto";
 import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
@@ -32,7 +33,8 @@ message RateLimitQuotaUsageReports {
   // [#next-free-field: 6]
   message BucketQuotaUsage {
     // Bucket id for which request quota usage is reported.
-    BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
+    envoy.extensions.common.ratelimit.v3.BucketId bucket_id = 1
+        [(validate.rules).message = {required: true}];
 
     // Time elapsed since the last report.
     google.protobuf.Duration time_elapsed = 2;
@@ -76,7 +78,8 @@ message RateLimitQuotaResponse {
     }
 
     // Bucket id for which to take the action.
-    BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
+    envoy.extensions.common.ratelimit.v3.BucketId bucket_id = 1
+        [(validate.rules).message = {required: true}];
 
     oneof bucket_action {
       // Apply quota assignment to the bucket.
@@ -99,10 +102,4 @@ message RateLimitQuotaResponse {
 
   // An ordered list of actions to be applied to the buckets.
   repeated BucketAction bucket_action = 1;
-}
-
-// The identifier for the bucket. Used to match the bucket on the control
-// plane (RLQS server), and on the data plane (RLQS client).
-message BucketId {
-  map<string, string> bucket = 1;
 }
