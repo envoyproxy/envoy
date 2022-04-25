@@ -437,7 +437,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {
   EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
       .WillOnce(testing::SetArgReferee<0>(descriptor_first_match_));
 
-  auto headers = Http::TestRequestHeaderMapImpl();
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
