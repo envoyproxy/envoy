@@ -21,23 +21,11 @@ Publish release and artifacts
 After merging the above changes, a new release may be
 `tagged <https://github.com/envoyproxy/envoy-mobile/releases>`_.
 
-When tagging a release, it should contain all the artifacts built by CI on the main commit being
-tagged as the new version. These artifacts may be downloaded by clicking on the CI status of the
-commit on main, then clicking ``Artifacts`` in the top right corner. After downloading, be sure
-to upload the artifacts when tagging the GitHub release.
-
 Upon tagging the release, jobs automatically kick off on main which:
 
-- Publish an Android artifact to Maven
-- Publish the most recent version of the Envoy Mobile docs
-
-The last step to completing a release is to publish the CocoaPods artifact to the specs repo.
-This can be done by any maintainer with write access to the spec definition. From the repository
-directory, run:
-
-``pod trunk push``
-
-Note: This last step is slated to be automated in :issue:`#624 <624>`.
+- Creates a GitHub release, along with iOS & Android build artifacts
+- Publishes the release to Maven & CocoaPods
+- Publishes the most recent version of the Envoy Mobile docs
 
 
 Pre-release versioning
