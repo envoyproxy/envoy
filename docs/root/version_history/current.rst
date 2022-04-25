@@ -21,6 +21,8 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* http: deprecated ``envoy.reloadable_features.correct_scheme_and_xfp`` and legacy code paths.
+
 New Features
 ------------
 * dns_resolver: added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.

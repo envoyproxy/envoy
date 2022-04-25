@@ -836,10 +836,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
 }
 
 absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correct_scheme_and_xfp")) {
-    return headers.getSchemeValue();
-  }
-  return headers.getForwardedProtoValue();
+  return headers.getSchemeValue();
 }
 
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,

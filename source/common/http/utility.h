@@ -438,9 +438,7 @@ const std::string& getProtocolString(const Protocol p);
 
 /**
  * Return the scheme of the request.
- * For legacy code (envoy.reloadable_features.correct_scheme_and_xfp == false) this
- * will be the value of the X-Forwarded-Proto header value. By default it will
- * return the scheme if present, otherwise the value of X-Forwarded-Proto if
+ * By default it will return the scheme if present, otherwise the value of X-Forwarded-Proto if
  * present.
  */
 absl::string_view getScheme(const RequestHeaderMap& headers);
