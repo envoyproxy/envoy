@@ -3,6 +3,8 @@
 #include <chrono>
 
 #include "source/common/protobuf/utility.h"
+#include "envoy/runtime/runtime.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -145,17 +147,23 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  if (!descriptors_.empty() && !request_descriptors.empty()) {
-    bool limit = true;
-    for (const auto& request_descriptor : request_descriptors) {
-      auto it = descriptors_.find(request_descriptor);
-      if (it != descriptors_.end()) {
-        limit &= requestAllowedHelper(*it->token_state_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_local_ratelimit_match_all_descriptors")) {
+    bool limit = requestAllowedHelper(tokens_);
+    if (!descriptors_.empty() && !request_descriptors.empty()) {
+      for (const auto& request_descriptor : request_descriptors) {
+        auto it = descriptors_.find(request_descriptor);
+        if (it != descriptors_.end()) {
+          limit &= requestAllowedHelper(*it->token_state_);
+        }
       }
     }
     return limit;
   }
-  return requestAllowedHelper(tokens_);
+  auto descriptor = descriptorHelper(request_descriptors);
+
+  return descriptor.has_value() ? requestAllowedHelper(*descriptor.value().get().token_state_)
+                                : requestAllowedHelper(tokens_);
 }
 
 uint32_t LocalRateLimiterImpl::maxTokens(
