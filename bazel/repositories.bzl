@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.language",
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
@@ -126,7 +127,10 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
-    external_http_archive("rules_rust")
+    external_http_archive(
+        "rules_rust",
+        patches = ["@envoy//bazel:rules_rust.patch"],
+    )
 
 def envoy_dependencies(skip_targets = []):
     # Add a binding for repository variables.
@@ -172,6 +176,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
@@ -203,6 +208,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
+    _com_github_facebook_zstd()
     _re2()
     _upb()
     _proxy_wasm_cpp_sdk()
@@ -370,6 +376,14 @@ def _com_github_google_libsxg():
         actual = "@envoy//bazel/foreign_cc:libsxg",
     )
 
+def _com_github_unicode_org_icu():
+    external_http_archive(
+        name = "com_github_unicode_org_icu",
+        patches = ["@envoy//bazel/foreign_cc:icu.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
@@ -464,6 +478,17 @@ def _org_brotli():
     native.bind(
         name = "brotlidec",
         actual = "@org_brotli//:brotlidec",
+    )
+
+def _com_github_facebook_zstd():
+    external_http_archive(
+        name = "com_github_facebook_zstd",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "zstd",
+        actual = "@envoy//bazel/foreign_cc:zstd",
     )
 
 def _com_google_cel_cpp():
@@ -863,14 +888,6 @@ def _com_googlesource_chromium_zlib():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
-        # Rewrite third_party includes and #pragma clang.
-        patch_cmds = ["find . -type f -exec sed -e '\
-    /^#include/ s!third_party/boringssl/src/include/!! ;\
-    /^#include/ s!third_party/nghttp2/src/lib/includes/!! ;\
-    /^#include/ s!third_party/zlib/!! ;\
-    /^#pragma/ s!clang!GCC!; \
-    /^#pragma/ s!-Weverything!-Wall!\
-    ' -i -- {} \\; "],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(

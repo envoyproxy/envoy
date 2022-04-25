@@ -79,9 +79,29 @@ protected:
 
 TEST_F(StatsRequestTest, Empty) { EXPECT_EQ(0, iterateChunks(*makeRequest(false, false))); }
 
-TEST_F(StatsRequestTest, OneStat) {
+TEST_F(StatsRequestTest, OneCounter) {
   store_.counterFromStatName(makeStatName("foo"));
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneGauge) {
+  store_.gaugeFromStatName(makeStatName("foo"), Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneHistogram) {
+  store_.histogramFromStatName(makeStatName("foo"), Stats::Histogram::Unit::Milliseconds);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneTextReadout) {
+  store_.textReadoutFromStatName(makeStatName("foo"));
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneScope) {
+  Stats::ScopeSharedPtr scope = store_.createScope("foo");
+  EXPECT_EQ(0, iterateChunks(*makeRequest(false, false)));
 }
 
 TEST_F(StatsRequestTest, ManyStatsSmallChunkSize) {

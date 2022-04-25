@@ -150,6 +150,10 @@ const TlsContextMatchCriteria* DelegatingRouteEntry::tlsContextMatchCriteria() c
   return base_route_->routeEntry()->tlsContextMatchCriteria();
 }
 
+const PathMatchCriterion& DelegatingRouteEntry::pathMatchCriterion() const {
+  return base_route_->routeEntry()->pathMatchCriterion();
+}
+
 bool DelegatingRouteEntry::includeAttemptCountInRequest() const {
   return base_route_->routeEntry()->includeAttemptCountInRequest();
 }

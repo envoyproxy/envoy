@@ -5,6 +5,18 @@
 namespace Envoy {
 namespace Io {
 
+bool isIoUringSupported() {
+  struct io_uring_params p {};
+  struct io_uring ring;
+
+  bool is_supported = io_uring_queue_init_params(2, &ring, &p) == 0;
+  if (is_supported) {
+    io_uring_queue_exit(&ring);
+  }
+
+  return is_supported;
+}
+
 IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                        ThreadLocal::SlotAllocator& tls)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),

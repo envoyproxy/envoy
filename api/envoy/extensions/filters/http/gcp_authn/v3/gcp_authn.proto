@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.gcp_authn.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_uri.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.gcp_authn.v3";
+option java_outer_classname = "GcpAuthnProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/gcp_authn/v3;gcp_authnv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: GCP authentication]
+// GCP authentication :ref:`configuration overview <config_http_filters_gcp_authn>`.
+// [#extension: envoy.filters.http.gcp_authn]
+
+// Filter configuration.
+message GcpAuthnFilterConfig {
+  // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
+  // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
+  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+
+  // Retry policy for fetching tokens.
+  // This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
+  config.core.v3.RetryPolicy retry_policy = 2;
+}
+
+message Audience {
+  // The map of audience key to audience value.
+  // The key is defined as the contract with control plane in the configuration. It is fixed string "audience_key".
+  // The value is URL of the receiving service that performs token authentication.
+  map<string, string> audience_map = 1;
+}

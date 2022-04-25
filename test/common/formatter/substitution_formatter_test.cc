@@ -1955,6 +1955,64 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   }
 }
 
+TEST(SubstitutionFormatterTest, GrpcStatusNumberFormatterTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(), true);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
+
+  for (size_t i = 0; i < grpcStatuses; ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(std::to_string(i), formatter.format(request_header, response_header, response_trailer,
+                                                  stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(i)));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(-1)));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(42738)));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(-1)));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(42738)));
+    response_header.clear();
+  }
+}
+
 void verifyStructOutput(ProtobufWkt::Struct output,
                         absl::node_hash_map<std::string, std::string> expected_map) {
   for (const auto& pair : expected_map) {
