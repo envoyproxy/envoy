@@ -42,6 +42,7 @@ public:
   QuicheMemSliceImpl& operator=(const QuicheMemSliceImpl& other) = delete;
   QuicheMemSliceImpl& operator=(QuicheMemSliceImpl&& other) noexcept {
     if (this != &other) {
+      Reset();
       fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
     }
