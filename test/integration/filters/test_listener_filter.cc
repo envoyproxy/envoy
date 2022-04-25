@@ -47,7 +47,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new test::integration::filters::TestUdpListenerFilterConfig()};
+    return std::make_unique<test::integration::filters::TestUdpListenerFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.udp_listener.test"; }
