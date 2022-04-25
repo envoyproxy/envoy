@@ -66,6 +66,9 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+  // Allow extension lookup by name in the integration tests.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
+                                    "false");
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -126,7 +129,7 @@ common_tls_context:
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   } else {

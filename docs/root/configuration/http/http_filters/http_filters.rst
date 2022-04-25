@@ -23,6 +23,7 @@ HTTP filters
   ext_authz_filter
   ext_proc_filter
   fault_filter
+  gcp_authn_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
   grpc_json_transcoder_filter
@@ -33,6 +34,7 @@ HTTP filters
   ip_tagging_filter
   jwt_authn_filter
   kill_request_filter
+  language_filter
   local_rate_limit_filter
   lua_filter
   oauth2_filter

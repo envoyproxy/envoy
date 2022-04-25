@@ -708,6 +708,13 @@ The extensions enabled by default can be disabled by adding the following parame
 `envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
 Note not all extensions can be disabled.
 
+To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
+
+* `v8` (the default included engine)
+* `wamr`
+* `wasmtime`
+* `wavm`
+
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
 

@@ -98,6 +98,9 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
               // available in the socket buffer.
               filter_buffer.activateFileEvent(Event::FileReadyType::Read);
             }
+          } else {
+            // The filter closed the socket.
+            continueFilterChain(false);
           }
           return;
         }
@@ -184,6 +187,13 @@ void ActiveTcpSocket::newConnection() {
     new_listener =
         listener_.getBalancedHandlerByAddress(*socket_->connectionInfoProvider().localAddress());
   }
+
+  // Reset the file events which are registered by listener filter.
+  // reference https://github.com/envoyproxy/envoy/issues/8925.
+  if (listener_filter_buffer_ != nullptr) {
+    listener_filter_buffer_->reset();
+  }
+
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
@@ -197,11 +207,6 @@ void ActiveTcpSocket::newConnection() {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {
       socket_->setDetectedTransportProtocol("raw_buffer");
-    }
-    // Reset the file events which are registered by listener filter.
-    // reference https://github.com/envoyproxy/envoy/issues/8925.
-    if (listener_filter_buffer_ != nullptr) {
-      listener_filter_buffer_->reset();
     }
     accept_filters_.clear();
     // Create a new connection on this listener.

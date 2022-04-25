@@ -84,7 +84,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
     the major version release notes. These should not be duplicated.
   * If the "Deprecated" section is empty, delete it.
   * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
-  * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+  * Switch the [VERSION.txt](VERSION.txt) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
     release, please also make sure there's a stable maintainer signed up for next quarter,
@@ -100,13 +100,13 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
   tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
-  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
+  [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
+* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
 * Do a new PR to setup the next version
-  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
+  * Update [VERSION.txt](VERSION.txt) to the next development release. E.g., "1.7.0-dev".
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
     release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
     Add an entry for the new file in the `toctree` in

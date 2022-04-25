@@ -4,7 +4,7 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
-load("@rules_rust//rust:repositories.bzl", "rust_repositories")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
@@ -22,7 +22,20 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     gazelle_dependencies()
     apple_rules_dependencies()
     pip_dependencies()
-    rust_repositories()
+    rules_rust_dependencies()
+    rust_register_toolchains(
+        include_rustc_srcs = True,
+        extra_target_triples = [
+            "aarch64-apple-ios",
+            "aarch64-linux-android",
+            "armv7-linux-androideabi",
+            "i686-linux-android",
+            "wasm32-unknown-unknown",
+            "wasm32-wasi",
+            "x86_64-apple-ios",
+            "x86_64-linux-android",
+        ],
+    )
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()

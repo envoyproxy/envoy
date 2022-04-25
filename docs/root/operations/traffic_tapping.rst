@@ -47,6 +47,8 @@ or cluster. For a plain text socket this might look like:
                   path_prefix: /some/tap/path
       transport_socket:
         name: envoy.transport_sockets.raw_buffer
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
 
 For a TLS socket, this will be:
 

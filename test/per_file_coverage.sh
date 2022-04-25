@@ -4,8 +4,8 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.0"
-"source/common/api:76.5"
-"source/common/api/posix:75.0"
+"source/common/api:82.5"
+"source/common/api/posix:81.7"
 "source/common/common:96.2"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
@@ -14,6 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:95.5"
 "source/common/http:96.3"
 "source/common/http/http2:96.4"
+"source/common/io:98.0"
 "source/common/json:89.8"
 "source/common/matcher:92.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV

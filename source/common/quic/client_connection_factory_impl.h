@@ -45,7 +45,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
-    OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
+    OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope);
 
 } // namespace Quic
 } // namespace Envoy

@@ -115,6 +115,10 @@ public:
   // Called when the mandatory handshake is complete. This is when a HTTP/3 connection is regarded
   // as connected and is able to send requests.
   virtual void onHandshakeComplete() PURE;
+  // Called upon connection close event from a client who hasn't finish handshake but already sent
+  // early data.
+  // TODO(danzh) actually call it from h3 pool.
+  virtual void onZeroRttHandshakeFailed() PURE;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
@@ -141,7 +145,7 @@ public:
 
   std::unique_ptr<Network::ClientConnection>
   createClientConnection(Quic::QuicStatNames& quic_stat_names,
-                         OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
+                         OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope);
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
@@ -164,7 +168,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
-                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
+                 OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info);
 

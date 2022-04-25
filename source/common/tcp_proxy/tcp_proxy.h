@@ -53,10 +53,28 @@ namespace TcpProxy {
   GAUGE(upstream_flush_active, Accumulate)
 
 /**
+ * Tcp proxy stats for on-demand. These stats are generated only if the tcp proxy enables on demand.
+ */
+#define ON_DEMAND_TCP_PROXY_STATS(COUNTER)                                                         \
+  COUNTER(on_demand_cluster_attempt)                                                               \
+  COUNTER(on_demand_cluster_missing)                                                               \
+  COUNTER(on_demand_cluster_timeout)                                                               \
+  COUNTER(on_demand_cluster_success)
+
+/**
  * Struct definition for all tcp proxy stats. @see stats_macros.h
  */
 struct TcpProxyStats {
   ALL_TCP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct definition for on-demand related tcp proxy stats. @see stats_macros.h
+ * These stats are available if and only if the tcp proxy enables on-demand.
+ * Note that these stats has the same prefix as `TcpProxyStats`.
+ */
+struct OnDemandStats {
+  ON_DEMAND_TCP_PROXY_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 class Drainer;
@@ -110,6 +128,34 @@ private:
 };
 
 /**
+ * On demand configurations.
+ */
+class OnDemandConfig {
+public:
+  OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
+                     on_demand_message,
+                 Server::Configuration::FactoryContext& context, Stats::Scope& scope)
+      : odcds_(context.clusterManager().allocateOdCdsApi(on_demand_message.odcds_config(),
+                                                         OptRef<xds::core::v3::ResourceLocator>(),
+                                                         context.messageValidationVisitor())),
+        lookup_timeout_(std::chrono::milliseconds(
+            PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
+        stats_(generateStats(scope)) {}
+  Upstream::OdCdsApiHandle& onDemandCds() const { return *odcds_; }
+  std::chrono::milliseconds timeout() const { return lookup_timeout_; }
+  const OnDemandStats& stats() const { return stats_; }
+
+private:
+  static OnDemandStats generateStats(Stats::Scope& scope);
+  Upstream::OdCdsApiHandlePtr odcds_;
+  // The timeout of looking up the on-demand cluster.
+  std::chrono::milliseconds lookup_timeout_;
+  // On demand stats.
+  OnDemandStats stats_;
+};
+using OnDemandConfigOptConstRef = OptRef<const OnDemandConfig>;
+
+/**
  * Filter configuration.
  *
  * This configuration holds a TLS slot, and therefore it must be destructed
@@ -136,18 +182,26 @@ public:
         return TunnelingConfigHelperOptConstRef();
       }
     }
+    OnDemandConfigOptConstRef onDemandConfig() {
+      if (on_demand_config_) {
+        return OnDemandConfigOptConstRef(*on_demand_config_);
+      } else {
+        return OnDemandConfigOptConstRef();
+      }
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
-    const Stats::ScopePtr stats_scope_;
+    const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
+    std::unique_ptr<OnDemandConfig> on_demand_config_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -185,6 +239,17 @@ public:
     return cluster_metadata_match_criteria_.get();
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
+  OptRef<Upstream::OdCdsApiHandle> onDemandCds() const {
+    auto on_demand_config = shared_config_->onDemandConfig();
+    return on_demand_config.has_value() ? makeOptRef(on_demand_config->onDemandCds())
+                                        : OptRef<Upstream::OdCdsApiHandle>();
+  }
+  // This function must not be called if on demand is disabled.
+  std::chrono::milliseconds odcdsTimeout() const {
+    return shared_config_->onDemandConfig()->timeout();
+  }
+  // This function must not be called if on demand is disabled.
+  const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -366,7 +431,14 @@ protected:
   }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
-  Network::FilterStatus initializeUpstreamConnection();
+
+  // Create connection to the upstream cluster. This function can be repeatedly called on upstream
+  // connection failure.
+  Network::FilterStatus establishUpstreamConnection();
+
+  // The callback upon on demand cluster discovery response.
+  void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
+
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
@@ -385,6 +457,9 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
+
+  // A pointer to the on demand cluster lookup when lookup is in flight.
+  Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
 
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.

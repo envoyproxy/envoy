@@ -30,9 +30,7 @@ message AccessLog {
 
   reserved "config";
 
-  // The name of the access log extension to instantiate.
-  // The name must match one of the compiled in loggers.
-  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.access_loggers>` for the default list of available loggers.
+  // The name of the access log extension configuration.
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.
@@ -112,7 +110,7 @@ message ComparisonFilter {
   Op op = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Value to compare against.
-  core.v3.RuntimeUInt32 value = 2;
+  core.v3.RuntimeUInt32 value = 2 [(validate.rules).message = {required: true}];
 }
 
 // Filters on HTTP response/status code.
