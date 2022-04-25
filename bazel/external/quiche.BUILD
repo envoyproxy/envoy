@@ -410,39 +410,6 @@ envoy_cc_test(
     ],
 )
 
-# envoy_cc_library(
-#     name = "http2_adapter_oghttp2_adapter",
-#     srcs = [
-#         "quiche/http2/adapter/oghttp2_adapter.cc",
-#         "quiche/http2/adapter/oghttp2_session.cc",
-#     ],
-#     hdrs = [
-#         "quiche/http2/adapter/oghttp2_adapter.h",
-#         "quiche/http2/adapter/oghttp2_session.h",
-#     ],
-#     external_deps = [
-#         "abseil_algorithm",
-#     ],
-#     copts = quiche_copts,
-#     repository = "@envoy",
-#     deps = [
-#         ":http2_adapter_callback_visitor",
-#         ":http2_adapter_data_source",
-#         ":http2_adapter_http2_protocol",
-#         ":http2_adapter_http2_util",
-#         ":http2_adapter_http2_visitor_interface",
-#         ":http2_adapter_interface_lib",
-#         ":http2_adapter_nghttp2_callbacks",
-#         ":http2_adapter_nghttp2_data_provider",
-#         ":http2_adapter_nghttp2_include",
-#         ":http2_adapter_nghttp2_util",
-#         ":http2_adapter_window_manager",
-#         ":http2_core_http2_trace_logging_lib",
-#         ":http2_core_priority_write_scheduler_lib",
-#         ":quiche_common_platform_export",
-#     ],
-# )
-
 envoy_cc_library(
     name = "http2_adapter_oghttp2_adapter",
     srcs = [
