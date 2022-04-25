@@ -5,6 +5,8 @@
 set -e
 
 
+# TEMP: ARBITRARY CHANGE
+
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
           "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" || "$1" == "tooling" \
