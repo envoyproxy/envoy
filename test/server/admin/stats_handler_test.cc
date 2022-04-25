@@ -145,7 +145,6 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
-  Buffer::OwnedImpl data, used_data;
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
