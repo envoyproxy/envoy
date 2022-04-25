@@ -11,7 +11,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 /**
- * ProtocolConverter is an abstract class that implements protocol-related methods on
+ * ProtocolConverter is an class that implements protocol-related methods on
  * DecoderEventHandler in terms of converting the decoded messages into a different protocol.
  */
 class ProtocolConverter : public virtual DecoderEventHandler {

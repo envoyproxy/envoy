@@ -25,6 +25,7 @@ enum class ResponseStatus {
   Complete = 1, // The upstream response is complete.
   Reset = 2,    // The upstream response is invalid and its connection must be reset.
 };
+
 /**
  * Common interface for FilterDecoderCallbacks and FilterEncoderCallbacks.
  */
@@ -83,6 +84,7 @@ public:
    */
   virtual bool responseSuccess() PURE;
 };
+
 /**
  * Decoder filter callbacks add additional callbacks.
  */
@@ -181,8 +183,9 @@ using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
  * Encoder filter interface.
  *
  * Currently the EncoderFilter and BidirectionFilter support
- * a. peek the metadata and content for encoding, and
- * b. modify the metadata and content except string value for encoding.
+ * a. peek the metadata and content for encoding,
+ * b. modify the metadata and content except string value for encoding, and
+ * c. what DecoderFilter supports for BidirectionFilter.
  *
  * Do not support
  * a. pass through data separately for encode and decode, e.g., pass through data for request but
@@ -195,7 +198,7 @@ public:
   ~EncoderFilter() override = default;
 
   /**
-   * Called by the connection manager once to initialize the filter decoder callbacks that the
+   * Called by the connection manager once to initialize the filter encoder callbacks that the
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
@@ -210,7 +213,7 @@ public:
 using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
 
 /**
- * Bidirection filter interface. @see EncoderFilter.
+ * Bidirection filter interface. @see EncoderFilter for limitation.
  */
 class BidirectionFilter : public FilterBase {
 public:
@@ -284,11 +287,13 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addDecoderFilter(DecoderFilterSharedPtr filter) PURE;
+
   /**
    * Add an encoder filter that is used when writing connection data.
    * @param filter supplies the filter to add.
    */
   virtual void addEncoderFilter(EncoderFilterSharedPtr filter) PURE;
+
   /**
    * Add a bidirection filter that is used when reading and writing connection data.
    * @param filter supplies the filter to add.

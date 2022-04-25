@@ -225,6 +225,8 @@ FilterStatus ConnectionManager::ResponseDecoder::transportBegin(MessageMetadataS
 FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
+  // Currently we don't support returning FilterStatus::StopIteration from encoder filters.
+  // Hence, this if-statement is always false.
   if (parent_.applyEncoderFilters(DecoderEvent::TransportEnd, absl::any(), protocol_converter_) ==
       FilterStatus::StopIteration) {
     pending_transport_end_ = true;
@@ -297,7 +299,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   metadata_->setSequenceId(parent_.original_sequence_id_);
 
   if (metadata->hasReplyType()) {
-    // TODO: the status of success could be altered by filters
+    // TODO(kuochunghsu): the status of success could be altered by filters
     success_ = metadata->replyType() == ReplyType::Success;
   }
 
@@ -341,7 +343,6 @@ FilterStatus ConnectionManager::ResponseDecoder::structEnd() {
   return parent_.applyEncoderFilters(DecoderEvent::StructEnd, absl::any(), protocol_converter_);
 }
 
-// TODO(kuochunghsu): these parameter
 FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view name,
                                                             FieldType& field_type,
                                                             int16_t& field_id) {
@@ -497,6 +498,7 @@ ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
     }
   }
 
+  // The protocol converter writes the data to a buffer for response.
   if (protocol_converter) {
     filter_action_(protocol_converter.get());
   }
@@ -727,6 +729,9 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   }
 }
 
+// TODO(kuochunghsu): passthroughSupported for decoder/encoder filters with more flexibility.
+// That is, supporting passthrough data for decoder filters if all  decoder filters agree,
+// and supporting passthrough data for encoder filters if all encoder filters agree.
 bool ConnectionManager::ActiveRpc::passthroughSupported() const {
   for (auto& entry : decoder_filters_) {
     if (!entry->decoder_handle_->passthroughSupported()) {

@@ -1331,7 +1331,7 @@ TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
 
 // Test the base case where there is no limit on the number of requests.
 TEST_F(ThriftConnectionManagerTest, RequestWithNoMaxRequestsLimit) {
-  initializeFilter("");
+  initializeFilter();
   EXPECT_EQ(0, config_->maxRequestsPerConnection());
 
   EXPECT_EQ(50, sendRequests(50));
@@ -2212,7 +2212,7 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  // PassthroughData is expected to be called.
+  // PassthroughData is not expected to be called.
   passthroughSupportedSetup(false, false);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};

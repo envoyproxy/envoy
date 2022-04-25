@@ -12,14 +12,14 @@ namespace ThriftFilters {
 
 /**
  * Pass through Thrift decoder/encoder/bidirection filter. Continue at each state within the series
- * of transitions.
+ * of transitions, and pass through the decoded/encoded data.
  */
 class PassThroughDecoderFilter : public DecoderFilter {
 public:
-  // ThriftFilterBase
+  // Thrift FilterBase
   void onDestroy() override {}
 
-  // ThriftDecoderFilter
+  // Thrift DecoderFilter
   void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   };
@@ -109,10 +109,10 @@ protected:
 
 class PassThroughEncoderFilter : public EncoderFilter {
 public:
-  // FilterBase
+  // Thrift FilterBase
   void onDestroy() override {}
 
-  // ThriftEncoderFilter
+  // Thrift EncoderFilter
   void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   };
@@ -202,17 +202,20 @@ protected:
 
 class PassThroughBidirectionFilter : public BidirectionFilter {
 public:
-  // FilterBase
+  // ThriftFilterBase
   void onDestroy() override {}
 
+  // Thrift DecoderFilter
   void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
 
+  // Thrift EncoderFilter
   void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
 
+  // Thrift Decoder/Encoder State Machine
   bool decodePassthroughSupported() const override { return true; }
 
   bool encodePassthroughSupported() const override { return true; }
