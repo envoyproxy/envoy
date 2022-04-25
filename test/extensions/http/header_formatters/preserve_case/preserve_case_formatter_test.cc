@@ -60,6 +60,8 @@ TEST(PreserveCaseFormatterTest, ProperCaseFormatterOnUnknownHeadersEnabled) {
   EXPECT_EQ("Baz", formatter.format("baz"));
   EXPECT_EQ("Hello-World", formatter.format("hello-world"));
   EXPECT_EQ("Hello#WORLD", formatter.format("hello#wORLD"));
+
+  EXPECT_EQ(true, formatter.formatterOnUnknownHeaders().has_value());
 }
 
 TEST(PreserveCaseFormatterTest, DefaultFormatterOnUnknownHeadersEnabled) {
@@ -78,6 +80,8 @@ TEST(PreserveCaseFormatterTest, DefaultFormatterOnUnknownHeadersEnabled) {
   EXPECT_EQ("baz", formatter.format("baz"));
   EXPECT_EQ("hello-world", formatter.format("hello-world"));
   EXPECT_EQ("hello#wORLD", formatter.format("hello#wORLD"));
+
+  EXPECT_EQ(false, formatter.formatterOnUnknownHeaders().has_value());
 }
 
 } // namespace PreserveCase
