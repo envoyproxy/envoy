@@ -1,4 +1,4 @@
-name: artifacts
+name: release
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - v*
 
 jobs:
-  main_android_dist_ci:
-    name: main_android_dist_ci
+  android_release_artifacts:
+    name: android_release_artifacts
     runs-on: macos-11
     timeout-minutes: 120
     steps:
@@ -34,26 +34,26 @@ jobs:
               --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
               //:android_dist_ci
       - name: 'Tar artifacts'
-        run: tar -czvf envoy_mobile.tar.gz dist/envoy.aar dist/envoy-pom.xml dist/envoy-javadoc.jar dist/envoy-sources.jar
+        run: tar -czvf envoy_android_aar_sources.tar.gz dist/envoy.aar dist/envoy-pom.xml dist/envoy-javadoc.jar dist/envoy-sources.jar
       - uses: actions/upload-artifact@v2
         with:
           name: envoy_android_aar_sources
-          path: ./envoy_mobile.tar.gz
+          path: ./envoy_android_aar_sources.tar.gz
 
-  android_aar_sonatype_deploy:
-    name: android_deploy
-    needs: main_android_dist_ci
+  android_release_deploy:
+    name: android_release_deploy
+    needs: android_release_artifacts
     runs-on: ubuntu-18.04
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: envoy_android_aar_sources
           path: dist/
-      - run: tar -xvf dist/envoy_mobile.tar.gz
+      - run: tar -xvf dist/envoy_android_aar_sources.tar.gz
       - name: 'Configure envoy-bot git user'
         run: |
           # Switch global user to be envoy-bot for deployment
@@ -100,8 +100,8 @@ jobs:
                 dist/envoy-pom.xml.asc \
                 dist/envoy-javadoc.jar.asc
 
-  main_ios_dist:
-    name: main_ios_dist
+  ios_release_artifacts_framework:
+    name: ios_release_artifacts_framework
     runs-on: macos-11
     timeout-minutes: 120
     steps:
@@ -129,18 +129,18 @@ jobs:
           name: envoy_ios_framework
           path: dist/ios_artifact
 
-  main_ios_cocoapods:
-    name: main_ios_cocoapods
+  ios_release_artifacts_cocoapods:
+    name: ios_release_artifacts_cocoapods
     runs-on: macos-11
     timeout-minutes: 45
-    needs: [main_ios_dist]
+    needs: [ios_release_artifacts_framework]
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: envoy_ios_framework
           path: dist/envoy_ios_cocoapods
@@ -154,3 +154,48 @@ jobs:
         with:
           name: envoy_ios_cocoapods
           path: dist/envoy_ios_cocoapods
+
+  create_github_release:
+    name: create_github_release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [android_release_artifacts, ios_release_artifacts_framework, ios_release_artifacts_cocoapods]
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/download-artifact@v3
+        with:
+          name: envoy_android_aar_sources
+          path: ./envoy_android_aar_sources.tar.gz
+      - uses: actions/download-artifact@v3
+        with:
+          name: envoy_ios_framework
+          path: ./envoy_ios_framework.zip
+      - uses: actions/download-artifact@v3
+        with:
+          name: envoy_ios_cocoapods
+          path: ./envoy_ios_cocoapods.zip
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            envoy_android_aar_sources.tar.gz
+            envoy_ios_framework.zip
+            envoy_ios_cocoapods.zip
+
+  publish_to_cocoapods:
+    name: publish_to_cocoapods
+    runs-on: macos-11
+    timeout-minutes: 45
+    needs: create_github_release
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - name: 'Push CocoaPods podspec'
+        run: bundle exec pod trunk push
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
