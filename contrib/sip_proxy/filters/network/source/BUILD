@@ -111,6 +111,7 @@ envoy_cc_library(
         "metadata.h",
         "operation.h",
     ],
+    srcs = ["metadata.cc"],
     external_deps = ["abseil_optional"],
     deps = [
         ":sip_lib",

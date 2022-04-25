@@ -11,7 +11,7 @@ void PendingList::pushIntoPendingList(const std::string& type, const std::string
                                       SipFilters::DecoderFilterCallbacks& activetrans,
                                       std::function<void(void)> func) {
   ENVOY_LOG(debug, "PUSH {}-{} {} into PendigList", type, key, activetrans.transactionId());
-  if (activetrans.metadata()->queryMap()[type]) {
+  if (activetrans.metadata()->affinityIteration()->query_) {
     if (pending_list_[type + key].empty()) {
       // need to do tra query
       func();

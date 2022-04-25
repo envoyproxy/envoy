@@ -290,7 +290,7 @@ private:
                                               MessageMetadataSharedPtr metadata, std::string dest,
                                               bool& lb_ret);
 
-  QueryStatus handleCustomizedAffinity(std::string type, std::string key,
+  QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type, const std::string& key,
                                        MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;

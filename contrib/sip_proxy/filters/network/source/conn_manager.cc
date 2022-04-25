@@ -52,7 +52,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     return QueryStatus::Continue;
   }
 
-  if (activetrans.metadata()->queryMap()[type]) {
+  if (activetrans.metadata()->affinityIteration()->query_) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
         traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
@@ -115,7 +115,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
       parent_.onResponseHandleForPendingList(
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-            metadata->nextAffinity();
+            metadata->nextAffinityIteration();
             parent_.continueHandling(metadata, decoder_event_handler);
           });
     }
