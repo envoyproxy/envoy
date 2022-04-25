@@ -79,7 +79,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamNumStreams(uint64_t num_streams) override { num_streams_ = num_streams; }
   uint64_t upstreamNumStreams() const override { return num_streams_; }
 
-  void setUpstreamProtocol(Http::Protocol protocol) override {upstream_protocol_ = protocol; }
+  void setUpstreamProtocol(Http::Protocol protocol) override { upstream_protocol_ = protocol; }
   absl::optional<Http::Protocol> upstreamProtocol() const override { return upstream_protocol_; }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};

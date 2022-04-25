@@ -804,7 +804,8 @@ private:
   FieldExtractor field_extractor_;
 };
 
-class StreamInfoUpstreamSslConnectionInfoFieldExtractor : public StreamInfoFormatter::FieldExtractor {
+class StreamInfoUpstreamSslConnectionInfoFieldExtractor
+    : public StreamInfoFormatter::FieldExtractor {
 public:
   using FieldExtractor =
       std::function<absl::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
@@ -812,7 +813,8 @@ public:
   StreamInfoUpstreamSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
 
   absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    if (!stream_info.upstreamInfo() || stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
+    if (!stream_info.upstreamInfo() ||
+        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
       return absl::nullopt;
     }
 
@@ -825,7 +827,8 @@ public:
   }
 
   ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    if (!stream_info.upstreamInfo() || stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
+    if (!stream_info.upstreamInfo() ||
+        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
       return unspecifiedValue();
     }
 
@@ -943,12 +946,11 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoStringFieldExtractor>(
-                                  [](const StreamInfo::StreamInfo& stream_info)
-                                  {
+                                  [](const StreamInfo::StreamInfo& stream_info) {
                                     return stream_info.upstreamInfo()
-                                      ? SubstitutionFormatUtils::protocolToString(
-                                             stream_info.upstreamInfo()->upstreamProtocol())
-                                      : absl::nullopt;
+                                               ? SubstitutionFormatUtils::protocolToString(
+                                                     stream_info.upstreamInfo()->upstreamProtocol())
+                                               : absl::nullopt;
                                   });
                             }}},
                           {"RESPONSE_CODE",
@@ -1159,7 +1161,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                           {"UPSTREAM_TLS_CIPHER",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.ciphersuiteString();
                                   });
@@ -1167,7 +1170,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                           {"UPSTREAM_TLS_VERSION",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.tlsVersion();
                                   });
@@ -1175,7 +1179,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                           {"UPSTREAM_TLS_SESSION_ID",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.sessionId();
                                   });
@@ -1183,7 +1188,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                           {"UPSTREAM_PEER_ISSUER",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.issuerPeerCertificate();
                                   });
@@ -1191,7 +1197,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                           {"UPSTREAM_PEER_CERT",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.urlEncodedPemEncodedPeerCertificate();
                                   });
@@ -1199,7 +1206,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                           {"UPSTREAM_PEER_SUBJECT",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
-                              return std::make_unique<StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return connection_info.subjectPeerCertificate();
                                   });
@@ -1919,8 +1927,11 @@ UpstreamPeerCertVStartFormatter::UpstreamPeerCertVStartFormatter(const std::stri
           format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                       [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                         return stream_info.upstreamInfo() &&
-                            stream_info.upstreamInfo()->upstreamSslConnection() != nullptr
-                                   ? stream_info.upstreamInfo()->upstreamSslConnection()->validFromPeerCertificate()
+                                       stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                           nullptr
+                                   ? stream_info.upstreamInfo()
+                                         ->upstreamSslConnection()
+                                         ->validFromPeerCertificate()
                                    : absl::optional<SystemTime>();
                       })) {}
 UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(const std::string& format)
@@ -1928,8 +1939,11 @@ UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(const std::string& 
           format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
                       [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                         return stream_info.upstreamInfo() &&
-                           stream_info.upstreamInfo()->upstreamSslConnection() != nullptr
-                                   ? stream_info.upstreamInfo()->upstreamSslConnection()->expirationPeerCertificate()
+                                       stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                           nullptr
+                                   ? stream_info.upstreamInfo()
+                                         ->upstreamSslConnection()
+                                         ->expirationPeerCertificate()
                                    : absl::optional<SystemTime>();
                       })) {}
 
