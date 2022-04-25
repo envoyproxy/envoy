@@ -138,7 +138,7 @@ public:
    * @param origin The origin to set network characteristics for.
    * @param srtt The number of concurrent streams allowed.
    */
-  void setConcurrentStreams(const Origin& origin, uint32_t concurrent_streams);
+  virtual void setConcurrentStreams(const Origin& origin, uint32_t concurrent_streams) PURE;
 
   /**
    * Returns the number of concurrent streams allowed by the last connection to this origin,
@@ -147,7 +147,7 @@ public:
    * characteristics, so this is a best guess estimate not a guarantee.
    * @param origin The origin to get network characteristics for.
    */
-  void getConcurrentStreams(const Origin& origin, uint32_t concurrent_streams);
+  virtual uint32_t getConcurrentStreams(const Origin& origin) const PURE;
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the

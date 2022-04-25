@@ -84,8 +84,8 @@ public:
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
   void setSrtt(const Origin& origin, std::chrono::microseconds srtt) override;
   std::chrono::microseconds getSrtt(const Origin& origin) const override;
-  void setConcurrentStreams(const Origin& origin, uint32_t concurrent_streams);
-  uint32_t getConcurrentStreams(const Origin& origin) const;
+  void setConcurrentStreams(const Origin& origin, uint32_t concurrent_streams) override;
+  uint32_t getConcurrentStreams(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
   HttpServerPropertiesCache::Http3StatusTracker&
