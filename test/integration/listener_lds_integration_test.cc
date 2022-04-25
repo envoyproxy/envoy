@@ -724,11 +724,201 @@ struct PerConnection {
   std::unique_ptr<RawConnectionDriver> client_conn_;
   FakeRawConnectionPtr upstream_conn_;
 };
+
+class ListenerFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                      public BaseIntegrationTest {
+public:
+  ListenerFilterIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF") {}
+};
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFilterDrainData) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        drain: true
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  std::string data_after_drain = data.substr(2, std::string::npos);
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size() - 2, &data_after_drain));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFilterChangeMaxReadBytes) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        new_max_read_bytes: 10
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  std::string data2 = "world";
+  std::string expected_data = data + data2;
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  ASSERT_TRUE(tcp_client->write(data2));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(expected_data.size(), &expected_data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, MultipleInspectDataFilters) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, MultipleInspectDataFilters2) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 2
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, ListenerFiltersCloseConnectionOnAccept) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 0
+        close_connection: true
+        )EOF");
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersCloseConnectionAfterGetData) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: true
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  auto result = tcp_client->write(data);
+  // The connection could be closed when writing or after write.
+  if (result == true) {
+    tcp_client->waitForDisconnect();
+  }
+}
+
+TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilters) {
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 0
+        close_connection: false
+        )EOF");
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  std::string data = "hello";
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion>,
                        public BaseIntegrationTest {
 public:
   RebalancerTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    listener_filters:
+    # The inspect data filter is used for test the file event reset after
+    # rebalance the request.
+    - name: envoy.filters.listener.inspect_data
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
     filter_chains:
     - filters:
       - name: envoy.filters.network.tcp_proxy
