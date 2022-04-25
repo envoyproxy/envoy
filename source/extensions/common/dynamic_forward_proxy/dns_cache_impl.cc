@@ -388,6 +388,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     notifyThreads(host, primary_host_info->host_info_);
   }
 
+  runResolutionCompleteCallbacks(host, primary_host_info->host_info_, status);
+
   // Kick off the refresh timer.
   if (status == Network::DnsResolver::ResolutionStatus::Success) {
     primary_host_info->failure_backoff_strategy_->reset(
@@ -407,6 +409,14 @@ void DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
                                          const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
     callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info);
+  }
+}
+
+void DnsCacheImpl::runResolutionCompleteCallbacks(const std::string& host,
+                                                  const DnsHostInfoSharedPtr& host_info,
+                                                  Network::DnsResolver::ResolutionStatus status) {
+  for (auto* callbacks : update_callbacks_) {
+    callbacks->callbacks_.onDnsResolutionComplete(host, host_info, status);
   }
 }
 
