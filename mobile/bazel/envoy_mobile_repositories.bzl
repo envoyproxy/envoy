@@ -69,16 +69,6 @@ def upstream_envoy_overrides():
         urls = ["https://github.com/google/boringssl/archive/648cbaf033401b7fe7acdce02f275b06a88aab5c.tar.gz"],
     )
 
-    # Envoy uses rules_python v0.1.0, which does not include tooling for packaging Python.  The
-    # Python platform implementation needs to be packaged and uploaded to pypi, so we need a more
-    # recent version.
-    http_archive(
-        name = "rules_python",
-        sha256 = "ecd139e703b41ae2ea115f4f4229b4ea2d70bab908fb75a3b49640f976213009",
-        strip_prefix = "rules_python-6f37aa9966f53e063c41b7509a386d53a9f156c3",
-        urls = ["https://github.com/bazelbuild/rules_python/archive/6f37aa9966f53e063c41b7509a386d53a9f156c3.tar.gz"],
-    )
-
 def swift_repos():
     http_archive(
         name = "build_bazel_rules_apple",
