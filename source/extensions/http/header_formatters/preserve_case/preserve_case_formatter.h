@@ -31,7 +31,9 @@ private:
   bool forward_reason_phrase_{false};
   std::string reason_phrase_;
   envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
-      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers_{false};
+      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers_{
+          envoy::extensions::http::header_formatters::preserve_case::v3::
+              PreserveCaseFormatterConfig::DEFAULT};
   Envoy::Http::HeaderKeyFormatterConstPtr header_key_formatter_on_unknown_headers_;
 };
 

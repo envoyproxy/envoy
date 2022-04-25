@@ -10,6 +10,8 @@ namespace {
 struct TestParams {
   Network::Address::IpVersion ip_version;
   bool forward_reason_phrase;
+  envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers;
 };
 
 std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {

@@ -7,6 +7,34 @@
 namespace Envoy {
 namespace {
 
+struct FormatterOnUnknownHeadersTestParams {
+  Network::Address::IpVersion ip_version;
+  envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers;
+};
+
+std::string formatterOnUnknownHeadersTestParamsToString(
+    const ::testing::TestParamInfo<FormatterOnUnknownHeadersTestParams>& p) {
+  return fmt::format("{}_{}",
+                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                     p.param.formatter_type_on_unknown_headers);
+}
+
+std::vector<FormatterOnUnknownHeadersTestParams> getFormatterOnUnknownHeadersTestParams() {
+  std::vector<FormatterOnUnknownHeadersTestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(FormatterOnUnknownHeadersTestParams{
+        ip_version, envoy::extensions::http::header_formatters::preserve_case::v3::
+                        PreserveCaseFormatterConfig::DEFAULT});
+    ret.push_back(FormatterOnUnknownHeadersTestParams{
+        ip_version, envoy::extensions::http::header_formatters::preserve_case::v3::
+                        PreserveCaseFormatterConfig::PROPER_CASE});
+  }
+
+  return ret;
+}
+
 // Demonstrate using a filter to affect the case.
 class PreserveCaseFilter : public Http::PassThroughFilter {
 public:
@@ -32,11 +60,13 @@ public:
 
 constexpr char PreserveCaseFilter::name[];
 
-class PreserveCaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+class PreserveCaseIntegrationTest
+    : public testing::TestWithParam<FormatterOnUnknownHeadersTestParams>,
+      public HttpIntegrationTest {
 public:
   PreserveCaseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), registration_(factory_) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version),
+        registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -48,7 +78,8 @@ public:
           typed_extension_config->set_name("preserve_case");
           auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
                                                    preserve_case::v3::PreserveCaseFormatterConfig>(
-              fmt::format("formatter_type_on_unknown_headers: {}", "PROPER_CASE"));
+              fmt::format("formatter_type_on_unknown_headers: {}",
+                          GetParam().formatter_type_on_unknown_headers));
           typed_extension_config->mutable_typed_config()->PackFrom(config);
         });
 
@@ -61,7 +92,8 @@ public:
       typed_extension_config->set_name("preserve_case");
       auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
                                                preserve_case::v3::PreserveCaseFormatterConfig>(
-          fmt::format("formatter_type_on_unknown_headers: {}", "PROPER_CASE"));
+          fmt::format("formatter_type_on_unknown_headers: {}",
+                      GetParam().formatter_type_on_unknown_headers));
       typed_extension_config->mutable_typed_config()->PackFrom(config);
       ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                        protocol_options);
@@ -75,8 +107,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(getFormatterOnUnknownHeadersTestParams()),
+                         formatterOnUnknownHeadersTestParamsToString);
 
 // Verify that we preserve case in both directions.
 TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
@@ -100,7 +132,19 @@ TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
   EXPECT_TRUE(absl::StrContains(upstream_request, "My-Request-Header: foo"));
   EXPECT_TRUE(absl::StrContains(upstream_request, "HOst: host"));
   EXPECT_TRUE(absl::StrContains(upstream_request, "Request-Header: request-header-value"));
-  EXPECT_TRUE(absl::StrContains(upstream_request, "X-Forwarded-For: x-forwarded-for-value"));
+  switch (GetParam().formatter_type_on_unknown_headers) {
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      DEFAULT:
+    EXPECT_TRUE(absl::StrContains(upstream_request, "x-forwarded-for: x-forwarded-for-value"));
+    break;
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      PROPER_CASE:
+    EXPECT_TRUE(absl::StrContains(upstream_request, "X-Forwarded-For: x-forwarded-for-value"));
+    break;
+  default:
+    EXPECT_TRUE(absl::StrContains(upstream_request, "x-forwarded-for: x-forwarded-for-value"));
+    break;
+  }
 
   // Verify that the downstream response has preserved cased headers.
   auto response =
@@ -111,7 +155,20 @@ TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
   tcp_client->waitForData("Content-Length: 0", false);
   tcp_client->waitForData("My-Response-Header: foo", false);
   tcp_client->waitForData("Response-Header: response-header-value", false);
-  tcp_client->waitForData("Hello-Header: hello-header-value", false);
+  switch (GetParam().formatter_type_on_unknown_headers) {
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      DEFAULT:
+    tcp_client->waitForData("hello-header: hello-header-value", false);
+    break;
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      PROPER_CASE:
+    tcp_client->waitForData("Hello-Header: hello-header-value", false);
+    break;
+  default:
+    tcp_client->waitForData("hello-header: hello-header-value", false);
+    break;
+  }
+
   tcp_client->close();
 }
 
