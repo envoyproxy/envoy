@@ -917,7 +917,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else {
     // Serve the redirect URL based on the scheme of the original URL, not the
     // security of the underlying connection.
-    final_scheme = Http::Utility::getScheme(headers);
+    final_scheme = headers.getSchemeValue();
   }
 
   if (!port_redirect_.empty()) {
