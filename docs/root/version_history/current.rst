@@ -9,8 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* tls: removed SHA-1 cipher suites from the server-side defaults.
 * local_ratelimit: local_ratelimit will consume tokens of all matched descriptors. This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.http_local_ratelimit_match_all_descriptors`` to false.
+* tls: removed SHA-1 cipher suites from the server-side defaults.
 
 Bug Fixes
 ---------
