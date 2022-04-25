@@ -4963,3 +4963,24 @@ envoy_cc_test(
         ":quic_platform",
     ],
 )
+
+envoy_cc_library(
+    name = "quiche_common_platform_lower_case_string",
+    hdrs = ["quiche/common/platform/api/quiche_lower_case_string.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = ["@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_header_policy",
+    hdrs = ["quiche/common/platform/api/quiche_header_policy.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [":quiche_common_platform_default_quiche_platform_impl_header_policy_impl_lib"],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_default_quiche_platform_impl_header_policy_impl_lib",
+    hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_header_policy_impl.h"],
+)
