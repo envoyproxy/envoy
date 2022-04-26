@@ -163,7 +163,7 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
   }
 }
 
-// If the implementation of an cluster specifier plugin is not provided in current Envoy and the
+// If the implementation of a cluster specifier plugin is not provided in current Envoy and the
 // plugin is set to optional, then this null plugin will be used as a placeholder.
 class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:

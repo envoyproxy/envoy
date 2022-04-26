@@ -48,7 +48,7 @@ public:
   createClusterSpecifierPlugin(const Protobuf::Message& config,
                                Server::Configuration::CommonFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.route.cluster_specifier_plugin"; }
+  std::string category() const override { return "envoy.router.cluster_specifier_plugin"; }
 };
 
 using ClusterSpecifierPluginFactoryConfigPtr = std::unique_ptr<ClusterSpecifierPluginFactoryConfig>;
