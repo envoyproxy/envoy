@@ -1,5 +1,5 @@
-1.20.3 (Pending)
-========================
+1.20.3 (April 26, 2022)
+=======================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -15,12 +15,15 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* docker: update Docker images to resolve CVE issues in container packages (#20760).
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 New Features
 ------------
+
 
 Deprecated
 ----------
