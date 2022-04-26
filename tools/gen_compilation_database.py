@@ -22,7 +22,7 @@ def generate_compilation_database(args):
         "--output_groups=compdb_files,header_files"
     ] + args.bazel_targets)
 
-    execroot = subprocess.check_output([bazel.args, "info", "execution_root"]
+    execroot = subprocess.check_output([args.bazel, "info", "execution_root"]
                                        + bazel_options).decode().strip()
 
     db_entries = []
