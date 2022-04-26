@@ -484,15 +484,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "zlib",
         project_desc = "zlib compression library",
         project_url = "https://zlib.net",
-        version = "79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
-        # Use the dev branch of zlib to resolve fuzz bugs and out of bound
-        # errors resulting in crashes in zlib 1.2.11.
-        # TODO(asraa): Remove when zlib > 1.2.11 is released.
-        sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
+        version = "1.2.12",
+        sha256 = "d8688496ea40fb61787500e863cc63c9afcbc524468cedeb478068924eb54932",
         strip_prefix = "zlib-{version}",
-        urls = ["https://github.com/madler/zlib/archive/{version}.tar.gz"],
+        urls = ["https://github.com/madler/zlib/archive/v{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2019-04-14",
+        release_date = "2022-03-27",
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     org_boost = dict(
