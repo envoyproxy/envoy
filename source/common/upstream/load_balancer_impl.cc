@@ -997,11 +997,11 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
   if (host_create_duration < slow_start_window_ &&
       host.health() == Upstream::Host::Health::Healthy) {
     aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
-    if (aggression_ < 0.0) {
+    if (aggression_ <= 0.0 || std::isnan(aggression_)) {
       ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
                                    "aggression cannot be less than 0.0");
+      aggression_ = 1.0;
     }
-    aggression_ = std::max(0.0, aggression_);
 
     ASSERT(aggression_ > 0.0);
     auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
