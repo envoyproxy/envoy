@@ -616,7 +616,7 @@ public:
     return std::make_unique<ProtobufWkt::Struct>();
   }
 
-  std::string name() const override { return "envoy.route.cluster_specifier_plugin.mock"; }
+  std::string name() const override { return "envoy.router.cluster_specifier_plugin.mock"; }
 };
 
 } // namespace Router
