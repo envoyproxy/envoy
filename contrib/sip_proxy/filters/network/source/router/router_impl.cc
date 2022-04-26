@@ -118,11 +118,7 @@ void Router::onDestroy() {
   if (!callbacks_->transactionId().empty()) {
     for (auto& kv : *transaction_infos_) {
       auto transaction_info = kv.second;
-      try {
-        transaction_info->getTransaction(callbacks_->transactionId());
-        transaction_info->deleteTransaction(callbacks_->transactionId());
-      } catch (std::out_of_range const&) {
-      }
+      transaction_info->deleteTransaction(callbacks_->transactionId());
     }
   }
 
@@ -137,7 +133,8 @@ void Router::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callb
   settings_ = callbacks_->settings();
 }
 
-QueryStatus Router::handleCustomizedAffinity(const std::string& header, const std::string& type, const std::string& key,
+QueryStatus Router::handleCustomizedAffinity(const std::string& header, const std::string& type,
+                                             const std::string& key,
                                              MessageMetadataSharedPtr metadata) {
   QueryStatus ret = QueryStatus::Stop;
   std::string host;
@@ -147,9 +144,9 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
     ret = QueryStatus::Continue;
   } else if (type == "text") {
     auto header_type = HeaderTypes::get().str2Header(header);
-    ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(header, std::string(metadata->header(header_type).text()), *callbacks_, host);
-  }
-  else {
+    ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
+        header, std::string(metadata->header(header_type).text()), *callbacks_, host);
+  } else {
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(type, key, *callbacks_, host);
   }
 
@@ -166,8 +163,8 @@ FilterStatus Router::handleAffinity() {
 
 #if 1
   // TODO To be deleted
-  ENVOY_LOG(trace, "Updata pCookieIpMap in tra");
   if (metadata->pCookieIpMap().has_value()) {
+    ENVOY_LOG(trace, "Updata pCookieIpMap in tra");
     auto [key, val] = metadata->pCookieIpMap().value();
     callbacks_->traHandler()->retrieveTrafficRoutingAssistant("lskpmc", key, *callbacks_, host);
     if (host != val) {
@@ -197,7 +194,14 @@ FilterStatus Router::handleAffinity() {
 
     if (!options->customizedAffinity().entries().empty()) {
       for (const auto& aff : options->customizedAffinity().entries()) {
-        auto header = HeaderTypes::get().str2Header(aff.header());
+        HeaderType header = HeaderType::Route;
+        if (!aff.header().empty()) {
+          header = HeaderTypes::get().str2Header(aff.header());
+          if (header == HeaderType::Other) {
+            ENVOY_LOG(error, "header {} is not supported", aff.header());
+            continue;
+          }
+        }
         auto type = aff.key_name();
 
         absl::string_view key = "";
@@ -212,7 +216,8 @@ FilterStatus Router::handleAffinity() {
         }
 
         if (!key.empty()) {
-          metadata->affinity().emplace_back(aff.header(), type, std::string(key), aff.query(), aff.subscribe());
+          metadata->affinity().emplace_back(aff.header(), type, std::string(key), aff.query(),
+                                            aff.subscribe());
         }
       }
     } else if ((metadata->methodType() != MethodType::Register && options->sessionAffinity()) ||
@@ -316,12 +321,9 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     upstream_request_->setMetadata(metadata);
     ENVOY_STREAM_LOG(debug, "reuse upstream request for {}", *callbacks_,
                      host->address()->ip()->addressAsString());
-    try {
-      transaction_info->getTransaction(std::string(metadata->transactionId().value()));
-    } catch (std::out_of_range const&) {
-      transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
-                                          callbacks_, upstream_request_);
-    }
+
+    transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
+                                        upstream_request_);
   } else {
     upstream_request_ = std::make_shared<UpstreamRequest>(
         std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
@@ -332,12 +334,8 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     ENVOY_STREAM_LOG(debug, "create new upstream request {}", *callbacks_,
                      host->address()->ip()->addressAsString());
 
-    try {
-      transaction_info->getTransaction(std::string(metadata->transactionId().value()));
-    } catch (std::out_of_range const&) {
-      transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
-                                          callbacks_, upstream_request_);
-    }
+    transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
+                                        upstream_request_);
   }
 
   lb_ret = true;
@@ -355,20 +353,24 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
-  if (!metadata->affinity().empty() && metadata->affinityIteration() != metadata->affinity().end()) {
+  if (!metadata->affinity().empty() &&
+      metadata->affinityIteration() != metadata->affinity().end()) {
     std::string host;
     metadata->resetDestination();
 
     ENVOY_STREAM_LOG(debug, "handle affinity of {} {} {}", *callbacks_,
-                     metadata->affinityIteration()->header_, metadata->affinityIteration()->type_, metadata->affinityIteration()->value_);
-    auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header_,metadata->affinityIteration()->type_,
+                     metadata->affinityIteration()->header_, metadata->affinityIteration()->type_,
+                     metadata->affinityIteration()->value_);
+    auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header_,
+                                               metadata->affinityIteration()->type_,
                                                metadata->affinityIteration()->key_, metadata);
 
     if (QueryStatus::Continue == handle_ret) {
       host = metadata->destination();
       ENVOY_STREAM_LOG(debug, "get existing destination {}", *callbacks_, host);
     } else if (QueryStatus::Pending == handle_ret) {
-      ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_, metadata->affinityIteration()->key_);
+      ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
+                       metadata->affinityIteration()->key_);
       // Need to wait remote query response,
       // after response back, still back with current affinity
       metadata->setState(State::HandleAffinity);
@@ -391,12 +393,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       upstream_request_->setMetadata(metadata);
       upstream_request_->setDecoderFilterCallbacks(*callbacks_);
 
-      try {
-        transaction_info->getTransaction(std::string(metadata->transactionId().value()));
-      } catch (std::out_of_range const&) {
-        transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
-                                            callbacks_, upstream_request_);
-      }
+      transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
+                                          callbacks_, upstream_request_);
       ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
       // Continue: continue to messageEnd, StopIteration: continue to next affinity
       if (FilterStatus::StopIteration == upstream_request_->start()) {
@@ -425,13 +423,13 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     metadata->nextAffinityIteration();
     return FilterStatus::Continue;
   } else {
-    ENVOY_STREAM_LOG(debug, "no destination.", *callbacks_);
     metadata->resetDestination();
     if (!metadata->stopLoadBalance()) {
-      // Last affinity
+      ENVOY_STREAM_LOG(debug, "no destination from affinity, do load balance", *callbacks_);
       return messageHandlerWithLoadBalancer(transaction_info, metadata, "",
                                             upstream_request_started);
     } else {
+      ENVOY_STREAM_LOG(debug, "no destination without load balance", *callbacks_);
       return FilterStatus::StopIteration;
     }
   }
@@ -608,9 +606,9 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 }
 
 SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&& transaction_id) {
-  try {
+  if (transaction_info_->hasTransaction(transaction_id)) {
     return transaction_info_->getTransaction(std::move(transaction_id)).activeTrans();
-  } catch (std::out_of_range const&) {
+  } else {
     return nullptr;
   }
 }

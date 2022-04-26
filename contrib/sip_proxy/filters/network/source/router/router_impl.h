@@ -201,17 +201,31 @@ public:
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
                          std::shared_ptr<UpstreamRequest> upstream_request) {
+    ENVOY_LOG(info, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ insert transaction {}", transaction_id);
+    if (hasTransaction(transaction_id)) {
+      return;
+    }
+
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
 
   void deleteTransaction(std::string&& transaction_id) {
-    tls_->getTyped<ThreadLocalTransactionInfo>()
-        .transaction_info_map_.at(transaction_id)
-        ->toDelete();
+    if (hasTransaction(transaction_id)) {
+      tls_->getTyped<ThreadLocalTransactionInfo>()
+          .transaction_info_map_.at(transaction_id)
+          ->toDelete();
+    }
+  }
+
+  bool hasTransaction(std::string& transaction_id) {
+    return tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.find(
+               transaction_id) !=
+           tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.end();
   }
 
   TransactionInfoItem& getTransaction(std::string&& transaction_id) {
+    ENVOY_LOG(info, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ get transaction {}", transaction_id);
     return *(tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.at(transaction_id));
   }
 
@@ -222,11 +236,24 @@ public:
   }
 
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
-    try {
+    if (tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.find(host) !=
+        tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.end()) {
+      ENVOY_LOG(info, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ find upstream requests for host {}",
+                host);
       return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } catch (std::out_of_range const&) {
+    } else {
+      ENVOY_LOG(info,
+                "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ can't find upstream requests for host {}",
+                host);
       return nullptr;
     }
+#if 0
+    try {
+      return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
+    } catch (std::out_of_range const & e) {
+      return nullptr;
+    }
+#endif
   }
 
   void deleteUpstreamRequest(const std::string& host) {
@@ -290,8 +317,8 @@ private:
                                               MessageMetadataSharedPtr metadata, std::string dest,
                                               bool& lb_ret);
 
-  QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type, const std::string& key,
-                                       MessageMetadataSharedPtr metadata);
+  QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
+                                       const std::string& key, MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
