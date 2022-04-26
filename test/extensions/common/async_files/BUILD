@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -58,5 +59,14 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files:status_after_file_error",
+    ],
+)
+
+envoy_cc_mock(
+    name = "mocks",
+    srcs = ["mocks.cc"],
+    hdrs = ["mocks.h"],
+    deps = [
+        "//source/extensions/common/async_files",
     ],
 )
