@@ -24,6 +24,7 @@ Removed Config or Runtime
 * compressor: removed ``envoy.reloadable_features.fix_added_trailers`` and legacy code paths.
 
 * ext_authz: removed ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard and legacy code paths.
+* http: deprecated ``envoy.reloadable_features.correct_scheme_and_xfp`` and legacy code paths.
 
 New Features
 ------------
