@@ -15,22 +15,21 @@ namespace PreserveCase {
 PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
     const bool forward_reason_phrase,
     const envoy::extensions::http::header_formatters::preserve_case::v3::
-        PreserveCaseFormatterConfig::FormatterTypeOnUnknownHeaders
-            formatter_type_on_unknown_headers)
+        PreserveCaseFormatterConfig::FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers)
     : forward_reason_phrase_(forward_reason_phrase),
-      formatter_type_on_unknown_headers_(formatter_type_on_unknown_headers) {
-  switch (formatter_type_on_unknown_headers_) {
+      formatter_type_on_envoy_headers_(formatter_type_on_envoy_headers) {
+  switch (formatter_type_on_envoy_headers_) {
   case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
       DEFAULT:
-    header_key_formatter_on_unknown_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
+    header_key_formatter_on_enovy_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
     break;
   case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
       PROPER_CASE:
-    header_key_formatter_on_unknown_headers_ =
+    header_key_formatter_on_enovy_headers_ =
         std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>();
     break;
   default:
-    header_key_formatter_on_unknown_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
+    header_key_formatter_on_enovy_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
     break;
   }
 }
@@ -42,8 +41,8 @@ std::string PreserveCaseHeaderFormatter::format(absl::string_view key) const {
   // optional backing string. We can do this in a follow up if there is interest.
   if (remembered_key_itr != original_header_keys_.end()) {
     return *remembered_key_itr;
-  } else if (formatterOnUnknownHeaders().has_value()) {
-    return formatterOnUnknownHeaders()->format(key);
+  } else if (formatterOnEnvoyHeaders().has_value()) {
+    return formatterOnEnvoyHeaders()->format(key);
   } else {
     return std::string(key);
   }
@@ -68,29 +67,29 @@ absl::string_view PreserveCaseHeaderFormatter::getReasonPhrase() const {
 };
 
 Envoy::Http::HeaderKeyFormatterOptConstRef
-PreserveCaseHeaderFormatter::formatterOnUnknownHeaders() const {
-  return makeOptRefFromPtr(header_key_formatter_on_unknown_headers_.get());
+PreserveCaseHeaderFormatter::formatterOnEnvoyHeaders() const {
+  return makeOptRefFromPtr(header_key_formatter_on_enovy_headers_.get());
 }
 
 class PreserveCaseFormatterFactory : public Envoy::Http::StatefulHeaderKeyFormatterFactory {
 public:
-  PreserveCaseFormatterFactory(const bool forward_reason_phrase,
-                               const envoy::extensions::http::header_formatters::preserve_case::v3::
-                                   PreserveCaseFormatterConfig::FormatterTypeOnUnknownHeaders
-                                       formatter_type_on_unknown_headers)
+  PreserveCaseFormatterFactory(
+      const bool forward_reason_phrase,
+      const envoy::extensions::http::header_formatters::preserve_case::v3::
+          PreserveCaseFormatterConfig::FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers)
       : forward_reason_phrase_(forward_reason_phrase),
-        formatter_type_on_unknown_headers_(formatter_type_on_unknown_headers) {}
+        formatter_type_on_envoy_headers_(formatter_type_on_envoy_headers) {}
 
   // Envoy::Http::StatefulHeaderKeyFormatterFactory
   Envoy::Http::StatefulHeaderKeyFormatterPtr create() override {
     return std::make_unique<PreserveCaseHeaderFormatter>(forward_reason_phrase_,
-                                                         formatter_type_on_unknown_headers_);
+                                                         formatter_type_on_envoy_headers_);
   }
 
 private:
   const bool forward_reason_phrase_;
   const envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
-      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers_;
+      FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers_;
 };
 
 class PreserveCaseFormatterFactoryConfig
@@ -106,8 +105,8 @@ public:
                                              preserve_case::v3::PreserveCaseFormatterConfig&>(
             message, ProtobufMessage::getStrictValidationVisitor());
 
-    return std::make_shared<PreserveCaseFormatterFactory>(
-        config.forward_reason_phrase(), config.formatter_type_on_unknown_headers());
+    return std::make_shared<PreserveCaseFormatterFactory>(config.forward_reason_phrase(),
+                                                          config.formatter_type_on_envoy_headers());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

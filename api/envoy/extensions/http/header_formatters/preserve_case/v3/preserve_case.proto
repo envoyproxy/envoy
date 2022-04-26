@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.http.header_formatters.preserve_case.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.header_formatters.preserve_case.v3";
 option java_outer_classname = "PreserveCaseProto";
@@ -17,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // See the :ref:`header casing <config_http_conn_man_header_casing>` configuration guide for more
 // information.
 message PreserveCaseFormatterConfig {
-  enum FormatterTypeOnUnknownHeaders {
+  enum FormatterTypeOnEnvoyHeaders {
     // Use LowerCase on unknown headers.
     DEFAULT = 0;
 
@@ -31,7 +32,8 @@ message PreserveCaseFormatterConfig {
   // This is off by default, and a standard reason phrase is used for a corresponding HTTP response code.
   bool forward_reason_phrase = 1;
 
-  // Type of formatter to use on unknown headers which are added by envoy.
-  // The default type is DEFAULT, use LowerCase on unknown headers.
-  FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers = 2;
+  // Type of formatter to use on headers which are added by envoy (which are lower case by default).
+  // The default type is DEFAULT, use LowerCase on envoy headers.
+  FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers = 2
+      [(validate.rules).enum = {defined_only: true}];
 }

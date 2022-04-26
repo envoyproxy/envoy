@@ -15,26 +15,26 @@ namespace PreserveCase {
 class PreserveCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
 public:
   // Envoy::Http::StatefulHeaderKeyFormatter
-  PreserveCaseHeaderFormatter(const bool forward_reason_phrase,
-                              const envoy::extensions::http::header_formatters::preserve_case::v3::
-                                  PreserveCaseFormatterConfig::FormatterTypeOnUnknownHeaders
-                                      formatter_type_on_unknown_headers);
+  PreserveCaseHeaderFormatter(
+      const bool forward_reason_phrase,
+      const envoy::extensions::http::header_formatters::preserve_case::v3::
+          PreserveCaseFormatterConfig::FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers);
 
   std::string format(absl::string_view key) const override;
   void processKey(absl::string_view key) override;
   void setReasonPhrase(absl::string_view reason_phrase) override;
   absl::string_view getReasonPhrase() const override;
-  Envoy::Http::HeaderKeyFormatterOptConstRef formatterOnUnknownHeaders() const;
+  Envoy::Http::HeaderKeyFormatterOptConstRef formatterOnEnvoyHeaders() const;
 
 private:
   StringUtil::CaseUnorderedSet original_header_keys_;
   bool forward_reason_phrase_{false};
   std::string reason_phrase_;
   envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
-      FormatterTypeOnUnknownHeaders formatter_type_on_unknown_headers_{
+      FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers_{
           envoy::extensions::http::header_formatters::preserve_case::v3::
               PreserveCaseFormatterConfig::DEFAULT};
-  Envoy::Http::HeaderKeyFormatterConstPtr header_key_formatter_on_unknown_headers_;
+  Envoy::Http::HeaderKeyFormatterConstPtr header_key_formatter_on_enovy_headers_;
 };
 
 } // namespace PreserveCase

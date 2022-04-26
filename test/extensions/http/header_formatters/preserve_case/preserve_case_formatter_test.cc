@@ -44,7 +44,7 @@ TEST(PreserveCaseFormatterTest, ReasonPhraseDisabled) {
   EXPECT_TRUE(formatter.getReasonPhrase().empty());
 }
 
-TEST(PreserveCaseFormatterTest, ProperCaseFormatterOnUnknownHeadersEnabled) {
+TEST(PreserveCaseFormatterTest, ProperCaseFormatterOnEnvoyHeadersEnabled) {
   PreserveCaseHeaderFormatter formatter(false,
                                         envoy::extensions::http::header_formatters::preserve_case::
                                             v3::PreserveCaseFormatterConfig::PROPER_CASE);
@@ -61,10 +61,10 @@ TEST(PreserveCaseFormatterTest, ProperCaseFormatterOnUnknownHeadersEnabled) {
   EXPECT_EQ("Hello-World", formatter.format("hello-world"));
   EXPECT_EQ("Hello#WORLD", formatter.format("hello#wORLD"));
 
-  EXPECT_EQ(true, formatter.formatterOnUnknownHeaders().has_value());
+  EXPECT_EQ(true, formatter.formatterOnEnvoyHeaders().has_value());
 }
 
-TEST(PreserveCaseFormatterTest, DefaultFormatterOnUnknownHeadersEnabled) {
+TEST(PreserveCaseFormatterTest, DefaultFormatterOnEnvoyHeadersEnabled) {
   PreserveCaseHeaderFormatter formatter(false,
                                         envoy::extensions::http::header_formatters::preserve_case::
                                             v3::PreserveCaseFormatterConfig::DEFAULT);
@@ -81,7 +81,7 @@ TEST(PreserveCaseFormatterTest, DefaultFormatterOnUnknownHeadersEnabled) {
   EXPECT_EQ("hello-world", formatter.format("hello-world"));
   EXPECT_EQ("hello#wORLD", formatter.format("hello#wORLD"));
 
-  EXPECT_EQ(false, formatter.formatterOnUnknownHeaders().has_value());
+  EXPECT_EQ(false, formatter.formatterOnEnvoyHeaders().has_value());
 }
 
 } // namespace PreserveCase
