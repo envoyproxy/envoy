@@ -29,7 +29,8 @@ public:
   }
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
-    auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(4096);
+    auto compressor =
+        std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
     compressor->init(level_, strategy_, window_bits_, memory_level_);
     return compressor;
   }
@@ -44,6 +45,7 @@ private:
   const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
   const int64_t window_bits_;
   const uint64_t memory_level_;
+  const uint64_t chunk_size_{4096};
 };
 
 class MockZstdCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
@@ -52,9 +54,8 @@ public:
       : level_(level), strategy_(strategy) {}
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
-    auto compressor = std::make_unique<Compression::Zstd::Compressor::ZstdCompressorImpl>(
-        level_, enable_checksum_, strategy_, cdict_manager_, 4096);
-    return compressor;
+    return std::make_unique<Compression::Zstd::Compressor::ZstdCompressorImpl>(
+        level_, enable_checksum_, strategy_, cdict_manager_, chunk_size_);
   }
 
   const std::string& statsPrefix() const override { CONSTRUCT_ON_FIRST_USE(std::string, "zstd."); }
@@ -67,6 +68,7 @@ private:
   const uint32_t strategy_;
   const bool enable_checksum_{};
   Compression::Zstd::Compressor::ZstdCDictManagerPtr cdict_manager_{nullptr};
+  const uint64_t chunk_size_{4096};
 };
 
 using CompressionParams = std::tuple<int64_t, uint64_t, int64_t, uint64_t>;
@@ -148,7 +150,7 @@ struct Result {
   uint64_t total_compressed_bytes = 0;
 };
 
-enum CompressorLibs { Gzip, Zstd };
+enum class CompressorLibs { Gzip, Zstd };
 
 static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImpl>&& chunks,
                            CompressionParams params,
@@ -199,13 +201,19 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   }
 
   EXPECT_EQ(res.total_uncompressed_bytes,
-            stats.counterFromString("test.compressor.." + compressor + ".total_uncompressed_bytes")
+            stats
+                .counterFromString(
+                    absl::StrCat("test.compressor..", compressor, ".total_uncompressed_bytes"))
                 .value());
   EXPECT_EQ(res.total_compressed_bytes,
-            stats.counterFromString("test.compressor.." + compressor + ".total_compressed_bytes")
+            stats
+                .counterFromString(
+                    absl::StrCat("test.compressor..", compressor, ".total_compressed_bytes"))
                 .value());
 
-  EXPECT_EQ(1U, stats.counterFromString("test.compressor.." + compressor + ".compressed").value());
+  EXPECT_EQ(1U,
+            stats.counterFromString(absl::StrCat("test.compressor..", compressor, ".compressed"))
+                .value());
   auto end = std::chrono::high_resolution_clock::now();
   const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   state.SetIterationTime(elapsed.count());
@@ -460,7 +468,7 @@ static void compressChunks16384WithZstd(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
-    res = compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
+    compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
 }
 BENCHMARK(compressChunks16384WithZstd)
