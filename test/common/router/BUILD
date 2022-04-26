@@ -46,6 +46,20 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "config_impl_integration_test",
+    srcs = [
+        "config_impl_integration_test.cc",
+    ],
+    deps = [
+        "//source/common/protobuf",
+        "//source/common/router:config_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "config_impl_headermap_benchmark_test",
     srcs = ["config_impl_headermap_benchmark_test.cc"],
