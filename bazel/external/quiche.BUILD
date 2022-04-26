@@ -4802,17 +4802,34 @@ envoy_cc_library(
 
 envoy_cc_test_library(
     name = "quiche_common_platform_test",
-    srcs = [
-        "quiche/common/platform/api/quiche_mem_slice_test.cc",
-        "quiche/common/platform/api/quiche_time_utils_test.cc",
-    ],
     hdrs = ["quiche/common/platform/api/quiche_test.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = ["@envoy//test/common/quic/platform:quiche_test_impl_lib"],
+)
+
+envoy_cc_test(
+    name = "quiche_common_mem_slice_test",
+    srcs = ["quiche/common/platform/api/quiche_mem_slice_test.cc"],
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_platform",
-        "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_test(
+    name = "quiche_common_time_utils_test",
+    srcs = ["quiche/common/platform/api/quiche_time_utils_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform",
+        ":quiche_common_platform_test",
     ],
 )
 
