@@ -46,6 +46,12 @@ envoy_entry_point(
 
 envoy_py_binary(
     name = "tools.docs.rst_check",
-    data = ["//docs:root/version_history/current.rst"],
-    deps = [requirement("aio.run.checker")],
+    data = [
+        "//:VERSION.txt",
+        "//docs:version_histories",
+    ],
+    deps = [
+        requirement("aio.run.checker"),
+        requirement("packaging"),
+    ],
 )

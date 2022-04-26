@@ -4,6 +4,8 @@ import sys
 from functools import cached_property
 from typing import Iterator, List, Pattern
 
+from packaging import version
+
 from aio.run import checker
 
 INVALID_REFLINK = r".* ref:.*"
@@ -24,16 +26,17 @@ LINK_TICKS_REGEX = re.compile(r".* `[^`].*`_")
 #   - add rstcheck and/or rstlint
 
 
-class CurrentVersionFile:
+class CurrentVersion:
 
-    def __init__(self, path: pathlib.Path):
-        self._path = path
+    def __init__(self, checker, version_path: pathlib.Path, rst_path: pathlib.Path):
+        self.checker = checker
+        self._version_path = version_path
+        self._rst_path = rst_path
 
     @property
     def lines(self) -> Iterator[str]:
-        with open(self.path) as f:
-            for line in f.readlines():
-                yield line.strip()
+        for line in self.current_rst_file.read_text().split("\n"):
+            yield line.strip()
 
     @cached_property
     def single_tick_re(self) -> Pattern[str]:
@@ -55,9 +58,9 @@ class CurrentVersionFile:
     def new_line_re(self) -> Pattern[str]:
         return re.compile(VERSION_HISTORY_NEW_LINE_REGEX)
 
-    @property
-    def path(self) -> pathlib.Path:
-        return self._path
+    @cached_property
+    def current_rst_file(self) -> pathlib.Path:
+        return self._rst_path.joinpath("current.rst")
 
     @property
     def prior_endswith_period(self) -> bool:
@@ -134,7 +137,59 @@ class CurrentVersionFile:
             self.single_tick_re.match(line) and (not self.ref_ticks_re.match(line)) and
             (not self.link_ticks_re.match(line))) else [])
 
+    @cached_property
+    def version(self):
+        return version.Version(self._version_path.read_text().strip())
+
+    @property
+    def version_string(self):
+        return '.'.join(str(i) for i in self.version.release)
+
+    @property
+    def rst_version_string(self):
+        return '.'.join(str(i) for i in self.rst_version.release)
+
+    @cached_property
+    def rst_version_data(self):
+        for line in self.lines:
+            return line.strip()
+
+    @cached_property
+    def rst_version(self):
+        return version.Version(self.rst_version_data.split(" ")[0])
+
+    @cached_property
+    def rst_version_date(self):
+        return self.rst_version_data.split(" ")[1].strip("()")
+
+    def check_version(self):
+        if self.version.release != self.rst_version.release:
+            self.checker.error(
+                "release_version",
+                [f"Release version mismatch `{self.version_string}` "
+                 f"!= `{self.rst_version_string}`\n"
+                 f"   VERSION.txt = `{self.version_string}`\n"
+                 f"   current.rst = `{self.rst_version_string}`"])
+        else:
+            self.checker.succeed("release_version", [f"Release versions match ({self.version_string})"])
+        if self.version.is_devrelease:
+            if self.rst_version_date != "Pending":
+                self.checker.error(
+                    "version",
+                    ["`VERSION.txt` is set to dev release, but `current.rst is *not* \"Pending\"\n"
+                     "    set date -> Pending or fix `VERSION.txt`"])
+            else:
+                self.checker.succeed("version", ["VERSION is set to dev, and current rst version is \"Pending\""])
+        elif self.rst_version_date == "Pending":
+            self.checker.error(
+                "version",
+                [f"`VERSION.txt` is *not* set to dev release, but `current.rst is \"Pending\"\n"
+                 f"    set date -> Pending or fix `VERSION.txt`"])
+        else:
+            self.checker.succeed("version", [f"VERSION is not set to dev, and current rst version is not \"Pending\""])
+
     def run_checks(self) -> Iterator[str]:
+        self.check_version()
         self.set_tokens()
         for line_number, line in enumerate(self.lines):
             if self.section_name_re.match(line):
@@ -142,7 +197,7 @@ class CurrentVersionFile:
                     break
                 self.set_tokens()
             for error in self.check_line(line):
-                yield f"({self.path}:{line_number + 1}) {error}"
+                yield f"({self.current_rst_file}:{line_number + 1}) {error}"
 
     def set_tokens(self, line: str = "", first_word: str = "", next_word: str = "") -> None:
         self.prior_line = line
@@ -155,7 +210,10 @@ class RSTChecker(checker.Checker):
 
     async def check_current_version(self) -> None:
         errors = list(
-            CurrentVersionFile(pathlib.Path("docs/root/version_history/current.rst")).run_checks())
+            CurrentVersion(
+                self,
+                pathlib.Path("VERSION.txt"),
+                pathlib.Path("docs/root/version_history")).run_checks())
         if errors:
             self.error("current_version", errors)
 

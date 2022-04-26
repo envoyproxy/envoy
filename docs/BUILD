@@ -160,6 +160,11 @@ pkg_files(
     strip_prefix = "/docs",
 )
 
+filegroup(
+    name = "version_histories",
+    srcs = glob(["root/version_history/*"]),
+)
+
 pkg_files(
     name = "sphinx_root",
     srcs = glob(["root/**/*"]),
