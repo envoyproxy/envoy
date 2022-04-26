@@ -6394,7 +6394,7 @@ filter_chains:
 TEST(ListenerMessageUtilTest, ListenerMessageSameAreEquivalent) {
   envoy::config::listener::v3::Listener listener1;
   envoy::config::listener::v3::Listener listener2;
-  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
 }
 
 TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentNameNotEquivalent) {
@@ -6402,7 +6402,7 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentNameNotEquivalent) {
   listener1.set_name("listener1");
   envoy::config::listener::v3::Listener listener2;
   listener2.set_name("listener2");
-  EXPECT_FALSE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  EXPECT_FALSE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
 }
 
 TEST(ListenerMessageUtilTest, ListenerDefaultFilterChainChangeIsAlwaysFilterChainOnlyChange) {
@@ -6418,22 +6418,22 @@ TEST(ListenerMessageUtilTest, ListenerDefaultFilterChainChangeIsAlwaysFilterChai
   {
     listener1.clear_default_filter_chain();
     listener2.clear_default_filter_chain();
-    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
   }
   {
     *listener1.mutable_default_filter_chain() = default_filter_chain_1;
     listener2.clear_default_filter_chain();
-    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
   }
   {
     listener1.clear_default_filter_chain();
     *listener2.mutable_default_filter_chain() = default_filter_chain_2;
-    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
   }
   {
     *listener1.mutable_default_filter_chain() = default_filter_chain_1;
     *listener2.mutable_default_filter_chain() = default_filter_chain_2;
-    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
   }
   {
     listener1.clear_default_filter_chain();
@@ -6454,7 +6454,7 @@ TEST(ListenerMessageUtilTest, ListenerDefaultFilterChainChangeIsAlwaysFilterChai
                    value: foo
     )EOF";
     TestUtility::loadFromYaml(filter_chain_matcher, *listener2.mutable_filter_chain_matcher());
-    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
   }
 }
 
@@ -6469,7 +6469,45 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquival
   auto add_filter_chain_2 = listener2.add_filter_chains();
   add_filter_chain_2->set_name("127.0.0.2");
 
-  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
+  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentListenerFiltersAreEquivalent) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  auto listener_filter_1 = listener1.add_listener_filters();
+  listener_filter_1->set_name("listener1");
+
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+  auto listener_filter_2 = listener2.add_listener_filters();
+  listener_filter_2->set_name("listener2");
+
+  EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentListenerTimeoutConfigAreEquivalent) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  auto listener_filter_1 = listener1.add_listener_filters();
+  listener_filter_1->set_name("listener");
+
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+  auto listener_filter_2 = listener2.add_listener_filters();
+  listener_filter_2->set_name("listener");
+
+  {
+    auto* timeout = listener1.mutable_listener_filters_timeout();
+    timeout->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
+  }
+
+  {
+    listener1.clear_listener_filters_timeout();
+    listener1.set_continue_on_listener_filters_timeout(true);
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(listener1, listener2));
+  }
 }
 
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWorkerNotStarted) {

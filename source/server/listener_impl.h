@@ -32,7 +32,7 @@ public:
   /**
    * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
    */
-  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+  static bool filterChainAndListenerFilterOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                     const envoy::config::listener::v3::Listener& rhs);
 };
 

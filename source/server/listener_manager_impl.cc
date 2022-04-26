@@ -695,7 +695,14 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
         filter_chain.startDraining();
         draining_group->addFilterChainToDrain(filter_chain);
       });
+
+  // Skip draining if there is no different filter chain.
   auto filter_chain_size = draining_group->numDrainingFilterChains();
+  if (filter_chain_size == 0) {
+    draining_filter_chains_manager_.erase(draining_group);
+    return;
+  }
+
   stats_.total_filter_chains_draining_.add(filter_chain_size);
   draining_group->getDrainingListener().debugLog(
       absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
