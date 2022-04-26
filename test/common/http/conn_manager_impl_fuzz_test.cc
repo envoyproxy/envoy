@@ -449,6 +449,7 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
+        decoding_done_ = true;
       }
       break;
     }
