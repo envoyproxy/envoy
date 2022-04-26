@@ -21,6 +21,7 @@ Bug Fixes
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+* compressor: removed ``envoy.reloadable_features.fix_added_trailers`` and legacy code paths.
 
 New Features
 ------------
