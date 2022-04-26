@@ -6,6 +6,21 @@ Pending Release
 
 Breaking changes:
 
+- None
+
+Bugfixes:
+
+- None
+
+Features:
+
+- None
+
+0.4.6 (April 26, 2022)
+========================
+
+Breaking changes:
+
 - iOS: the minimum supported iOS version is now 12.0 (:issue:`#2084 <2084>`)
 
 Bugfixes:
