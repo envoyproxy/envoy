@@ -411,8 +411,7 @@ void ConnectivityGrid::onIdleReceived() {
 
 bool ConnectivityGrid::shouldAttemptHttp3() {
   if (host_->address()->type() != Network::Address::Type::Ip) {
-    ENVOY_LOG(error, "Address is not an IP address");
-    ASSERT(false);
+    IS_ENVOY_BUG("Address is not an IP address");
     return false;
   }
   uint32_t port = host_->address()->ip()->port();

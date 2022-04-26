@@ -103,6 +103,13 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
+
+  /**
+   * Tell the resolver to reset networking, typically in response to a network switch (e.g., from
+   * WiFi to cellular). What the resolver does is resolver dependent but might involve creating
+   * new resolver connections, re-reading resolver targets, etc.
+   */
+  virtual void resetNetworking() PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;
