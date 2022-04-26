@@ -14,6 +14,10 @@ If enabled the file system buffer filter can populate (or correct) the content-l
 if it is not present or differs from the actual size in the request. This behavior can be separately
 enabled for requests or responses, via the listener or per-route configuration of the filter.
 
+.. note::
+
+ This filter is not yet supported on Windows.
+
 Configuration
 -------------
 
