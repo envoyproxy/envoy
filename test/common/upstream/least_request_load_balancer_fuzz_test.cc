@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Upstream {
 
-static const u_int32_t MaxChoiceCountForTest = 150;
+static const uint32_t MaxChoiceCountForTest = 150;
 
 // Least Request takes into account both weights (handled in ZoneAwareLoadBalancerFuzzBase), and
 // requests active as well
