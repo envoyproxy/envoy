@@ -127,8 +127,7 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
   Event::SimulatedTimeSystem time_source;
-  EXPECT_EQ(std::numeric_limits<int>::max(),
-            Utility::getDaysUntilExpiration(nullptr, time_source).value());
+  EXPECT_EQ(SIZE_MAX, Utility::getDaysUntilExpiration(nullptr, time_source).value());
 }
 
 TEST(UtilityTest, TestValidFrom) {

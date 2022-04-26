@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <limits>
 
@@ -48,7 +49,7 @@ ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
 }
 
 absl::optional<size_t> ContextManagerImpl::daysUntilFirstCertExpires() const {
-  absl::optional<size_t> ret = absl::make_optional(std::numeric_limits<int>::max());
+  absl::optional<size_t> ret = absl::make_optional(SIZE_MAX);
   for (const auto& context : contexts_) {
     if (context) {
       const absl::optional<size_t> tmp = context->daysUntilFirstCertExpires();

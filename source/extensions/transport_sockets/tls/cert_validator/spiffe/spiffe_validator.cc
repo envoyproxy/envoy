@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
+#include <cstdint>
+
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -265,7 +267,7 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
 
 absl::optional<size_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
-    return absl::make_optional(0);
+    return absl::make_optional(SIZE_MAX);
   }
   absl::optional<size_t> ret = absl::make_optional(SIZE_MAX);
   for (auto& cert : ca_certs_) {

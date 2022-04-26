@@ -1,5 +1,7 @@
 #include "source/server/ssl_context_manager.h"
 
+#include <cstddef>
+
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
@@ -26,7 +28,7 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   }
 
   absl::optional<size_t> daysUntilFirstCertExpires() const override {
-    return absl::make_optional(std::numeric_limits<int>::max());
+    return absl::make_optional(SIZE_MAX);
   }
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override {
     return absl::nullopt;

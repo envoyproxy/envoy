@@ -21,7 +21,7 @@ TEST(SslContextManager, createStub) {
   Ssl::ContextManagerPtr manager = createContextManager("fake_factory_name", time_system);
 
   // Check we've created a stub, not real manager.
-  EXPECT_EQ(manager->daysUntilFirstCertExpires().value(), std::numeric_limits<int>::max());
+  EXPECT_EQ(manager->daysUntilFirstCertExpires().value(), SIZE_MAX);
   EXPECT_EQ(manager->secondsUntilFirstOcspResponseExpires(), absl::nullopt);
   EXPECT_THROW_WITH_MESSAGE(manager->createSslClientContext(scope, client_config), EnvoyException,
                             "SSL is not supported in this configuration");
