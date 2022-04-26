@@ -1791,7 +1791,7 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   std::string settings_data(settings_frame);
   ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                                                  settings_data.size());
+                                 settings_data.size());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
 
