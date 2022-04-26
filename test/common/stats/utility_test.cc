@@ -1,3 +1,5 @@
+#include <cstddef>
+#include <iterator>
 #include <string>
 
 #include "envoy/stats/stats_macros.h"
@@ -272,6 +274,29 @@ TEST_P(StatsUtilityTest, StoreTextReadoutAll) { storeAll<TextReadout>(makeTextRe
 TEST_P(StatsUtilityTest, ScopeTextReadoutOnce) { scopeOnce<TextReadout>(makeTextReadout()); }
 
 TEST_P(StatsUtilityTest, ScopeTextReadoutAll) { scopeAll<TextReadout>(makeTextReadout()); }
+
+TEST_P(StatsUtilityTest, SanitizeStatsName) {
+
+  absl::string_view testStrings[6] = {
+    "a.b.c.",
+    ".a.b.c",
+    "a::b",
+    "a.\0",
+    "a://b",
+    "a:/b"
+  };
+    absl::string_view expectStrings[6] = {
+    "a.b.c",
+    "a.b.c",
+    "a__b",
+    "a",
+    "a_b",
+    "a_b"
+  };
+  for (size_t i = 0; i < std::size(testStrings); i++) {
+    EXPECT_EQ(expectStrings[i], Utility::sanitizeStatsName(testStrings[i]));
+  }
+}
 
 } // namespace
 } // namespace Stats
