@@ -4356,12 +4356,9 @@ envoy_cc_test_library(
         "quiche/epoll_server/platform/api/epoll_address_test_utils.h",
         "quiche/epoll_server/platform/api/epoll_bug.h",
         "quiche/epoll_server/platform/api/epoll_expect_bug.h",
-        "quiche/epoll_server/platform/api/epoll_export.h",
         "quiche/epoll_server/platform/api/epoll_logging.h",
-        "quiche/epoll_server/platform/api/epoll_ptr_util.h",
         "quiche/epoll_server/platform/api/epoll_test.h",
         "quiche/epoll_server/platform/api/epoll_thread.h",
-        "quiche/epoll_server/platform/api/epoll_time.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
@@ -4965,4 +4962,25 @@ envoy_cc_test(
         ":quic_core_batch_writer_sendmmsg_batch_writer_lib",
         ":quic_platform",
     ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_lower_case_string",
+    hdrs = ["quiche/common/platform/api/quiche_lower_case_string.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = ["@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_header_policy",
+    hdrs = ["quiche/common/platform/api/quiche_header_policy.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [":quiche_common_platform_default_quiche_platform_impl_header_policy_impl_lib"],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_default_quiche_platform_impl_header_policy_impl_lib",
+    hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_header_policy_impl.h"],
 )
