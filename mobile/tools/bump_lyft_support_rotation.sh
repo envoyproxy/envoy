@@ -47,4 +47,12 @@ first_line="$(head -n 1 "$maintainers_file")"
 current=${first_line#"current: "}
 next="$(next_maintainer "$current" "$maintainers_file")"
 set_maintainer "$next" "$maintainers_file"
-echo "Lyft support maintainer changing from $current to $next"
+
+message="Lyft support maintainer changing from <https://github.com/$current|$current> to <https://github.com/$next|$next>"
+echo "$message"
+
+curl -H "Content-type: application/json" \
+  --data "{\"channel\":\"C02F93EEJCE\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"$message\"}}]}" \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -X POST \
+  https://slack.com/api/chat.postMessage
