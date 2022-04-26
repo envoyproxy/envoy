@@ -150,13 +150,27 @@ bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_local_ratelimit_match_all_descriptors")) {
-    bool limit = requestAllowedHelper(tokens_);
+    // If a request is limited by a descriptor, it will not consume token from the remaining
+    // matched descriptors, so we first check the remaining tokens of matched descriptors instead of
+    // trying to consuming tokens.
+    bool limit = tokens_.tokens_.load(std::memory_order_relaxed) == 0 ? false : true;
+    std::vector<TokenState*> token_states;
     if (!descriptors_.empty() && !request_descriptors.empty()) {
       for (const auto& request_descriptor : request_descriptors) {
         if (auto it = descriptors_.find(request_descriptor); it != descriptors_.end()) {
-          limit &= requestAllowedHelper(*it->token_state_);
+          token_states.push_back(it->token_state_.get());
+          limit &= (it->token_state_->tokens_.load(std::memory_order_relaxed) == 0 ? false : true);
         }
       }
+    }
+    if (!limit) {
+      return limit;
+    }
+    limit |= requestAllowedHelper(tokens_);
+    for (const auto& token_state : token_states) {
+      // Tokens may be all consumed by other threads, but it will still return true for this
+      // request, otherwise we need apply lock.
+      limit |= requestAllowedHelper(*token_state);
     }
     return limit;
   }

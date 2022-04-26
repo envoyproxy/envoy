@@ -428,7 +428,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {
-  // Request should also be rate limited as it should match both descriptors
+  // Request should also be rate limited as it should match both descriptors and global token.
   setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
