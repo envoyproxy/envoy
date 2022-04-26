@@ -139,7 +139,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
   if (status != ARES_SUCCESS) {
     if (!parent_.accept_nodata_ || !isResponseWithNoRecords(status)) {
-      ENVOY_LOG_EVENT(critical, "cares_resolution_failure",
+      ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                       "dns resolution for {} failed with c-ares status {}", dns_name_, status);
     }
   }
