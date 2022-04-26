@@ -76,6 +76,10 @@ build:tsan-dev --copt -DEVENT__DISABLE_DEBUG_MODE
 # https://github.com/google/sanitizers/issues/953
 build:tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 
+# Exclude debug info from the release binary since it makes it too large to fit
+# into a zip file. This shouldn't affect crash reports.
+build:release-common --define=no_debug_info=1
+
 # Compile releases optimizing for size (eg -Os, etc).
 build:release-common --config=sizeopt
 
@@ -88,11 +92,6 @@ build:release-ios --config=ios
 build:release-ios --config=release-common
 build:release-ios --copt=-fembed-bitcode
 build:release-ios --compilation_mode=opt
-# Exclude debug info from the release binary since it makes it too large to fit
-# into a zip file. This shouldn't affect iOS crash reports. We do not define it for Android
-# builds as it leads to a removal of relevant symbols from Android binaries (and
-# corresponding objdump files).
-build:release-ios --define=no_debug_info=1
 
 # Flags for release builds targeting Android or the JVM
 # Release does not use the option --define=logger=android
