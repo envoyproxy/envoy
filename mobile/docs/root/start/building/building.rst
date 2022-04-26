@@ -100,7 +100,7 @@ This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and 
 Upon completion of the build, you'll see a ``Envoy.framework`` directory at
 :repo:`dist/Envoy.framework <dist>`.
 
-Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_
+Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_ (envoy_android_aar_sources.zip)
 or from :ref:`CocoaPods <cocoapods>`.
 
 The ``envoy_mobile_ios`` Bazel rule defined in the :repo:`dist BUILD file <dist/BUILD>` provides an
