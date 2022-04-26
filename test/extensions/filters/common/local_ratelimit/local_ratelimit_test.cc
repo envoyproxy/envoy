@@ -87,9 +87,7 @@ TEST_F(LocalRateLimiterImplTest, CasEdgeCases) {
 
     // Start a thread and see if we are under limit. This will wait pre-CAS.
     synchronizer().waitOn("allowed_pre_cas");
-    // Since we first check the remaining tokens of matched descriptors instead of trying to
-    // consuming tokens.
-    std::thread t1([&] { EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_)); });
+    std::thread t1([&] { EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_)); });
     // Wait until the thread is actually waiting.
     synchronizer().barrierOn("allowed_pre_cas");
 
@@ -315,9 +313,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
 
     // Start a thread and see if we are under limit. This will wait pre-CAS.
     synchronizer().waitOn("allowed_pre_cas");
-    // Since we first check the remaining tokens of matched descriptors instead of trying to
-    // consuming tokens.
-    std::thread t1([&] { EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_)); });
+    std::thread t1([&] { EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_)); });
     // Wait until the thread is actually waiting.
     synchronizer().barrierOn("allowed_pre_cas");
 
@@ -506,6 +502,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  // A request limited by a descriptor or global token will not consume token from other matched
+  // descriptors.
   EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
 

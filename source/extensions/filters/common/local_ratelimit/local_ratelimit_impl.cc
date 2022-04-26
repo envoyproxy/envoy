@@ -131,6 +131,10 @@ bool LocalRateLimiterImpl::requestAllowedHelper(const TokenState& tokens) const 
   return true;
 }
 
+bool LocalRateLimiterImpl::hasEnoughTokens(const TokenState& tokens) const {
+  return tokens.tokens_.load(std::memory_order_relaxed) == 0 ? false : true;
+}
+
 OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::descriptorHelper(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (!descriptors_.empty() && !request_descriptors.empty()) {
@@ -150,29 +154,36 @@ bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_local_ratelimit_match_all_descriptors")) {
-    // If a request is limited by a descriptor, it will not consume token from the remaining
+    // If a request is limited by a descriptor, it should not consume token from the remaining
     // matched descriptors, so we first check the remaining tokens of matched descriptors instead of
-    // trying to consuming tokens.
-    bool limit = tokens_.tokens_.load(std::memory_order_relaxed) == 0 ? false : true;
+    // trying to consuming their tokens. If one of these tokens is 0, it just return false and will
+    // not consume any tokens of matched descriptors. Otherwise, it will try to consume 1 token from
+    // each matched descriptor.
+    bool allow = hasEnoughTokens(tokens_);
+    // Global token is not enough.
+    if (!allow) {
+      return allow;
+    }
     std::vector<TokenState*> token_states;
     if (!descriptors_.empty() && !request_descriptors.empty()) {
       for (const auto& request_descriptor : request_descriptors) {
         if (auto it = descriptors_.find(request_descriptor); it != descriptors_.end()) {
+          allow &= hasEnoughTokens(*it->token_state_);
+          // Descriptor token is not enough.
+          if (!allow) {
+            return allow;
+          }
           token_states.push_back(it->token_state_.get());
-          limit &= (it->token_state_->tokens_.load(std::memory_order_relaxed) == 0 ? false : true);
         }
       }
     }
-    if (!limit) {
-      return limit;
-    }
-    limit |= requestAllowedHelper(tokens_);
+
+    // All tokens are enough.
+    allow &= requestAllowedHelper(tokens_);
     for (const auto& token_state : token_states) {
-      // Tokens may be all consumed by other threads, but it will still return true for this
-      // request, otherwise we need apply lock.
-      limit |= requestAllowedHelper(*token_state);
+      allow &= requestAllowedHelper(*token_state);
     }
-    return limit;
+    return allow;
   }
   auto descriptor = descriptorHelper(request_descriptors);
 
