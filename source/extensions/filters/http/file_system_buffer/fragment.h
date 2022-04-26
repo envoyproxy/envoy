@@ -15,6 +15,8 @@ namespace FileSystemBuffer {
 using Extensions::Common::AsyncFiles::AsyncFileHandle;
 using Extensions::Common::AsyncFiles::CancelFunction;
 
+// Internal implementation detail exposed for use in Fragment's variant.
+// Represents a buffer fragment that is in memory.
 class MemoryFragment {
 public:
   explicit MemoryFragment(Buffer::Instance& buffer);
@@ -25,10 +27,16 @@ private:
   std::unique_ptr<Buffer::OwnedImpl> buffer_;
 };
 
+// Internal implementation detail exposed for use in Fragment's variant.
+// Represents a buffer fragment that is being written to storage.
 class WritingFragment {};
 
+// Internal implementation detail exposed for use in Fragment's variant.
+// Represents a buffer fragment that is being read from storage.
 class ReadingFragment {};
 
+// Internal implementation detail exposed for use in Fragment's variant.
+// Represents a buffer fragment that is currently in storage.
 class StorageFragment {
 public:
   explicit StorageFragment(off_t offset) : offset_(offset) {}
@@ -75,9 +83,11 @@ public:
                                              std::function<void(std::function<void()>)> dispatch,
                                              std::function<void(absl::Status)> on_done);
 
-  // Removes the buffer from a memory instance and resets it to size 0.
+  // Moves the buffer from a memory instance to the returned value and resets the fragment to
+  // size 0.
   //
-  // It is an error to call extract() on a Fragment that is not in memory.
+  // It is an error to call extract() on a Fragment that is not in memory - an exception
+  // will be thrown.
   Buffer::InstancePtr extract();
 
   // Returns true if the fragment is in memory, false if in storage or transition.
