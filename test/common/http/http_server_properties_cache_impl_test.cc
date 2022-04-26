@@ -96,6 +96,14 @@ TEST_F(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
+TEST_F(HttpServerPropertiesCacheImplTest, SetConcurrency) {
+  initialize();
+  EXPECT_EQ(0, protocols_->size());
+  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "clear|0|5"));
+  protocols_->setConcurrentStreams(origin1_, 5);
+  EXPECT_EQ(5, protocols_->getConcurrentStreams(origin1_));
+}
+
 TEST_F(HttpServerPropertiesCacheImplTest, FindAlternatives) {
   initialize();
   EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0"));
@@ -281,9 +289,15 @@ TEST_F(HttpServerPropertiesCacheImplTest, InvalidString) {
           "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|2|3", dispatcher_.timeSource(), true)
           .has_value());
   // Non-numeric rtt
-  EXPECT_FALSE(HttpServerPropertiesCacheImpl::originDataFromString(
-                   "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a", dispatcher_.timeSource(), true)
-                   .has_value());
+  EXPECT_FALSE(
+      HttpServerPropertiesCacheImpl::originDataFromString(
+          "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|a|1", dispatcher_.timeSource(), true)
+          .has_value());
+  // Non-numeric concurrency
+  EXPECT_FALSE(
+      HttpServerPropertiesCacheImpl::originDataFromString(
+          "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|1|a", dispatcher_.timeSource(), true)
+          .has_value());
 
   // Standard entry with rtt and concurrency.
   EXPECT_TRUE(HttpServerPropertiesCacheImpl::originDataFromString(
