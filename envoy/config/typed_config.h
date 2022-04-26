@@ -32,6 +32,12 @@ public:
    * @return configuration proto full name, or empty for untyped factories.
    */
   virtual std::string configType() { return ""; }
+
+  /**
+   * @return All full names of configuration protos used by the factories except the name
+   * returned by configType().
+   */
+  virtual std::set<std::string> otherTypes() { return {}; }
 };
 
 /**

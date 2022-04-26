@@ -8499,13 +8499,14 @@ virtual_hosts:
       - match: { prefix: "/" }
         route: { cluster: baz }
     typed_per_filter_config:
-      unknown.filter:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
+      filter.unknown:
+        "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Didn't find a registered implementation for name: 'unknown.filter'");
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerVirtualHost) {
@@ -8600,14 +8601,13 @@ virtual_hosts:
         route: { cluster: baz }
     typed_per_filter_config:
       filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          seconds: 123
+        "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
@@ -8620,9 +8620,7 @@ virtual_hosts:
         route: { cluster: baz }
     typed_per_filter_config:
       filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          seconds: 123
+        "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
@@ -8641,14 +8639,13 @@ virtual_hosts:
         route: { cluster: baz }
         typed_per_filter_config:
           filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.Struct
-            value:
-              seconds: 123
+            "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
@@ -8661,9 +8658,7 @@ virtual_hosts:
         route: { cluster: baz }
         typed_per_filter_config:
           filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.Struct
-            value:
-              seconds: 123
+            "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
@@ -8687,7 +8682,7 @@ virtual_hosts:
               seconds: 123
     typed_per_filter_config:
       test.filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/google.protobuf.Timestamp
         value:
           seconds: 456
 )EOF";
@@ -8713,7 +8708,7 @@ virtual_hosts:
               seconds: 123
     typed_per_filter_config:
       test.filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/google.protobuf.Timestamp
         value:
           seconds: 456
 )EOF";

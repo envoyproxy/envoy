@@ -231,6 +231,18 @@ public:
     return std::make_unique<
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   }
+
+  std::set<std::string> otherTypes() override {
+    auto route_message = createEmptyRouteConfigProto();
+    if (route_message == nullptr) {
+      return {};
+    }
+    const std::string route_type_url = route_message->GetDescriptor()->full_name();
+    if (route_type_url == configType()) {
+      return {};
+    }
+    return {route_type_url};
+  }
 };
 
 } // namespace Configuration

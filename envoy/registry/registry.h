@@ -334,22 +334,26 @@ private:
         continue;
       }
 
-      // Skip untyped factories.
-      std::string config_type = factory->configType();
-      if (config_type.empty()) {
-        continue;
-      }
+      std::set<std::string> config_types = factory->otherTypes();
+      config_types.insert(factory->configType());
 
-      // Register config types in the mapping.
-      auto it = mapping->find(config_type);
-      if (it != mapping->end() && it->second != factory) {
-        // Mark double-registered types with a nullptr.
-        // See issue https://github.com/envoyproxy/envoy/issues/9643.
-        ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
-                  factory->name(), it->second ? it->second->name() : "");
-        it->second = nullptr;
-      } else {
-        mapping->emplace(std::make_pair(config_type, factory));
+      for (const std::string& config_type : config_types) {
+        // Skip untyped factories.
+        if (config_type.empty()) {
+          continue;
+        }
+
+        // Register config types in the mapping.
+        auto it = mapping->find(config_type);
+        if (it != mapping->end() && it->second != factory) {
+          // Mark double-registered types with a nullptr.
+          // See issue https://github.com/envoyproxy/envoy/issues/9643.
+          ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                    factory->name(), it->second ? it->second->name() : "");
+          it->second = nullptr;
+        } else {
+          mapping->emplace(std::make_pair(config_type, factory));
+        }
       }
     }
 
