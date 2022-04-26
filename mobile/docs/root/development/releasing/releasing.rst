@@ -11,9 +11,8 @@ Prepare for release
 
 Before cutting the release, submit and merge a PR with the following changes:
 
-1. Bump the version in the :repo:`EnvoyMobile.podspec <EnvoyMobile.podspec>` file
-2. Bump the version in the :repo:`VERSION <VERSION>` file
-3. Provide a brief overview of the release in the :repo:`version history documentation <docs/root/intro/version_history.rst>`
+1. Bump the version in the :repo:`VERSION <VERSION>` file
+2. Provide a brief overview of the release in the :repo:`version history documentation <docs/root/intro/version_history.rst>`
 
 Publish release and artifacts
 -----------------------------
