@@ -25,21 +25,16 @@ using ::testing::Eq;
 using ::testing::HasSubstr;
 using ::testing::StrictMock;
 
-std::function<void(absl::StatusOr<std::function<void()>>)> storageSuccessCallback() {
-  return [](absl::StatusOr<std::function<void()>> status_or_callback) {
-    ASSERT_OK(status_or_callback);
-    auto& inner_callback = status_or_callback.value();
-    inner_callback();
-  };
+std::function<void(absl::Status)> storageSuccessCallback() {
+  return [](absl::Status status) { ASSERT_OK(status); };
 }
 
 template <typename MatcherT>
-std::function<void(absl::StatusOr<std::function<void()>>)>
-storageFailureCallback(MatcherT matcher) {
-  return [matcher](absl::StatusOr<std::function<void()>> status_or_callback) {
-    EXPECT_THAT(status_or_callback.status(), matcher);
-  };
+std::function<void(absl::Status)> storageFailureCallback(MatcherT matcher) {
+  return [matcher](absl::Status status) { EXPECT_THAT(status, matcher); };
 }
+
+void dispatchImmediately(std::function<void()> callback) { callback(); }
 
 class FileSystemBufferFilterFragmentTest : public ::testing::Test {
 public:
@@ -53,7 +48,7 @@ protected:
               callback(frag->size());
               return []() {};
             });
-    EXPECT_OK(frag->toStorage(handle_, 123, storageSuccessCallback()));
+    EXPECT_OK(frag->toStorage(handle_, 123, &dispatchImmediately, storageSuccessCallback()));
   }
 };
 
@@ -91,7 +86,7 @@ TEST_F(FileSystemBufferFilterFragmentTest, WritesAndReadsBack) {
         return []() {};
       });
   // Request the fragment be moved to storage.
-  EXPECT_OK(frag.toStorage(handle_, 123, storageSuccessCallback()));
+  EXPECT_OK(frag.toStorage(handle_, 123, &dispatchImmediately, storageSuccessCallback()));
   // Before the file confirms written, the state should be neither in memory nor in storage.
   EXPECT_FALSE(frag.isMemory());
   EXPECT_FALSE(frag.isStorage());
@@ -110,7 +105,7 @@ TEST_F(FileSystemBufferFilterFragmentTest, WritesAndReadsBack) {
             return []() {};
           });
   // Request the fragment be moved from storage.
-  EXPECT_OK(frag.fromStorage(handle_, storageSuccessCallback()));
+  EXPECT_OK(frag.fromStorage(handle_, &dispatchImmediately, storageSuccessCallback()));
   // Before the file confirms read, the state should be neither in memory nor storage.
   EXPECT_FALSE(frag.isMemory());
   EXPECT_FALSE(frag.isStorage());
@@ -136,7 +131,8 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteError) {
         return []() {};
       });
   // Request the fragment be moved to storage.
-  EXPECT_OK(frag.toStorage(handle_, 123, storageFailureCallback(Eq(write_error))));
+  EXPECT_OK(
+      frag.toStorage(handle_, 123, &dispatchImmediately, storageFailureCallback(Eq(write_error))));
 
   // Fake file system declares a write error. This should
   // provoke the expected error in the callback above.
@@ -155,7 +151,7 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteIncomplete) {
       });
   // Request the fragment be moved to storage.
   EXPECT_OK(frag.toStorage(
-      handle_, 123,
+      handle_, 123, &dispatchImmediately,
       storageFailureCallback(HasStatusMessage(HasSubstr("wrote 2 bytes, wanted 5")))));
 
   // Fake file says it wrote 2 bytes when the fragment was of size 5 - this should
@@ -178,7 +174,8 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnReadError) {
             return []() {};
           });
   // Request the fragment be moved from storage.
-  EXPECT_OK(frag.fromStorage(handle_, storageFailureCallback(Eq(read_error))));
+  EXPECT_OK(
+      frag.fromStorage(handle_, &dispatchImmediately, storageFailureCallback(Eq(read_error))));
   // Fake file system declares a read error. This should
   // provoke the expected error in the callback above.
   captured_read_callback(read_error);
@@ -199,7 +196,8 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnReadIncomplete) {
           });
   // Request the fragment be moved from storage.
   EXPECT_OK(frag.fromStorage(
-      handle_, storageFailureCallback(HasStatusMessage(HasSubstr("read got 2 bytes, wanted 5")))));
+      handle_, &dispatchImmediately,
+      storageFailureCallback(HasStatusMessage(HasSubstr("read got 2 bytes, wanted 5")))));
 
   // Fake file system declares a read error. This should
   // provoke the expected error in the callback above.

@@ -12,10 +12,31 @@ namespace Extensions {
 namespace HttpFilters {
 namespace FileSystemBuffer {
 
-class FragmentData;
-using UpdateFragmentFunction = std::function<void()>;
 using Extensions::Common::AsyncFiles::AsyncFileHandle;
 using Extensions::Common::AsyncFiles::CancelFunction;
+
+class MemoryFragment {
+public:
+  explicit MemoryFragment(Buffer::Instance& buffer);
+  explicit MemoryFragment(Buffer::Instance& buffer, size_t size);
+  std::unique_ptr<Buffer::Instance> extract();
+
+private:
+  std::unique_ptr<Buffer::OwnedImpl> buffer_;
+};
+
+class WritingFragment {};
+
+class ReadingFragment {};
+
+class StorageFragment {
+public:
+  explicit StorageFragment(off_t offset) : offset_(offset) {}
+  off_t offset() const { return offset_; }
+
+private:
+  const off_t offset_;
+};
 
 // A Fragment is a piece of the buffer queue used by the filter.
 //
@@ -36,46 +57,23 @@ public:
 
   // Starts the transition for this fragment from memory to storage.
   //
-  // The on_done callback is called when the file write completes.
+  // The on_done callback is sent to the dispatcher function after the file write completes.
   //
-  // The callback includes its own callback parameter update_fragment (on success),
-  // so that the operation of updating the fragment can be dispatched to be performed
-  // in the envoy worker thread, rather than being performed on the callback thread.
-  // (This is important to allow for proper handling if the context was deleted while
-  // the operation was in flight, for example.)
-  // i.e. typical usage resembles:
-  // auto result = fragment.toStorage(file_handle, offset,
-  //     [this](absl::StatusOr<UpdateFragmentFunction> status_or_update_fragment) {
-  //   if (status_or_update_fragment.ok()) {
-  //     auto update_fragment = status_or_update_fragment.value();
-  //     dispatcher->dispatch([this, update_fragment]() {
-  //       update_fragment();
-  //       // do more stuff with the fragment, or in reaction to it being updated.
-  //     });
-  //   } else {
-  //     dispatcher->dispatch([this, status = status_or_update_fragment.status()]() {
-  //       // do stuff in response to the error.
-  //     });
-  //   }
-  // });
-  absl::StatusOr<CancelFunction>
-  toStorage(AsyncFileHandle file, off_t offset,
-            std::function<void(absl::StatusOr<UpdateFragmentFunction>)> on_done);
+  // When called from a filter, the dispatcher function must abort without calling the
+  // callback if the filter or fragment has been destroyed.
+  absl::StatusOr<CancelFunction> toStorage(AsyncFileHandle file, off_t offset,
+                                           std::function<void(std::function<void()>)> dispatch,
+                                           std::function<void(absl::Status)> on_done);
 
   // Starts the transition for this fragment from storage to memory.
   //
-  // The on_done callback is called when the file read completes.
+  // The on_done callback is sent to the dispatcher function after the file read completes.
   //
-  // The callback includes its own callback parameter update_fragment (on success),
-  // so that the operation of updating the fragment can be dispatched to be performed
-  // in the envoy worker thread, rather than being performed on the callback thread.
-  // (This is important to allow for proper handling if the context was deleted while
-  // the operation was in flight, for example.)
-  //
-  // See toStorage for example usage.
-  absl::StatusOr<CancelFunction>
-  fromStorage(AsyncFileHandle file,
-              std::function<void(absl::StatusOr<UpdateFragmentFunction>)> on_done);
+  // When called from a filter, the dispatcher function must abort without calling the
+  // callback if the filter or fragment has been destroyed.
+  absl::StatusOr<CancelFunction> fromStorage(AsyncFileHandle file,
+                                             std::function<void(std::function<void()>)> dispatch,
+                                             std::function<void(absl::Status)> on_done);
 
   // Removes the buffer from a memory instance and resets it to size 0.
   //
@@ -93,7 +91,7 @@ public:
 
 private:
   size_t size_;
-  std::unique_ptr<FragmentData> data_;
+  absl::variant<MemoryFragment, StorageFragment, ReadingFragment, WritingFragment> data_;
 };
 
 } // namespace FileSystemBuffer
