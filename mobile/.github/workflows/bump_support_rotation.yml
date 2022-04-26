@@ -9,6 +9,7 @@ on:
 jobs:
   bump_support_rotation:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'envoyproxy'
     permissions:
       pull-requests: write
     steps:
