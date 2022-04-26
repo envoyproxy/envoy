@@ -133,6 +133,7 @@ deadline of 3 weeks.
     release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
     Add an entry for the new file in the `toctree` in
     [version_history.rst](docs/root/version_history/version_history.rst).
+  * Edit the file you just created (eg `docs/root/version_history/v1.6.0.rst`) replacing the link part (between the `<>`) of any `ref:` links to point at the version - eg `` :ref:`Some link text <actual link>` `` -> `` :ref:`Some link text <v1.16:actual link>` ``
   * Create a new "current" version history file at the [release
   notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
   this text as the template for the new file:
