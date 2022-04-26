@@ -17,6 +17,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Bump Lyft Support Rotation
         run: ./tools/bump_lyft_support_rotation.sh
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       - name: Create PR
         uses: peter-evans/create-pull-request@v3
         with:
