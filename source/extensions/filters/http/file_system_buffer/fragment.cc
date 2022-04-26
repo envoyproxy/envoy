@@ -82,9 +82,9 @@ Fragment::fromStorage(AsyncFileHandle file, std::function<void(std::function<voi
           dispatch(
               [on_done = std::move(on_done), status = std::move(status)]() { on_done(status); });
         } else {
-          dispatch([this, on_done = std::move(on_done),
-                    data = std::shared_ptr<Buffer::Instance>(std::move(result.value()))]() {
-            data_.emplace<MemoryFragment>(*data);
+          auto buffer = std::shared_ptr<Buffer::Instance>(std::move(result.value()));
+          dispatch([this, on_done = std::move(on_done), buffer = std::move(buffer)]() {
+            data_.emplace<MemoryFragment>(*buffer);
             on_done(absl::OkStatus());
           });
         }
