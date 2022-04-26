@@ -139,10 +139,12 @@ To add an extension config to the API, the steps below should be followed:
        repeated core.v3.TypedExtensionConfig http_filter_extensions = 1;
      }
      ```
-   * Each extension added to `extensions_metadata.yaml` should have precisely one proto message annotated with the extension name. e.g.
+   * Each extension added to `extensions_metadata.yaml` should have precisely one proto file annotated with the extension name. e.g.
      ```proto
-     // YourFilterConfig is a message with this description.
+     // [#protodoc-title: Your New Filter]
      // [#extension: envoy.http.filters.your_new_filter]
+
+     // YourFilterConfig is the configuration for a YourFilter (write real documentation here).
      message YourFilterConfig {
      }
      ```
