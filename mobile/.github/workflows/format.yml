@@ -26,7 +26,7 @@ jobs:
         run: ./tools/check_format.sh
   precommit:
     name: precommit
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
@@ -46,7 +46,7 @@ jobs:
         run: swiftlint lint --strict
   kotlinlint:
     name: kotlin_lint
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1

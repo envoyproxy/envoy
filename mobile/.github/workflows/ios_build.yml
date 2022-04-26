@@ -9,7 +9,7 @@ on:
 jobs:
   iosbuild:
     name: ios_build
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
@@ -37,7 +37,7 @@ jobs:
   swifthelloworld:
     name: swift_helloworld
     needs: iosbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -71,7 +71,7 @@ jobs:
   swiftbaselineapp:
     name: swift_baseline_app
     needs: iosbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -105,7 +105,7 @@ jobs:
   swiftexperimentalapp:
     name: swift_experimental_app
     needs: iosbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -139,7 +139,7 @@ jobs:
   swiftasyncawait:
     name: swift_async_await
     needs: iosbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -173,7 +173,7 @@ jobs:
   objchelloworld:
     name: objc_helloworld
     needs: iosbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1

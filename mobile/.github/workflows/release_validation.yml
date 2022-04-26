@@ -9,7 +9,7 @@ on:
 jobs:
   cocoapods_spec_lint:
     name: cocoapods_spec_lint
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 20
     if: ${{ false }} # TODO(jpsim): Fix this validation when bumping versions
     steps:

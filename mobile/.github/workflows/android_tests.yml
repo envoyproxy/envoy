@@ -11,7 +11,7 @@ jobs:
     # revert to //test/kotlin/... once fixed
     # https://github.com/envoyproxy/envoy-mobile/issues/1932
     name: kotlin_tests_mac
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
@@ -51,7 +51,7 @@ jobs:
             //test/kotlin/io/...
   javatestsmac:
     name: java_tests_mac
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
