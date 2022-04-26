@@ -249,7 +249,7 @@ private:
   Init::SharedTargetImpl init_target_;
   bool started_{false};
 
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   ExtensionConfigDiscoveryStats stats_;
 
   // FilterConfigProviderManagerImplBase maintains active subscriptions in a map.

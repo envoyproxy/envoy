@@ -28,12 +28,6 @@ std::string getProtoName(const DnsTable::DnsServiceProtocol& protocol);
 absl::string_view getServiceFromName(const absl::string_view name);
 
 /**
- * @brief Extracts the protocol name from the fully qualified service name. The leading underscore
- * is discarded from the output
- */
-absl::string_view getProtoFromName(const absl::string_view name);
-
-/**
  * @brief Construct the full service name, including underscores, from the name, protocol and
  * domain fields.
  *
