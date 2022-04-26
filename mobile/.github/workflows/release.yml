@@ -8,7 +8,7 @@ on:
 jobs:
   android_release_artifacts:
     name: android_release_artifacts
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
@@ -102,7 +102,7 @@ jobs:
 
   ios_release_artifacts_framework:
     name: ios_release_artifacts_framework
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
@@ -131,7 +131,7 @@ jobs:
 
   ios_release_artifacts_cocoapods:
     name: ios_release_artifacts_cocoapods
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 45
     needs: [ios_release_artifacts_framework]
     steps:
@@ -186,7 +186,7 @@ jobs:
 
   publish_to_cocoapods:
     name: publish_to_cocoapods
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 45
     needs: create_github_release
     steps:

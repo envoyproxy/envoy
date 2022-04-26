@@ -9,7 +9,7 @@ on:
 jobs:
   androidbuild:
     name: android_build
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
@@ -46,7 +46,7 @@ jobs:
   javahelloworld:
     name: java_helloworld
     needs: androidbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -88,7 +88,7 @@ jobs:
   kotlinhelloworld:
     name: kotlin_helloworld
     needs: androidbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -131,7 +131,7 @@ jobs:
   kotlinbaselineapp:
     name: kotlin_baseline_app
     needs: androidbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -174,7 +174,7 @@ jobs:
   kotlinexperimentalapp:
     name: kotlin_experimental_app
     needs: androidbuild
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1

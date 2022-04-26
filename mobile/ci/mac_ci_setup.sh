@@ -6,7 +6,7 @@ set -e
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
 # See:
-# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-11-Readme.md for
+# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-12-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
@@ -44,7 +44,7 @@ fi
 ./bazelw version
 
 pip3 install slackclient
-# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-11-Readme.md#xcode
+# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-12-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_13.2.1.app
 
 if [[ "${1:-}" == "--android" ]]; then

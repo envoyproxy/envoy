@@ -9,7 +9,7 @@ on:
 jobs:
   swifttests:
     name: swift_tests
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
@@ -34,7 +34,7 @@ jobs:
         run: ./bazelw test --experimental_ui_max_stdouterr_bytes=10485760 --test_output=all --config=ios --build_tests_only --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/...
   objctests:
     name: objc_tests
-    runs-on: macos-11
+    runs-on: macos-12
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
