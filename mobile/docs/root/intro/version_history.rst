@@ -4,16 +4,32 @@ Version history
 Pending Release
 ===============
 
+Breaking changes:
+
+- iOS: the minimum supported iOS version is now 12.0 (:issue:`#2084 <2084>`)
+
 Bugfixes:
 
-- Android: Fix `NoClassDefFoundError` errors when using `addDNSFallbackNameservers`
-  or `addH2RawDomains` with Android versions older than API level 24.
-- iOS: Fix reachability which has been broken since February 11.
+- happy eyeballs: fix missing runtime configuration  (:issue:`#2068 <2068>`)
+- iOS: fix CocoaPods releases (:issue:`#2175 <2175>`)
+- android: fix Maven releases (:issue:`#2183 <2183>`)
+- dns: prevent dns refresh if network is unchanged (:issue:`#2122 <2122>`)
+- happy eyeballs: fix crash on Android (:issue:`#2132 <2132>`)
+- ios: fix termination crash in ProvisionalDispatcher (:issue:`#2059 <2059>`)
 
 Features:
 
-- API: added Envoy's response flags to final stream intel (:issue:`#2009 <2009>`)
-- size: The size of the dynamic library was reduced by ~46% (:issue:`#2053 <2053>`)
+- api: added Envoy's response flags to final stream intel (:issue:`#2009 <2009>`)
+- size: the size of the dynamic library was reduced by ~46% (:issue:`#2053 <2053>`)
+- tls: updated the bundled root certificates (:issue:`#2016 <2016>`)
+- api: expose "received byte count" in the Java API (:issue:`#2004 <2004>`)
+- bazel: allow configuring Android toolchain versions (:issue:`#2041 <2041>`)
+- ios: add explicit flow control onSendWindowAvailable to public interface (:issue:`#2046 <2046>`)
+- api: add option to add a list of H2-Raw domain names (:issue:`#2088 <2088>`)
+- ios: add support for toggling trust chain verification (:issue:`#2104 <2104>`)
+- api: add support for configuring minimum DNS refresh rate and per-host max connections (:issue:`#2123 <2123>`)
+- h3/quic: add experimental option to the Android/JVM EngineBuilder (:issue:`#2163 <2163>`)
+- android: include debug info in release binary (:issue:`#2188 <2188>`)
 
 0.4.5 (January 13, 2022)
 ========================
