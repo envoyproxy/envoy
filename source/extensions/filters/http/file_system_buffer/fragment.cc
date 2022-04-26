@@ -83,7 +83,7 @@ Fragment::fromStorage(AsyncFileHandle file, std::function<void(std::function<voi
               [on_done = std::move(on_done), status = std::move(status)]() { on_done(status); });
         } else {
           dispatch([this, on_done = std::move(on_done),
-                    data = std::shared_ptr<Buffer::Instance>(result.value().release())]() {
+                    data = std::shared_ptr<Buffer::Instance>(std::move(result.value()))]() {
             data_.emplace<MemoryFragment>(*data);
             on_done(absl::OkStatus());
           });
