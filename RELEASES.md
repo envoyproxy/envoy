@@ -16,8 +16,9 @@ Stable releases of Envoy include:
     including crashes triggered by a trusted control plane).
   * Bugfixes, deemed worthwhile by the maintainers of stable releases.
 
-Major release and security fixes both happen quartely whereas other releases are ad-hoc and
-best-effort.
+Major releases happen quartely and follow the schedule below. Security fixes typically happen
+quarterly as well, but this depends on the number and severity of security bugs. Other releases
+are ad-hoc and best-effort.
 
 ### Hand-off
 
@@ -49,7 +50,9 @@ schedule, initially aiming for the bi-weekly releases.
 Major releases are handled by the maintainer on-call and do not involve any backports.
 The details are outlined in the "Cutting a major release" section below.
 Security releases are handled by a Release Manager and a Fix Lead. The Release Manager is
-responsible for approving and merging backports. The Fix Lead is a member of the security
+responsible for approving and merging backports, with responsibilties outlined
+[in this doc](https://docs.google.com/document/d/1AnIqmJlGlN0nZaxDme2uMjcO9VJxIokGDMYsq2IZM98/edit).
+The Fix Lead is a member of the security
 team and is responsible for coordinating the overall release. This includes identifying
 issues to be fixed in the release, communications with the Envoy community, and the
 actual mechanics of the release itself.
