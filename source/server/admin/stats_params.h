@@ -29,6 +29,31 @@ struct StatsParams {
    */
   Http::Code parse(absl::string_view url, Buffer::Instance& response);
 
+  template <class StatType>
+  using CallOnStatFn =
+      std::function<void(const Stats::RefcountPtr<StatType>& stat, const std::string& name)>;
+
+  /*
+   * Determine whether a metric has never been emitted and choose to
+   * not show it if we only wanted used metrics.
+   */
+  template <class StatType>
+  void callIfShouldShowStat(const Stats::RefcountPtr<StatType>& stat,
+                            CallOnStatFn<StatType> call_on_stat_fn) const {
+    if (used_only_ && !stat->used()) {
+      return;
+    }
+    std::string name = stat->name();
+    if (safe_regex_) {
+      if (safe_filter_ != nullptr && !re2::RE2::PartialMatch(name, *safe_filter_)) {
+        return;
+      }
+    } else if (filter_.has_value() && !std::regex_search(name, filter_.value())) {
+      return;
+    }
+    call_on_stat_fn(stat, name);
+  }
+
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};

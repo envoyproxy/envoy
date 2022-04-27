@@ -12,7 +12,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
 
   auto filter_iter = query_.find("filter");
   if (filter_iter != query_.end()) {
-    filter_string_ =  filter_iter->second;
+    filter_string_ = filter_iter->second;
     if (safe_regex_) {
       safe_filter_ = std::make_shared<re2::RE2>(filter_string_);
       if (!safe_filter_->ok()) {

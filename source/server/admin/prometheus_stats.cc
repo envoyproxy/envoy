@@ -119,14 +119,14 @@ uint64_t outputStatType(
   std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan> groups(
       global_symbol_table);
 
+  StatsParams::CallOnStatFn<StatType> add_stat = [&groups](const Stats::RefcountPtr<StatType>& stat,
+                                                           const std::string&) {
+    groups[stat->tagExtractedStatName()].push_back(stat.get());
+  };
+
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
-
-    if (!shouldShowMetric(*metric, params.used_only_, params.filter_)) {
-      continue;
-    }
-
-    groups[metric->tagExtractedStatName()].push_back(metric.get());
+    params.callIfShouldShowStat(metric, add_stat);
   }
 
   auto result = groups.size();

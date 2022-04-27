@@ -124,19 +124,16 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
 }
 
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
+  auto add_stat = [this](const Stats::RefcountPtr<StatType>& stat, const std::string& name) {
+    stat_map_[name] = stat;
+  };
+  Stats::IterateFn<StatType> check_stat =
+      [this, add_stat](const Stats::RefcountPtr<StatType>& stat) -> bool {
+    params_.callIfShouldShowStat<StatType>(stat, add_stat);
+    return true;
+  };
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    Stats::IterateFn<StatType> fn = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-      if (params_.used_only_ && !stat->used()) {
-        return true;
-      }
-      std::string name = stat->name();
-      if (params_.filter_.has_value() && !std::regex_search(name, params_.filter_.value())) {
-        return true;
-      }
-      stat_map_[name] = stat;
-      return true;
-    };
-    scope->iterate(fn);
+    scope->iterate(check_stat);
   }
 }
 
