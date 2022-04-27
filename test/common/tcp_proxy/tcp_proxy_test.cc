@@ -1322,7 +1322,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
                                   "test_transport_failure");
 
   EXPECT_EQ(filter_->getStreamInfo().upstreamInfo()->upstreamTransportFailureReason(),
-            "test_failure");
+            "test_transport_failure");
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "test_transport_failure");
