@@ -1825,6 +1825,18 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
       http_context_, grpc_context_, router_context_, server_)};
 }
 
+absl::optional<Http::HttpServerPropertiesCache::Origin>
+getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
+  std::string sni(host->transportSocketFactory().defaultServerNameIndication());
+  if (options && options->serverNameOverride().has_value()) {
+    sni = options->serverNameOverride().value();
+  }
+  if (sni.empty()) {
+    return absl::nullopt;
+  }
+  return {{"https", sni, host->address()->ip()->port()}};
+}
+
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
@@ -1833,15 +1845,18 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
+  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache{};
+
+  if (alternate_protocol_options.has_value()) {
+    alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
+        alternate_protocol_options.value(), dispatcher);
+  }
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
-    Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
-                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     if (quic_info == nullptr) {
       quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
@@ -1857,10 +1872,22 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
+    absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+        getOrigin(transport_socket_options, host);
+    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+      envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+      default_options.set_name(host->cluster().name());
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+    }
+
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state);
+        transport_socket_options, state, getOrigin(transport_socket_options, host),
+        alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {

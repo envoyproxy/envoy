@@ -7,11 +7,13 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,10 +28,12 @@ namespace {
 class ConnPoolImplForTest : public Event::TestUsingSimulatedTime, public HttpConnPoolImplMixed {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state,
-                      Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster)
-      : HttpConnPoolImplMixed(dispatcher, random,
-                              Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
-                              Upstream::ResourcePriority::Default, nullptr, nullptr, state) {}
+                      Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster,
+                      HttpServerPropertiesCache::Origin origin,
+                      HttpServerPropertiesCacheSharedPtr cache)
+      : HttpConnPoolImplMixed(
+            dispatcher, random, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+            Upstream::ResourcePriority::Default, nullptr, nullptr, state, origin, cache) {}
 };
 
 /**
@@ -39,7 +43,19 @@ class MixedConnPoolImplTest : public testing::Test {
 public:
   MixedConnPoolImplTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_)) {}
+        cache_(std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()),
+        mock_cache_(*(dynamic_cast<MockHttpServerPropertiesCache*>(cache_.get()))),
+        conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_,
+                                                         origin_, cache_)) {
+    {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+        expected_capacity_ = 536870912;
+      } else {
+        expected_capacity_ = 1;
+      }
+    }
+  }
 
   ~MixedConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -49,12 +65,16 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  Http::HttpServerPropertiesCacheSharedPtr cache_;
+  MockHttpServerPropertiesCache& mock_cache_;
+  HttpServerPropertiesCache::Origin origin_{"https", "hostname.com", 443};
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
 
   void testAlpnHandshake(absl::optional<Protocol> protocol);
+  uint32_t expected_capacity_;
 };
 
 TEST_F(MixedConnPoolImplTest, AlpnTest) {
@@ -78,11 +98,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
                                                           : Http::Utility::AlpnNames::get().Http2);
   }
   EXPECT_CALL(*connection, nextProtocol()).WillOnce(Return(next_protocol));
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    EXPECT_EQ(536870912, state_.connecting_and_connected_stream_capacity_);
-  } else {
-    EXPECT_EQ(1, state_.connecting_and_connected_stream_capacity_);
-  }
+  EXPECT_EQ(expected_capacity_, state_.connecting_and_connected_stream_capacity_);
 
   connection->raiseEvent(Network::ConnectionEvent::Connected);
   if (!protocol.has_value()) {
@@ -98,6 +114,16 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
 }
 
 TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshake) { testAlpnHandshake({}); }
+
+TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
+
+  expected_capacity_ = 5;
+  EXPECT_CALL(mock_cache_, getConcurrentStreams(_)).WillOnce(Return(5));
+  testAlpnHandshake({});
+}
 
 TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) { testAlpnHandshake(Protocol::Http11); }
 

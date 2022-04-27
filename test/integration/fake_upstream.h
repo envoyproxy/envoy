@@ -645,6 +645,7 @@ public:
     return std::make_unique<FakeRawConnection>(shared_connection, time_system);
   }
 
+  absl::Mutex lock_;
   // Wait for one of the upstreams to receive a connection
   ABSL_MUST_USE_RESULT
   static testing::AssertionResult
@@ -848,7 +849,6 @@ private:
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.
-  absl::Mutex lock_;
   Thread::ThreadPtr thread_;
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
