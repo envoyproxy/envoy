@@ -484,15 +484,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "zlib",
         project_desc = "zlib compression library",
         project_url = "https://zlib.net",
-        version = "79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
-        # Use the dev branch of zlib to resolve fuzz bugs and out of bound
-        # errors resulting in crashes in zlib 1.2.11.
-        # TODO(asraa): Remove when zlib > 1.2.11 is released.
-        sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
+        version = "1.2.12",
+        sha256 = "d8688496ea40fb61787500e863cc63c9afcbc524468cedeb478068924eb54932",
         strip_prefix = "zlib-{version}",
-        urls = ["https://github.com/madler/zlib/archive/{version}.tar.gz"],
+        urls = ["https://github.com/madler/zlib/archive/v{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2019-04-14",
+        release_date = "2022-03-27",
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     org_boost = dict(
@@ -709,16 +706,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "org_golang_google_protobuf",
             "org_golang_x_tools",
         ],
-    ),
-    rules_cc = dict(
-        project_name = "C++ rules for Bazel",
-        project_desc = "Bazel rules for the C++ language",
-        project_url = "https://github.com/bazelbuild/rules_cc",
-        version = "0.0.1",
-        sha256 = "4dccbfd22c0def164c8f47458bd50e0c7148f3d92002cdb459c2a96a68498241",
-        urls = ["https://github.com/bazelbuild/rules_cc/releases/download/{version}/rules_cc-{version}.tar.gz"],
-        release_date = "2021-10-07",
-        use_category = ["build"],
     ),
     rules_foreign_cc = dict(
         project_name = "Rules for using foreign build systems in Bazel",
@@ -1138,12 +1125,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.2.1",
-        sha256 = "b58c63a6d8221f408f8852b4f74f81bc8c7aac9273f3899a74e32e6168a2c624",
+        version = "0.3.1",
+        sha256 = "e074f1e203607c5fcd549929d956170346f8807d2bbaeb98b2ed213c37e0870f",
         urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2022-04-04",
+        release_date = "2022-04-26",
         cpe = "N/A",
     ),
     rules_antlr = dict(

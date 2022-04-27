@@ -1,7 +1,6 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
@@ -42,7 +41,7 @@ def _envoy_cc_test_infrastructure_library(
         extra_deps = [repository + "//test:test_pch"]
         pch_copts = envoy_pch_copts(repository, "//test:test_pch")
 
-    cc_library(
+    native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
@@ -103,7 +102,7 @@ def envoy_cc_fuzz_test(
         **kwargs
     )
 
-    cc_test(
+    native.cc_test(
         name = name,
         copts = envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts() + select({
@@ -161,7 +160,7 @@ def envoy_cc_test(
         exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
-    cc_test(
+    native.cc_test(
         name = name,
         srcs = srcs,
         data = data,

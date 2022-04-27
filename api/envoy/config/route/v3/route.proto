@@ -4,7 +4,6 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
-import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -122,28 +121,14 @@ message RouteConfiguration {
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
 
-  // [#not-implemented-hide:]
   // A list of plugins and their configurations which may be used by a
-  // :ref:`envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin`
+  // :ref:`cluster specifier plugin name <envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin>`
   // within the route. All *extension.name* fields in this list must be unique.
   repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
 
   // Specify a set of default request mirroring policies which apply to all routes under its virtual hosts.
   // Note that policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 13;
-}
-
-// Configuration for a cluster specifier plugin.
-message ClusterSpecifierPlugin {
-  // The name of the plugin and its opaque configuration.
-  core.v3.TypedExtensionConfig extension = 1;
-
-  // If is_optional is not set and the plugin defined by this message is not
-  // a supported type, the containing resource is NACKed. If is_optional is
-  // set, the resource would not be NACKed for this reason. In this case,
-  // routes referencing this plugin's name would not be treated as an illegal
-  // configuration, but would result in a failure if the route is selected.
-  bool is_optional = 2;
 }
 
 message Vhds {

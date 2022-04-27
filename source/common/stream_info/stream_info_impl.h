@@ -79,6 +79,9 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamNumStreams(uint64_t num_streams) override { num_streams_ = num_streams; }
   uint64_t upstreamNumStreams() const override { return num_streams_; }
 
+  void setUpstreamProtocol(Http::Protocol protocol) override { upstream_protocol_ = protocol; }
+  absl::optional<Http::Protocol> upstreamProtocol() const override { return upstream_protocol_; }
+
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   UpstreamTiming upstream_timing_;
@@ -88,6 +91,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   std::string upstream_transport_failure_reason_;
   FilterStateSharedPtr upstream_filter_state_;
   size_t num_streams_{};
+  absl::optional<Http::Protocol> upstream_protocol_;
 };
 
 struct StreamInfoImpl : public StreamInfo {

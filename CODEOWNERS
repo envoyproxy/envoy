@@ -138,7 +138,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/clusters/aggregate @yxue @snowp
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @lambdai
-/*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @rojkov @delong-coder
+/*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
 /*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy @tonya11en
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
@@ -187,24 +187,25 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
-# support library for filesystem based extensions
+# File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblack
+/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblack
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
 # compression code
-/*/extensions/filters/http/decompressor @rojkov @kbaichoo
-/*/extensions/filters/http/gzip @gsagula @kbaichoo
-/*/extensions/filters/http/common/compressor @gsagula @rojkov @kbaichoo
-/*/extensions/filters/http/compressor @rojkov @kbaichoo
-/*/extensions/compression/brotli @rojkov @kbaichoo
-/*/extensions/compression/common @kbaichoo @rojkov
-/*/extensions/compression/gzip/decompressor @rojkov @kbaichoo
-/*/extensions/compression/gzip/compressor @rojkov @kbaichoo
-/*/extensions/compression/gzip/common @rojkov @kbaichoo
-/*/extensions/compression/zstd @rojkov @rainingmaster
+/*/extensions/filters/http/decompressor @kbaichoo @mattklein123
+/*/extensions/filters/http/gzip @kbaichoo @mattklein123
+/*/extensions/filters/http/common/compressor @kbaichoo @mattklein123
+/*/extensions/filters/http/compressor @kbaichoo @mattklein123
+/*/extensions/compression/brotli @kbaichoo @mattklein123
+/*/extensions/compression/common @kbaichoo @mattklein123
+/*/extensions/compression/gzip/decompressor @kbaichoo @mattklein123
+/*/extensions/compression/gzip/compressor @kbaichoo @mattklein123
+/*/extensions/compression/gzip/common @kbaichoo @mattklein123
+/*/extensions/compression/zstd @rainingmaster @mattklein123
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
 # health cehck
@@ -242,9 +243,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/tracers/common @wbpcode @Shikugawa
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
-/*/extensions/filters/http/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
-/*/extensions/filters/network/ext_authz @esmet @gsagula @pradeepcrao @ggreenway
+/*/extensions/filters/common/ext_authz @esmet @pradeepcrao @ggreenway
+/*/extensions/filters/http/ext_authz @esmet @pradeepcrao @ggreenway
+/*/extensions/filters/network/ext_authz @esmet @pradeepcrao @ggreenway
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @lambdai @lizan
 # mongo proxy
@@ -268,15 +269,15 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
-/contrib/common/sqlutils/ @cpakulski @dio
+/contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
 /contrib/mysql_proxy/ @rshriram @venilnoronha
-/contrib/postgres_proxy/ @fabriziomello @cpakulski @dio
+/contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @rgs1 @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
-/contrib/cryptomb/ @rojkov @ipuustin
-/contrib/vcl/ @florincoras @rojkov @KfreeZ
-/contrib/hyperscan/ @rojkov @zhxie
+/contrib/cryptomb/ @ipuustin @ipuustin
+/contrib/vcl/ @florincoras @KfreeZ
+/contrib/hyperscan/ @zhxie @zhxie
 /contrib/language/ @diceride @diceride

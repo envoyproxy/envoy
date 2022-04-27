@@ -42,6 +42,10 @@ public:
   QuicheMemSliceImpl& operator=(const QuicheMemSliceImpl& other) = delete;
   QuicheMemSliceImpl& operator=(QuicheMemSliceImpl&& other) noexcept {
     if (this != &other) {
+      // OwnedImpl::move() appends data from `other` without clearing the buffer
+      // first. It is necessary to call Reset() beforehand to clear
+      // `single_slice_buffer_`.
+      Reset();
       fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
     }
