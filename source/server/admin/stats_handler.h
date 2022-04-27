@@ -71,7 +71,8 @@ public:
    * @params params the already-parsed parameters.
    * @param response buffer into which to write response
    */
-  static void prometheusRender(Stats::Store& stats, const Stats::CustomStatNamespaces& custom_namespaces,
+  static void prometheusRender(Stats::Store& stats,
+                               const Stats::CustomStatNamespaces& custom_namespaces,
                                const StatsParams& params, Buffer::Instance& response);
 
   Http::Code handlerContention(absl::string_view path_and_query,

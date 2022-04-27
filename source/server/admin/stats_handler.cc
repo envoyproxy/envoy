@@ -109,7 +109,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 }
 
 Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
-                                           Buffer::Instance& response) {
+                                         Buffer::Instance& response) {
   StatsParams params;
   Http::Code code = params.parse(path_and_query, response);
   if (code != Http::Code::OK) {
@@ -126,8 +126,8 @@ void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::I
   prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
 }
 
-
-void StatsHandler::prometheusRender(Stats::Store& stats, const Stats::CustomStatNamespaces& custom_namespaces,
+void StatsHandler::prometheusRender(Stats::Store& stats,
+                                    const Stats::CustomStatNamespaces& custom_namespaces,
                                     const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
