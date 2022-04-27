@@ -38,7 +38,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     } else if (format_value.value() == "text") {
       format_ = StatsFormat::Text;
     } else {
-      response.add("usage: /stats?format=json  or /stats?format=prometheus \n\n");
+      response.add("usage: /stats?format=(json|prometheus|text)\n\n");
       return Http::Code::BadRequest;
     }
   }

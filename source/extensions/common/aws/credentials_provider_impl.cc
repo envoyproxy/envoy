@@ -3,8 +3,10 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/lock_guard.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,20 +73,29 @@ void InstanceProfileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the instance metadata");
 
   // First discover the Role of this instance
-  const auto instance_role_string =
-      metadata_fetcher_(EC2_METADATA_HOST, SECURITY_CREDENTIALS_PATH, "");
+  Http::RequestMessageImpl message;
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  message.headers().setHost(EC2_METADATA_HOST);
+  message.headers().setPath(SECURITY_CREDENTIALS_PATH);
+  const auto instance_role_string = metadata_fetcher_(message);
   if (!instance_role_string) {
     ENVOY_LOG(error, "Could not retrieve credentials listing from the instance metadata");
     return;
   }
+  fetchCredentialFromInstanceRole(instance_role_string.value());
+}
 
-  const auto instance_role_list =
-      StringUtil::splitToken(StringUtil::trim(instance_role_string.value()), "\n");
+void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
+    const std::string& instance_role) {
+  if (instance_role.empty()) {
+    return;
+  }
+  const auto instance_role_list = StringUtil::splitToken(StringUtil::trim(instance_role), "\n");
   if (instance_role_list.empty()) {
     ENVOY_LOG(error, "No AWS credentials were found in the instance metadata");
     return;
   }
-  ENVOY_LOG(debug, "AWS credentials list:\n{}", instance_role_string.value());
+  ENVOY_LOG(debug, "AWS credentials list:\n{}", instance_role);
 
   // Only one Role can be associated with an instance:
   // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html
@@ -94,15 +105,27 @@ void InstanceProfileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "AWS credentials path: {}", credential_path);
 
   // Then fetch and parse the credentials
-  const auto credential_document = metadata_fetcher_(EC2_METADATA_HOST, credential_path, "");
+  Http::RequestMessageImpl message;
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  message.headers().setHost(EC2_METADATA_HOST);
+  message.headers().setPath(credential_path);
+
+  const auto credential_document = metadata_fetcher_(message);
   if (!credential_document) {
     ENVOY_LOG(error, "Could not load AWS credentials document from the instance metadata");
     return;
   }
+  extractCredentials(credential_document.value());
+}
 
+void InstanceProfileCredentialsProvider::extractCredentials(
+    const std::string& credential_document_value) {
+  if (credential_document_value.empty()) {
+    return;
+  }
   Json::ObjectSharedPtr document_json;
   try {
-    document_json = Json::Factory::loadFromString(credential_document.value());
+    document_json = Json::Factory::loadFromString(credential_document_value);
   } catch (EnvoyException& e) {
     ENVOY_LOG(error, "Could not parse AWS credentials document: {}", e.what());
     return;
@@ -133,17 +156,27 @@ void TaskRoleCredentialsProvider::refresh() {
   absl::string_view host;
   absl::string_view path;
   Http::Utility::extractHostPathFromUri(credential_uri_, host, path);
-  const auto credential_document =
-      metadata_fetcher_(std::string(host.data(), host.size()),
-                        std::string(path.data(), path.size()), authorization_token_);
+
+  Http::RequestMessageImpl message;
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  message.headers().setHost(host);
+  message.headers().setPath(path);
+  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_token_);
+  const auto credential_document = metadata_fetcher_(message);
   if (!credential_document) {
     ENVOY_LOG(error, "Could not load AWS credentials document from the task role");
     return;
   }
+  extractCredentials(credential_document.value());
+}
 
+void TaskRoleCredentialsProvider::extractCredentials(const std::string& credential_document_value) {
+  if (credential_document_value.empty()) {
+    return;
+  }
   Json::ObjectSharedPtr document_json;
   try {
-    document_json = Json::Factory::loadFromString(credential_document.value());
+    document_json = Json::Factory::loadFromString(credential_document_value);
   } catch (EnvoyException& e) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from the task role: {}", e.what());
     return;

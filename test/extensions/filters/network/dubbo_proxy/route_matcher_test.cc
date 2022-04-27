@@ -64,7 +64,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -99,7 +99,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -137,7 +137,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -181,7 +181,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -230,7 +230,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -270,7 +270,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -311,7 +311,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -354,7 +354,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -385,7 +385,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -416,7 +416,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -452,7 +452,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -494,7 +494,7 @@ routes:
 
   setDefaultInvocationCallback(*invo);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -528,7 +528,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -562,7 +562,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::NullObject>());
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -596,7 +596,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
@@ -630,7 +630,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("300"));
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -663,7 +663,7 @@ routes:
   invo->mutableParameters()->resize(2);
   invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id:94562");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
@@ -702,7 +702,7 @@ routes:
   invo->mutableAttachment()->insert("custom", "123");
   invo->mutableAttachment()->insert("custom1", "123");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -755,13 +755,13 @@ route_config:
   invo->mutableParameters()->resize(2);
   invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  MultiRouteMatcher matcher(config.route_config(), context);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  RouteConfigImpl matcher(config.route_config(), context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 
   {
     envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy invalid_config;
-    MultiRouteMatcher matcher(invalid_config.route_config(), context);
+    RouteConfigImpl matcher(invalid_config.route_config(), context);
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
 }
@@ -793,7 +793,7 @@ routes:
   setDefaultInvocationCallback(*invo);
 
   // There is no parameter information in metadata.
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -860,7 +860,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
 
   {
@@ -908,7 +908,7 @@ routes:
 
   envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW(SingleRouteMatcherImpl m(config, context), EnvoyException);
 }
 

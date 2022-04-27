@@ -60,3 +60,24 @@ updates:
   directory: "/"
   schedule:
     interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/ext_authz/auth/grpc-service"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/grpc-bridge/server"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/grpc-bridge/server/kv"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/load-reporting-service"
+  schedule:
+    interval: daily
+

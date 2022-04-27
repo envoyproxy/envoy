@@ -3,6 +3,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
@@ -35,9 +36,9 @@ public:
    */
   uint64_t handlerStats(const StatsParams& params) {
     Buffer::OwnedImpl data;
-
-    if (params.format_ == Envoy::Server::StatsParams::Foramt::Prometheus) {
-
+    if (params.format_ == Envoy::Server::StatsFormat::Prometheus) {
+      Envoy::Server::StatsHandler::prometheusRender(store_, custom_namespaces_, params, data);
+      return data.length();
     }
     Admin::RequestPtr request = StatsHandler::makeRequest(store_, params);
     auto response_headers = Http::ResponseHeaderMapImpl::create();
@@ -56,6 +57,7 @@ public:
   Stats::AllocatorImpl alloc_;
   Stats::ThreadLocalStoreImpl store_;
   std::vector<Stats::ScopeSharedPtr> scopes_;
+  Envoy::Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
 
 } // namespace Server
@@ -129,7 +131,7 @@ static void BM_AllCountersJson(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count > 130 * 1000 * 1000, "expected count > 1130M"); // actual = 135,789,011
+    RELEASE_ASSERT(count > 130 * 1000 * 1000, "expected count > 130M"); // actual = 135,789,011
   }
 }
 BENCHMARK(BM_AllCountersJson)->Unit(benchmark::kMillisecond);
@@ -186,7 +188,7 @@ static void BM_AllCountersPrometheus(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count > 130 * 1000 * 1000, "expected count > 1130M"); // actual = 135,789,011
+    RELEASE_ASSERT(count > 250 * 1000 * 1000, "expected count > 250M"); // actual = 261,578,000
   }
 }
 BENCHMARK(BM_AllCountersPrometheus)->Unit(benchmark::kMillisecond);
@@ -201,7 +203,7 @@ static void BM_UsedCountersPrometheus(benchmark::State& state) {
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
     RELEASE_ASSERT(count > 1000 * 1000, "expected count > 1M");
-    RELEASE_ASSERT(count < 2 * 1000 * 1000, "expected count < 2M"); // actual = 1,348,901
+    RELEASE_ASSERT(count < 3 * 1000 * 1000, "expected count < 3M"); // actual = 2,597,780
   }
 }
 BENCHMARK(BM_UsedCountersPrometheus)->Unit(benchmark::kMillisecond);
@@ -215,7 +217,7 @@ static void BM_FilteredCountersPrometheus(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count < 100, "expected count < 100"); // actual = 12
+    RELEASE_ASSERT(count == 0, "expected count == 0");
   }
 }
 BENCHMARK(BM_FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
@@ -229,7 +231,7 @@ static void BM_SafeFilteredCountersPrometheus(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count < 100, "expected count < 100"); // actual = 12
+    RELEASE_ASSERT(count == 0, "expected count == 0");
   }
 }
 BENCHMARK(BM_SafeFilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
