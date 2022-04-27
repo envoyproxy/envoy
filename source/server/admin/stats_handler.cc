@@ -87,7 +87,7 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
     // Ideally we'd find a way to do this without slowing down
     // the non-Prometheus implementations.
     Buffer::OwnedImpl response;
-    prometheusStats(params, response);
+    prometheusFlushAndRender(params, response);
     return Admin::makeStaticTextRequest(response, code);
   }
 
@@ -109,28 +109,32 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 }
 
 Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
-                                         Buffer::Instance& response) {
+                                           Buffer::Instance& response) {
   StatsParams params;
   Http::Code code = params.parse(path_and_query, response);
   if (code != Http::Code::OK) {
     return code;
   }
-  prometheusStats(params, response);
+  prometheusFlushAndRender(params, response);
   return Http::Code::OK;
 }
 
-void StatsHandler::prometheusStats(const StatsParams& params, Buffer::Instance& response) {
+void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+}
 
-  Stats::Store& stats = server_.stats();
+
+void StatsHandler::prometheusRender(Stats::Store& stats, const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
                                               text_readouts_vec, response, params,
-                                              server_.api().customStatNamespaces());
+                                              custom_namespaces);
 }
 
 Http::Code StatsHandler::handlerContention(absl::string_view,

@@ -16,7 +16,7 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     break;
   case StatsFormat::Prometheus:
     // TODO(#16139): once Prometheus shares this algorithm here, this becomes a legitimate choice.
-    ASSERT(false);
+    IS_ENVOY_BUG("reached Prometheus case in switch unexpectedly");
     return Http::Code::BadRequest;
   }
 

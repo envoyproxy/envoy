@@ -140,7 +140,7 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   const CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", code_response.second);
+  EXPECT_EQ("usage: /stats?format=(json|prometheus|text)\n\n", code_response.second);
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
