@@ -17,6 +17,10 @@ public:
     alpn_.clear();
     return Network::FilterStatus::Continue;
   }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  }
+  size_t maxReadBytes() const override { return 0; }
 
   static void setAlpn(std::string alpn) {
     absl::MutexLock m(&alpn_lock_);

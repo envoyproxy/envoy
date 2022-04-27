@@ -346,6 +346,8 @@ public:
     return *fake_upstreams_.back();
   }
 
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
+
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
