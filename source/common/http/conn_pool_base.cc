@@ -117,6 +117,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
 // not considering http/2 connections connected until the SETTINGS frame is
 // received, but that would result in a latency penalty instead.
 void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
+  // FIXME update cache if present
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_allow_capacity_increase_by_settings")) {
     if (settings.maxConcurrentStreams().has_value()) {

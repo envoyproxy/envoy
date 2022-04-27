@@ -27,7 +27,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state);
+                 Upstream::ClusterConnectivityState& state,
+                 absl::optional<HttpServerPropertiesCache::Origin> origin,
+                 Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache);
 
 } // namespace Http2
 } // namespace Http

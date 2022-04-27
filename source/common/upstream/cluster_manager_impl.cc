@@ -1851,6 +1851,16 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
         alternate_protocol_options.value(), dispatcher);
   }
+  if (!alternate_protocol_options.has_value() &&
+      (protocols.size() == 2 || (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2))
+      && Runtime::runtimeFeatureEnabled(
+                      "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+      envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+      default_options.set_name(host->cluster().name());
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+  }
+
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
@@ -1871,28 +1881,23 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     PANIC("unexpected");
 #endif
   }
+  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+      getOrigin(transport_socket_options, host);
   if (protocols.size() >= 2) {
-    absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
-        getOrigin(transport_socket_options, host);
     ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-      envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
-      default_options.set_name(host->cluster().name());
-      alternate_protocols_cache =
-          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
-    }
 
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, getOrigin(transport_socket_options, host),
+        transport_socket_options, state, origin,
         alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state);
+                                         priority, options, transport_socket_options, state,
+                                         origin, alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {

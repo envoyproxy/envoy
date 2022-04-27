@@ -8,6 +8,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/conn_pool/conn_pool_base.h"
 #include "source/common/http/codec_client.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -153,10 +154,13 @@ public:
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
-      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
+      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
+      absl::optional<Http::HttpServerPropertiesCache::Origin> origin,
+      Http::HttpServerPropertiesCacheSharedPtr cache)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
-        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]),
+        origin_(origin), cache_(cache) {
     ASSERT(protocols.size() == 1);
   }
 
@@ -176,6 +180,8 @@ protected:
   const CreateCodecFn codec_fn_;
   const CreateClientFn client_fn_;
   const Http::Protocol protocol_;
+  absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  Http::HttpServerPropertiesCacheSharedPtr cache_;
 };
 
 /**

@@ -28,7 +28,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state) {
+                 Upstream::ClusterConnectivityState& state,
+                 absl::optional<HttpServerPropertiesCache::Origin> origin,
+                 Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
@@ -38,7 +40,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                                                  pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http2});
+      std::vector<Protocol>{Protocol::Http2}, origin, cache);
 }
 
 } // namespace Http2
