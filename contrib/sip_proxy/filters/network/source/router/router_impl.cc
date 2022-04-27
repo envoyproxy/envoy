@@ -359,25 +359,25 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     metadata->resetDestination();
 
     ENVOY_STREAM_LOG(debug, "handle affinity of {} {} {}", *callbacks_,
-                     metadata->affinityIteration()->header_, metadata->affinityIteration()->type_,
-                     metadata->affinityIteration()->value_);
-    auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header_,
-                                               metadata->affinityIteration()->type_,
-                                               metadata->affinityIteration()->key_, metadata);
+                     metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
+                     metadata->affinityIteration()->value());
+    auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header(),
+                                               metadata->affinityIteration()->type(),
+                                               metadata->affinityIteration()->key(), metadata);
 
     if (QueryStatus::Continue == handle_ret) {
       host = metadata->destination();
       ENVOY_STREAM_LOG(debug, "get existing destination {}", *callbacks_, host);
     } else if (QueryStatus::Pending == handle_ret) {
       ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
-                       metadata->affinityIteration()->key_);
+                       metadata->affinityIteration()->key());
       // Need to wait remote query response,
       // after response back, still back with current affinity
       metadata->setState(State::HandleAffinity);
       return FilterStatus::StopIteration;
     } else {
       ENVOY_STREAM_LOG(debug, "no existing destintion for {}", *callbacks_,
-                       metadata->affinityIteration()->key_);
+                       metadata->affinityIteration()->key());
       // Need to try next affinity
       metadata->nextAffinityIteration();
       metadata->setState(State::HandleAffinity);

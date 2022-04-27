@@ -32,7 +32,7 @@ namespace SipProxy {
  */
 enum class State { ALL_PROTOCOL_STATES(GENERATE_ENUM) };
 
-class SipHeader {
+class SipHeader : public Logger::Loggable<Logger::Id::filter> {
 public:
   SipHeader(HeaderType type, absl::string_view value) : type_(type), raw_text_(value) {}
   void parseHeader();
@@ -41,11 +41,13 @@ public:
 
   // "text" as the special param for raw_text_
   bool hasParam(absl::string_view param) const {
+    ENVOY_LOG(trace, "text: {}", raw_text_);
     if (param == "text") {
       return true;
     }
 
     for (auto& p : params_) {
+      ENVOY_LOG(trace, "hasParam: {} {}", p.first, p.second);
       if (p.first == param) {
         return true;
       }
@@ -70,11 +72,21 @@ public:
   std::vector<std::pair<absl::string_view, absl::string_view>> params_;
 };
 
-struct AffinityEntry {
+class AffinityEntry {
+public:
   AffinityEntry(const std::string& header, const std::string& type, const std::string& key, bool query, bool subscribe)
       : header_(header), type_(type), key_(key), query_(query), subscribe_(subscribe) {}
   AffinityEntry(const std::string& header, const std::string& type, const std::string& key, const std::string& value, bool query, bool subscribe)
       : header_(header), type_(type), key_(key), value_(value), query_(query), subscribe_(subscribe) {}
+
+  std::string & header() { return header_; }
+  std::string & type() { return type_; }
+  std::string & key() { return key_; }
+  std::string & value() { return value_; }
+  bool query() { return query_; }
+  bool subscribe() { return subscribe_; }
+
+private:
   std::string header_;
   std::string type_;
   std::string key_;

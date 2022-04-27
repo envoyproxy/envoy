@@ -201,7 +201,6 @@ public:
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
                          std::shared_ptr<UpstreamRequest> upstream_request) {
-    ENVOY_LOG(info, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ insert transaction {}", transaction_id);
     if (hasTransaction(transaction_id)) {
       return;
     }
@@ -225,7 +224,6 @@ public:
   }
 
   TransactionInfoItem& getTransaction(std::string&& transaction_id) {
-    ENVOY_LOG(info, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ get transaction {}", transaction_id);
     return *(tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.at(transaction_id));
   }
 
@@ -238,13 +236,8 @@ public:
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
     if (tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.find(host) !=
         tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.end()) {
-      ENVOY_LOG(info, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ find upstream requests for host {}",
-                host);
       return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
     } else {
-      ENVOY_LOG(info,
-                "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ can't find upstream requests for host {}",
-                host);
       return nullptr;
     }
 #if 0

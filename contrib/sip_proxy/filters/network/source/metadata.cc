@@ -14,25 +14,25 @@ void SipHeader::parseHeader() {
 
   std::size_t pos = 0;
   std::string pattern = "(.*)=(.*?)>*";
-  absl::string_view header = raw_text_;
+  absl::string_view & header = raw_text_;
 
   // Has "SIP/2.0" in top line
   // Eg: INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0
   if (std::size_t found = header.find(" SIP"); found != absl::string_view::npos) {
-    header = static_cast<std::string>(header).substr(0, found);
+    header = header.substr(0, found);
   }
 
-  while (std::size_t found = header.find_first_of(":;>", pos)) {
-    std::string str;
+  while (std::size_t found = header.find_first_of(";>", pos)) {
+    absl::string_view str;
     if (found == absl::string_view::npos) {
-      str = static_cast<std::string>(header).substr(pos);
+      str = header.substr(pos);
     } else {
-      str = static_cast<std::string>(header).substr(pos, found - pos);
+      str = header.substr(pos, found - pos);
     }
 
     std::string param = "";
     std::string value = "";
-    re2::RE2::FullMatch(static_cast<std::string>(str), pattern, &param, &value);
+    re2::RE2::FullMatch(std::string(str), pattern, &param, &value);
 
     if (!param.empty() && !value.empty()) {
       if (value.find("sip:") != absl::string_view::npos) {
@@ -48,9 +48,12 @@ void SipHeader::parseHeader() {
 
       if (!value.empty()) {
         if (param == "opaque") {
-          params_.emplace_back(std::make_pair("ep", value));
+          auto value_view = header.substr(header.find(value), value.length());
+          params_.emplace_back(std::make_pair("ep", value_view));
         } else {
-          params_.emplace_back(std::make_pair(param, value));
+          auto param_view = header.substr(header.find(param), param.length());
+          auto value_view = header.substr(header.find(value), value.length());
+          params_.emplace_back(std::make_pair(param_view, value_view));
         }
       }
     }

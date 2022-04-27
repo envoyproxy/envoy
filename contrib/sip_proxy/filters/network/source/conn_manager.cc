@@ -52,7 +52,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     return QueryStatus::Continue;
   }
 
-  if (activetrans.metadata()->affinityIteration()->query_) {
+  if (activetrans.metadata()->affinityIteration()->query()) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
         traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
