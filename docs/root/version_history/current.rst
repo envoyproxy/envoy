@@ -27,6 +27,7 @@ Removed Config or Runtime
 * dns: removed ``envoy.reloadable_features.use_dns_ttl`` and legacy code paths.
 * ext_authz: removed ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard and legacy code paths.
 * http: deprecated ``envoy.reloadable_features.correct_scheme_and_xfp`` and legacy code paths.
+* tcp_proxy: removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
 
 New Features
 ------------
