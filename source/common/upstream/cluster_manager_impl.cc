@@ -1861,6 +1861,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
           alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
   }
 
+  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+      getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
@@ -1889,8 +1891,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, origin,
-        alternate_protocols_cache);
+        transport_socket_options, state, origin, alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
