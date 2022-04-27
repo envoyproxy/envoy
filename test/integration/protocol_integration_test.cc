@@ -3382,7 +3382,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
   expectUpstreamBytesSentAndReceived(
       BytesCountExpectation(256, 120, 204, 67),
       BytesCountExpectation(172, 81, 154, http2_trailer_bytes_received),
-      BytesCountExpectation(154, 59, 142, 33));
+      BytesCountExpectation(154, 33, 142, 7));
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
