@@ -276,26 +276,12 @@ TEST_P(StatsUtilityTest, ScopeTextReadoutOnce) { scopeOnce<TextReadout>(makeText
 TEST_P(StatsUtilityTest, ScopeTextReadoutAll) { scopeAll<TextReadout>(makeTextReadout()); }
 
 TEST_P(StatsUtilityTest, SanitizeStatsName) {
-
-  absl::string_view testStrings[6] = {
-    "a.b.c.",
-    ".a.b.c",
-    "a::b",
-    "a.\0",
-    "a://b",
-    "a:/b"
-  };
-    absl::string_view expectStrings[6] = {
-    "a.b.c",
-    "a.b.c",
-    "a__b",
-    "a",
-    "a_b",
-    "a_b"
-  };
-  for (size_t i = 0; i < std::size(testStrings); i++) {
-    EXPECT_EQ(expectStrings[i], Utility::sanitizeStatsName(testStrings[i]));
-  }
+  EXPECT_EQ("a.b.c", , Utility::sanitizeStatsName("a.b.c."));
+  EXPECT_EQ("a.b.c", , Utility::sanitizeStatsName(".a.b.c"));
+  EXPECT_EQ("a__b", , Utility::sanitizeStatsName("a::b"));
+  EXPECT_EQ("a", , Utility::sanitizeStatsName("a.\0"));
+  EXPECT_EQ("a_b", , Utility::sanitizeStatsName("a://b"));
+  EXPECT_EQ("a_b", , Utility::sanitizeStatsName("a:/b"));
 }
 
 } // namespace
