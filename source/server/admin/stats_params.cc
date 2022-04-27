@@ -8,11 +8,20 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   used_only_ = query_.find("usedonly") != query_.end();
   pretty_ = query_.find("pretty") != query_.end();
   prometheus_text_readouts_ = query_.find("text_readouts") != query_.end();
-  if (!Utility::filterParam(query_, response, filter_)) {
-    return Http::Code::BadRequest;
-  }
-  if (filter_.has_value()) {
-    filter_string_ = query_.find("filter")->second;
+  safe_regex_ = query_.find("safe") != query_.end();
+
+  auto filter_iter = query_.find("filter");
+  if (filter_iter != query_.end()) {
+    filter_string_ =  filter_iter->second;
+    if (safe_regex_) {
+      safe_filter_ = std::make_shared<re2::RE2>(filter_string_);
+      if (!safe_filter_->ok()) {
+        response.add("invalid safe regex");
+        return Http::Code::BadRequest;
+      }
+    } else if (!Utility::filterParam(query_, response, filter_)) {
+      return Http::Code::BadRequest;
+    }
   }
 
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode_);
