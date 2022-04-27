@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
@@ -63,7 +64,7 @@ private:
   DubboFilterStats stats_;
   const SerializationType serialization_type_;
   const ProtocolType protocol_type_;
-  Router::RouteMatcherPtr route_matcher_;
+  Router::RouteConfigImplPtr route_matcher_;
 
   std::list<DubboFilters::FilterFactoryCb> filter_factories_;
 };
