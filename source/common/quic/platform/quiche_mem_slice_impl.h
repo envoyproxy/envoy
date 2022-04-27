@@ -29,11 +29,9 @@ public:
   QuicheMemSliceImpl(quiche::QuicheBuffer buffer);
   QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
 
-  // Prerequisite: `buffer` must be non-empty, and its first slice must have
-  // length `length`.
-  // Constructs a QuicheMemSliceImpl, copies `length` bytes into it from
-  // `buffer`, and drains `length` bytes of `buffer`, effectively consuming its
-  // first slice.
+  // Constructs a QuicheMemSliceImpl and moves the first slice of `buffer` into
+  // it. Prerequisite: `buffer` must be non-empty, and its first slice must
+  // have length `length`.
   explicit QuicheMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length);
 
   QuicheMemSliceImpl(const QuicheMemSliceImpl& other) = delete;
