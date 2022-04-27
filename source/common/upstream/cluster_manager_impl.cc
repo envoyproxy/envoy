@@ -75,6 +75,18 @@ bool contains(const std::vector<Http::Protocol>& protocols,
   return true;
 }
 
+absl::optional<Http::HttpServerPropertiesCache::Origin>
+getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
+  std::string sni = host->transportSocketFactory().defaultServerNameIndication();
+  if (options && options->serverNameOverride().has_value()) {
+    sni = options->serverNameOverride().value();
+  }
+  if (sni.empty()) {
+    return absl::nullopt;
+  }
+  return {{"https", sni, host->address()->ip()->port()}};
+}
+
 } // namespace
 
 void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
@@ -1825,18 +1837,6 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
       http_context_, grpc_context_, router_context_, server_)};
 }
 
-absl::optional<Http::HttpServerPropertiesCache::Origin>
-getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
-  std::string sni(host->transportSocketFactory().defaultServerNameIndication());
-  if (options && options->serverNameOverride().has_value()) {
-    sni = options->serverNameOverride().value();
-  }
-  if (sni.empty()) {
-    return absl::nullopt;
-  }
-  return {{"https", sni, host->address()->ip()->port()}};
-}
-
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
@@ -1845,7 +1845,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
-  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache{};
+  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
 
   if (alternate_protocol_options.has_value()) {
     alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
@@ -1858,6 +1858,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
+    ASSERT(alternate_protocols_cache);
 #ifdef ENVOY_ENABLE_QUIC
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     if (quic_info == nullptr) {
@@ -1874,9 +1875,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+      ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
       envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
       default_options.set_name(host->cluster().name());
       alternate_protocols_cache =
