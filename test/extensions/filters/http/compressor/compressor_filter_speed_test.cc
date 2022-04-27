@@ -447,11 +447,10 @@ static void compressFullWithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
-  Envoy::Extensions::HttpFilters::Compressor::Result res;
 
   for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
-    res = compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
+    compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
 }
 BENCHMARK(compressFullWithZstd)
@@ -464,7 +463,6 @@ static void compressChunks16384WithZstd(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
-  Envoy::Extensions::HttpFilters::Compressor::Result res;
 
   for (auto _ : state) { // NOLINT
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
