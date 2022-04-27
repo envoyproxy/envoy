@@ -40,7 +40,7 @@ message CaresDnsResolverConfig {
   // provide IPv4 addresses.
   bool filter_unroutable_families = 4;
 
-  // Treat ARES_ENODATA and ARES_ENOTFOUND as valid responses and propagate the "no records" result back to the caller.
+  // Treat `ARES_ENODATA` and `ARES_ENOTFOUND` as valid responses and propagate the "no records" result back to the caller.
   bool accept_nodata = 5;
 
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.

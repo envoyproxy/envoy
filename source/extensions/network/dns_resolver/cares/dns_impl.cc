@@ -24,7 +24,7 @@ namespace Envoy {
 namespace Network {
 
 namespace {
-// Treat responses with ARES_ENODATA or ARES_ENOTFOUND status as DNS response with no records.
+// Treat responses with `ARES_ENODATA` or `ARES_ENOTFOUND` status as DNS response with no records.
 // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for details.
 bool isResponseWithNoRecords(int status) {
   return status == ARES_ENODATA || status == ARES_ENOTFOUND;
@@ -220,8 +220,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
   } else if (parent_.accept_nodata_ && isResponseWithNoRecords(status) && !dual_resolution_) {
-    // Treat ARES_ENODATA or ARES_ENOTFOUND here as success for last attempt to populate back the
-    // "empty records" response.
+    // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success for last attempt to populate back
+    // the "empty records" response.
     pending_response_.status_ = ResolutionStatus::Success;
   }
 
