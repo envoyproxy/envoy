@@ -160,7 +160,6 @@ static void BM_AllCountersPrometheus(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
-    ENVOY_LOG_MISC(error, "count={}", count);
     RELEASE_ASSERT(count > 250 * 1000 * 1000, "expected count > 250M"); // actual = 261,578,000
   }
 }
