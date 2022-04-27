@@ -400,7 +400,7 @@ public:
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
-                      absl::optional<size_t> max_length);
+                      absl::optional<size_t> max_length, bool format_as_number = false);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&,
@@ -411,6 +411,9 @@ public:
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
+
+private:
+  const bool format_as_number_;
 };
 
 /**
@@ -580,6 +583,24 @@ public:
 class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 public:
   DownstreamPeerCertVEndFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for upstream cert start time from the StreamInfo's
+ * upstreamInfo.
+ */
+class UpstreamPeerCertVStartFormatter : public SystemTimeFormatter {
+public:
+  UpstreamPeerCertVStartFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for upstream cert end time from the StreamInfo's
+ * upstreamInfo.
+ */
+class UpstreamPeerCertVEndFormatter : public SystemTimeFormatter {
+public:
+  UpstreamPeerCertVEndFormatter(const std::string& format);
 };
 
 /**

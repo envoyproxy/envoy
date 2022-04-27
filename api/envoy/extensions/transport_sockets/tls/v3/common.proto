@@ -448,8 +448,12 @@ message CertificateValidationContext {
   //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   repeated SubjectAltNameMatcher match_typed_subject_alt_names = 15;
 
-  // This field is deprecated in favor of ref:`match_typed_subject_alt_names
+  // This field is deprecated in favor of
+  // :ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
+  // Note that if both this field and :ref:`match_typed_subject_alt_names
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
+  // are specified, the former (deprecated field) is ignored.
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

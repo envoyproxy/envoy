@@ -140,6 +140,10 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
     return;
   }
+  // Ensure the event loop gets at least one event to end the test.
+  auto end_timer =
+      server->dispatcher().createTimer([]() { ENVOY_LOG_MISC(trace, "server timer fired"); });
+  end_timer->enableTimer(std::chrono::milliseconds(5000));
   // If we were successful, run any pending events on the main thread's dispatcher loop. These might
   // be, for example, pending DNS resolution callbacks. If they generate exceptions, we want to
   // explode and fail the test, hence we do this outside of the try-catch above.

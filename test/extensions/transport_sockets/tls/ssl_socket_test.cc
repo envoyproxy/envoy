@@ -4487,6 +4487,12 @@ TEST_P(SslSocketTest, CipherSuites) {
 
   // Client connects with unsupported cipher suite, connection fails.
   client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-ECDSA-AES128-SHA");
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
+  client_params->add_cipher_suites("AES128-SHA");
+  client_params->add_cipher_suites("ECDHE-ECDSA-AES256-SHA");
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-SHA");
+  client_params->add_cipher_suites("AES256-SHA");
   server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
   updateFilterChain(tls_context, *filter_chain);
   TestUtilOptionsV2 error_test_options(listener, client, false, GetParam());

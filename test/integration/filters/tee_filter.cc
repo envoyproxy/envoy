@@ -52,51 +52,56 @@ Http::FilterFactoryCb StreamTeeFilterConfig::createFilter(const std::string&,
                                                           Server::Configuration::FactoryContext&) {
   return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<StreamTeeFilter>();
-    // TODO(kbaichoo): support multiple streams.
-    current_tee_ = filter;
+    // TODO(kbaichoo): support multiple connections.
+    uint32_t next_stream_id = consumeNextClientStreamId();
+    ASSERT(!stream_id_to_stream_tee_.contains(next_stream_id), "Client Stream ID already exists.");
+    stream_id_to_stream_tee_.insert({next_stream_id, filter});
     callbacks.addStreamFilter(std::move(filter));
   };
 }
 
-bool StreamTeeFilterConfig::inspectStreamTee(int /*stream_number*/,
+bool StreamTeeFilterConfig::inspectStreamTee(uint32_t stream_id,
                                              std::function<void(const StreamTee&)> inspector) {
-  if (!current_tee_) {
-    ENVOY_LOG_MISC(warn, "No current stream_tee!");
+  if (!stream_id_to_stream_tee_.contains(stream_id)) {
+    ENVOY_LOG_MISC(warn, "No stream with the given ID.");
     return false;
   }
 
-  // TODO(kbaichoo): support multiple streams.
-  inspector(*current_tee_);
+  const StreamTeeSharedPtr& stream_tee = stream_id_to_stream_tee_.find(stream_id)->second;
+  inspector(*stream_tee);
   return true;
 }
 
 bool StreamTeeFilterConfig::setEncodeDataCallback(
-    int /*stream_number*/,
+    uint32_t stream_id,
     std::function<Http::FilterDataStatus(StreamTee&,
                                          Http::StreamEncoderFilterCallbacks* encoder_cbs)>
         cb) {
-  if (!current_tee_) {
-    ENVOY_LOG_MISC(warn, "No current stream_tee!");
+  if (!stream_id_to_stream_tee_.contains(stream_id)) {
+    ENVOY_LOG_MISC(warn, "No stream with the given ID.");
     return false;
   }
 
-  absl::MutexLock l{&current_tee_->mutex_};
-  current_tee_->on_encode_data_ = cb;
+  StreamTeeSharedPtr& stream_tee = stream_id_to_stream_tee_.find(stream_id)->second;
+  absl::MutexLock l{&stream_tee->mutex_};
+  stream_tee->on_encode_data_ = cb;
+
   return true;
 }
 
 bool StreamTeeFilterConfig::setDecodeDataCallback(
-    int /*stream_number*/,
+    uint32_t stream_id,
     std::function<Http::FilterDataStatus(StreamTee&,
                                          Http::StreamDecoderFilterCallbacks* decoder_cbs)>
         cb) {
-  if (!current_tee_) {
-    ENVOY_LOG_MISC(warn, "No current stream_tee!");
+  if (!stream_id_to_stream_tee_.contains(stream_id)) {
+    ENVOY_LOG_MISC(warn, "No stream with the given ID.");
     return false;
   }
 
-  absl::MutexLock l{&current_tee_->mutex_};
-  current_tee_->on_decode_data_ = cb;
+  StreamTeeSharedPtr& stream_tee = stream_id_to_stream_tee_.find(stream_id)->second;
+  absl::MutexLock l{&stream_tee->mutex_};
+  stream_tee->on_decode_data_ = cb;
   return true;
 }
 

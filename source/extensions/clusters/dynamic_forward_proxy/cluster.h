@@ -39,6 +39,9 @@ public:
       const std::string& host,
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
   void onDnsHostRemove(const std::string& host) override;
+  void onDnsResolutionComplete(const std::string&,
+                               const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
+                               Network::DnsResolver::ResolutionStatus) override {}
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
 

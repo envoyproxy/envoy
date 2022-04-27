@@ -166,6 +166,11 @@ pkg_files(
     strip_prefix = "/docs/root",
 )
 
+pkg_files(
+    name = "sphinx_inventories",
+    srcs = ["inventories"],
+)
+
 # TODO(phlax): this appears unused, fix or remove
 pkg_files(
     name = "google_vrp_config",
@@ -186,6 +191,7 @@ pkg_filegroup(
     srcs = [
         ":examples_rst",
         ":sphinx_base",
+        ":sphinx_inventories",
         ":sphinx_root",
     ],
 )

@@ -43,9 +43,9 @@ public:
   }
 };
 
-class ModifyBuffferFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class ModifyBufferFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  ModifyBuffferFilterConfig() : EmptyHttpFilterConfig("modify-buffer-filter") {}
+  ModifyBufferFilterConfig() : EmptyHttpFilterConfig("modify-buffer-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override {
@@ -56,7 +56,7 @@ public:
 };
 
 // perform static registration
-static Registry::RegisterFactory<ModifyBuffferFilterConfig,
+static Registry::RegisterFactory<ModifyBufferFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

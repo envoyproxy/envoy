@@ -53,7 +53,7 @@ private:
 
   CdsApiHelper helper_;
   ClusterManager& cm_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   Config::SubscriptionPtr subscription_;
   std::function<void()> initialize_callback_;
 };
