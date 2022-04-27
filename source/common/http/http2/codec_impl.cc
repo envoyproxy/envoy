@@ -182,6 +182,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
+    stream_manager_.chunk_size_ = buffer_limit;
   }
 }
 
@@ -447,7 +448,9 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     --read_disable_count_;
     if (!buffersOverrun()) {
       scheduleProcessingOfBufferedData();
-      grantPeerAdditionalStreamWindow();
+      if (shouldAllowPeerAdditionalStreamWindow()) {
+        grantPeerAdditionalStreamWindow();
+      }
     }
   }
 }
@@ -502,19 +505,40 @@ void ConnectionImpl::StreamImpl::decodeData() {
     return;
   }
 
-  // Any buffered data will be consumed.
+  // Buffered data may be consumed. Restore if not all consumed.
   stream_manager_.body_buffered_ = false;
 
+  bool already_drained_data = false;
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
-    decoder().decodeData(*pending_recv_data_, sendEndStream());
+    const bool decodeDataInChunk = defer_processing_backedup_streams_ &&
+                                   stream_manager_.decodeAsChunks() &&
+                                   pending_recv_data_->length() > stream_manager_.chunk_size_;
+    if (decodeDataInChunk) {
+      Buffer::OwnedImpl chunk_buffer;
+      // TODO(kbaichoo): Consider implementing an approximate move for chunking.
+      chunk_buffer.move(*pending_recv_data_, stream_manager_.chunk_size_);
+
+      // With the current implementation this should always be true,
+      // though this can change with approximation.
+      stream_manager_.body_buffered_ = true;
+
+      decoder().decodeData(chunk_buffer, sendEndStream());
+      already_drained_data = true;
+
+      if (!buffersOverrun()) {
+        process_buffered_data_callback_->scheduleCallbackNextIteration();
+      }
+    } else {
+      // Send the entire buffer through.
+      decoder().decodeData(*pending_recv_data_, sendEndStream());
+    }
   }
 
-  // TODO(kbaichoo): If dumping buffered data, we should do so in default read
-  // size chunks rather than dumping the entire buffer, which can have fairness
-  // issues.
-  pending_recv_data_->drain(pending_recv_data_->length());
+  if (!already_drained_data) {
+    pending_recv_data_->drain(pending_recv_data_->length());
+  }
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {

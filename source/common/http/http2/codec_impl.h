@@ -379,6 +379,12 @@ protected:
       // as the stream had pending data to process and the stream was not reset.
       bool buffered_on_stream_close_{false};
 
+      // Chunk size for processing body data. Defaults to the value of high
+      // watermark of the *pending_recv_data_* buffer.
+      // If 0, we will process all buffered data (chunking disabled).
+      uint32_t chunk_size_{0};
+
+      bool decodeAsChunks() const { return chunk_size_ > 0; }
       bool hasBufferedBodyOrTrailers() const { return body_buffered_ || trailers_buffered_; }
     };
 
