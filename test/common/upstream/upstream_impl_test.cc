@@ -3400,6 +3400,7 @@ public:
   }
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
   std::string configType() override { return ""; };
+  std::set<std::string> otherTypes() override { return {}; }
 
   TestFilterConfigFactoryBase& parent_;
 };
