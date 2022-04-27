@@ -274,6 +274,12 @@ protected:
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
+
+  // Test sending and receiving large request and response bodies with autonomous upstream.
+  void testGiantRequestAndResponse(
+      uint64_t request_size, uint64_t response_size, bool set_content_length_header,
+      std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.

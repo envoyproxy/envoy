@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -620,41 +621,6 @@ public:
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
-protected:
-  const bool case_sensitive_;
-  const std::string prefix_rewrite_;
-  Regex::CompiledMatcherPtr regex_rewrite_;
-  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  std::string regex_rewrite_substitution_;
-  std::string regex_rewrite_redirect_substitution_;
-  const std::string host_rewrite_;
-  bool include_vh_rate_limits_;
-  absl::optional<ConnectConfig> connect_config_;
-
-  RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
-
-  /**
-   * Returns the correct path rewrite string for this route.
-   *
-   * The provided container may be used to store memory backing the return value
-   * therefore it must outlive any use of the return value.
-   */
-  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
-                                    absl::optional<std::string>& container) const;
-
-  void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
-                          bool insert_envoy_original_path) const;
-
-  absl::optional<std::string>
-  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
-                                            absl::string_view matched_path) const;
-
-private:
-  struct RuntimeData {
-    std::string fractional_runtime_key_{};
-    envoy::type::v3::FractionalPercent fractional_runtime_default_{};
-  };
-
   class DynamicRouteEntry : public RouteEntry, public Route {
   public:
     DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
@@ -854,6 +820,42 @@ private:
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
+protected:
+  const bool case_sensitive_;
+  const std::string prefix_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  std::string regex_rewrite_substitution_;
+  std::string regex_rewrite_redirect_substitution_;
+  const std::string host_rewrite_;
+  bool include_vh_rate_limits_;
+  absl::optional<ConnectConfig> connect_config_;
+
+  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   uint64_t random_value) const;
+
+  /**
+   * Returns the correct path rewrite string for this route.
+   *
+   * The provided container may be used to store memory backing the return value
+   * therefore it must outlive any use of the return value.
+   */
+  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
+                                    absl::optional<std::string>& container) const;
+
+  void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
+                          bool insert_envoy_original_path) const;
+
+  absl::optional<std::string>
+  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
+                                            absl::string_view matched_path) const;
+
+private:
+  struct RuntimeData {
+    std::string fractional_runtime_key_{};
+    envoy::type::v3::FractionalPercent fractional_runtime_default_{};
+  };
+
   /**
    * Returns a vector of request header parsers which applied or will apply header transformations
    * to the request in this route.
@@ -923,6 +925,7 @@ private:
   const bool append_xfh_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
+  ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
@@ -1254,6 +1257,8 @@ public:
 
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
 
+  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1265,6 +1270,8 @@ private:
   const bool most_specific_header_mutations_wins_;
   const uint32_t max_direct_response_body_size_bytes_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
+  // Cluster specifier plugins/providers.
+  absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
 };
 
 /**
