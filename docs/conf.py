@@ -331,7 +331,7 @@ intersphinx_mapping = {
     'v1.17': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', "inventories/v1.17/objects.inv"),
     'v1.18': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', "inventories/v1.18/objects.inv"),
     'v1.19': ('https://www.envoyproxy.io/docs/envoy/v1.19.4', "inventories/v1.19/objects.inv"),
-    'v1.20': ('https://www.envoyproxy.io/docs/envoy/v1.20.1', "inventories/v1.20/objects.inv"),
+    'v1.20': ('https://www.envoyproxy.io/docs/envoy/v1.20.3', "inventories/v1.20/objects.inv"),
     'v1.21': ('https://www.envoyproxy.io/docs/envoy/v1.21.1', "inventories/v1.21/objects.inv"),
     'v1.22': ('https://www.envoyproxy.io/docs/envoy/v1.22.0', "inventories/v1.22/objects.inv"),
 }
