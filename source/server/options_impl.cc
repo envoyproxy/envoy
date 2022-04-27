@@ -326,7 +326,7 @@ spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_vie
     return spdlog::level::level_enum::warn;
   }
 
-  size_t level_to_use = SIZE_MAX;
+  size_t level_to_use = std::numeric_limits<size_t>::max();
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
     spdlog::string_view_t spd_log_level = spdlog::level::level_string_views[i];
     if (log_level == absl::string_view(spd_log_level.data(), spd_log_level.size())) {
@@ -335,7 +335,7 @@ spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_vie
     }
   }
 
-  if (level_to_use == SIZE_MAX) {
+  if (level_to_use == std::numeric_limits<size_t>::max()) {
     logError(fmt::format("error: invalid log level specified '{}'", log_level));
   }
   return static_cast<spdlog::level::level_enum>(level_to_use);

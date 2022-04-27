@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
+#include <cstdint>
 
 namespace Envoy {
 namespace Extensions {
@@ -255,7 +256,7 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
 
 absl::optional<size_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
-    return absl::make_optional(std::numeric_limits<int>::max());
+    return absl::make_optional(SIZE_MAX);
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),

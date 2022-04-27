@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 #include <regex>
 #include <string>
@@ -539,7 +540,7 @@ typed_config:
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
   initialize();
-  EXPECT_EQ(0, validator().daysUntilFirstCertExpires().value());
+  EXPECT_EQ(SIZE_MAX, validator().daysUntilFirstCertExpires().value());
 
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
