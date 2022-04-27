@@ -84,6 +84,7 @@ The route specific configuration:
         typed_per_filter_config:
           envoy.filters.http.local_ratelimit:
             "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            stat_prefix: http_local_rate_limiter
             token_bucket:
               max_tokens: 10000
               tokens_per_fill: 1000
