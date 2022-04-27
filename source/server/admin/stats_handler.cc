@@ -119,12 +119,12 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
   return Http::Code::OK;
 }
 
-void StatsHandler::prometheusStats(const StatsParams& params, Buffer::Instance& response) {
+void StatsHandler::prometheusStats(Stats::Store& stats, const StatsParams& params,
+                                   Buffer::Instance& response) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
 
-  Stats::Store& stats = server_.stats();
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();

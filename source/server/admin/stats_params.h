@@ -44,10 +44,8 @@ struct StatsParams {
       return;
     }
     std::string name = stat->name();
-    if (safe_regex_) {
-      if (safe_filter_ != nullptr && !re2::RE2::PartialMatch(name, *safe_filter_)) {
-        return;
-      }
+    if (safe_filter_ != nullptr && !re2::RE2::PartialMatch(name, *safe_filter_)) {
+      return;
     } else if (filter_.has_value() && !std::regex_search(name, filter_.value())) {
       return;
     }
@@ -57,7 +55,6 @@ struct StatsParams {
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
-  bool safe_regex_{false};
   StatsFormat format_{StatsFormat::Text};
   std::string filter_string_;
   absl::optional<std::regex> filter_;

@@ -242,6 +242,13 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
             "B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
             "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
             code_response.second);
+
+  code_response = handlerStats(url + "&usedonly&filter=h2&safe");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
+            "B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
+            "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
+            code_response.second);
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
@@ -1195,6 +1202,13 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
   // but we always precede by 'Invalid regex: "'.
   EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
   EXPECT_THAT(data.toString(), EndsWith("\"\n"));
+}
+
+TEST_P(AdminInstanceTest, StatsInvalidSafeRegex) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test&safe", header_map, data));
+  EXPECT_EQ("Invalid safe regex", data.toString());
 }
 
 TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {

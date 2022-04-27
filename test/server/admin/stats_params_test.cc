@@ -19,5 +19,23 @@ TEST(StatsParamsTest, ParseParamsFormat) {
   EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=bogus", response));
 }
 
+TEST(StatsParamsTest, ParseParamsFilter) {
+  Buffer::OwnedImpl response;
+
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
+    EXPECT_TRUE(params.filter_.has_value());
+    EXPECT_EQ(nullptr, params.safe_filter_);
+  }
+
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo&safe", response));
+    EXPECT_FALSE(params.filter_.has_value());
+    EXPECT_NE(nullptr, params.safe_filter_);
+  }
+}
+
 } // namespace Server
 } // namespace Envoy
