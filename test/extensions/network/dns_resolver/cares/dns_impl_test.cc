@@ -28,6 +28,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -1311,17 +1312,17 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
                                                        DnsLookupFamily::V4Only, true));
 }
 
-class DnsImplAcceptEnodataTest : public DnsImplTest {
+class DnsImplAcceptNodataTest : public DnsImplTest {
 protected:
   bool acceptNodata() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
-INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAcceptEnodataTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAcceptNodataTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV4) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledV4) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Success,
@@ -1329,7 +1330,7 @@ TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV4) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV6) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
                                              DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
@@ -1337,7 +1338,7 @@ TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV6) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledAuto) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledAuto) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
@@ -1345,7 +1346,7 @@ TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledAuto) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV4Preferred) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledV4Preferred) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
                                              DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
@@ -1353,24 +1354,33 @@ TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledV4Preferred) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledNoDataV4) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledNoDataV4) {
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Success, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledNoDataV6) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledNoDataV6) {
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
                                     DnsResolver::ResolutionStatus::Success, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_P(DnsImplAcceptEnodataTest, AcceptEnodataEnabledNoDataAuto) {
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledNoDataAuto) {
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                     DnsResolver::ResolutionStatus::Success, {}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplAcceptNodataTest, AcceptNodataEnabledNoDataDisableByGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.cares_accept_nodata", "false"}});
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

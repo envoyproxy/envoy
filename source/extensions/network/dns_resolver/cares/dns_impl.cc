@@ -16,6 +16,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "ares.h"
@@ -138,7 +139,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
   pending_resolutions_--;
 
   if (status != ARES_SUCCESS) {
-    if (!parent_.accept_nodata_ || !isResponseWithNoRecords(status)) {
+    if (!accept_nodata_ || !isResponseWithNoRecords(status)) {
       ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                       "dns resolution for {} failed with c-ares status {}", dns_name_, status);
     }
@@ -219,7 +220,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
-  } else if (parent_.accept_nodata_ && isResponseWithNoRecords(status) && !dual_resolution_) {
+  } else if (accept_nodata_ && isResponseWithNoRecords(status) && !dual_resolution_) {
     // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success for last attempt to populate back
     // the "empty records" response.
     pending_response_.status_ = ResolutionStatus::Success;
@@ -380,6 +381,9 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
       dns_lookup_family == DnsLookupFamily::All) {
     dual_resolution_ = true;
   }
+
+  accept_nodata_ = parent.accept_nodata_ &&
+                   Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata");
 
   switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:
