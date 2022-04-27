@@ -1883,8 +1883,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     PANIC("unexpected");
 #endif
   }
-  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
-      getOrigin(transport_socket_options, host);
   if (protocols.size() >= 2) {
     ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
 

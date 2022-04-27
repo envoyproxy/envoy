@@ -28,8 +28,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state,
-                 absl::optional<HttpServerPropertiesCache::Origin> origin,
-                 Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache);
+                 absl::optional<HttpServerPropertiesCache::Origin> origin = absl::nullopt,
+                 Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache = nullptr);
 
 } // namespace Http2
 } // namespace Http

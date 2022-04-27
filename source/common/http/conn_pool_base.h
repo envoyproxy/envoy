@@ -155,8 +155,8 @@ public:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
       CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
-      absl::optional<Http::HttpServerPropertiesCache::Origin> origin,
-      Http::HttpServerPropertiesCacheSharedPtr cache)
+      absl::optional<Http::HttpServerPropertiesCache::Origin> origin = absl::nullopt,
+      Http::HttpServerPropertiesCacheSharedPtr cache = nullptr)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
         codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]),
