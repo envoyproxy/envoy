@@ -50,9 +50,6 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
     return nullptr;
   }
 
-  ENVOY_LOG(trace, "Do Route match with header: {}, parameter: {} and domain: {}", header_,
-            parameter_, domain_);
-
   type = Envoy::Extensions::NetworkFilters::SipProxy::HeaderTypes::get().str2Header(header_);
 
   if (type == HeaderType::Other) {
@@ -175,7 +172,6 @@ FilterStatus Router::handleAffinity() {
   }
 #endif
 
-  ENVOY_LOG(trace, "Get Protocal Options Config");
   const std::shared_ptr<const ProtocolOptionsConfig> options =
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
           SipFilters::SipFilterNames::get().SipProxy);
@@ -185,10 +181,8 @@ FilterStatus Router::handleAffinity() {
   }
 
   // Do subscribe
-  ENVOY_LOG(trace, "Tra handle do subscribe");
   callbacks_->traHandler()->doSubscribe(options->customizedAffinity());
 
-  ENVOY_LOG(trace, "handle cutomiziedAffitniy");
   if (metadata->affinity().empty()) {
     metadata->setStopLoadBalance(options->customizedAffinity().stop_load_balance());
 

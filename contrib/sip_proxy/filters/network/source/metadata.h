@@ -41,13 +41,11 @@ public:
 
   // "text" as the special param for raw_text_
   bool hasParam(absl::string_view param) const {
-    ENVOY_LOG(trace, "text: {}", raw_text_);
     if (param == "text") {
       return true;
     }
 
     for (auto& p : params_) {
-      ENVOY_LOG(trace, "hasParam: {} {}", p.first, p.second);
       if (p.first == param) {
         return true;
       }

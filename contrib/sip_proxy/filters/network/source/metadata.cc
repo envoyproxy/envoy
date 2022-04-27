@@ -84,7 +84,6 @@ void MessageMetadata::addEPOperation(
     size_t raw_offset, absl::string_view& header,
     const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
         local_services) {
-  ENVOY_LOG(trace, "addEPOperation() with header: {}", header);
   if (header.find(";ep=") != absl::string_view::npos) {
     // already Contact have ep
     return;
