@@ -195,6 +195,16 @@ The following command operators are supported:
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
   available (e.g. in TCP logs).
 
+%UPSTREAM_PROTOCOL%
+  HTTP
+    Upstream protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
+
+  TCP/UDP
+    Not implemented ("-").
+
+  In typed JSON logs, UPSTREAM_PROTOCOL will render the string ``"-"`` if the protocol is not
+  available (e.g. in TCP logs).
+
 %RESPONSE_CODE%
   HTTP
     HTTP response code. Note that a response code of '0' means that the server never sent the
@@ -842,6 +852,80 @@ The following command operators are supported:
     Not implemented ("-").
 
   DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+%UPSTREAM_PEER_SUBJECT%
+  HTTP
+    The subject present in the peer certificate used to establish the upstream TLS connection.
+  TCP
+    The subject present in the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_ISSUER%
+  HTTP
+    The issuer present in the peer certificate used to establish the upstream TLS connection.
+  TCP
+    The issuer present in the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_TLS_SESSION_ID%
+  HTTP
+    The session ID for the established upstream TLS connection.
+  TCP
+    The session ID for the established upstream TLS connection.
+  UDP
+    Not implemented (0).
+
+%UPSTREAM_TLS_CIPHER%
+  HTTP
+    The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.
+  TCP
+    The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_TLS_VERSION%
+  HTTP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
+  TCP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_CERT%
+  HTTP
+    The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.
+  TCP
+    The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+.. _config_access_log_format_upstream_peer_cert_v_start:
+
+%UPSTREAM_PEER_CERT_V_START%
+  HTTP
+    The validity start date of the upstream server certificate used to establish the upstream TLS connection.
+  TCP
+    The validity start date of the upstream server certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+  UPSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_upstream_peer_cert_v_end:
+
+%UPSTREAM_PEER_CERT_V_END%
+  HTTP
+    The validity end date of the upstream server certificate used to establish the upstream TLS connection.
+  TCP
+    The validity end date of the upstream server certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+  UPSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %HOSTNAME%

@@ -37,7 +37,6 @@
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
-#include "source/common/tcp/original_conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/maglev_lb.h"
@@ -1886,13 +1885,8 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     ClusterConnectivityState& state) {
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
-    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                               transport_socket_options, state);
-  } else {
-    return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
-        dispatcher, host, priority, options, transport_socket_options)};
-  }
+  return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                             transport_socket_options, state);
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

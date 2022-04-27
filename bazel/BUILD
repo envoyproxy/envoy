@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load("//bazel:utils.bzl", "json_data")
