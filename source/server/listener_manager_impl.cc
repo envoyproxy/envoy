@@ -678,7 +678,8 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   *existing_active_listener = std::move(*existing_warming_listener);
 
   // Skip draining if there is no different filter chain.
-  if (ListenerMessageUtil::filterChainChanged(previous_listener->config(), (*existing_active_listener)->config())) {
+  if (ListenerMessageUtil::filterChainChanged(previous_listener->config(),
+                                              (*existing_active_listener)->config())) {
     // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
     // their state.
     drainFilterChains(std::move(previous_listener), **existing_active_listener);
