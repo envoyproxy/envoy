@@ -77,8 +77,7 @@ const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior) 
 
 namespace {
 
-size_t getMemoryBufferBytesLimit(
-    const absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>& configs) {
+size_t getMemoryBufferBytesLimit(const StreamConfigVector& configs) {
   for (const ProtoStreamConfig& cfg : configs) {
     if (cfg.has_memory_buffer_bytes_limit()) {
       return cfg.memory_buffer_bytes_limit().value();
@@ -87,8 +86,7 @@ size_t getMemoryBufferBytesLimit(
   return FileSystemBufferFilterMergedConfig::default_memory_buffer_bytes_limit;
 }
 
-size_t getStorageBufferBytesLimit(
-    const absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>& configs) {
+size_t getStorageBufferBytesLimit(const StreamConfigVector& configs) {
   for (const ProtoStreamConfig& cfg : configs) {
     if (cfg.has_storage_buffer_bytes_limit()) {
       return cfg.storage_buffer_bytes_limit().value();
@@ -97,8 +95,7 @@ size_t getStorageBufferBytesLimit(
   return FileSystemBufferFilterMergedConfig::default_storage_buffer_bytes_limit;
 }
 
-size_t getStorageBufferQueueHighWatermarkBytes(
-    const absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>& configs) {
+size_t getStorageBufferQueueHighWatermarkBytes(const StreamConfigVector& configs) {
   for (const ProtoStreamConfig& cfg : configs) {
     if (cfg.has_storage_buffer_queue_high_watermark_bytes()) {
       return cfg.storage_buffer_queue_high_watermark_bytes().value();
@@ -107,9 +104,7 @@ size_t getStorageBufferQueueHighWatermarkBytes(
   return std::min(getMemoryBufferBytesLimit(configs), getStorageBufferBytesLimit(configs));
 }
 
-absl::string_view getStorageBufferPath(
-    const absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>&
-        configs) {
+absl::string_view getStorageBufferPath(const FilterConfigVector& configs) {
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.proto().has_storage_buffer_path()) {
       return cfg.proto().storage_buffer_path().value();
@@ -119,9 +114,7 @@ absl::string_view getStorageBufferPath(
   return env_tmpdir ? env_tmpdir : "/tmp";
 }
 
-AsyncFileManager& getAsyncFileManager(
-    const absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>&
-        configs) {
+AsyncFileManager& getAsyncFileManager(const FilterConfigVector& configs) {
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.asyncFileManager()) {
       return *cfg.asyncFileManager();
@@ -130,8 +123,7 @@ AsyncFileManager& getAsyncFileManager(
   throw(EnvoyException("FileSystemBufferFilterConfig must have manager_config"));
 }
 
-const BufferBehavior& getBufferBehavior(
-    const absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>& configs) {
+const BufferBehavior& getBufferBehavior(const StreamConfigVector& configs) {
   for (const ProtoStreamConfig& cfg : configs) {
     if (cfg.has_behavior()) {
       return selectBufferBehavior(cfg.behavior());
@@ -140,10 +132,9 @@ const BufferBehavior& getBufferBehavior(
   return BufferBehaviorStreamWhenPossible::instance;
 }
 
-const FileSystemBufferFilterMergedConfig::StreamConfig getBufferRequestConfig(
-    const absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>&
-        configs) {
-  absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4> request_configs;
+const FileSystemBufferFilterMergedConfig::StreamConfig
+getBufferRequestConfig(const FilterConfigVector& configs) {
+  StreamConfigVector request_configs;
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.proto().has_request()) {
       request_configs.emplace_back(cfg.proto().request());
@@ -152,10 +143,9 @@ const FileSystemBufferFilterMergedConfig::StreamConfig getBufferRequestConfig(
   return FileSystemBufferFilterMergedConfig::StreamConfig(request_configs);
 }
 
-const FileSystemBufferFilterMergedConfig::StreamConfig getBufferResponseConfig(
-    const absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>&
-        configs) {
-  absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4> response_configs;
+const FileSystemBufferFilterMergedConfig::StreamConfig
+getBufferResponseConfig(const FilterConfigVector& configs) {
+  StreamConfigVector response_configs;
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.proto().has_response()) {
       response_configs.emplace_back(cfg.proto().response());
@@ -166,8 +156,7 @@ const FileSystemBufferFilterMergedConfig::StreamConfig getBufferResponseConfig(
 
 } // namespace
 
-FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(
-    const absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>& configs)
+FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(const StreamConfigVector& configs)
     : memory_buffer_bytes_limit_(getMemoryBufferBytesLimit(configs)),
       storage_buffer_bytes_limit_(getStorageBufferBytesLimit(configs)),
       storage_buffer_queue_high_watermark_bytes_(getStorageBufferQueueHighWatermarkBytes(configs)),
@@ -190,8 +179,7 @@ FileSystemBufferFilterConfig::FileSystemBufferFilterConfig(
 }
 
 FileSystemBufferFilterMergedConfig::FileSystemBufferFilterMergedConfig(
-    const absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>&
-        configs)
+    const FilterConfigVector& configs)
     : async_file_manager_(getAsyncFileManager(configs)),
       storage_buffer_path_(getStorageBufferPath(configs)),
       request_(getBufferRequestConfig(configs)), response_(getBufferResponseConfig(configs)) {}

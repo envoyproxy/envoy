@@ -57,12 +57,19 @@ private:
   const ProtoFileSystemBufferFilterConfig config_;
 };
 
+// To facilitate merging configuration quickly, we use an InlinedVector. The size of 4 was
+// selected to accommodate listener, vhost, route, plus one to avoid a surprising cost
+// increase if another layer is added in future (since it's short-lived and on the stack
+// the cost of that +1 is essentially nothing.)
+using StreamConfigVector = absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>;
+using FilterConfigVector =
+    absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>;
+
 class FileSystemBufferFilterMergedConfig {
 public:
   class StreamConfig {
   public:
-    StreamConfig(
-        const absl::InlinedVector<std::reference_wrapper<const ProtoStreamConfig>, 4>& configs);
+    StreamConfig(const StreamConfigVector& configs);
     size_t memoryBufferBytesLimit() const { return memory_buffer_bytes_limit_; }
     size_t storageBufferBytesLimit() const { return storage_buffer_bytes_limit_; }
     size_t storageBufferQueueHighWatermarkBytes() const {
@@ -77,9 +84,7 @@ public:
     const BufferBehavior& behavior_;
   };
   // The first config is highest priority, overriding later configs for any value present.
-  explicit FileSystemBufferFilterMergedConfig(
-      const absl::InlinedVector<std::reference_wrapper<const FileSystemBufferFilterConfig>, 4>&
-          configs);
+  explicit FileSystemBufferFilterMergedConfig(const FilterConfigVector& configs);
   const std::string& storageBufferPath() const { return storage_buffer_path_; }
   AsyncFileManager& asyncFileManager() const { return async_file_manager_; }
   const StreamConfig& request() const { return request_; }
