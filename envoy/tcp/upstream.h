@@ -78,6 +78,8 @@ public:
    * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
    *
    * @param reason supplies the failure reason.
+   * @param failure_reason failure reason string (Note: it is expected that the caller will provide
+   * matching `reason` and `failure_reason`).
    * @param host supplies the description of the host that caused the failure. This may be nullptr
    *             if no host was involved in the failure (for example overflow).
    */
