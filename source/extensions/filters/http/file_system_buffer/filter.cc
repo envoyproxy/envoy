@@ -10,7 +10,7 @@ FileSystemBufferFilter::FileSystemBufferFilter(
     : base_config_(base_config) {}
 
 const std::string& FileSystemBufferFilter::filterName() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "dropbox.envoy.file_system_buffer");
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.http.file_system_buffer");
 }
 
 } // namespace FileSystemBuffer
