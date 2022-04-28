@@ -700,9 +700,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
         filter_chain.startDraining();
         draining_group->addFilterChainToDrain(filter_chain);
       });
-
   auto filter_chain_size = draining_group->numDrainingFilterChains();
-
   stats_.total_filter_chains_draining_.add(filter_chain_size);
   draining_group->getDrainingListener().debugLog(
       absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
