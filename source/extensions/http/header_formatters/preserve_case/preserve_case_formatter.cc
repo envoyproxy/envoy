@@ -1,10 +1,7 @@
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
-#include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.validate.h"
 #include "envoy/registry/registry.h"
-
-#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -70,50 +67,6 @@ Envoy::Http::HeaderKeyFormatterOptConstRef
 PreserveCaseHeaderFormatter::formatterOnEnvoyHeaders() const {
   return makeOptRefFromPtr(header_key_formatter_on_enovy_headers_.get());
 }
-
-class PreserveCaseFormatterFactory : public Envoy::Http::StatefulHeaderKeyFormatterFactory {
-public:
-  PreserveCaseFormatterFactory(
-      const bool forward_reason_phrase,
-      const envoy::extensions::http::header_formatters::preserve_case::v3::
-          PreserveCaseFormatterConfig::FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers)
-      : forward_reason_phrase_(forward_reason_phrase),
-        formatter_type_on_envoy_headers_(formatter_type_on_envoy_headers) {}
-
-  // Envoy::Http::StatefulHeaderKeyFormatterFactory
-  Envoy::Http::StatefulHeaderKeyFormatterPtr create() override {
-    return std::make_unique<PreserveCaseHeaderFormatter>(forward_reason_phrase_,
-                                                         formatter_type_on_envoy_headers_);
-  }
-
-private:
-  const bool forward_reason_phrase_;
-  const envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
-      FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers_;
-};
-
-class PreserveCaseFormatterFactoryConfig
-    : public Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig {
-public:
-  // Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig
-  std::string name() const override { return "preserve_case"; }
-
-  Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr
-  createFromProto(const Protobuf::Message& message) override {
-    auto config =
-        MessageUtil::downcastAndValidate<const envoy::extensions::http::header_formatters::
-                                             preserve_case::v3::PreserveCaseFormatterConfig&>(
-            message, ProtobufMessage::getStrictValidationVisitor());
-
-    return std::make_shared<PreserveCaseFormatterFactory>(config.forward_reason_phrase(),
-                                                          config.formatter_type_on_envoy_headers());
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::http::header_formatters::preserve_case::v3::
-                                PreserveCaseFormatterConfig>();
-  }
-};
 
 REGISTER_FACTORY(PreserveCaseFormatterFactoryConfig,
                  Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig);

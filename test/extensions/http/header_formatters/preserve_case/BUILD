@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "//test/test_common:utility_lib",
     ],
 )
 
