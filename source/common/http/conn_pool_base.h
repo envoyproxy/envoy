@@ -136,6 +136,7 @@ public:
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
+  HttpConnPoolImplBase& fixed_parent() { return *static_cast<FixedHttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
 };

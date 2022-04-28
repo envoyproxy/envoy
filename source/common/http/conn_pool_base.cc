@@ -117,7 +117,6 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
 // not considering http/2 connections connected until the SETTINGS frame is
 // received, but that would result in a latency penalty instead.
 void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
-  // FIXME update cache if present
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_allow_capacity_increase_by_settings")) {
     if (settings.maxConcurrentStreams().has_value()) {
@@ -126,6 +125,9 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
       // TODO(alyssawilk) move remaining_streams_, concurrent_stream_limit_ and
       // currentUnusedCapacity() to be explicit int32_t
       ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
+      if (fixed_parent().cache_ && fixed_parent().origin_.has_value()) {
+        fixed_parent().cache_->setConcurrentStreams(*fixed_parent().origin_, settings.maxConcurrentStreams().value());
+      }
       concurrent_stream_limit_ =
           std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
 

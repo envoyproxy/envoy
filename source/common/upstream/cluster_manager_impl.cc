@@ -1893,7 +1893,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
-    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state,
                                          origin, alternate_protocols_cache);
