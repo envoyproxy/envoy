@@ -7,7 +7,6 @@ load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
-load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 
@@ -43,8 +42,6 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         oss_fuzz = True,
         honggfuzz = False,
     )
-    rules_cc_dependencies()
-    rules_cc_toolchains()
     emscripten_deps()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.

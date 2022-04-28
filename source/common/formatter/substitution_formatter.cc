@@ -459,6 +459,16 @@ SubstitutionFormatParser::getKnownFormatters() {
          [](const std::string& format, const absl::optional<size_t>&) {
            return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
          }}},
+       {"UPSTREAM_PEER_CERT_V_START",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL,
+         [](const std::string& format, const absl::optional<size_t>&) {
+           return std::make_unique<UpstreamPeerCertVStartFormatter>(format);
+         }}},
+       {"UPSTREAM_PEER_CERT_V_END",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL,
+         [](const std::string& format, const absl::optional<size_t>&) {
+           return std::make_unique<UpstreamPeerCertVEndFormatter>(format);
+         }}},
        {"ENVIRONMENT",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& key, absl::optional<size_t>& max_length) {
@@ -794,6 +804,46 @@ private:
   FieldExtractor field_extractor_;
 };
 
+class StreamInfoUpstreamSslConnectionInfoFieldExtractor
+    : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor =
+      std::function<absl::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
+
+  StreamInfoUpstreamSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+
+  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
+    if (!stream_info.upstreamInfo() ||
+        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
+      return absl::nullopt;
+    }
+
+    const auto value = field_extractor_(*(stream_info.upstreamInfo()->upstreamSslConnection()));
+    if (value && value->empty()) {
+      return absl::nullopt;
+    }
+
+    return value;
+  }
+
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    if (!stream_info.upstreamInfo() ||
+        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
+      return unspecifiedValue();
+    }
+
+    const auto value = field_extractor_(*(stream_info.upstreamInfo()->upstreamSslConnection()));
+    if (value && value->empty()) {
+      return unspecifiedValue();
+    }
+
+    return ValueUtil::optionalStringValue(value);
+  }
+
+private:
+  FieldExtractor field_extractor_;
+};
+
 const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnownFieldExtractors() {
   CONSTRUCT_ON_FIRST_USE(FieldExtractorLookupTbl,
                          {{"REQUEST_DURATION",
@@ -890,6 +940,17 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return SubstitutionFormatUtils::protocolToString(
                                         stream_info.protocol());
+                                  });
+                            }}},
+                          {"UPSTREAM_PROTOCOL",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.upstreamInfo()
+                                               ? SubstitutionFormatUtils::protocolToString(
+                                                     stream_info.upstreamInfo()->upstreamProtocol())
+                                               : absl::nullopt;
                                   });
                             }}},
                           {"RESPONSE_CODE",
@@ -1095,6 +1156,60 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return stream_info.attemptCount().value_or(0);
+                                  });
+                            }}},
+                          {"UPSTREAM_TLS_CIPHER",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.ciphersuiteString();
+                                  });
+                            }}},
+                          {"UPSTREAM_TLS_VERSION",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.tlsVersion();
+                                  });
+                            }}},
+                          {"UPSTREAM_TLS_SESSION_ID",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.sessionId();
+                                  });
+                            }}},
+                          {"UPSTREAM_PEER_ISSUER",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.issuerPeerCertificate();
+                                  });
+                            }}},
+                          {"UPSTREAM_PEER_CERT",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                  });
+                            }}},
+                          {"UPSTREAM_PEER_SUBJECT",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.subjectPeerCertificate();
                                   });
                             }}},
                           {"DOWNSTREAM_LOCAL_ADDRESS",
@@ -1805,6 +1920,30 @@ DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::stri
                             stream_info.downstreamAddressProvider().sslConnection();
                         return connection_info != nullptr
                                    ? connection_info->expirationPeerCertificate()
+                                   : absl::optional<SystemTime>();
+                      })) {}
+UpstreamPeerCertVStartFormatter::UpstreamPeerCertVStartFormatter(const std::string& format)
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.upstreamInfo() &&
+                                       stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                           nullptr
+                                   ? stream_info.upstreamInfo()
+                                         ->upstreamSslConnection()
+                                         ->validFromPeerCertificate()
+                                   : absl::optional<SystemTime>();
+                      })) {}
+UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(const std::string& format)
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.upstreamInfo() &&
+                                       stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                           nullptr
+                                   ? stream_info.upstreamInfo()
+                                         ->upstreamSslConnection()
+                                         ->expirationPeerCertificate()
                                    : absl::optional<SystemTime>();
                       })) {}
 
