@@ -37,12 +37,13 @@ protected:
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
-  void initialize() override {
-    // Setup two upstream hosts, one for each cluster.
-    setUpstreamCount(2);
+  void setupModifications() {
+    if (modifications_set_up_) {
+      return;
+    }
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add the static cluster to serve SRDS.
+      // Add another static cluster for sending HTTP requests.
       auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
       cluster_1->MergeFrom(bootstrap.static_resources().clusters()[0]);
       cluster_1->set_name("cluster_1");
@@ -123,14 +124,23 @@ fragments:
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
+    modifications_set_up_ = true;
+  }
+
+  void initialize() override {
+    // Setup two upstream hosts, one for each cluster.
+    setUpstreamCount(2);
+    setupModifications();
     HttpIntegrationTest::initialize();
   }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the SRDS upstream.
+    srds_upstream_idx_ = fake_upstreams_.size();
     addFakeUpstream(Http::CodecType::HTTP2);
     // Create the RDS upstream.
+    rds_upstream_idx_ = fake_upstreams_.size();
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
@@ -153,9 +163,15 @@ fragments:
     resetFakeUpstreamInfo(&scoped_rds_upstream_info_);
   }
 
-  FakeUpstream& getRdsFakeUpstream() const { return *fake_upstreams_[3]; }
+  FakeUpstream& getRdsFakeUpstream() const {
+    ASSERT(rds_upstream_idx_ < fake_upstreams_.size());
+    return *fake_upstreams_[rds_upstream_idx_];
+  }
 
-  FakeUpstream& getScopedRdsFakeUpstream() const { return *fake_upstreams_[2]; }
+  FakeUpstream& getScopedRdsFakeUpstream() const {
+    ASSERT(srds_upstream_idx_ < fake_upstreams_.size());
+    return *fake_upstreams_[srds_upstream_idx_];
+  }
 
   void createStream(FakeUpstreamInfo* upstream_info, FakeUpstream& upstream,
                     const std::string& resource_name) {
@@ -259,9 +275,12 @@ fragments:
   }
 
   const std::string srds_config_name_{"foo-scoped-routes"};
+  std::size_t rds_upstream_idx_ = -1;
+  std::size_t srds_upstream_idx_ = -1;
   FakeUpstreamInfo scoped_rds_upstream_info_;
   FakeUpstreamInfo rds_upstream_info_;
   std::string srds_resources_locator_;
+  bool modifications_set_up_ = false;
 };
 
 } // namespace Envoy
