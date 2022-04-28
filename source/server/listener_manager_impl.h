@@ -181,7 +181,7 @@ public:
                       Quic::QuicStatNames& quic_stat_names);
 
   void onListenerWarmed(ListenerImpl& listener);
-  void inPlaceFilterChainUpdate(ListenerImpl& listener, bool filter_chain_changed);
+  void inPlaceFilterChainUpdate(ListenerImpl& listener);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,

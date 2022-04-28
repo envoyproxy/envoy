@@ -656,8 +656,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener,
-                                                   bool filter_chain_changed) {
+void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
   ASSERT(existing_warming_listener != warming_listeners_.end());
@@ -679,7 +678,7 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener,
   *existing_active_listener = std::move(*existing_warming_listener);
 
   // Skip draining if there is no different filter chain.
-  if (filter_chain_changed) {
+  if (ListenerMessageUtil::filterChainChanged(previous_listener->config(), (*existing_active_listener)->config())) {
     // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
     // their state.
     drainFilterChains(std::move(previous_listener), **existing_active_listener);

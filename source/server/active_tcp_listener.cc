@@ -69,8 +69,8 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   config_ = &config;
   // `listener_filters_timeout` and `continue_on_listener_filters_timeout` can be
   // in-place updated
-  listener_filters_timeout_ = config.listenerFiltersTimeout();
-  continue_on_listener_filters_timeout_ = config.continueOnListenerFiltersTimeout();
+  listener_filters_timeout_ = config_->listenerFiltersTimeout();
+  continue_on_listener_filters_timeout_ = config_->continueOnListenerFiltersTimeout();
 }
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {

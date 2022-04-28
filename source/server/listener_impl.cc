@@ -434,11 +434,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             initManager(), origin.filter_chain_manager_),
       reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this, &origin] {
+                          [this] {
                             ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(
-                                *this,
-                                ListenerMessageUtil::filterChainChanged(config_, origin.config_));
+                            parent_.inPlaceFilterChainUpdate(*this);
                           }),
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()) {
