@@ -73,6 +73,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stats_params_test",
+    srcs = ["stats_params_test.cc"],
+    deps = [
+        "//source/server/admin:stats_params_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stats_render_test",
     srcs = ["stats_render_test.cc"],
     deps = [
