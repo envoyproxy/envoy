@@ -37,6 +37,10 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  void resetNetworking() override {
+    // Dirty the channel so that the next query will recreate it.
+    dirty_channel_ = true;
+  }
 
 private:
   friend class DnsResolverImplPeer;
