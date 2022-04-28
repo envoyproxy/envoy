@@ -18,6 +18,9 @@ using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
 
 namespace Server {
 
+StatsTextRender::StatsTextRender(const StatsParams& params)
+    : histogram_buckets_mode_(params.histogram_buckets_mode_) {}
+
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
   response.addFragments({name, ": ", absl::StrCat(value), "\n"});
@@ -83,9 +86,8 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 }
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response,
-                                 Utility::HistogramBucketsMode histogram_buckets_mode)
-    : histogram_buckets_mode_(histogram_buckets_mode) {
+                                 Buffer::Instance& response, const StatsParams& params)
+    : histogram_buckets_mode_(params.histogram_buckets_mode_) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the entire stats output, as that
   // makes streaming difficult. Instead we emit the preamble in the
