@@ -409,12 +409,12 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   if (config_.get()->allowRequestsWithoutProxyProtocol()) {
     if (raw_slice.len_ < PROXY_PROTO_V1_SIGNATURE_LEN) {
       ENVOY_LOG(debug, "request does not have enough bytes to determine if v1 or v2 proxy "
-                        "protocol, forwarding as is");
+                       "protocol, forwarding as is");
       return ReadOrParseState::SkipFilter;
     }
 
     if ((raw_slice.len_ < PROXY_PROTO_V2_SIGNATURE_LEN ||
-          memcmp(buf, PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN)) &&
+         memcmp(buf, PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN)) &&
         memcmp(buf, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
       // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
       // short-circuit
