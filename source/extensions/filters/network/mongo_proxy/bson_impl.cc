@@ -368,9 +368,9 @@ std::string FieldImpl::toString() const {
 }
 
 void DocumentImpl::fromBuffer(Buffer::Instance& data) {
-  uint64_t original_buffer_length = data.length();
-  int32_t message_length = BufferHelper::removeInt32(data);
-  if (static_cast<uint64_t>(message_length) > original_buffer_length) {
+  const ssize_t original_buffer_length = data.length();
+  const int32_t message_length = BufferHelper::removeInt32(data);
+  if (message_length <= 0 || message_length > original_buffer_length) {
     throw EnvoyException("invalid BSON message length");
   }
 
@@ -378,8 +378,14 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
             original_buffer_length);
 
   while (true) {
-    uint64_t document_bytes_remaining = data.length() - (original_buffer_length - message_length);
+    const ssize_t bytes_remaining_after_message = original_buffer_length - message_length;
+    const ssize_t document_bytes_remaining =
+        static_cast<ssize_t>(data.length()) - bytes_remaining_after_message;
     ENVOY_LOG(trace, "BSON document bytes remaining: {}", document_bytes_remaining);
+    // Although mongo_proxy traffic is trusted, do a minimal check.
+    if (document_bytes_remaining < 0) {
+      throw EnvoyException("invalid document");
+    }
     if (document_bytes_remaining == 1) {
       uint8_t last_byte = BufferHelper::removeByte(data);
       if (last_byte != 0) {
