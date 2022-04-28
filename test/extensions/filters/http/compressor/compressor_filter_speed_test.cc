@@ -394,17 +394,14 @@ static std::vector<CompressionParams> zstd_compression_params = {
     // level7 + default
     {7, 0, 0, 0},
 
-    // level1 + default
+    // level8 + default
     {8, 0, 0, 0},
 
-    // level8 + default
+    // level9 + default
     {9, 0, 0, 0},
 
-    // level9 + default
-    {10, 0, 0, 0},
-
     // level10 + default
-    {1, 0, 0, 0},
+    {10, 0, 0, 0},
 
     // level11 + default
     {11, 0, 0, 0},
