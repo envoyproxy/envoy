@@ -13,6 +13,7 @@
 #include "test/integration/ads_integration.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/scoped_rds.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
@@ -686,6 +687,283 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluste
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
 
+  cleanupUpstreamAndDownstream();
+}
+
+class OdCdsScopedRdsIntegrationTestBase : public ScopedRdsIntegrationTest {
+public:
+  void clearOnDemandConfig() {
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+      OdCdsIntegrationHelper::clearOnDemandConfig(hcm);
+    });
+  }
+
+  void clearPerRouteConfig(std::string vhost_name, std::string route_name) {
+    config_helper_.addConfigModifier(
+        [vhost_name = std::move(vhost_name),
+         route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& hcm) {
+          OdCdsIntegrationHelper::clearPerRouteConfig(hcm, vhost_name, route_name);
+        });
+  }
+
+  void addOnDemandConfig(OdCdsIntegrationHelper::OnDemandConfig config) {
+    config_helper_.addConfigModifier(
+        [config = std::move(config)](ConfigHelper::HttpConnectionManager& hcm) {
+          OdCdsIntegrationHelper::addOnDemandConfig(hcm, std::move(config));
+        });
+  }
+
+  void addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig config, std::string vhost_name,
+                         std::string route_name) {
+    config_helper_.addConfigModifier(
+        [config = std::move(config), vhost_name = std::move(vhost_name),
+         route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& hcm) {
+          OdCdsIntegrationHelper::addPerRouteConfig(hcm, std::move(config), vhost_name, route_name);
+        });
+  }
+
+  void initialize() override {
+    ScopedRdsIntegrationTest::setupModifications();
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* odcds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      odcds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      odcds_cluster->set_name("odcds_cluster");
+      ConfigHelper::setHttp2(*odcds_cluster);
+    });
+    on_server_init_function_ = [this]() {
+      const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+on_demand: true
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+      createScopedRdsStream();
+      sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+    };
+    // We want to have odcds upstream available through xds_upstream_
+    create_xds_upstream_ = true;
+    ScopedRdsIntegrationTest::initialize();
+
+    // Create the new cluster upstream.
+    new_cluster_upstream_idx_ = fake_upstreams_.size();
+    addFakeUpstream(Http::CodecType::HTTP2);
+    new_cluster_ = ConfigHelper::buildStaticCluster(
+        "new_cluster", fake_upstreams_[new_cluster_upstream_idx_]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()));
+
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  FakeStreamPtr odcds_stream_;
+  std::size_t odcds_upstream_idx_;
+  std::size_t new_cluster_upstream_idx_;
+  envoy::config::cluster::v3::Cluster new_cluster_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OdCdsScopedRdsIntegrationTestBase,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Test the an update of scoped route config is performed on demand. Since the config contains the
+// cluster-header action and HCM config enables on demand cluster discovery, it kicks in too. After
+// all this, the HTTP request should succeed.
+TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDS) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    // Add on-demand extension config to the hcm.
+    auto odcds_config = OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster");
+    auto on_demand_config = OdCdsIntegrationHelper::createOnDemandConfig(odcds_config, 2500);
+    OdCdsIntegrationHelper::addOnDemandConfig(hcm, on_demand_config);
+  });
+  initialize();
+  registerTestServerPorts({"http"});
+
+  const std::string route_config_tmpl = R"EOF(
+      virtual_hosts:
+      - name: integration
+        routes:
+        - name: odcds_route
+          route:
+            cluster_header: "Pick-This-Cluster"
+          match:
+            prefix: "/"
+        domains: ["*"]
+      name: {}
+)EOF";
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Request that match lazily loaded scope will trigger on demand loading.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":scheme", "http"},
+                                     {":authority", "vhost.first"},
+                                     {"Pick-This-Cluster", "new_cluster"},
+                                     {"Addr", "x-foo-key=foo"}});
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
+// Test the an update of scoped route config is performed on demand. Since the config contains the
+// cluster-header action and the scoped route config enables on demand cluster discovery on a vhost
+// level, it kicks in too. After all this, the HTTP request should succeed.
+TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInVHost) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+  initialize();
+  registerTestServerPorts({"http"});
+
+  const std::string route_config_tmpl = R"EOF(
+      virtual_hosts:
+      - name: integration
+        typed_per_filter_config:
+          envoy.filters.http.on_demand:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+            odcds_config:
+              resource_api_version: V3
+              api_config_source:
+                api_type: DELTA_GRPC
+                transport_api_version: V3
+                grpc_services:
+                  envoy_grpc:
+                    cluster_name: odcds_cluster
+            odcds_timeout: "2.5s"
+        routes:
+        - name: odcds_route
+          route:
+            cluster_header: "Pick-This-Cluster"
+          match:
+            prefix: "/"
+        domains: ["*"]
+      name: {}
+)EOF";
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Request that match lazily loaded scope will trigger on demand loading.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":scheme", "http"},
+                                     {":authority", "vhost.first"},
+                                     {"Pick-This-Cluster", "new_cluster"},
+                                     {"Addr", "x-foo-key=foo"}});
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
+// Test the an update of scoped route config is performed on demand. Since the config contains the
+// cluster-header action and the scoped route config enables on demand cluster discovery on a route
+// level, it kicks in too. After all this, the HTTP request should succeed.
+TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+  initialize();
+  registerTestServerPorts({"http"});
+
+  const std::string route_config_tmpl = R"EOF(
+      virtual_hosts:
+      - name: integration
+        routes:
+        - name: odcds_route
+          typed_per_filter_config:
+            envoy.filters.http.on_demand:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+              odcds_config:
+                resource_api_version: V3
+                api_config_source:
+                  api_type: DELTA_GRPC
+                  transport_api_version: V3
+                  grpc_services:
+                    envoy_grpc:
+                      cluster_name: odcds_cluster
+              odcds_timeout: "2.5s"
+          route:
+            cluster_header: "Pick-This-Cluster"
+          match:
+            prefix: "/"
+        domains: ["*"]
+      name: {}
+)EOF";
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Request that match lazily loaded scope will trigger on demand loading.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":scheme", "http"},
+                                     {":authority", "vhost.first"},
+                                     {"Pick-This-Cluster", "new_cluster"},
+                                     {"Addr", "x-foo-key=foo"}});
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
 
