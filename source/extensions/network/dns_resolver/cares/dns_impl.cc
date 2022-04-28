@@ -374,14 +374,14 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
     DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
     ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
     : PendingResolution(parent, callback, dispatcher, channel, dns_name),
-      dns_lookup_family_(dns_lookup_family), available_interfaces_(availableInterfaces()) {
+      dns_lookup_family_(dns_lookup_family), available_interfaces_(availableInterfaces()),
+      accept_nodata_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata")) {
   if (dns_lookup_family == DnsLookupFamily::Auto ||
       dns_lookup_family == DnsLookupFamily::V4Preferred ||
       dns_lookup_family == DnsLookupFamily::All) {
     dual_resolution_ = true;
   }
-
-  accept_nodata_ = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata");
 
   switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:

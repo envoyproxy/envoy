@@ -137,7 +137,7 @@ private:
     const DnsLookupFamily dns_lookup_family_;
     // Queried for at construction time.
     const AvailableInterfaces available_interfaces_;
-    bool accept_nodata_;
+    const bool accept_nodata_{false};
   };
 
   struct AresOptions {
