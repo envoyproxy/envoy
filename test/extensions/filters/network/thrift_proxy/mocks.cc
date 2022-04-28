@@ -127,7 +127,7 @@ MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
 }
 MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() = default;
 
-MockBidirectionFilter::MockBidirectionFilter() {
+MockBidirectionalFilter::MockBidirectionalFilter() {
   ON_CALL(*this, decodeTransportBegin(_)).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, decodeTransportEnd()).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, decodeMessageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
@@ -172,7 +172,7 @@ MockBidirectionFilter::MockBidirectionFilter() {
   ON_CALL(*this, encodeSetBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, encodeSetEnd()).WillByDefault(Return(FilterStatus::Continue));
 }
-MockBidirectionFilter::~MockBidirectionFilter() = default;
+MockBidirectionalFilter::~MockBidirectionalFilter() = default;
 
 MockFilterConfigFactory::MockFilterConfigFactory() : name_("envoy.filters.thrift.mock_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();

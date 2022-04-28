@@ -187,16 +187,16 @@ using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 /**
  * Encoder filter interface.
  *
- * Currently the EncoderFilter and BidirectionFilter support
+ * Currently the EncoderFilter and BidirectionalFilter support
  * a. peek the metadata and content for encoding,
  * b. modify the metadata and content except string value for encoding, and
- * c. what DecoderFilter supports for BidirectionFilter.
+ * c. what DecoderFilter supports for BidirectionalFilter.
  *
  * Do not support
  * a. pass through data separately for encode and decode, e.g., pass through data for request but
  * not pass through data for response, and
  * b. return StopIteration for decoder_events in for encoder filter and encode* events for
- * bidirection filter. The filters trying to return StopIteration will reset the connection.
+ * bidirectional filter. The filters trying to return StopIteration will reset the connection.
  */
 class EncoderFilter : public FilterBase, public virtual DecoderEventHandler {
 public:
@@ -218,11 +218,11 @@ public:
 using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
 
 /**
- * Bidirection filter interface. @see EncoderFilter for limitation.
+ * Bidirectional filter interface. @see EncoderFilter for limitation.
  */
-class BidirectionFilter : public FilterBase {
+class BidirectionalFilter : public FilterBase {
 public:
-  ~BidirectionFilter() override = default;
+  ~BidirectionalFilter() override = default;
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
   virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
   virtual bool decodePassthroughSupported() const PURE;
@@ -277,7 +277,7 @@ public:
   virtual FilterStatus encodeSetEnd() PURE;
 };
 
-using BidirectionFilterSharedPtr = std::shared_ptr<BidirectionFilter>;
+using BidirectionalFilterSharedPtr = std::shared_ptr<BidirectionalFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -300,10 +300,10 @@ public:
   virtual void addEncoderFilter(EncoderFilterSharedPtr filter) PURE;
 
   /**
-   * Add a bidirection filter that is used when reading and writing connection data.
+   * Add a bidirectional filter that is used when reading and writing connection data.
    * @param filter supplies the filter to add.
    */
-  virtual void addBidirectionFilter(BidirectionFilterSharedPtr filter) PURE;
+  virtual void addBidirectionalFilter(BidirectionalFilterSharedPtr filter) PURE;
 };
 
 /**

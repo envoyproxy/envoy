@@ -10,9 +10,9 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace ThriftFilters {
 
-class BidirectionFilterWrapper final : public FilterBase {
+class BidirectionalFilterWrapper final : public FilterBase {
 public:
-  BidirectionFilterWrapper(BidirectionFilterSharedPtr filter);
+  BidirectionalFilterWrapper(BidirectionalFilterSharedPtr filter);
 
   // ThriftBaseFilter
   void onDestroy() override { parent_->onDestroy(); }
@@ -21,10 +21,10 @@ public:
   EncoderFilterSharedPtr encoder_filter_;
 
 private:
-  BidirectionFilterSharedPtr parent_;
+  BidirectionalFilterSharedPtr parent_;
 };
 
-using BidirectionFilterWrapperSharedPtr = std::shared_ptr<BidirectionFilterWrapper>;
+using BidirectionalFilterWrapperSharedPtr = std::shared_ptr<BidirectionalFilterWrapper>;
 
 } // namespace ThriftFilters
 } // namespace ThriftProxy

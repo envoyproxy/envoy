@@ -202,7 +202,7 @@ public:
 
   MOCK_METHOD(void, addDecoderFilter, (DecoderFilterSharedPtr));
   MOCK_METHOD(void, addEncoderFilter, (EncoderFilterSharedPtr));
-  MOCK_METHOD(void, addBidirectionFilter, (BidirectionFilterSharedPtr));
+  MOCK_METHOD(void, addBidirectionalFilter, (BidirectionalFilterSharedPtr));
 };
 
 class MockDecoderFilter : public DecoderFilter {
@@ -334,12 +334,12 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
-class MockBidirectionFilter : public BidirectionFilter {
+class MockBidirectionalFilter : public BidirectionalFilter {
 public:
-  MockBidirectionFilter();
-  ~MockBidirectionFilter() override;
+  MockBidirectionalFilter();
+  ~MockBidirectionalFilter() override;
 
-  // ThriftProxy::ThriftFilters::BidirectionFilter
+  // ThriftProxy::ThriftFilters::BidirectionalFilter
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, encodePassthroughSupported, (), (const));

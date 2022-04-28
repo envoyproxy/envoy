@@ -43,11 +43,11 @@ public:
                  Router::RouteConfigProviderManager& route_config_provider_manager,
                  ThriftFilters::DecoderFilterSharedPtr decoder_filter,
                  ThriftFilters::EncoderFilterSharedPtr encoder_filter,
-                 ThriftFilters::BidirectionFilterSharedPtr bidirection_filter,
+                 ThriftFilters::BidirectionalFilterSharedPtr bidirectional_filter,
                  ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context, route_config_provider_manager),
         decoder_filter_(decoder_filter), encoder_filter_(encoder_filter),
-        bidirection_filter_(bidirection_filter), stats_(stats) {}
+        bidirectional_filter_(bidirectional_filter), stats_(stats) {}
 
   // ConfigImpl
   ThriftFilterStats& stats() override { return stats_; }
@@ -60,7 +60,7 @@ public:
       callbacks.addEncoderFilter(custom_encoder_filter_);
     }
     callbacks.addEncoderFilter(encoder_filter_);
-    callbacks.addBidirectionFilter(bidirection_filter_);
+    callbacks.addBidirectionalFilter(bidirectional_filter_);
   }
   TransportPtr createTransport() override {
     if (transport_) {
@@ -79,7 +79,7 @@ public:
   ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
   ThriftFilters::EncoderFilterSharedPtr custom_encoder_filter_;
   ThriftFilters::EncoderFilterSharedPtr encoder_filter_;
-  ThriftFilters::BidirectionFilterSharedPtr bidirection_filter_;
+  ThriftFilters::BidirectionalFilterSharedPtr bidirectional_filter_;
   ThriftFilterStats& stats_;
   MockTransport* transport_{};
   MockProtocol* protocol_{};
@@ -134,11 +134,11 @@ public:
     proto_config_ = config;
     decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
     encoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockEncoderFilter>>();
-    bidirection_filter_ = std::make_shared<NiceMock<ThriftFilters::MockBidirectionFilter>>();
+    bidirectional_filter_ = std::make_shared<NiceMock<ThriftFilters::MockBidirectionalFilter>>();
 
     config_ = std::make_unique<TestConfigImpl>(proto_config_, context_,
                                                *route_config_provider_manager_, decoder_filter_,
-                                               encoder_filter_, bidirection_filter_, stats_);
+                                               encoder_filter_, bidirectional_filter_, stats_);
     if (custom_transport_) {
       config_->transport_ = custom_transport_;
     }
@@ -519,7 +519,7 @@ public:
     EXPECT_CALL(*encoder_filter_, setBegin(field_type_i32, one_32));
     EXPECT_CALL(*encoder_filter_, setEnd());
 
-    EXPECT_CALL(*bidirection_filter_, decodeMessageBegin(_))
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageBegin(_))
         .WillOnce(
             Invoke([req_msg_type, req_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
               EXPECT_TRUE(metadata->hasMethodName());
@@ -530,29 +530,29 @@ public:
               EXPECT_EQ(req_seq_id, metadata->sequenceId());
               return FilterStatus::Continue;
             }));
-    EXPECT_CALL(*bidirection_filter_, decodeMessageEnd());
-    EXPECT_CALL(*bidirection_filter_, decodeStructBegin("")).Times(2);
-    EXPECT_CALL(*bidirection_filter_, decodeStructEnd()).Times(2);
-    EXPECT_CALL(*bidirection_filter_, decodeFieldBegin("", _, _)).Times(11);
-    EXPECT_CALL(*bidirection_filter_, decodeFieldEnd()).Times(11);
-    EXPECT_CALL(*bidirection_filter_, decodeBoolValue(one));
-    EXPECT_CALL(*bidirection_filter_, decodeByteValue(two));
-    EXPECT_CALL(*bidirection_filter_, decodeDoubleValue(three));
-    EXPECT_CALL(*bidirection_filter_, decodeInt16Value(four));
-    EXPECT_CALL(*bidirection_filter_, decodeInt32Value(five));
-    EXPECT_CALL(*bidirection_filter_, decodeInt64Value(six));
-    EXPECT_CALL(*bidirection_filter_, decodeStringValue("seven"));
-    EXPECT_CALL(*bidirection_filter_, decodeMapBegin(field_type_i32, field_type_i32, one_32));
-    EXPECT_CALL(*bidirection_filter_, decodeInt32Value(eight)).Times(4);
-    EXPECT_CALL(*bidirection_filter_, decodeMapEnd());
-    EXPECT_CALL(*bidirection_filter_, decodeListBegin(field_type_i32, one_32));
-    EXPECT_CALL(*bidirection_filter_, decodeListEnd());
-    EXPECT_CALL(*bidirection_filter_, decodeSetBegin(field_type_i32, one_32));
-    EXPECT_CALL(*bidirection_filter_, decodeSetEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeStructBegin("")).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, decodeStructEnd()).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, decodeFieldBegin("", _, _)).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, decodeFieldEnd()).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, decodeBoolValue(one));
+    EXPECT_CALL(*bidirectional_filter_, decodeByteValue(two));
+    EXPECT_CALL(*bidirectional_filter_, decodeDoubleValue(three));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt16Value(four));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt32Value(five));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt64Value(six));
+    EXPECT_CALL(*bidirectional_filter_, decodeStringValue("seven"));
+    EXPECT_CALL(*bidirectional_filter_, decodeMapBegin(field_type_i32, field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt32Value(eight)).Times(4);
+    EXPECT_CALL(*bidirectional_filter_, decodeMapEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeListBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, decodeListEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeSetBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, decodeSetEnd());
 
-    EXPECT_CALL(*bidirection_filter_, encodeTransportBegin(_));
-    EXPECT_CALL(*bidirection_filter_, encodeTransportEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeMessageBegin(_))
+    EXPECT_CALL(*bidirectional_filter_, encodeTransportBegin(_));
+    EXPECT_CALL(*bidirectional_filter_, encodeTransportEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeMessageBegin(_))
         .WillOnce(
             Invoke([resp_msg_type, resp_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
               EXPECT_TRUE(metadata->hasMethodName());
@@ -563,55 +563,55 @@ public:
               EXPECT_EQ(resp_seq_id, metadata->sequenceId());
               return FilterStatus::Continue;
             }));
-    EXPECT_CALL(*bidirection_filter_, encodeMessageEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeStructBegin("")).Times(2);
-    EXPECT_CALL(*bidirection_filter_, encodeStructEnd()).Times(2);
-    EXPECT_CALL(*bidirection_filter_, encodeFieldBegin("", _, _)).Times(11);
-    EXPECT_CALL(*bidirection_filter_, encodeFieldEnd()).Times(11);
-    EXPECT_CALL(*bidirection_filter_, encodeBoolValue(one));
-    EXPECT_CALL(*bidirection_filter_, encodeByteValue(two));
-    EXPECT_CALL(*bidirection_filter_, encodeDoubleValue(three));
-    EXPECT_CALL(*bidirection_filter_, encodeInt16Value(four));
-    EXPECT_CALL(*bidirection_filter_, encodeInt32Value(five));
-    EXPECT_CALL(*bidirection_filter_, encodeInt64Value(six));
-    EXPECT_CALL(*bidirection_filter_, encodeStringValue("seven"));
-    EXPECT_CALL(*bidirection_filter_, encodeMapBegin(field_type_i32, field_type_i32, one_32));
-    EXPECT_CALL(*bidirection_filter_, encodeInt32Value(eight)).Times(4);
-    EXPECT_CALL(*bidirection_filter_, encodeMapEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeListBegin(field_type_i32, one_32));
-    EXPECT_CALL(*bidirection_filter_, encodeListEnd());
-    EXPECT_CALL(*bidirection_filter_, encodeSetBegin(field_type_i32, one_32));
-    EXPECT_CALL(*bidirection_filter_, encodeSetEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeMessageEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeStructBegin("")).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, encodeStructEnd()).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, encodeFieldBegin("", _, _)).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, encodeFieldEnd()).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, encodeBoolValue(one));
+    EXPECT_CALL(*bidirectional_filter_, encodeByteValue(two));
+    EXPECT_CALL(*bidirectional_filter_, encodeDoubleValue(three));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt16Value(four));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt32Value(five));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt64Value(six));
+    EXPECT_CALL(*bidirectional_filter_, encodeStringValue("seven"));
+    EXPECT_CALL(*bidirectional_filter_, encodeMapBegin(field_type_i32, field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt32Value(eight)).Times(4);
+    EXPECT_CALL(*bidirectional_filter_, encodeMapEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeListBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, encodeListEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeSetBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, encodeSetEnd());
   }
 
   void passthroughSupportedSetup(bool expected_decode_passthrough_data_called = true,
                                  bool expected_encode_passthrough_data_called = true) {
     EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
     EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*bidirection_filter_, decodePassthroughSupported()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*bidirection_filter_, encodePassthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*bidirectional_filter_, decodePassthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*bidirectional_filter_, encodePassthroughSupported()).WillRepeatedly(Return(true));
 
     if (expected_decode_passthrough_data_called) {
       EXPECT_CALL(*decoder_filter_, passthroughData(_));
-      EXPECT_CALL(*bidirection_filter_, decodePassthroughData(_));
+      EXPECT_CALL(*bidirectional_filter_, decodePassthroughData(_));
     } else {
       EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
-      EXPECT_CALL(*bidirection_filter_, decodePassthroughData(_)).Times(0);
+      EXPECT_CALL(*bidirectional_filter_, decodePassthroughData(_)).Times(0);
     }
 
     if (expected_encode_passthrough_data_called) {
       EXPECT_CALL(*encoder_filter_, passthroughData(_));
-      EXPECT_CALL(*bidirection_filter_, encodePassthroughData(_));
+      EXPECT_CALL(*bidirectional_filter_, encodePassthroughData(_));
     } else {
       EXPECT_CALL(*encoder_filter_, passthroughData(_)).Times(0);
-      EXPECT_CALL(*bidirection_filter_, encodePassthroughData(_)).Times(0);
+      EXPECT_CALL(*bidirectional_filter_, encodePassthroughData(_)).Times(0);
     }
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
-  std::shared_ptr<ThriftFilters::MockBidirectionFilter> bidirection_filter_;
+  std::shared_ptr<ThriftFilters::MockBidirectionalFilter> bidirectional_filter_;
   Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
@@ -1580,10 +1580,11 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCallWithMultipleFilters) 
   InSequence s;
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*bidirection_filter_, decodeMessageBegin(_)).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, decodeMessageBegin(_))
+      .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*custom_decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*bidirection_filter_, decodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -1591,10 +1592,11 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCallWithMultipleFilters) 
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   // Reverse order for encoder filters.
-  EXPECT_CALL(*bidirection_filter_, encodeMessageBegin(_)).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, encodeMessageBegin(_))
+      .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*encoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*custom_encoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*bidirection_filter_, encodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, encodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*encoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*custom_encoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
 
@@ -1644,11 +1646,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
   {
     InSequence s;
     EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
-    EXPECT_CALL(*bidirection_filter_, decodeMessageBegin(_))
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageBegin(_))
         .WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(*custom_decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(*decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
-    EXPECT_CALL(*bidirection_filter_, decodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd())
+        .WillOnce(Return(FilterStatus::Continue));
     callbacks->continueDecoding();
   }
 

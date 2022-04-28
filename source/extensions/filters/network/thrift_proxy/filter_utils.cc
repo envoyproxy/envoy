@@ -8,7 +8,7 @@ namespace ThriftFilters {
 
 class DelegateDecoderFilter final : public DecoderFilter {
 public:
-  DelegateDecoderFilter(BidirectionFilterSharedPtr filter) : parent_(filter){};
+  DelegateDecoderFilter(BidirectionalFilterSharedPtr filter) : parent_(filter){};
   // ThriftBaseFilter
   void onDestroy() override { throw EnvoyException(fmt::format("should not be called")); }
 
@@ -97,14 +97,14 @@ public:
   ThriftProxy::FilterStatus setEnd() override { return parent_->decodeSetEnd(); }
 
 private:
-  BidirectionFilterSharedPtr parent_;
+  BidirectionalFilterSharedPtr parent_;
 };
 
 using DelegateDecoderFilterSharedPtr = std::shared_ptr<DelegateDecoderFilter>;
 
 class DelegateEncoderFilter final : public EncoderFilter {
 public:
-  DelegateEncoderFilter(BidirectionFilterSharedPtr filter) : parent_(filter){};
+  DelegateEncoderFilter(BidirectionalFilterSharedPtr filter) : parent_(filter){};
   // ThriftBaseFilter
   void onDestroy() override { throw EnvoyException(fmt::format("should not be called")); }
 
@@ -193,12 +193,12 @@ public:
   ThriftProxy::FilterStatus setEnd() override { return parent_->encodeSetEnd(); }
 
 private:
-  BidirectionFilterSharedPtr parent_;
+  BidirectionalFilterSharedPtr parent_;
 };
 
 using DelegateEncoderFilterSharedPtr = std::shared_ptr<DelegateEncoderFilter>;
 
-BidirectionFilterWrapper::BidirectionFilterWrapper(BidirectionFilterSharedPtr filter)
+BidirectionalFilterWrapper::BidirectionalFilterWrapper(BidirectionalFilterSharedPtr filter)
     : decoder_filter_(std::make_shared<DelegateDecoderFilter>(filter)),
       encoder_filter_(std::make_shared<DelegateEncoderFilter>(filter)), parent_(filter) {}
 

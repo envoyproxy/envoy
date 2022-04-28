@@ -204,9 +204,9 @@ TEST_F(ThriftPassThroughEncoderFilterTest, AllMethodsAreImplementedTrivially) {
   EXPECT_NO_THROW(filter_->onDestroy());
 }
 
-class ThriftPassThroughBidirectionFilterTest : public testing::Test {
+class ThriftPassThroughBidirectionalFilterTest : public testing::Test {
 public:
-  class Filter : public PassThroughBidirectionFilter {
+  class Filter : public PassThroughBidirectionalFilter {
   public:
     DecoderFilterCallbacks* decoderFilterCallbacks() { return decoder_callbacks_; }
     EncoderFilterCallbacks* encoderFilterCallbacks() { return encoder_callbacks_; }
@@ -225,7 +225,7 @@ public:
 };
 
 // Tests that each method returns ThriftProxy::FilterStatus::Continue.
-TEST_F(ThriftPassThroughBidirectionFilterTest, AllMethodsAreImplementedTrivially) {
+TEST_F(ThriftPassThroughBidirectionalFilterTest, AllMethodsAreImplementedTrivially) {
   initialize();
 
   EXPECT_EQ(&decoder_filter_callbacks_, filter_->decoderFilterCallbacks());

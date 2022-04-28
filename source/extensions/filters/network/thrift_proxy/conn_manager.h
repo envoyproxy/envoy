@@ -280,9 +280,9 @@ private:
       base_filters_.emplace_back(filter);
     }
 
-    void addBidirectionFilter(ThriftFilters::BidirectionFilterSharedPtr filter) override {
-      ThriftFilters::BidirectionFilterWrapperSharedPtr wrapper =
-          std::make_unique<ThriftFilters::BidirectionFilterWrapper>(filter);
+    void addBidirectionalFilter(ThriftFilters::BidirectionalFilterSharedPtr filter) override {
+      ThriftFilters::BidirectionalFilterWrapperSharedPtr wrapper =
+          std::make_unique<ThriftFilters::BidirectionalFilterWrapper>(filter);
 
       ActiveRpcDecoderFilterPtr decoder_wrapper =
           std::make_unique<ActiveRpcDecoderFilter>(*this, wrapper->decoder_filter_);

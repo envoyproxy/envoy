@@ -11,8 +11,8 @@ namespace ThriftProxy {
 namespace ThriftFilters {
 
 /**
- * Pass through Thrift decoder/encoder/bidirection filter. Continue at each state within the series
- * of transitions, and pass through the decoded/encoded data.
+ * Pass through Thrift decoder/encoder/bidirectional filter. Continue at each state within the
+ * series of transitions, and pass through the decoded/encoded data.
  */
 class PassThroughDecoderFilter : public DecoderFilter {
 public:
@@ -200,7 +200,7 @@ protected:
   EncoderFilterCallbacks* encoder_callbacks_{};
 };
 
-class PassThroughBidirectionFilter : public BidirectionFilter {
+class PassThroughBidirectionalFilter : public BidirectionalFilter {
 public:
   // ThriftFilterBase
   void onDestroy() override {}
