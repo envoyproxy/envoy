@@ -76,9 +76,8 @@ TEST_F(KafkaResponseParserTest, ResponseHeaderParserShouldThrowIfThereIsUnexpect
   // given
   const int32_t payload_length = 100;
   const int32_t correlation_id = 1234;
-  uint32_t header_len = 0;
-  header_len += putIntoBuffer(payload_length);
-  header_len += putIntoBuffer(correlation_id); // Insert correlation id.
+  putIntoBuffer(payload_length);
+  putIntoBuffer(correlation_id); // Insert correlation id.
 
   absl::string_view data = putGarbageIntoBuffer();
 

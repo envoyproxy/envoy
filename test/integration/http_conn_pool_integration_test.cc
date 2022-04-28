@@ -8,8 +8,6 @@ namespace {
 class HttpConnPoolIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle",
-                                      "true");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Set pool limit so that the test can use it's stats to validate that
       // the pool is deleted.

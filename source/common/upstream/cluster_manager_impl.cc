@@ -74,6 +74,18 @@ bool contains(const std::vector<Http::Protocol>& protocols,
   return true;
 }
 
+absl::optional<Http::HttpServerPropertiesCache::Origin>
+getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
+  std::string sni = std::string(host->transportSocketFactory().defaultServerNameIndication());
+  if (options && options->serverNameOverride().has_value()) {
+    sni = options->serverNameOverride().value();
+  }
+  if (sni.empty()) {
+    return absl::nullopt;
+  }
+  return {{"https", sni, host->address()->ip()->port()}};
+}
+
 } // namespace
 
 void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
@@ -1716,20 +1728,16 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  if (container->draining_ ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  container->pools_->erasePool(priority, hash_key);
 
-    ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
-    container->pools_->erasePool(priority, hash_key);
-
-    // Guard deletion of the container with `do_not_delete_` to avoid deletion while
-    // iterating through the container in `container->pools_->startDrain()`. See
-    // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->empty()) {
-      ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
-      host_http_conn_pool_map_.erase(
-          host); // NOTE: `container` is erased after this point in the lambda.
-    }
+  // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+  // iterating through the container in `container->pools_->startDrain()`. See
+  // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
+  if (!container->do_not_delete_ && container->pools_->empty()) {
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    host_http_conn_pool_map_.erase(
+        host); // NOTE: `container` is erased after this point in the lambda.
   }
 }
 
@@ -1801,12 +1809,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      if (container.draining_ ||
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
-        ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
-        thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
-        container.pools_.erase(erase_iter);
-      }
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+      container.pools_.erase(erase_iter);
     }
 
     if (container.pools_.empty()) {
@@ -1832,15 +1837,21 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
+  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
+
+  if (alternate_protocol_options.has_value()) {
+    alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
+        alternate_protocol_options.value(), dispatcher);
+  }
+  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+      getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
+    ASSERT(alternate_protocols_cache);
 #ifdef ENVOY_ENABLE_QUIC
-    Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
-                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     if (quic_info == nullptr) {
       quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
@@ -1856,10 +1867,19 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+      ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
+      envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+      default_options.set_name(host->cluster().name());
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+    }
+
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state);
+        transport_socket_options, state, origin, alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
