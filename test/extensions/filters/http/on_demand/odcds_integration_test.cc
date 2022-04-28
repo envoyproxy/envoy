@@ -256,6 +256,7 @@ public:
     // create_xds_upstream_ will create a fake upstream for odcds_cluster
     setUpstreamCount(0);
     // We want to have xds upstream available through xds_upstream_
+    odcds_upstream_idx_ = 0;
     create_xds_upstream_ = true;
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Change cluster_0 to serve on-demand CDS.
@@ -278,6 +279,7 @@ public:
   }
 
   FakeStreamPtr odcds_stream_;
+  std::size_t odcds_upstream_idx_;
   std::size_t new_cluster_upstream_idx_;
   envoy::config::cluster::v3::Cluster new_cluster_;
 };
@@ -465,7 +467,7 @@ TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtRouteLevelWorks) {
                                                  {"Pick-This-Cluster", "new_cluster"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_,
+  EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(*dispatcher_, xds_connection_,
                                                          std::chrono::milliseconds(1000)));
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -492,7 +494,7 @@ TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtVirtualHostLevelWorks) {
                                                  {"Pick-This-Cluster", "new_cluster"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_,
+  EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(*dispatcher_, xds_connection_,
                                                          std::chrono::milliseconds(1000)));
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -746,6 +748,8 @@ key:
     create_xds_upstream_ = true;
     ScopedRdsIntegrationTest::initialize();
 
+    // We expect the odcds fake upstream to be the last one in fake_upstreams_ at the moment.
+    odcds_upstream_idx_ = fake_upstreams_.size() - 1;
     // Create the new cluster upstream.
     new_cluster_upstream_idx_ = fake_upstreams_.size();
     addFakeUpstream(Http::CodecType::HTTP2);
