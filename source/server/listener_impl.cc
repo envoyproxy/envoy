@@ -436,7 +436,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this, &origin] {
                             ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this, ListenerMessageUtil::filterChainChanged(config_, origin.config_));
+                            parent_.inPlaceFilterChainUpdate(
+                                *this,
+                                ListenerMessageUtil::filterChainChanged(config_, origin.config_));
                           }),
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()) {
@@ -987,13 +989,14 @@ bool ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(
   return differencer.Compare(lhs, rhs);
 }
 
-bool ListenerMessageUtil::filterChainChanged(
-    const envoy::config::listener::v3::Listener& lhs,
-    const envoy::config::listener::v3::Listener& rhs) {
+bool ListenerMessageUtil::filterChainChanged(const envoy::config::listener::v3::Listener& lhs,
+                                             const envoy::config::listener::v3::Listener& rhs) {
 
   return RepeatedPtrUtil::hash(lhs.filter_chains()) != RepeatedPtrUtil::hash(rhs.filter_chains()) ||
-         MessageUtil::hash(lhs.default_filter_chain()) != MessageUtil::hash(rhs.default_filter_chain()) ||
-         MessageUtil::hash(lhs.filter_chain_matcher()) != MessageUtil::hash(rhs.filter_chain_matcher());
+         MessageUtil::hash(lhs.default_filter_chain()) !=
+             MessageUtil::hash(rhs.default_filter_chain()) ||
+         MessageUtil::hash(lhs.filter_chain_matcher()) !=
+             MessageUtil::hash(rhs.filter_chain_matcher());
 }
 
 } // namespace Server

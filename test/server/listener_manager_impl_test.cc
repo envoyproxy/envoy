@@ -6526,11 +6526,8 @@ TEST(ListenerMessageUtilTest, ListenerMessageDefaultFilterChainChanged) {
   listener1.set_name("common");
   envoy::config::listener::v3::Listener listener2;
   listener2.set_name("common");
-  
-  {
-    EXPECT_FALSE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
-  }
+
+  { EXPECT_FALSE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2)); }
 
   // Test default filter chain change.
   envoy::config::listener::v3::FilterChain default_filter_chain_1;
@@ -6540,14 +6537,12 @@ TEST(ListenerMessageUtilTest, ListenerMessageDefaultFilterChainChanged) {
   {
     *listener1.mutable_default_filter_chain() = default_filter_chain_1;
     listener2.clear_default_filter_chain();
-    EXPECT_TRUE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
   }
   {
     *listener1.mutable_default_filter_chain() = default_filter_chain_1;
     *listener2.mutable_default_filter_chain() = default_filter_chain_2;
-    EXPECT_TRUE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
   }
 }
 
@@ -6574,8 +6569,7 @@ TEST(ListenerMessageUtilTest, ListenerMessageFilterChainMatcherChanged) {
                    value: foo
     )EOF";
     TestUtility::loadFromYaml(filter_chain_matcher, *listener2.mutable_filter_chain_matcher());
-    EXPECT_TRUE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
   }
   {
     const std::string filter_chain_matcher1 = R"EOF(
@@ -6610,8 +6604,7 @@ TEST(ListenerMessageUtilTest, ListenerMessageFilterChainMatcherChanged) {
     )EOF";
     TestUtility::loadFromYaml(filter_chain_matcher1, *listener2.mutable_filter_chain_matcher());
     TestUtility::loadFromYaml(filter_chain_matcher2, *listener2.mutable_filter_chain_matcher());
-    EXPECT_TRUE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
   }
 }
 
@@ -6625,15 +6618,13 @@ TEST(ListenerMessageUtilTest, ListenerMessageFilterChainsChanged) {
     add_filter_chain_1->set_name("127.0.0.1");
     auto add_filter_chain_2 = listener2.add_filter_chains();
     add_filter_chain_2->set_name("127.0.0.2");
-    EXPECT_TRUE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
   }
   {
     listener1.clear_filter_chains();
     auto add_filter_chain_2 = listener2.add_filter_chains();
     add_filter_chain_2->set_name("127.0.0.2");
-    EXPECT_TRUE(
-        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+    EXPECT_TRUE(Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
   }
 }
 
