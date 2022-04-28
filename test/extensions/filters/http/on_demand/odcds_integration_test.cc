@@ -799,7 +799,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDS) {
       name: {}
 )EOF";
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that match lazily loaded scope will trigger on demand loading.
+  // Request that matches lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -868,7 +868,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInVHost
       name: {}
 )EOF";
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that match lazily loaded scope will trigger on demand loading.
+  // Request that matches lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -937,7 +937,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute
       name: {}
 )EOF";
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that match lazily loaded scope will trigger on demand loading.
+  // Request that matches lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -968,6 +968,102 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute
   verifyResponse(std::move(response), "200", {}, {});
 
   cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that an update of scoped route config is performed on demand. Despite the fact that config
+// contains the cluster-header action, the request will fail, because ODCDS is not enabled.
+TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisabled) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+  initialize();
+  registerTestServerPorts({"http"});
+
+  const std::string route_config_tmpl = R"EOF(
+      virtual_hosts:
+      - name: integration
+        routes:
+        - name: odcds_route
+          route:
+            cluster_header: "Pick-This-Cluster"
+          match:
+            prefix: "/"
+        domains: ["*"]
+      name: {}
+)EOF";
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Request that matches lazily loaded scope will trigger on demand loading.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":scheme", "http"},
+                                     {":authority", "vhost.first"},
+                                     {"Pick-This-Cluster", "new_cluster"},
+                                     {"Addr", "x-foo-key=foo"}});
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(*dispatcher_, xds_connection_,
+                                                         std::chrono::milliseconds(1000)));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that an update of scoped route config is performed on demand. Despite the fact that config
+// contains the cluster-header action and ODCDS is enabled in HCM, the request will fail, because
+// ODCDS is disabled in virtual host.
+TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisabledInVHost) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    // Add on-demand extension config to the hcm.
+    auto odcds_config = OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster");
+    auto on_demand_config = OdCdsIntegrationHelper::createOnDemandConfig(odcds_config, 2500);
+    OdCdsIntegrationHelper::addOnDemandConfig(hcm, on_demand_config);
+  });
+  initialize();
+  registerTestServerPorts({"http"});
+
+  const std::string route_config_tmpl = R"EOF(
+      virtual_hosts:
+      - name: integration
+        typed_per_filter_config:
+          envoy.filters.http.on_demand:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+        routes:
+        - name: odcds_route
+          route:
+            cluster_header: "Pick-This-Cluster"
+          match:
+            prefix: "/"
+        domains: ["*"]
+      name: {}
+)EOF";
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Request that matches lazily loaded scope will trigger on demand loading.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":scheme", "http"},
+                                     {":authority", "vhost.first"},
+                                     {"Pick-This-Cluster", "new_cluster"},
+                                     {"Addr", "x-foo-key=foo"}});
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(*dispatcher_, xds_connection_,
+                                                         std::chrono::milliseconds(1000)));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
   cleanupUpstreamAndDownstream();
 }
 
