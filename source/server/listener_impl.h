@@ -35,6 +35,13 @@ public:
   static bool
   filterChainAndListenerFilterOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                          const envoy::config::listener::v3::Listener& rhs);
+
+  /**
+   * @return true if listener message lhs and rhs's filter chain related config are different.
+   */
+  static bool filterChainChanged(
+    const envoy::config::listener::v3::Listener& lhs,
+    const envoy::config::listener::v3::Listener& rhs);
 };
 
 class ListenerManagerImpl;

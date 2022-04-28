@@ -656,7 +656,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
+void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener, bool filter_chain_changed) {
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
   ASSERT(existing_warming_listener != warming_listeners_.end());
@@ -676,9 +676,13 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
 
   auto previous_listener = std::move(*existing_active_listener);
   *existing_active_listener = std::move(*existing_warming_listener);
-  // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
-  // their state.
-  drainFilterChains(std::move(previous_listener), **existing_active_listener);
+
+  // Skip draining if there is no different filter chain.
+  if (filter_chain_changed) {
+    // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
+    // their state.
+    drainFilterChains(std::move(previous_listener), **existing_active_listener);
+  }
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
@@ -696,12 +700,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
         draining_group->addFilterChainToDrain(filter_chain);
       });
 
-  // Skip draining if there is no different filter chain.
   auto filter_chain_size = draining_group->numDrainingFilterChains();
-  if (filter_chain_size == 0) {
-    draining_filter_chains_manager_.erase(draining_group);
-    return;
-  }
 
   stats_.total_filter_chains_draining_.add(filter_chain_size);
   draining_group->getDrainingListener().debugLog(

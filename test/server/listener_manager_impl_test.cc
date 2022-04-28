@@ -6521,6 +6521,122 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentListenerTimeoutConfigA
   }
 }
 
+TEST(ListenerMessageUtilTest, ListenerMessageDefaultFilterChainChanged) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+  
+  {
+    EXPECT_FALSE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+
+  // Test default filter chain change.
+  envoy::config::listener::v3::FilterChain default_filter_chain_1;
+  default_filter_chain_1.set_name("127.0.0.1");
+  envoy::config::listener::v3::FilterChain default_filter_chain_2;
+  default_filter_chain_2.set_name("127.0.0.2");
+  {
+    *listener1.mutable_default_filter_chain() = default_filter_chain_1;
+    listener2.clear_default_filter_chain();
+    EXPECT_TRUE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+  {
+    *listener1.mutable_default_filter_chain() = default_filter_chain_1;
+    *listener2.mutable_default_filter_chain() = default_filter_chain_2;
+    EXPECT_TRUE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageFilterChainMatcherChanged) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+
+  {
+    const std::string filter_chain_matcher = R"EOF(
+       matcher_tree:
+         input:
+           name: port
+           typed_config:
+             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+         exact_match_map:
+           map:
+             "10000":
+               action:
+                 name: foo
+                 typed_config:
+                   "@type": type.googleapis.com/google.protobuf.StringValue
+                   value: foo
+    )EOF";
+    TestUtility::loadFromYaml(filter_chain_matcher, *listener2.mutable_filter_chain_matcher());
+    EXPECT_TRUE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+  {
+    const std::string filter_chain_matcher1 = R"EOF(
+       matcher_tree:
+         input:
+           name: port
+           typed_config:
+             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+         exact_match_map:
+           map:
+             "10000":
+               action:
+                 name: foo
+                 typed_config:
+                   "@type": type.googleapis.com/google.protobuf.StringValue
+                   value: foo
+    )EOF";
+    const std::string filter_chain_matcher2 = R"EOF(
+       matcher_tree:
+         input:
+           name: port
+           typed_config:
+             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+         exact_match_map:
+           map:
+             "10000":
+               action:
+                 name: foo
+                 typed_config:
+                   "@type": type.googleapis.com/google.protobuf.StringValue
+                   value: foo
+    )EOF";
+    TestUtility::loadFromYaml(filter_chain_matcher1, *listener2.mutable_filter_chain_matcher());
+    TestUtility::loadFromYaml(filter_chain_matcher2, *listener2.mutable_filter_chain_matcher());
+    EXPECT_TRUE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+}
+
+TEST(ListenerMessageUtilTest, ListenerMessageFilterChainsChanged) {
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("common");
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("common");
+  {
+    auto add_filter_chain_1 = listener1.add_filter_chains();
+    add_filter_chain_1->set_name("127.0.0.1");
+    auto add_filter_chain_2 = listener2.add_filter_chains();
+    add_filter_chain_2->set_name("127.0.0.2");
+    EXPECT_TRUE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+  {
+    listener1.clear_filter_chains();
+    auto add_filter_chain_2 = listener2.add_filter_chains();
+    add_filter_chain_2->set_name("127.0.0.2");
+    EXPECT_TRUE(
+        Server::ListenerMessageUtil::filterChainChanged(listener1, listener2));
+  }
+}
+
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWorkerNotStarted) {
   // Worker is not started yet.
   auto listener_proto = createDefaultListener();

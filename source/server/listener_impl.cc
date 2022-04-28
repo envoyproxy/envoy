@@ -434,9 +434,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             initManager(), origin.filter_chain_manager_),
       reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
+                          [this, &origin] {
                             ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this);
+                            parent_.inPlaceFilterChainUpdate(*this, ListenerMessageUtil::filterChainChanged(config_, origin.config_));
                           }),
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()) {
@@ -985,6 +985,15 @@ bool ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "filter_chain_matcher"));
   return differencer.Compare(lhs, rhs);
+}
+
+bool ListenerMessageUtil::filterChainChanged(
+    const envoy::config::listener::v3::Listener& lhs,
+    const envoy::config::listener::v3::Listener& rhs) {
+
+  return RepeatedPtrUtil::hash(lhs.filter_chains()) != RepeatedPtrUtil::hash(rhs.filter_chains()) ||
+         MessageUtil::hash(lhs.default_filter_chain()) != MessageUtil::hash(rhs.default_filter_chain()) ||
+         MessageUtil::hash(lhs.filter_chain_matcher()) != MessageUtil::hash(rhs.filter_chain_matcher());
 }
 
 } // namespace Server
