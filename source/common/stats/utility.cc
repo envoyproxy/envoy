@@ -19,10 +19,10 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
   }
 
   std::string stats_name = std::string(name);
+  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
   absl::StrReplaceAll(
       {
-          {":", "_"},
-          {"\0", "_"},
           {"_//", "_"},
           {"_/", "_"},
       },
