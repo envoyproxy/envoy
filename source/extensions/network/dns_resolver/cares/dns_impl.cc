@@ -26,14 +26,6 @@
 namespace Envoy {
 namespace Network {
 
-namespace {
-// Treat responses with `ARES_ENODATA` or `ARES_ENOTFOUND` status as DNS response with no records.
-// @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for details.
-bool isResponseWithNoRecords(int status) {
-  return status == ARES_ENODATA || status == ARES_ENOTFOUND;
-}
-} // namespace
-
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
     Event::Dispatcher& dispatcher,
@@ -132,6 +124,12 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
       RELEASE_ASSERT(result == ARES_SUCCESS, "");
     }
   }
+}
+
+// Treat responses with `ARES_ENODATA` or `ARES_ENOTFOUND` status as DNS response with no records.
+// @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for details.
+bool DnsResolverImpl::AddrInfoPendingResolution::isResponseWithNoRecords(int status) {
+  return status == ARES_ENODATA || status == ARES_ENOTFOUND;
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
