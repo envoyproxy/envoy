@@ -694,33 +694,10 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluste
 
 class OdCdsScopedRdsIntegrationTestBase : public ScopedRdsIntegrationTest {
 public:
-  void clearOnDemandConfig() {
-    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
-      OdCdsIntegrationHelper::clearOnDemandConfig(hcm);
-    });
-  }
-
-  void clearPerRouteConfig(std::string vhost_name, std::string route_name) {
-    config_helper_.addConfigModifier(
-        [vhost_name = std::move(vhost_name),
-         route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& hcm) {
-          OdCdsIntegrationHelper::clearPerRouteConfig(hcm, vhost_name, route_name);
-        });
-  }
-
   void addOnDemandConfig(OdCdsIntegrationHelper::OnDemandConfig config) {
     config_helper_.addConfigModifier(
         [config = std::move(config)](ConfigHelper::HttpConnectionManager& hcm) {
           OdCdsIntegrationHelper::addOnDemandConfig(hcm, std::move(config));
-        });
-  }
-
-  void addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig config, std::string vhost_name,
-                         std::string route_name) {
-    config_helper_.addConfigModifier(
-        [config = std::move(config), vhost_name = std::move(vhost_name),
-         route_name = std::move(route_name)](ConfigHelper::HttpConnectionManager& hcm) {
-          OdCdsIntegrationHelper::addPerRouteConfig(hcm, std::move(config), vhost_name, route_name);
         });
   }
 
@@ -761,6 +738,23 @@ key:
     registerTestServerPorts({"http"});
   }
 
+  IntegrationStreamDecoderPtr initialRDSCommunication(std::string route_config_tmpl) {
+    registerTestServerPorts({"http"});
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    // Request that matches lazily loaded scope will trigger on demand loading.
+    auto response = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/meh"},
+                                       {":scheme", "http"},
+                                       {":authority", "vhost.first"},
+                                       {"Pick-This-Cluster", "new_cluster"},
+                                       {"Addr", "x-foo-key=foo"}});
+    createRdsStream("foo_route1");
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+    test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+    return response;
+  }
+
   FakeStreamPtr odcds_stream_;
   std::size_t odcds_upstream_idx_;
   std::size_t new_cluster_upstream_idx_;
@@ -777,12 +771,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDS) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
-  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
-    // Add on-demand extension config to the hcm.
-    auto odcds_config = OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster");
-    auto on_demand_config = OdCdsIntegrationHelper::createOnDemandConfig(odcds_config, 2500);
-    OdCdsIntegrationHelper::addOnDemandConfig(hcm, on_demand_config);
-  });
+  addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500));
   initialize();
   registerTestServerPorts({"http"});
 
@@ -798,18 +787,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDS) {
         domains: ["*"]
       name: {}
 )EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that matches lazily loaded scope will trigger on demand loading.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":scheme", "http"},
-                                     {":authority", "vhost.first"},
-                                     {"Pick-This-Cluster", "new_cluster"},
-                                     {"Addr", "x-foo-key=foo"}});
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  auto response = initialRDSCommunication(route_config_tmpl);
 
   createXdsConnection();
   auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
@@ -841,7 +819,6 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInVHost
     name: envoy.filters.http.on_demand
     )EOF");
   initialize();
-  registerTestServerPorts({"http"});
 
   const std::string route_config_tmpl = R"EOF(
       virtual_hosts:
@@ -867,18 +844,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInVHost
         domains: ["*"]
       name: {}
 )EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that matches lazily loaded scope will trigger on demand loading.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":scheme", "http"},
-                                     {":authority", "vhost.first"},
-                                     {"Pick-This-Cluster", "new_cluster"},
-                                     {"Addr", "x-foo-key=foo"}});
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  auto response = initialRDSCommunication(route_config_tmpl);
 
   createXdsConnection();
   auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
@@ -910,7 +876,6 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute
     name: envoy.filters.http.on_demand
     )EOF");
   initialize();
-  registerTestServerPorts({"http"});
 
   const std::string route_config_tmpl = R"EOF(
       virtual_hosts:
@@ -936,18 +901,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute
         domains: ["*"]
       name: {}
 )EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that matches lazily loaded scope will trigger on demand loading.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":scheme", "http"},
-                                     {":authority", "vhost.first"},
-                                     {"Pick-This-Cluster", "new_cluster"},
-                                     {"Addr", "x-foo-key=foo"}});
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  auto response = initialRDSCommunication(route_config_tmpl);
 
   createXdsConnection();
   auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
@@ -978,7 +932,6 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
     name: envoy.filters.http.on_demand
     )EOF");
   initialize();
-  registerTestServerPorts({"http"});
 
   const std::string route_config_tmpl = R"EOF(
       virtual_hosts:
@@ -992,18 +945,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
         domains: ["*"]
       name: {}
 )EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that matches lazily loaded scope will trigger on demand loading.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":scheme", "http"},
-                                     {":authority", "vhost.first"},
-                                     {"Pick-This-Cluster", "new_cluster"},
-                                     {"Addr", "x-foo-key=foo"}});
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  auto response = initialRDSCommunication(route_config_tmpl);
 
   EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(*dispatcher_, xds_connection_,
                                                          std::chrono::milliseconds(1000)));
@@ -1021,14 +963,8 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
-  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
-    // Add on-demand extension config to the hcm.
-    auto odcds_config = OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster");
-    auto on_demand_config = OdCdsIntegrationHelper::createOnDemandConfig(odcds_config, 2500);
-    OdCdsIntegrationHelper::addOnDemandConfig(hcm, on_demand_config);
-  });
+  addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500));
   initialize();
-  registerTestServerPorts({"http"});
 
   const std::string route_config_tmpl = R"EOF(
       virtual_hosts:
@@ -1045,18 +981,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
         domains: ["*"]
       name: {}
 )EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that matches lazily loaded scope will trigger on demand loading.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":scheme", "http"},
-                                     {":authority", "vhost.first"},
-                                     {"Pick-This-Cluster", "new_cluster"},
-                                     {"Addr", "x-foo-key=foo"}});
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  auto response = initialRDSCommunication(route_config_tmpl);
 
   EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(*dispatcher_, xds_connection_,
                                                          std::chrono::milliseconds(1000)));
