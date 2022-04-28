@@ -5,8 +5,8 @@
 #include "envoy/http/header_formatter.h"
 
 #include "source/common/http/http1/header_formatter.h"
-#include "source/common/protobuf/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
