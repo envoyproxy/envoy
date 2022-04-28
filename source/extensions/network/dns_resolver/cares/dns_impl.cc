@@ -1,11 +1,12 @@
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
+#include <sys/socket.h>
+
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
-#include <sys/socket.h>
 
 #include "envoy/common/platform.h"
 #include "envoy/registry/registry.h"
@@ -139,8 +140,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
   pending_resolutions_--;
 
   if (status != ARES_SUCCESS && (!isResponseWithNoRecords(status) || !accept_nodata_)) {
-      ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
-                      "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
+                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
   }
 
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
