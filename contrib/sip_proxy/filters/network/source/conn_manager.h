@@ -118,7 +118,7 @@ public:
 
   std::shared_ptr<SipSettings> settings() const override { return config_.settings(); }
 
-  void continueHandling(const std::string& key);
+  void continueHandling(const std::string& key, bool try_next_affinity=false);
   void continueHandling(MessageMetadataSharedPtr metadata,
                         DecoderEventHandler& decoder_event_handler);
   std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() { return this->tra_handler_; }
@@ -203,7 +203,7 @@ private:
     }
     void onReset() override { return parent_.onReset(); }
 
-    void continueHandling(const std::string& key) override { return parent_.continueHandling(key); }
+    void continueHandling(const std::string& key, bool try_next_affinity) override { return parent_.continueHandling(key, try_next_affinity); }
     MessageMetadataSharedPtr metadata() override { return parent_.metadata(); }
 
     // PendingListHandler
@@ -298,7 +298,7 @@ private:
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       return parent_.tra_handler_;
     }
-    void continueHandling(const std::string& key) override { return parent_.continueHandling(key); }
+    void continueHandling(const std::string& key, bool try_next_affinity) override { return parent_.continueHandling(key, try_next_affinity); }
 
     // Sip::FilterChainFactoryCallbacks
     void addDecoderFilter(SipFilters::DecoderFilterSharedPtr filter) override {

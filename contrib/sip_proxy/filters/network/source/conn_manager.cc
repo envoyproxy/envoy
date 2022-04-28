@@ -87,11 +87,11 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
                                               const absl::any& resp) {
   switch (type) {
   case TrafficRoutingAssistant::ResponseType::CreateResp: {
-    ENVOY_LOG(trace, "=== CreateResp");
+    ENVOY_LOG(trace, "TRA === CreateResp");
     break;
   }
   case TrafficRoutingAssistant::ResponseType::UpdateResp: {
-    ENVOY_LOG(trace, "=== UpdateResp");
+    ENVOY_LOG(trace, "TRA === UpdateResp");
     break;
   }
   case TrafficRoutingAssistant::ResponseType::RetrieveResp: {
@@ -100,7 +100,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::RetrieveResponse>(resp)
             .data();
     for (const auto& item : resp_data) {
-      ENVOY_LOG(trace, "=== RetrieveResp {} {}={}", message_type, item.first, item.second);
+      ENVOY_LOG(trace, "TRA === RetrieveResp {} {}={}", message_type, item.first, item.second);
       if (!item.second.empty()) {
         parent_.onResponseHandleForPendingList(
             message_type, item.first,
@@ -123,17 +123,17 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
     break;
   }
   case TrafficRoutingAssistant::ResponseType::DeleteResp: {
-    ENVOY_LOG(trace, "=== DeleteLskpmcResp");
+    ENVOY_LOG(trace, "TRA === DeleteResp");
     break;
   }
   case TrafficRoutingAssistant::ResponseType::SubscribeResp: {
-    ENVOY_LOG(trace, "=== SubscribeLskpmcResp");
-    auto lskpmcs =
+    ENVOY_LOG(trace, "TRA === SubscribeResp");
+    auto data =
         absl::any_cast<
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::SubscribeResponse>(resp)
             .data();
-    for (auto& item : lskpmcs) {
-      ENVOY_LOG(debug, "tra update {}: {}={}", message_type, item.first, item.second);
+    for (auto& item : data) {
+      ENVOY_LOG(debug, "TRA UPDATE {}: {}={}", message_type, item.first, item.second);
       (*traffic_routing_assistant_map_)[message_type].emplace(item);
     }
   }
@@ -183,11 +183,19 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManager::continueHandling(const std::string& key) {
+void ConnectionManager::continueHandling(const std::string& key, bool try_next_affinity) {
   onResponseHandleForPendingList(
       "connection_pending", key,
       [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-        continueHandling(metadata, decoder_event_handler);
+        if (try_next_affinity) {
+          metadata->nextAffinityIteration();
+          if (metadata->affinityIteration() != metadata->affinity().end()) {
+            metadata->setState(State::HandleAffinity);
+            continueHandling(metadata, decoder_event_handler);
+          }
+        } else {
+          continueHandling(metadata, decoder_event_handler);
+        }
       });
 }
 

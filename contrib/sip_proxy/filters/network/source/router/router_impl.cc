@@ -149,7 +149,8 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
 
   if (QueryStatus::Continue == ret) {
     metadata->setDestination(host);
-    ENVOY_LOG(debug, "Set destination from local cache {} = {} ", type, metadata->destination());
+    ENVOY_LOG(debug, "Set destination from local cache {} {} {} = {}", header, type, key,
+              metadata->destination());
   }
   return ret;
 }
@@ -231,6 +232,7 @@ FilterStatus Router::handleAffinity() {
         metadata->affinity().emplace_back("Route", "ep", "ep", std::string(dest), false, false);
       }
     }
+
     metadata->resetAffinityIteration();
   }
 
@@ -304,8 +306,11 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
   // check the host ip is equal to dest. If false, then return StopIteration
   // if this function return StopIteration, then continue with next affinity
   if (!dest.empty() && dest != host->address()->ip()->addressAsString()) {
+    ENVOY_LOG(info, "LB selected host {} is not equal to predefined dest {}",
+              host->address()->ip()->addressAsString(), dest);
     return FilterStatus::StopIteration;
   }
+
   if (auto upstream_request =
           transaction_info->getUpstreamRequest(host->address()->ip()->addressAsString());
       upstream_request != nullptr) {
@@ -360,8 +365,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                                                metadata->affinityIteration()->key(), metadata);
 
     if (QueryStatus::Continue == handle_ret) {
+      // has already get the destination from affinity
       host = metadata->destination();
-      ENVOY_STREAM_LOG(debug, "get existing destination {}", *callbacks_, host);
+      ENVOY_STREAM_LOG(debug, "has already get destination {} from affinity", *callbacks_, host);
     } else if (QueryStatus::Pending == handle_ret) {
       ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
                        metadata->affinityIteration()->key());
@@ -375,7 +381,6 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       // Need to try next affinity
       metadata->nextAffinityIteration();
       metadata->setState(State::HandleAffinity);
-      ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
       return FilterStatus::Continue;
     }
 
@@ -396,26 +401,24 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
         ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
         return FilterStatus::StopIteration;
       }
-      metadata->nextAffinityIteration();
       return FilterStatus::Continue;
     }
-    ENVOY_STREAM_LOG(trace, "no destination preset select with load balancer.", *callbacks_);
+
+    ENVOY_STREAM_LOG(trace, "no destination preset select with load balancer host= {}", *callbacks_,
+                     host);
 
     upstream_request_started = false;
     messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
     if (upstream_request_started) {
-      // Continue: continue to messageEnd
-      // StopIteration: continue to next affinity
       // Defer to handle in upstream request onPoolReady or onPoolFailure
       return FilterStatus::StopIteration;
     } else {
       // continue to next affinity
       metadata->setState(State::HandleAffinity);
       ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
+      metadata->nextAffinityIteration();
+      return FilterStatus::Continue;
     }
-    // Continue: continue to messageEnd
-    metadata->nextAffinityIteration();
-    return FilterStatus::Continue;
   } else {
     metadata->resetDestination();
     if (!metadata->stopLoadBalance()) {
@@ -437,7 +440,6 @@ FilterStatus Router::messageEnd() {
   metadata_->setEP(Utility::localAddress(context_));
 
   std::shared_ptr<Encoder> encoder = std::make_shared<EncoderImpl>();
-  ENVOY_STREAM_LOG(debug, "before encode", *callbacks_);
   encoder->encode(metadata_, transport_buffer);
 
   ENVOY_STREAM_LOG(trace, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
@@ -520,21 +522,16 @@ void UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(info, "on pool failure {}", static_cast<int>(reason));
+  ENVOY_LOG(info, "on pool failure {} reason {}", host->address()->ip()->addressAsString(),
+            static_cast<int>(reason));
   conn_state_ = ConnectionState::NotConnected;
   conn_pool_handle_ = nullptr;
 
   // Once onPoolFailure, this instance is invalid, can't be reused.
   transaction_info_->deleteUpstreamRequest(host->address()->ip()->addressAsString());
 
-  // Continue to next affinity
-  if (metadata_->affinityIteration() != metadata_->affinity().end()) {
-    metadata_->nextAffinityIteration();
-    metadata_->setState(State::HandleAffinity);
-
-    if (callbacks_) {
-      callbacks_->continueHandling(host->address()->asString());
-    }
+  if (callbacks_) {
+    callbacks_->continueHandling(host->address()->asString(), true);
   }
 
   // Mimic an upstream reset.
@@ -557,7 +554,7 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_
 
   if (continue_handling) {
     if (callbacks_) {
-      callbacks_->continueHandling(host->address()->asString());
+      callbacks_->continueHandling(host->address()->asString(), false);
     }
   }
 }

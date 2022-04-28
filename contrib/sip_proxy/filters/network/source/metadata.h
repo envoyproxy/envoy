@@ -72,15 +72,18 @@ public:
 
 class AffinityEntry {
 public:
-  AffinityEntry(const std::string& header, const std::string& type, const std::string& key, bool query, bool subscribe)
+  AffinityEntry(const std::string& header, const std::string& type, const std::string& key,
+                bool query, bool subscribe)
       : header_(header), type_(type), key_(key), query_(query), subscribe_(subscribe) {}
-  AffinityEntry(const std::string& header, const std::string& type, const std::string& key, const std::string& value, bool query, bool subscribe)
-      : header_(header), type_(type), key_(key), value_(value), query_(query), subscribe_(subscribe) {}
+  AffinityEntry(const std::string& header, const std::string& type, const std::string& key,
+                const std::string& value, bool query, bool subscribe)
+      : header_(header), type_(type), key_(key), value_(value), query_(query),
+        subscribe_(subscribe) {}
 
-  std::string & header() { return header_; }
-  std::string & type() { return type_; }
-  std::string & key() { return key_; }
-  std::string & value() { return value_; }
+  std::string& header() { return header_; }
+  std::string& type() { return type_; }
+  std::string& key() { return key_; }
+  std::string& value() { return value_; }
   bool query() { return query_; }
   bool subscribe() { return subscribe_; }
 
@@ -148,7 +151,13 @@ public:
   std::vector<AffinityEntry>& affinity() { return affinity_; }
   void resetAffinityIteration() { affinity_iteration_ = affinity_.begin(); }
   std::vector<AffinityEntry>::iterator& affinityIteration() { return affinity_iteration_; };
-  std::vector<AffinityEntry>::iterator& nextAffinityIteration() { return ++affinity_iteration_; };
+  std::vector<AffinityEntry>::iterator& nextAffinityIteration() {
+    if (affinity_iteration_ != affinity_.end()) {
+      return ++affinity_iteration_;
+    } else {
+      return affinity_iteration_;
+    }
+  };
 
   void addEPOperation(
       size_t raw_offset, absl::string_view& header,
@@ -173,9 +182,7 @@ public:
     return headers_[type].at(index);
   }
 
-  std::vector<SipHeader> & listHeader(HeaderType type) {
-    return headers_[type];
-  }
+  std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
 
 private:
   MsgType msg_type_;
@@ -193,13 +200,14 @@ private:
   std::string destination_ = "";
 
   std::vector<AffinityEntry> affinity_;
-  std::vector<AffinityEntry>::iterator affinity_iteration_;
+  std::vector<AffinityEntry>::iterator affinity_iteration_{affinity_.begin()};
 
   std::string raw_msg_{};
   State state_{State::TransportBegin};
   bool stop_load_balance_{};
 
-  bool isDomainMatched(absl::string_view& header,
+  bool isDomainMatched(
+      absl::string_view& header,
       const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
           local_services) {
     for (auto& service : local_services) {
