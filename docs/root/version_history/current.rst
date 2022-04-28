@@ -37,7 +37,7 @@ New Features
 * dns_resolver: added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
 * ext_proc: added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
 * thrift: added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
-* thrift: introduced thrift configurable encoder and bidirection filters, which allows peeking and modifying the thrift message.
+* thrift: introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift message.
 
 Deprecated
 ----------
