@@ -989,25 +989,26 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return data;
 }
 
-void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+void ClusterManagerImpl::drainConnections(const std::string& cluster,
+                                          DrainConnectionsHostPredicate predicate) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call", "drainConnections called for cluster {}",
                   cluster);
 
-  tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+  tls_.runOnAllThreads([cluster, predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
-      cluster_entry->second->drainAllConnPools();
+      cluster_entry->second->drainAllConnPools(predicate);
     }
   });
 }
 
-void ClusterManagerImpl::drainConnections() {
+void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
                   "drainConnections called for all clusters");
 
-  tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+  tls_.runOnAllThreads([predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainAllConnPools();
+      cluster_entry.second->drainAllConnPools(predicate);
     }
   });
 }
@@ -1558,9 +1559,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnP
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools() {
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools(
+    DrainConnectionsHostPredicate predicate) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     for (const HostSharedPtr& host : host_set->hosts()) {
+      if (predicate != nullptr && !predicate(*host)) {
+        continue;
+      }
+
       parent_.drainAllConnPoolsWorker(host);
     }
   }
