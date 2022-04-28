@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/utility.h"
 
+#include <cstdint>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/safe_memcpy.h"
@@ -8,7 +10,6 @@
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
-#include <cstdint>
 
 namespace Envoy {
 namespace Extensions {
