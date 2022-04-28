@@ -18,7 +18,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.network.dns_resolver.cares]
 
 // Configuration for c-ares DNS resolver.
-// [#next-free-field: 6]
 message CaresDnsResolverConfig {
   // A list of dns resolver addresses.
   // :ref:`use_resolvers_as_fallback<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
@@ -39,9 +38,6 @@ message CaresDnsResolverConfig {
   // presents. e.g., if there are no available IPv4 network interfaces, the resolver will not
   // provide IPv4 addresses.
   bool filter_unroutable_families = 4;
-
-  // Treat `ARES_ENODATA` and `ARES_ENOTFOUND` as valid responses and propagate the "no records" result back to the caller.
-  bool accept_nodata = 5;
 
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
   config.core.v3.DnsResolverOptions dns_resolver_options = 2;

@@ -41,8 +41,7 @@ DnsResolverImpl::DnsResolverImpl(
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
-      filter_unroutable_families_(config.filter_unroutable_families()),
-      accept_nodata_(config.accept_nodata()) {
+      filter_unroutable_families_(config.filter_unroutable_families()) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
 }
@@ -382,8 +381,7 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
     dual_resolution_ = true;
   }
 
-  accept_nodata_ = parent.accept_nodata_ &&
-                   Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata");
+  accept_nodata_ = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata");
 
   switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:

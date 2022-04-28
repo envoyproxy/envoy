@@ -172,7 +172,6 @@ private:
   const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
-  const bool accept_nodata_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

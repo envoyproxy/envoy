@@ -11,7 +11,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* dns: added :ref:`accept_nodata <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.accept_nodata>` to allow propagating DNS responses with no records back to callers like strict_dns cluster.
+* dns: allow propagating DNS responses with no records back to callers like strict_dns cluster, guarded by ``envoy.reloadable_features.cares_accept_nodata``
 * tls: if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
 * tls: removed SHA-1 cipher suites from the server-side defaults.
 
