@@ -801,7 +801,8 @@ public:
       auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-      envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+      envoy::config::core::v3::GrpcService* grpc_service =
+          lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
     });
     on_server_init_function_ = [&]() {
@@ -1007,7 +1008,7 @@ TEST_P(ListenerFilterIntegrationTest, InplaceUpdateListenerFilterOrder) {
         max_read_bytes: 5
         close_connection: false
         )EOF");
-  
+
   initializeWithLds();
 
   std::string data = "hello";
@@ -1053,7 +1054,7 @@ TEST_P(ListenerFilterIntegrationTest, InplaceUpdateListenerFilterConfig) {
         max_read_bytes: 5
         close_connection: false
         )EOF");
-  
+
   initializeWithLds();
 
   std::string data = "hello";

@@ -966,17 +966,18 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
              Network::Utility::protobufAddressSocketType(other.config_.address());
 }
 
-bool ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(const envoy::config::listener::v3::Listener& lhs,
-                                                const envoy::config::listener::v3::Listener& rhs) {
+bool ListenerMessageUtil::filterChainAndListenerFilterOnlyChange(
+    const envoy::config::listener::v3::Listener& lhs,
+    const envoy::config::listener::v3::Listener& rhs) {
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
   differencer.IgnoreField(
       envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("listener_filters"));
-  differencer.IgnoreField(
-      envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("listener_filters_timeout"));
-  differencer.IgnoreField(
-      envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("continue_on_listener_filters_timeout"));
+  differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
+      "listener_filters_timeout"));
+  differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
+      "continue_on_listener_filters_timeout"));
   differencer.IgnoreField(
       envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("filter_chains"));
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
