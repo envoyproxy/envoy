@@ -1716,20 +1716,16 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  if (container->draining_ ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  container->pools_->erasePool(priority, hash_key);
 
-    ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
-    container->pools_->erasePool(priority, hash_key);
-
-    // Guard deletion of the container with `do_not_delete_` to avoid deletion while
-    // iterating through the container in `container->pools_->startDrain()`. See
-    // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->empty()) {
-      ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
-      host_http_conn_pool_map_.erase(
-          host); // NOTE: `container` is erased after this point in the lambda.
-    }
+  // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+  // iterating through the container in `container->pools_->startDrain()`. See
+  // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
+  if (!container->do_not_delete_ && container->pools_->empty()) {
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    host_http_conn_pool_map_.erase(
+        host); // NOTE: `container` is erased after this point in the lambda.
   }
 }
 
@@ -1801,12 +1797,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      if (container.draining_ ||
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
-        ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
-        thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
-        container.pools_.erase(erase_iter);
-      }
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+      container.pools_.erase(erase_iter);
     }
 
     if (container.pools_.empty()) {
