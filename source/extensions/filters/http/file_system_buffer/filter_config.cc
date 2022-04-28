@@ -114,13 +114,13 @@ absl::string_view getStorageBufferPath(const FilterConfigVector& configs) {
   return env_tmpdir ? env_tmpdir : "/tmp";
 }
 
-AsyncFileManager& getAsyncFileManager(const FilterConfigVector& configs) {
+AsyncFileManager* getAsyncFileManager(const FilterConfigVector& configs) {
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.asyncFileManager()) {
-      return *cfg.asyncFileManager();
+      return cfg.asyncFileManager().get();
     }
   }
-  throw(EnvoyException("FileSystemBufferFilterConfig must have manager_config"));
+  return nullptr;
 }
 
 const BufferBehavior& getBufferBehavior(const StreamConfigVector& configs) {
@@ -133,32 +133,33 @@ const BufferBehavior& getBufferBehavior(const StreamConfigVector& configs) {
 }
 
 const FileSystemBufferFilterMergedConfig::StreamConfig
-getBufferRequestConfig(const FilterConfigVector& configs) {
+getBufferRequestConfig(const FilterConfigVector& configs, bool has_file_manager) {
   StreamConfigVector request_configs;
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.proto().has_request()) {
       request_configs.emplace_back(cfg.proto().request());
     }
   }
-  return FileSystemBufferFilterMergedConfig::StreamConfig(request_configs);
+  return FileSystemBufferFilterMergedConfig::StreamConfig(request_configs, has_file_manager);
 }
 
 const FileSystemBufferFilterMergedConfig::StreamConfig
-getBufferResponseConfig(const FilterConfigVector& configs) {
+getBufferResponseConfig(const FilterConfigVector& configs, bool has_file_manager) {
   StreamConfigVector response_configs;
   for (const FileSystemBufferFilterConfig& cfg : configs) {
     if (cfg.proto().has_response()) {
       response_configs.emplace_back(cfg.proto().response());
     }
   }
-  return FileSystemBufferFilterMergedConfig::StreamConfig(response_configs);
+  return FileSystemBufferFilterMergedConfig::StreamConfig(response_configs, has_file_manager);
 }
 
 } // namespace
 
-FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(const StreamConfigVector& configs)
+FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(const StreamConfigVector& configs,
+                                                               bool has_file_manager)
     : memory_buffer_bytes_limit_(getMemoryBufferBytesLimit(configs)),
-      storage_buffer_bytes_limit_(getStorageBufferBytesLimit(configs)),
+      storage_buffer_bytes_limit_(has_file_manager ? getStorageBufferBytesLimit(configs) : 0),
       storage_buffer_queue_high_watermark_bytes_(getStorageBufferQueueHighWatermarkBytes(configs)),
       behavior_(getBufferBehavior(configs)) {}
 
@@ -182,7 +183,8 @@ FileSystemBufferFilterMergedConfig::FileSystemBufferFilterMergedConfig(
     const FilterConfigVector& configs)
     : async_file_manager_(getAsyncFileManager(configs)),
       storage_buffer_path_(getStorageBufferPath(configs)),
-      request_(getBufferRequestConfig(configs)), response_(getBufferResponseConfig(configs)) {}
+      request_(getBufferRequestConfig(configs, async_file_manager_ != nullptr)),
+      response_(getBufferResponseConfig(configs, async_file_manager_ != nullptr)) {}
 
 } // namespace FileSystemBuffer
 } // namespace HttpFilters

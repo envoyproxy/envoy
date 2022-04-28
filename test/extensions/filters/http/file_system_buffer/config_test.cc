@@ -91,24 +91,30 @@ TEST_F(FileSystemBufferFilterConfigDeathTest, ThrowsExceptionWithConfiguredInval
                           "is not a directory");
 }
 
-TEST_F(FileSystemBufferFilterConfigDeathTest, ThrowsExceptionOnMergeWithNoManagerConfig) {
+TEST_F(FileSystemBufferFilterConfigTest, FallsBackToZeroStorageIfManagerNotConfigured) {
   auto base_config = captureConfigFromProto(emptyConfig());
-  EXPECT_THROW_WITH_REGEX(FileSystemBufferFilterMergedConfig({*base_config}), EnvoyException,
-                          "must have manager_config");
+  auto config = FileSystemBufferFilterMergedConfig({*base_config});
+  EXPECT_EQ(config.request().memoryBufferBytesLimit(),
+            FileSystemBufferFilterMergedConfig::default_memory_buffer_bytes_limit);
+  EXPECT_EQ(config.response().memoryBufferBytesLimit(),
+            FileSystemBufferFilterMergedConfig::default_memory_buffer_bytes_limit);
+  EXPECT_EQ(0, config.request().storageBufferBytesLimit());
+  EXPECT_EQ(0, config.response().storageBufferBytesLimit());
+  EXPECT_FALSE(config.hasAsyncFileManager());
 }
 
-TEST_F(FileSystemBufferFilterConfigTest, NoExceptionOnMergeWithManagerConfigInRouteConfig) {
+TEST_F(FileSystemBufferFilterConfigTest, ManagerIsConfiguredOnMergeWithManagerConfigInRouteConfig) {
   auto base_config = captureConfigFromProto(emptyConfig());
   auto route_config = makeRouteConfig(minimalConfig());
   auto config = FileSystemBufferFilterMergedConfig({*base_config, *route_config});
-  // Not throwing an exception is success.
+  EXPECT_TRUE(config.hasAsyncFileManager());
 }
 
-TEST_F(FileSystemBufferFilterConfigTest, NoExceptionOnMergeWithManagerConfigInBaseConfig) {
+TEST_F(FileSystemBufferFilterConfigTest, ManagerIsConfiguredOnMergeWithManagerConfigInBaseConfig) {
   auto base_config = captureConfigFromProto(minimalConfig());
   auto route_config = makeRouteConfig(emptyConfig());
   auto config = FileSystemBufferFilterMergedConfig({*base_config, *route_config});
-  // Not throwing an exception is success.
+  EXPECT_TRUE(config.hasAsyncFileManager());
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, MinimalProtoGeneratesFilterWithDefaultConfig) {

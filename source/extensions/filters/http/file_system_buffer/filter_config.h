@@ -69,7 +69,7 @@ class FileSystemBufferFilterMergedConfig {
 public:
   class StreamConfig {
   public:
-    StreamConfig(const StreamConfigVector& configs);
+    StreamConfig(const StreamConfigVector& configs, bool has_file_manager);
     size_t memoryBufferBytesLimit() const { return memory_buffer_bytes_limit_; }
     size_t storageBufferBytesLimit() const { return storage_buffer_bytes_limit_; }
     size_t storageBufferQueueHighWatermarkBytes() const {
@@ -86,7 +86,8 @@ public:
   // The first config is highest priority, overriding later configs for any value present.
   explicit FileSystemBufferFilterMergedConfig(const FilterConfigVector& configs);
   const std::string& storageBufferPath() const { return storage_buffer_path_; }
-  AsyncFileManager& asyncFileManager() const { return async_file_manager_; }
+  bool hasAsyncFileManager() const { return async_file_manager_ != nullptr; }
+  AsyncFileManager& asyncFileManager() const { return *async_file_manager_; }
   const StreamConfig& request() const { return request_; }
   const StreamConfig& response() const { return response_; }
 
@@ -94,7 +95,7 @@ public:
   static constexpr size_t default_storage_buffer_bytes_limit = 32 * 1024 * 1024;
 
 private:
-  AsyncFileManager& async_file_manager_;
+  AsyncFileManager* async_file_manager_;
   const std::string storage_buffer_path_;
   const StreamConfig request_;
   const StreamConfig response_;
