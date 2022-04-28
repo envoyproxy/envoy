@@ -77,7 +77,7 @@ bool contains(const std::vector<Http::Protocol>& protocols,
 
 absl::optional<Http::HttpServerPropertiesCache::Origin>
 getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
-  std::string sni = host->transportSocketFactory().defaultServerNameIndication();
+  std::string sni = std::string(host->transportSocketFactory().defaultServerNameIndication());
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
