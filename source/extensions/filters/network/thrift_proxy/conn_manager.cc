@@ -228,10 +228,12 @@ FilterStatus ConnectionManager::ResponseDecoder::transportBegin(MessageMetadataS
 FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
+  FilterStatus status =
+      parent_.applyEncoderFilters(DecoderEvent::TransportEnd, absl::any(), protocol_converter_);
   // Currently we don't support returning FilterStatus::StopIteration from encoder filters.
   // Hence, this if-statement is always false.
-  if (parent_.applyEncoderFilters(DecoderEvent::TransportEnd, absl::any(), protocol_converter_) ==
-      FilterStatus::StopIteration) {
+  ASSERT(status == FilterStatus::Continue);
+  if (status == FilterStatus::StopIteration) {
     pending_transport_end_ = true;
     return FilterStatus::StopIteration;
   }
@@ -430,10 +432,12 @@ void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
 
 void ConnectionManager::ActiveRpcEncoderFilter::continueEncoding() {
   // Not supported.
+  ASSERT(false);
 }
 
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(DecoderEvent state, absl::any data,
                                                                ActiveRpcDecoderFilter* filter) {
+  ASSERT(filter_action_ == nullptr || state == DecoderEvent::Default);
   prepareFilterAction(state, data);
 
   if (local_response_sent_) {
@@ -445,6 +449,7 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(DecoderEvent stat
   if (upgrade_handler_) {
     // Divert events to the current protocol upgrade handler.
     const FilterStatus status = filter_action_(upgrade_handler_.get());
+    filter_action_ = nullptr;
     filter_context_.reset();
     return status;
   }
@@ -456,6 +461,7 @@ FilterStatus
 ConnectionManager::ActiveRpc::applyEncoderFilters(DecoderEvent state, absl::any data,
                                                   ProtocolConverterSharedPtr protocol_converter,
                                                   ActiveRpcEncoderFilter* filter) {
+  ASSERT(filter_action_ == nullptr || state == DecoderEvent::Default);
   prepareFilterAction(state, data);
 
   if (applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_, protocol_converter) !=
