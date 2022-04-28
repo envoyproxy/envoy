@@ -32,39 +32,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 
-std::vector<TcpProxyIntegrationTestParams> newPoolTestParams() {
-  std::vector<TcpProxyIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::vector<TcpProxyIntegrationTestParams> getProtocolTestParams() {
-  std::vector<TcpProxyIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, true});
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::string
-protocolTestParamsToString(const ::testing::TestParamInfo<TcpProxyIntegrationTestParams>& params) {
-  return absl::StrCat(
-      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
-}
-
 void TcpProxyIntegrationTest::initialize() {
-  if (GetParam().test_original_version) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "false");
-  } else {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "true");
-  }
-
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
@@ -76,8 +44,9 @@ void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
                        "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
 }
 
-INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -986,7 +955,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute(
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyMetadataMatchIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test subset load balancing for a regular cluster when endpoint selector is defined at the top
 // level.
@@ -1214,7 +1184,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyDynamicMetadataMatchIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
@@ -1258,7 +1229,8 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
@@ -1545,6 +1517,6 @@ TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
-                         testing::ValuesIn(newPoolTestParams()), protocolTestParamsToString);
-
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 } // namespace Envoy

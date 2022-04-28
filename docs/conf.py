@@ -106,7 +106,7 @@ extlinks = {
 
 # Only lookup intersphinx for explicitly prefixed in cross-references
 # This makes docs versioning work
-intersphinx_disabled_domains = ['std']
+intersphinx_disabled_reftypes = ['*']
 
 # Setup global substitutions
 if 'pre-release' in release_level:
@@ -330,7 +330,7 @@ intersphinx_mapping = {
     'v1.16': ('https://www.envoyproxy.io/docs/envoy/v1.16.5', "inventories/v1.16/objects.inv"),
     'v1.17': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', "inventories/v1.17/objects.inv"),
     'v1.18': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', "inventories/v1.18/objects.inv"),
-    'v1.19': ('https://www.envoyproxy.io/docs/envoy/v1.19.1', "inventories/v1.19/objects.inv"),
+    'v1.19': ('https://www.envoyproxy.io/docs/envoy/v1.19.4', "inventories/v1.19/objects.inv"),
     'v1.20': ('https://www.envoyproxy.io/docs/envoy/v1.20.1', "inventories/v1.20/objects.inv"),
     'v1.21': ('https://www.envoyproxy.io/docs/envoy/v1.21.1', "inventories/v1.21/objects.inv"),
     'v1.22': ('https://www.envoyproxy.io/docs/envoy/v1.22.0', "inventories/v1.22/objects.inv"),

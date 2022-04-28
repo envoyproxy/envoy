@@ -34,6 +34,7 @@ envoy_cc_test_library(
         "//source/common/stream_info:filter_state_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:environment_lib",
@@ -42,6 +43,20 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_impl_integration_test",
+    srcs = [
+        "config_impl_integration_test.cc",
+    ],
+    deps = [
+        "//source/common/protobuf",
+        "//source/common/router:config_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )
 

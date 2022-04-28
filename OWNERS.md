@@ -37,8 +37,6 @@ routing PRs, questions, etc. to the right place.
   * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
-* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
-  * Scalability and performance.
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
@@ -49,7 +47,8 @@ routing PRs, questions, etc. to the right place.
   * Performance, Dubbo.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel, CI, compilers, linkers, general build issues, etc.
-
+* Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
+  * Listeners, RBAC, CEL, matching, Istio.
 
 # Senior extension maintainers
 
@@ -101,6 +100,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 * Jose Nino ([junr03](https://github.com/junr03)) (recruiting@junr03.com)
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
+* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
 
 # Friends of Envoy
 
