@@ -15,6 +15,16 @@ Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveC
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
     // For now, use the hard-coded setting. Eventually use the cached setting if available.
     initial_streams = host()->cluster().http2Options().max_concurrent_streams().value();
+    if (http_server_properties_cache_ && origin_.has_value()) {
+      uint32_t cached_concurrency =
+          http_server_properties_cache_->getConcurrentStreams(origin_.value());
+      if (cached_concurrency != 0 && cached_concurrency < initial_streams) {
+        // Only use the cached concurrency if lowers the streams below the
+        // configured max_concurrent_streams as Envoy should never send more
+        // than max_concurrent_streams at once.
+        initial_streams = cached_concurrency;
+      }
+    }
     auto max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
         host()->cluster().maxRequestsPerConnection());
     if (max_requests < initial_streams) {
@@ -64,6 +74,9 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
     uint32_t delta = client.concurrent_stream_limit_ - 1;
     client.concurrent_stream_limit_ = 1;
     decrConnectingAndConnectedStreamCapacity(delta, client);
+    if (http_server_properties_cache_ && origin_.has_value()) {
+      http_server_properties_cache_->setConcurrentStreams(origin_.value(), 1);
+    }
   }
 
   Upstream::Host::CreateConnectionData data{std::move(tcp_client->connection_),

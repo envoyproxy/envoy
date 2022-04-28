@@ -143,6 +143,7 @@ envoy_cc_library(
     hdrs = ["mixed_conn_pool.h"],
     deps = [
         ":conn_pool_base_lib",
+        ":http_server_properties_cache",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/tcp:conn_pool_lib",

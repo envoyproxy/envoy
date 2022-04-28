@@ -110,6 +110,9 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
+  absl::string_view defaultServerNameIndication() const override {
+    return config().serverNameIndication();
+  }
   bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
@@ -141,6 +144,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

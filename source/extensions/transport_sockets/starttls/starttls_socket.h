@@ -82,6 +82,7 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override { return false; }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;
