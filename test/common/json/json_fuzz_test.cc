@@ -15,7 +15,7 @@ static const size_t MaxInputSize = 64 * 1024;
 // has known limitations. See https://github.com/envoyproxy/envoy/issues/4705.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // protect against overly large JSON files
-  if (len > kMaxInputSize) {
+  if (len > MaxInputSize) {
     ENVOY_LOG_MISC(debug, "Buffer length is over {}KiB, skipping test.", MaxInputSize / 1024);
     return;
   }
