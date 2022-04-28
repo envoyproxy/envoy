@@ -102,7 +102,7 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
       const auto api_type = config.drds().config_source().api_config_source().api_type();
       if (api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
           api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
-        throw EnvoyException("trds supports only aggregated api_type in api_config_source");
+        throw EnvoyException("drds supports only aggregated api_type in api_config_source");
       }
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
