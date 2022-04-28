@@ -42,6 +42,18 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t length,
+                                         off_t offset) const {
+  const ssize_t rc = ::pwrite(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
+                                        off_t offset) const {
+  const ssize_t rc = ::pread(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
   const ssize_t rc = ::recv(socket, buffer, length, flags);
   return {rc, rc != -1 ? 0 : errno};
@@ -63,7 +75,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   UNREFERENCED_PARAMETER(vlen);
   UNREFERENCED_PARAMETER(flags);
   UNREFERENCED_PARAMETER(timeout);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return {false, EOPNOTSUPP};
 #endif
 }
 
@@ -238,6 +250,34 @@ SysCallIntResult OsSysCallsImpl::connect(os_fd_t sockfd, const sockaddr* addr, s
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags) const {
+  const int rc = ::open(pathname, flags);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags, mode_t mode) const {
+  const int rc = ::open(pathname, flags, mode);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::unlink(const char* pathname) const {
+  const int rc = ::unlink(pathname);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
+                                        const char* newpath, int flags) const {
+  const int rc = ::linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const {
+  const int rc = ::mkstemp(tmplate);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+bool OsSysCallsImpl::supportsAllPosixFileOperations() const { return true; }
+
 SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) {
   const int rc = ::shutdown(sockfd, how);
   return {rc, rc != -1 ? 0 : errno};
@@ -290,6 +330,10 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
   if (!SOCKET_FAILURE(result)) {
     tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
+
+    const uint64_t mss = (unix_tcp_info.tcpi_snd_mss > 0) ? unix_tcp_info.tcpi_snd_mss : 1460;
+    // Convert packets to bytes.
+    tcp_info->tcpi_snd_cwnd = unix_tcp_info.tcpi_snd_cwnd * mss;
   }
   return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
 #endif
@@ -325,7 +369,7 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
 // TODO: eliminate this branching by upstreaming an alternative Android implementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 #else
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;

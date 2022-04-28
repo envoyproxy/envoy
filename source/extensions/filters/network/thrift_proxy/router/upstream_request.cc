@@ -10,11 +10,12 @@ namespace Router {
 
 UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                                  MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                                 ProtocolType protocol_type)
+                                 ProtocolType protocol_type, bool close_downstream_on_error)
     : parent_(parent), stats_(parent.stats()), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
-      request_complete_(false), response_started_(false), response_complete_(false) {}
+      request_complete_(false), response_started_(false), response_complete_(false),
+      close_downstream_on_error_(close_downstream_on_error) {}
 
 UpstreamRequest::~UpstreamRequest() {
   if (conn_pool_handle_) {
@@ -66,7 +67,9 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
 
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
-  onResetStream(reason);
+  if (!onResetStream(reason)) {
+    parent_.continueDecoding();
+  }
 }
 
 void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -154,6 +157,12 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       stats_.incResponseInvalidType(cluster, upstream_host_);
       break;
     }
+
+    if (callbacks.responseMetadata()->isDraining()) {
+      stats_.incCloseDrain(cluster);
+      resetStream();
+    }
+
     onResponseComplete();
   } else if (status == ThriftFilters::ResponseStatus::Reset) {
     // Note: invalid responses are not accounted in the response size histogram.
@@ -194,22 +203,27 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
   ASSERT(!response_complete_);
+  bool end_downstream = true;
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_LOG(debug, "upstream remote close");
-    onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    end_downstream = onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
     ENVOY_LOG(debug, "upstream local close");
-    onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    end_downstream = onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
+  case Network::ConnectionEvent::ConnectedZeroRtt:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("reached unexpectedly");
   }
 
   releaseConnection(false);
+  if (!end_downstream && request_complete_) {
+    parent_.onReset();
+  }
 }
 
 uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
@@ -221,7 +235,6 @@ uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
   uint64_t size = transport_buffer.length();
 
   conn_data_->connection().write(transport_buffer, false);
-  onRequestComplete();
 
   return size;
 }
@@ -255,13 +268,8 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   upstream_host_ = host;
 }
 
-void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
-  if (metadata_->messageType() == MessageType::Oneway) {
-    // For oneway requests, we should not attempt a response. Reset the downstream to signal
-    // an error.
-    parent_.resetDownstreamConnection();
-    return;
-  }
+bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
+  bool close_downstream = true;
 
   chargeResponseTiming();
 
@@ -271,6 +279,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            false /* Don't close the downstream connection. */);
+    close_downstream = false;
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_host_->outlierDetector().putResult(
@@ -290,22 +299,21 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     stats_.incResponseLocalException(parent_.cluster());
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
-    if (!response_started_) {
+    if (response_started_) {
+      // Error occurred after a partial response, propagate the reset to the downstream.
+      parent_.resetDownstreamConnection();
+    } else {
+      close_downstream = close_downstream_on_error_;
       parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                           fmt::format("connection failure '{}'",
                                                       (upstream_host_ != nullptr)
                                                           ? upstream_host_->address()->asString()
                                                           : "to upstream")),
-                             true);
-      return;
+                             close_downstream);
     }
-
-    // Error occurred after a partial response, propagate the reset to the downstream.
-    parent_.resetDownstreamConnection();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  return close_downstream;
 }
 
 void UpstreamRequest::chargeResponseTiming() {

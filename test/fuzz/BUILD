@@ -33,6 +33,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test:test_listener_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ] + select({
@@ -60,10 +61,12 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "utility_lib",
+    srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
+        "//source/common/common:logger_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",

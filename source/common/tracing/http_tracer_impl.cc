@@ -48,7 +48,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EgressOperation;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return EMPTY_STRING; // Make the compiler happy.
 }
 
 Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
@@ -66,8 +66,6 @@ Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& str
   default:
     return {trace_reason, false};
   }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
@@ -86,10 +84,45 @@ static void addGrpcRequestTags(Span& span, const Http::RequestHeaderMap& headers
 template <class T> static void addGrpcResponseTags(Span& span, const T& headers) {
   addTagIfNotNull(span, Tracing::Tags::get().GrpcStatusCode, headers.GrpcStatus());
   addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
-  // Set error tag when status is not OK.
+  // Set error tag when Grpc status code represents an upstream error. See
+  // https://github.com/envoyproxy/envoy/issues/18877.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
-  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
+    if (grpc_status_code.has_value()) {
+      const auto& status = grpc_status_code.value();
+      if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
+        switch (status) {
+        // Each case below is considered to be a client side error, therefore should not be
+        // tagged as an upstream error. See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+        // for more details about how each Grpc status code is defined and whether it is an
+        // upstream error or a client error.
+        case Grpc::Status::WellKnownGrpcStatus::Ok:
+        case Grpc::Status::WellKnownGrpcStatus::Canceled:
+        case Grpc::Status::WellKnownGrpcStatus::InvalidArgument:
+        case Grpc::Status::WellKnownGrpcStatus::NotFound:
+        case Grpc::Status::WellKnownGrpcStatus::AlreadyExists:
+        case Grpc::Status::WellKnownGrpcStatus::PermissionDenied:
+        case Grpc::Status::WellKnownGrpcStatus::FailedPrecondition:
+        case Grpc::Status::WellKnownGrpcStatus::Aborted:
+        case Grpc::Status::WellKnownGrpcStatus::OutOfRange:
+        case Grpc::Status::WellKnownGrpcStatus::Unauthenticated:
+          break;
+        case Grpc::Status::WellKnownGrpcStatus::Unknown:
+        case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
+        case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
+        case Grpc::Status::WellKnownGrpcStatus::ResourceExhausted:
+        case Grpc::Status::WellKnownGrpcStatus::Internal:
+        case Grpc::Status::WellKnownGrpcStatus::Unavailable:
+        case Grpc::Status::WellKnownGrpcStatus::DataLoss:
+          span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+          break;
+        }
+      }
+    }
+  } else {
+    if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
+      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    }
   }
 }
 
@@ -173,18 +206,20 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
       addGrpcRequestTags(span, *request_headers);
     }
   }
+
+  span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
+  span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
+
+  setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
+
   CustomTagContext ctx{request_headers, stream_info};
 
   const CustomTagMap* custom_tag_map = tracing_config.customTags();
   if (custom_tag_map) {
     for (const auto& it : *custom_tag_map) {
-      it.second->apply(span, ctx);
+      it.second->applySpan(span, ctx);
     }
   }
-  span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
-  span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
-
-  setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
 
   span.finishSpan();
 }
@@ -243,22 +278,6 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
   }
 }
 
-CustomTagConstSharedPtr
-HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag) {
-  switch (tag.type_case()) {
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral:
-    return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kEnvironment:
-    return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kRequestHeader:
-    return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
-    return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
-
 HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
@@ -282,101 +301,6 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& 
   }
 
   return active_span;
-}
-
-void CustomTagBase::apply(Span& span, const CustomTagContext& ctx) const {
-  absl::string_view tag_value = value(ctx);
-  if (!tag_value.empty()) {
-    span.setTag(tag(), tag_value);
-  }
-}
-
-EnvironmentCustomTag::EnvironmentCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment)
-    : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
-  const char* env = std::getenv(name_.data());
-  final_value_ = env ? env : default_value_;
-}
-
-RequestHeaderCustomTag::RequestHeaderCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header)
-    : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
-      default_value_(request_header.default_value()) {}
-
-absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (ctx.trace_context == nullptr) {
-    return default_value_;
-  }
-  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.trace_context->getByKey(name_);
-  return entry.value_or(default_value_);
-}
-
-MetadataCustomTag::MetadataCustomTag(const std::string& tag,
-                                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata)
-    : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
-      metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
-
-void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
-  const envoy::config::core::v3::Metadata* meta = metadata(ctx);
-  if (!meta) {
-    if (!default_value_.empty()) {
-      span.setTag(tag(), default_value_);
-    }
-    return;
-  }
-  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(meta, metadata_key_);
-  switch (value.kind_case()) {
-  case ProtobufWkt::Value::kBoolValue:
-    span.setTag(tag(), value.bool_value() ? "true" : "false");
-    return;
-  case ProtobufWkt::Value::kNumberValue:
-    span.setTag(tag(), absl::StrCat("", value.number_value()));
-    return;
-  case ProtobufWkt::Value::kStringValue:
-    span.setTag(tag(), value.string_value());
-    return;
-  case ProtobufWkt::Value::kListValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.list_value()));
-    return;
-  case ProtobufWkt::Value::kStructValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.struct_value()));
-    return;
-  default:
-    break;
-  }
-  if (!default_value_.empty()) {
-    span.setTag(tag(), default_value_);
-  }
-}
-
-const envoy::config::core::v3::Metadata*
-MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  const StreamInfo::StreamInfo& stream_info = ctx.stream_info;
-  switch (kind_) {
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
-    return &stream_info.dynamicMetadata();
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    Router::RouteConstSharedPtr route = stream_info.route();
-    return route ? &route->metadata() : nullptr;
-  }
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
-    if (stream_info.upstreamInfo().has_value() &&
-        stream_info.upstreamInfo().value().get().upstreamHost()) {
-      return &stream_info.upstreamInfo().value().get().upstreamHost()->cluster().metadata();
-    }
-    return nullptr;
-  }
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kHost: {
-    if (stream_info.upstreamInfo().has_value() &&
-        stream_info.upstreamInfo().value().get().upstreamHost()) {
-      return stream_info.upstreamInfo().value().get().upstreamHost()->metadata().get();
-    }
-    return nullptr;
-  }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 }
 
 } // namespace Tracing

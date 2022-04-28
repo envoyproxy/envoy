@@ -131,7 +131,9 @@ message Cluster {
   // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
   // target will only get v6 addresses if there were NO v4 addresses to return.
   // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
-  // and return all resolved addresses.
+  // and return all resolved addresses. When this is used, Happy Eyeballs will be enabled for
+  // upstream connections. Refer to :ref:`Happy Eyeballs Support <arch_overview_happy_eyeballs>`
+  // for more information.
   // For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
@@ -363,12 +365,17 @@ message Cluster {
     // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
     //
     // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
-    // `new_weight = weight * time_factor ^ (1 / aggression)`,
+    // `new_weight = weight * max(min_weight_percent, time_factor ^ (1 / aggression))`,
     // where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
     //
     // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
     // Once host exits slow start, time_factor and aggression no longer affect its weight.
     core.v3.RuntimeDouble aggression = 2;
+
+    // Configures the minimum percentage of origin weight that avoids too small new weight,
+    // which may cause endpoints in slow start mode receive no traffic in slow start window.
+    // If not specified, the default is 10%.
+    type.v3.Percent min_weight_percent = 3;
   }
 
   // Specific configuration for the RoundRobin load balancing policy.
@@ -469,9 +476,8 @@ message Cluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.OriginalDstLbConfig";
 
-    // When true, :ref:`x-envoy-original-dst-host
-    // <config_http_conn_man_headers_x-envoy-original-dst-host>` can be used to override destination
-    // address.
+    // When true, a HTTP header can be used to override the original dst address. The default header is
+    // :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>`.
     //
     // .. attention::
     //
@@ -483,10 +489,14 @@ message Cluster {
     //
     //   If the header appears multiple times only the first value is used.
     bool use_http_header = 1;
+
+    // The http header to override destination address if :ref:`use_http_header <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.use_http_header>`.
+    // is set to true. If the value is empty, :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` will be used.
+    string http_header_name = 2;
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -595,6 +605,14 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+
+    // This controls what hosts are considered valid when using
+    // :ref:`host overrides <arch_overview_load_balancing_override_host>`, which is used by some
+    // filters to modify the load balancing decision.
+    //
+    // If this is unset then [UNKNOWN, HEALTHY, DEGRADED] will be applied by default. If this is
+    // set with an empty set of statuses then host overrides will be ignored by the load balancing.
+    core.v3.HealthStatusSet override_host_status = 8;
   }
 
   message RefreshRate {
@@ -735,11 +753,9 @@ message Cluster {
   // emitting stats for the cluster and access logging the cluster name. This will appear as
   // additional information in configuration dumps of a cluster's current status as
   // :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>`
-  // and as an additional tag "upstream_cluster.name" while tracing. Note: access logging using
-  // this field is presently enabled with runtime feature
-  // `envoy.reloadable_features.use_observable_cluster_name`. Any ``:`` in the name will be
-  // converted to ``_`` when emitting statistics. This should not be confused with :ref:`Router
-  // Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
+  // and as an additional tag "upstream_cluster.name" while tracing. Note: Any ``:`` in the name
+  // will be converted to ``_`` when emitting statistics. This should not be confused with
+  // :ref:`Router Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
   string alt_stat_name = 28 [(udpa.annotations.field_migrate).rename = "observability_name"];
 
   oneof cluster_discovery_type {
@@ -1166,6 +1182,11 @@ message UpstreamConnectionOptions {
 
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.v3.TcpKeepalive tcp_keepalive = 1;
+
+  // If enabled, associates the interface name of the local address with the upstream connection.
+  // This can be used by extensions during processing of requests. The association mechanism is
+  // implementation specific. Defaults to false due to performance concerns.
+  bool set_local_interface_name_on_upstream_connections = 2;
 }
 
 message TrackClusterStats {

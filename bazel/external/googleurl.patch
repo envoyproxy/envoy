@@ -112,39 +112,18 @@ index b5fe925..31aa81e 100644
  template <typename T>
  struct pointer_traits<::gurl_base::CheckedContiguousIterator<T>> {
 
-# TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
-# library from the upstream Chromium project. This is tracked in:
-# https://github.com/envoyproxy/envoy/issues/14743.
+# TODO(keith): Remove once https://quiche-review.googlesource.com/c/googleurl/+/10980 lands
 
-diff --git a/url/BUILD b/url/BUILD
-index f2ec8da..df69661 100644
---- a/url/BUILD
-+++ b/url/BUILD
-@@ -52,3 +52,27 @@ cc_library(
-         "//polyfills",
-     ] + build_config.icuuc_deps,
- )
-+
-+cc_library(
-+    name = "envoy_url",
-+    srcs = [
-+       "url_canon.cc",
-+       "url_canon_internal.cc",
-+       "url_canon_path.cc",
-+       "url_canon_stdstring.cc",
-+    ],
-+    hdrs = [
-+       "third_party/mozilla/url_parse.h",
-+       "url_canon.h",
-+       "url_canon_internal.h",
-+       "url_canon_stdstring.h",
-+       "url_parse_internal.h",
-+    ],
-+    copts = build_config.default_copts,
-+    visibility = ["//visibility:public"],
-+    deps = [
-+       "//base",
-+       "//base/strings",
-+       "//polyfills",
-+    ]
-+)
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 3a85453..a329de2 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -382,7 +382,7 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+ #define CONSTINIT
+ #endif
+ 
+-#if defined(__clang__)
++#if defined(__clang__) && HAS_CPP_ATTRIBUTE(gsl::Pointer)
+ #define GSL_OWNER [[gsl::Owner]]
+ #define GSL_POINTER [[gsl::Pointer]]
+ #else

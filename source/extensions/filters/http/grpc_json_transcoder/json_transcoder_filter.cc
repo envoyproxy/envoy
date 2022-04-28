@@ -133,8 +133,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      DescriptorSetCase::DESCRIPTOR_SET_NOT_SET:
+    throw EnvoyException("transcoding_filter: descriptor not set");
   }
 
   for (const auto& file : descriptor_set.file()) {
@@ -195,6 +196,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   switch (proto_config.url_unescape_spec()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       ALL_CHARACTERS_EXCEPT_RESERVED:
     pmb.SetUrlUnescapeSpec(
@@ -208,8 +210,6 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       ALL_CHARACTERS:
     pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharacters);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   pmb.SetQueryParamUnescapePlus(proto_config.query_param_unescape_plus());
   pmb.SetMatchUnregisteredCustomVerb(proto_config.match_unregistered_custom_verb());

@@ -11,13 +11,16 @@
 #include "source/common/event/deferred_task.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/timer_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -907,7 +910,6 @@ private:
     requested_advance_ = absl::ZeroDuration();
   }
 
-  TestScopedRuntime scoped_runtime_;
   absl::Duration requested_advance_ = absl::ZeroDuration();
   std::vector<std::function<void()>> check_callbacks_;
   bool in_event_loop_{};
@@ -1548,6 +1550,39 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
   EXPECT_CALL(*watchdog_, touch()).Times(2);
   EXPECT_CALL(watcher, ready());
   dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+class DispatcherConnectionTest : public testing::Test {
+protected:
+  DispatcherConnectionTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(DispatcherConnectionTest, CreateTcpConnection) {
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    SCOPED_TRACE(Network::Test::addressVersionAsString(ip_version));
+    auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
+        fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), 10911));
+    auto client_conn = dispatcher_->createClientConnection(
+        client_addr_port, Network::Address::InstanceConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr);
+    EXPECT_NE(nullptr, client_conn);
+    client_conn->close(Network::ConnectionCloseType::NoFlush);
+  }
+}
+
+// If the internal connection factory is not linked, envoy will be dead when creating connection to
+// internal address.
+TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExist) {
+  EXPECT_DEATH(
+      dispatcher_->createClientConnection(
+          std::make_shared<Network::Address::EnvoyInternalInstance>("listener_internal_address"),
+          Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+          nullptr),
+      "");
 }
 
 } // namespace

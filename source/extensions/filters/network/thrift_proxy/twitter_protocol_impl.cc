@@ -973,8 +973,6 @@ bool TwitterProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMeta
   case MessageType::Exception:
     updateMetadataWithResponseHeader(*header_, metadata);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   header_complete_ = false;
@@ -994,8 +992,6 @@ void TwitterProtocolImpl::writeMessageBegin(Buffer::Instance& buffer,
     case MessageType::Exception:
       writeResponseHeader(buffer, metadata);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

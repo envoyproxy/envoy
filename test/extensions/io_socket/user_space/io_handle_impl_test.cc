@@ -57,6 +57,8 @@ public:
   absl::FixedArray<char> buf_;
 };
 
+TEST_F(IoHandleImplTest, InterfaceName) { ASSERT_FALSE(io_handle_->interfaceName().has_value()); }
+
 // Test recv side effects.
 TEST_F(IoHandleImplTest, BasicRecv) {
   Buffer::OwnedImpl buf_to_write("0123456789");
@@ -1094,10 +1096,10 @@ TEST_F(IoHandleImplTest, DeathOnEnablingDestroyedEvents) {
                      "Null user_file_event_");
 }
 
-TEST_F(IoHandleImplTest, NotImplementDuplicate) { ASSERT_DEATH(io_handle_->duplicate(), ""); }
+TEST_F(IoHandleImplTest, NotImplementDuplicate) { EXPECT_ENVOY_BUG(io_handle_->duplicate(), ""); }
 
 TEST_F(IoHandleImplTest, NotImplementAccept) {
-  ASSERT_DEATH(io_handle_->accept(nullptr, nullptr), "");
+  EXPECT_ENVOY_BUG(io_handle_->accept(nullptr, nullptr), "");
 }
 
 TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {

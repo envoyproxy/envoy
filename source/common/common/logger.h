@@ -42,6 +42,7 @@ namespace Logger {
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
+  FUNCTION(ext_proc)                                                                               \
   FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
@@ -67,6 +68,7 @@ namespace Logger {
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
   FUNCTION(rbac)                                                                                   \
+  FUNCTION(rds)                                                                                    \
   FUNCTION(redis)                                                                                  \
   FUNCTION(router)                                                                                 \
   FUNCTION(runtime)                                                                                \

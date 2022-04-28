@@ -1,0 +1,13 @@
+FROM debian:buster-slim
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y python3 python3-pip python3-setuptools \
+    && apt-get autoremove -y && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip3 install -q Flask==2.0.3
+RUN mkdir -p /code/data
+RUN dd if=/dev/zero of="/code/data/file.txt" bs=1024 count=10240 \
+    && dd if=/dev/zero of="/code/data/file.json" bs=1024 count=10240
+ADD ./service.py /code
+ENTRYPOINT ["python3", "/code/service.py"]

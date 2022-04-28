@@ -33,6 +33,11 @@ envoy.access_loggers.wasm:
   - envoy.access_loggers
   security_posture: unknown
   status: alpha
+envoy.bootstrap.internal_listener:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
 envoy.bootstrap.wasm:
   categories:
   - envoy.bootstrap
@@ -78,16 +83,31 @@ envoy.compression.gzip.decompressor:
   - envoy.compression.decompressor
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.compression.zstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.compression.zstd.decompressor:
+  categories:
+  - envoy.compression.decompressor
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.config.validators.minimum_clusters:
+  categories:
+  - envoy.config.validators
+  security_posture: unknown
+  status: stable
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
@@ -173,6 +193,11 @@ envoy.filters.http.fault:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.http.gcp_authn:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.http.grpc_http1_bridge:
   categories:
   - envoy.filters.http
@@ -274,6 +299,11 @@ envoy.filters.http.tap:
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
 envoy.filters.http.wasm:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+envoy.filters.http.stateful_session:
   categories:
   - envoy.filters.http
   security_posture: unknown
@@ -698,17 +728,17 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:
@@ -733,5 +763,87 @@ envoy.network.dns_resolver.apple:
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers
+  security_posture: unknown
+  status: alpha
+envoy.http.stateful_session.cookie:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.request_headers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.request_trailers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.response_headers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.response_trailers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.destination_ip:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.destination_port:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.source_ip:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.source_port:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.direct_source_ip:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.source_type:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.server_name:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.transport_protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.application_protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.custom_matchers.trie_matcher:
+  categories:
+  - envoy.matching.network.custom_matchers
   security_posture: unknown
   status: alpha

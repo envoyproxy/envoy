@@ -18,7 +18,9 @@ Api::IoCallUint64Result TestIoSocketHandle::sendmsg(const Buffer::RawSlice* slic
                                                     const Address::Ip* self_ip,
                                                     const Address::Instance& peer_address) {
   if (write_override_) {
+    peer_address_override_ = peer_address;
     auto result = write_override_(this, slices, num_slice);
+    peer_address_override_.reset();
     if (result.has_value()) {
       return std::move(result).value();
     }

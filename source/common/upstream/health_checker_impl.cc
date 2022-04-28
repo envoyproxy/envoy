@@ -96,6 +96,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
         log_manager, dispatcher.timeSource(), health_check_config.event_log_path());
   }
   switch (health_check_config.health_checker_case()) {
+  case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
+    throw EnvoyException("invalid cluster config");
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
                                                        runtime, api.randomGenerator(),
@@ -120,10 +122,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
                                             validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
-  default:
-    // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
@@ -222,9 +222,8 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
     return Http::Protocol::Http2;
   case Http::CodecType::HTTP3:
     return Http::Protocol::Http3;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -294,7 +293,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       *request_headers,
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport(),
       host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_connection_info_provider_);
@@ -325,14 +323,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
     Http::GoAwayErrorCode error_code) {
   ENVOY_CONN_LOG(debug, "connection going away goaway_code={}, health_flags={}", *client_,
-                 error_code, HostUtility::healthFlagsToString(*host_));
-
-  // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
-  // ignore GOAWAY completely.
-  if (!parent_.runtime_.snapshot().runtimeFeatureEnabled(
-          "envoy.reloadable_features.health_check.graceful_goaway_handling")) {
-    return;
-  }
+                 static_cast<int>(error_code), HostUtility::healthFlagsToString(*host_));
 
   if (request_in_flight_ && error_code == Http::GoAwayErrorCode::NoError) {
     // The server is starting a graceful shutdown. Allow the in flight request
@@ -451,15 +442,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecType
 HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& type) {
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::type::v3::HTTP3:
     return Http::CodecType::HTTP3;
   case envoy::type::v3::HTTP2:
     return Http::CodecType::HTTP2;
   case envoy::type::v3::HTTP1:
     return Http::CodecType::HTTP1;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 Http::CodecClient*
@@ -610,7 +601,9 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "grpc.health.v1.Health.Check")) {
+          "grpc.health.v1.Health.Check")),
+      request_headers_parser_(
+          Router::HeaderParser::configure(config.grpc_health_check().initial_metadata())) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }
@@ -622,7 +615,10 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSession(
     GrpcHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, host), parent_(parent),
+      local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
+          Network::Utility::getCanonicalIpv4LoopbackAddress(),
+          Network::Utility::getCanonicalIpv4LoopbackAddress())) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
@@ -747,13 +743,18 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   headers_message->headers().setReferenceUserAgent(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, parent_.dispatcher_.timeSource(),
+                                         local_connection_info_provider_);
+  stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  stream_info.upstreamInfo()->setUpstreamHost(host_);
+  parent_.request_headers_parser_->evaluateHeaders(headers_message->headers(), stream_info);
+
   Grpc::Common::toGrpcTimeout(parent_.timeout_, headers_message->headers());
 
   Router::FilterUtility::setUpstreamScheme(
       headers_message->headers(),
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport(),
       host_->transportSocketFactory().implementsSecureTransport());
 
   auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);

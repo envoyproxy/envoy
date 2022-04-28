@@ -191,25 +191,13 @@ TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
 
   std::vector<IntegrationTcpClientPtr> tcp_clients;
   std::vector<FakeRawConnectionPtr> raw_conns;
-  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
-  raw_conns.emplace_back();
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
-  ASSERT_TRUE(tcp_clients.back()->connected());
 
-  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
-  raw_conns.emplace_back();
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
-  ASSERT_TRUE(tcp_clients.back()->connected());
-
-  // 3rd connection should fail, not because listener_0 hit a limit, but because the
-  // upstream listener hit a limit (5 conns would exist when it goes to accept, so it rejects it).
-  // We can see that listener_0 didn't hit any limits because it's downstream_global_cx_overflow
-  // stat is still at 0, in contrast with the TestGlobalLimit test where it is 1
-  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
-  raw_conns.emplace_back();
-  ASSERT_FALSE(
-      fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
-  tcp_clients.back()->waitForDisconnect();
+  for (int i = 0; i < 6; ++i) {
+    tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+    raw_conns.emplace_back();
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+    ASSERT_TRUE(tcp_clients.back()->connected());
+  }
 
   // Get rid of the client that failed to connect.
   tcp_clients.back()->close();

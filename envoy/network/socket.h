@@ -23,8 +23,6 @@ namespace Network {
 // avoid #ifdef proliferation.
 struct SocketOptionName {
   SocketOptionName() = default;
-  SocketOptionName(const SocketOptionName&) = default;
-  SocketOptionName& operator=(const SocketOptionName&) = default;
   SocketOptionName(int level, int option, const std::string& name)
       : value_(std::make_tuple(level, option, name)) {}
 
@@ -86,6 +84,12 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
+   * @return the name of the network interface used by local end of the connection, or unset if not
+   *available.
+   **/
+  virtual absl::optional<absl::string_view> interfaceName() const PURE;
+
+  /**
    * Dumps the state of the ConnectionInfoProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
@@ -142,6 +146,18 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param enable whether to enable or disable setting interface name. While having an interface
+   *               name might be helpful for debugging, it might come at a performance cost.
+   */
+  virtual void enableSettingInterfaceName(const bool enable) PURE;
+
+  /**
+   * @param interface_name the name of the network interface used by the local end of the
+   *connection.
+   **/
+  virtual void maybeSetInterfaceName(IoHandle& io_handle) PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.

@@ -3,7 +3,7 @@ load(
     "envoy_package",
 )
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@configs_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 

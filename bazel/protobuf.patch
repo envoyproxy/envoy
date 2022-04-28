@@ -12,13 +12,13 @@ index 1690d4219..8a7f1bf14 100644
  ################################################################################
  # Protobuf Runtime Library
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 52101b6fe..60f06aba2 100644
+index 9319c67f1..d85d53d4a 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -31,3 +31,9 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
  
- __version__ = '3.19.1'
+ __version__ = '3.19.4'
 +
 +if __name__ != '__main__':
 +  try:

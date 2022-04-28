@@ -40,8 +40,21 @@ More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/m
 
    Note that statistics should be collected by the dedicated :ref:`gRPC stats filter
    <config_http_filters_grpc_stats>` instead. The use of this filter for gRPC telemetry
-   has been disabled. Set the runtime value of ``envoy.reloadable_features.grpc_bridge_stats_disabled``
-   to false to turn on stat collection.
+   has been disabled.
+
+Protobuf upgrade support
+------------------------
+
+The filter will automatically frame requests with content-type *application/x-protobuf* as gRPC requests if
+:ref:`upgrade_protobuf_to_grpc <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.upgrade_protobuf_to_grpc>` is set.
+In this case the filter will prepend the body with the gRPC frame described above, and update the content-type header to
+`application/grpc` before sending the request to the gRPC server.
+
+In case the client sends a *content-length* header it will be removed before proceeding, as the value may conflict with
+the size specified in the gRPC frame.
+
+The response body returned to the client will not contain the gRPC header frame for requests that are upgraded in this
+fashion, i.e. the body will contain only the encoded Protobuf.
 
 Statistics
 ----------

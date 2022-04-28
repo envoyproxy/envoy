@@ -4,6 +4,7 @@ CONTRIB_EXTENSIONS = {
     # HTTP filters
     #
 
+    "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
     "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
 
@@ -35,4 +36,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
+
+    #
+    # Input matchers
+    #
+
+    "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
 }

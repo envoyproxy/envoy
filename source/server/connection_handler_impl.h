@@ -45,8 +45,8 @@ public:
   uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(absl::optional<uint64_t> overridden_listener,
-                   Network::ListenerConfig& config) override;
+  void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
+                   Runtime::Loader& runtime) override;
   void removeListeners(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
@@ -75,6 +75,8 @@ private:
   struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
+    Network::Address::InstanceConstSharedPtr address_;
+    uint64_t listener_tag_;
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
                   std::reference_wrapper<Network::UdpListenerCallbacks>,
@@ -93,7 +95,12 @@ private:
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
-  std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
+  absl::flat_hash_map<uint64_t, std::shared_ptr<ActiveListenerDetails>> listener_map_by_tag_;
+  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
+      tcp_listener_map_by_address_;
+  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
+      internal_listener_map_by_address_;
+
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};

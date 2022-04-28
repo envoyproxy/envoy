@@ -36,13 +36,29 @@ envoy_cc_library(
     name = "trace_driver_interface",
     hdrs = ["trace_driver.h"],
     deps = [
-        ":trace_context_interface",
-        ":trace_reason_interface",
-        "//envoy/stream_info:stream_info_interface",
+        ":trace_config_interface",
     ],
 )
 
 envoy_cc_library(
     name = "trace_context_interface",
     hdrs = ["trace_context.h"],
+)
+
+envoy_cc_library(
+    name = "custom_tag_interface",
+    hdrs = ["custom_tag.h"],
+    deps = [
+        ":trace_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "trace_config_interface",
+    hdrs = ["trace_config.h"],
+    deps = [
+        ":custom_tag_interface",
+    ],
 )

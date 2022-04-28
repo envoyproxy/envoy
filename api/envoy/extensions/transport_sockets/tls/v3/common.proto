@@ -44,8 +44,7 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
-  // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_0`` for
-  // servers.
+  // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_3`` for
@@ -289,7 +288,7 @@ message SubjectAltNameMatcher {
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -449,8 +448,12 @@ message CertificateValidationContext {
   //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   repeated SubjectAltNameMatcher match_typed_subject_alt_names = 15;
 
-  // This field is deprecated in favor of ref:`match_typed_subject_alt_names
+  // This field is deprecated in favor of
+  // :ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
+  // Note that if both this field and :ref:`match_typed_subject_alt_names
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
+  // are specified, the former (deprecated field) is ignored.
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -487,4 +490,11 @@ message CertificateValidationContext {
   // If this option is set to true, only the certificate at the end of the
   // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
   bool only_verify_leaf_cert_crl = 14;
+
+  // Config for the max number of intermediate certificates in chain that are parsed during verification.
+  // This does not include the leaf certificate. If configured, and the certificate chain is longer than allowed, the certificates
+  // above the limit are ignored, and certificate validation will fail. The default limit is 100,
+  // though this can be system-dependent.
+  // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_verify_depth.html
+  google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
 }

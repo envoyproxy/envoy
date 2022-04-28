@@ -19,12 +19,14 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
+using testing::Bool;
 using testing::Combine;
 using testing::ContainsRegex;
 using testing::Eq;
@@ -108,24 +110,28 @@ public:
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
   }
 
-  void initializeRouter(bool use_real_shadow_writer = false) {
+  void initializeRouter(ShadowWriter& shadow_writer, bool close_downstream_on_error) {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
-    if (!use_real_shadow_writer) {
-      router_ = std::make_unique<Router>(context_.clusterManager(), *stats_, context_.runtime(),
-                                         shadow_writer_);
-    } else {
-      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), *stats_,
-                                                               dispatcher_, context_.threadLocal());
-      router_ = std::make_unique<Router>(context_.clusterManager(), *stats_, context_.runtime(),
-                                         *shadow_writer_impl_);
-    }
+    router_ = std::make_unique<Router>(context_.clusterManager(), *stats_, context_.runtime(),
+                                       shadow_writer, close_downstream_on_error);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
     router_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+  void initializeRouter(bool close_downstream_on_error = true) {
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
+    initializeRouter(shadow_writer_, close_downstream_on_error);
+  }
+
+  void initializeRouterWithShadowWriter() {
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
+    shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), *stats_,
+                                                             dispatcher_, context_.threadLocal());
+    initializeRouter(*shadow_writer_impl_, true);
   }
 
   void initializeMetadata(MessageType msg_type, std::string method = "method",
@@ -541,7 +547,8 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true) {
+  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
+                      bool is_drain = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -549,6 +556,8 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
+    metadata->setDraining(is_drain);
+
     ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
     ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
 
@@ -560,12 +569,42 @@ public:
         .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
                 released(Ref(upstream_connection_)));
+
+    if (is_drain) {
+      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+    }
+
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
   void destroyRouter() {
     router_->onDestroy();
     router_.reset();
+  }
+
+  void expectStatCalls(Stats::MockStore& cluster_scope) {
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+        .WillByDefault(ReturnRef(cluster_scope));
+
+    EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
+
+    EXPECT_CALL(cluster_scope,
+                histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+    EXPECT_CALL(cluster_scope,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
+
+    EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_scope,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
+    EXPECT_CALL(cluster_scope,
+                histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_scope,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
   }
 
   TestNamedTransportConfigFactory transport_factory_;
@@ -663,8 +702,13 @@ INSTANTIATE_TEST_SUITE_P(DownstreamUpstreamTypes, ThriftRouterPassthroughTest,
                                  Values(ProtocolType::Binary, ProtocolType::Twitter)),
                          downstreamUpstreamTypesToString);
 
-TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
-  initializeRouter();
+class ThriftRouterRainidayTest : public testing::TestWithParam<bool>,
+                                 public ThriftRouterTestBase {};
+
+INSTANTIATE_TEST_SUITE_P(CloseDownstreamOnError, ThriftRouterRainidayTest, Bool());
+
+TEST_P(ThriftRouterRainidayTest, PoolRemoteConnectionFailure) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
@@ -677,8 +721,9 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
+  EXPECT_CALL(callbacks_, continueDecoding()).Times(GetParam() ? 0 : 1);
   EXPECT_CALL(
       context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
@@ -695,8 +740,8 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
                      .rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolLocalConnectionFailure) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
@@ -713,8 +758,8 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
                      .rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolTimeout) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolTimeout) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
@@ -727,7 +772,7 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(
       context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
@@ -745,8 +790,8 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
                      .rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolOverflowFailure) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolOverflowFailure) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
@@ -774,20 +819,19 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
                      .rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolConnectionFailureWithOnewayMessage) {
+  initializeRouter(GetParam());
   startRequest(MessageType::Oneway);
 
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_rq_oneway")
                      .value());
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
-  EXPECT_CALL(callbacks_, resetDownstreamConnection());
+  EXPECT_CALL(callbacks_, sendLocalReply(_, Eq(GetParam())));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
-  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_exception")
                      .value());
   EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
@@ -796,8 +840,8 @@ TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
   destroyRouter();
 }
 
-TEST_F(ThriftRouterTest, NoRoute) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, NoRoute) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
@@ -806,14 +850,14 @@ TEST_F(ThriftRouterTest, NoRoute) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
 }
 
-TEST_F(ThriftRouterTest, NoCluster) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, NoCluster) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
@@ -826,7 +870,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
@@ -868,8 +912,8 @@ TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
   verifyMetadataMatchCriteriaFromRoute(false);
 }
 
-TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, ClusterMaintenanceMode) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
@@ -883,7 +927,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
@@ -892,8 +936,8 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
                      .value());
 }
 
-TEST_F(ThriftRouterTest, NoHealthyHosts) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, NoHealthyHosts) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
@@ -907,7 +951,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
@@ -934,22 +978,6 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
 
   upstream_callbacks_->onUpstreamData(buffer, true);
-  destroyRouter();
-}
-
-TEST_F(ThriftRouterTest, UpstreamRemoteCloseMidResponse) {
-  initializeRouter();
-  startRequest(MessageType::Call);
-  connectUpstream();
-
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   destroyRouter();
 }
 
@@ -991,8 +1019,8 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
   destroyRouter();
 }
 
-TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteClose) {
+  initializeRouter(GetParam());
   startRequest(MessageType::Call);
   connectUpstream();
   sendTrivialStruct(FieldType::String);
@@ -1002,30 +1030,23 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
+  EXPECT_CALL(callbacks_, onReset()).Times(0);
   EXPECT_CALL(
       context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
-  initializeRouter();
+TEST_F(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteCloseCompletedRequest) {
+  initializeRouter(false);
   startRequest(MessageType::Call);
   connectUpstream();
-  sendTrivialStruct(FieldType::String);
+  completeRequest();
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(callbacks_, sendLocalReply(_, false));
+  EXPECT_CALL(callbacks_, onReset());
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1685,32 +1706,29 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
   initializeRouter();
 
   Stats::MockStore cluster_scope;
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
-      .WillByDefault(ReturnRef(cluster_scope));
-
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
-
-  EXPECT_CALL(cluster_scope,
-              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
-
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+  expectStatCalls(cluster_scope);
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();
   returnResponse();
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamDraining) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
+
+  initializeRouter();
+
+  Stats::MockStore cluster_scope;
+  expectStatCalls(cluster_scope);
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
+
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, true /* is_drain */);
   destroyRouter();
 }
 
@@ -1755,7 +1773,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
     route_entry_.policies_.push_back(policy);
   }
 
-  initializeRouter(true);
+  initializeRouterWithShadowWriter();
 
   // Set sequence id to 0, since that's what the new connections used for shadow requests will use.
   startRequestWithExistingConnection(MessageType::Call, 0);

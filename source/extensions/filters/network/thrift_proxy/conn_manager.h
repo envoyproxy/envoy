@@ -4,6 +4,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
@@ -51,7 +52,7 @@ class ConnectionManager : public Network::ReadFilter,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                    TimeSource& time_system);
+                    TimeSource& time_system, const Network::DrainDecision& drain_decision);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -135,6 +136,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
     MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
     bool responseSuccess() override { return parent_.responseSuccess(); }
+    void onReset() override { parent_.onReset(); }
 
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
@@ -211,6 +213,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
     MessageMetadataSharedPtr responseMetadata() override { return response_decoder_->metadata_; }
     bool responseSuccess() override { return response_decoder_->success_.value_or(false); }
+    void onReset() override;
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
@@ -224,7 +227,6 @@ private:
     void finalizeRequest();
 
     void createFilterChain();
-    void onReset();
     void onError(const std::string& what);
 
     ConnectionManager& parent_;
@@ -268,6 +270,7 @@ private:
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;
+  const Network::DrainDecision& drain_decision_;
 
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};

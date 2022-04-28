@@ -44,6 +44,7 @@
 #include "source/server/active_raw_udp_listener_config.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -401,6 +402,12 @@ public:
     absl::MutexLock lock(&lock_);
     initialized_ = true;
   }
+
+  // Some upstream connection are supposed to be alive forever.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult virtual waitForNoPost(
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -463,8 +470,7 @@ public:
   // Should only be called for HTTP2 or above, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
 
-  // Update the maximum number of concurrent streams. This is currently only
-  // supported for HTTP/3
+  // Update the maximum number of concurrent streams.
   void updateConcurrentStreams(uint64_t max_streams);
 
 private:
@@ -623,6 +629,9 @@ public:
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
+  testing::AssertionResult assertPendingConnectionsEmpty();
+
+  ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
@@ -733,7 +742,7 @@ private:
       return parent_.onRecvDatagram(data);
     }
     Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("not implemented");
     }
 
   private:
@@ -846,6 +855,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Runtime::MockLoader> runtime_;
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
@@ -858,7 +868,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

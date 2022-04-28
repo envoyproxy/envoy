@@ -181,13 +181,13 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,
                                        FilterState::LifeSpan::FilterChain);
-    EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
+    EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
 
     stream_info.upstreamInfo()->setUpstreamFilterState(stream_info.filterState());
     EXPECT_EQ(1, stream_info.upstreamInfo()
                      ->upstreamFilterState()
                      ->getDataReadOnly<TestIntAccessor>("test")
-                     .access());
+                     ->access());
 
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
@@ -206,6 +206,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.upstreamInfo()->setUpstreamConnectionId(12345);
     ASSERT_TRUE(stream_info.upstreamInfo()->upstreamConnectionId().has_value());
     EXPECT_EQ(12345, stream_info.upstreamInfo()->upstreamConnectionId().value());
+
+    EXPECT_FALSE(stream_info.upstreamInfo()->upstreamInterfaceName().has_value());
+    stream_info.upstreamInfo()->setUpstreamInterfaceName("lo");
+    ASSERT_TRUE(stream_info.upstreamInfo()->upstreamInterfaceName().has_value());
+    EXPECT_EQ("lo", stream_info.upstreamInfo()->upstreamInterfaceName().value());
 
     std::shared_ptr<UpstreamInfo> new_info = std::make_shared<UpstreamInfoImpl>();
     EXPECT_NE(stream_info.upstreamInfo(), new_info);

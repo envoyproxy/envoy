@@ -3,7 +3,6 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
-#include "source/extensions/filters/network/common/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
@@ -119,8 +118,6 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
   // mock/fake objects are also prohibited. We could also avoid fuzzing some unfinished features by
   // checking them here. For now there are only three filters {DirectResponse, LocalRateLimit,
   // HttpConnectionManager} on which we have constraints.
-  const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
-      std::string(filter_name));
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
         dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
@@ -153,6 +150,26 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(absl::StrCat(
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
+    }
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::HTTP2) {
+      // Sanity check on connection_keepalive interval and timeout.
+      try {
+        PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), interval);
+      } catch (const DurationUtil::OutOfRangeException& e) {
+        throw EnvoyException(
+            absl::StrCat("In http2_protocol_options.connection_keepalive interval shall not be "
+                         "negative. Exception {}",
+                         e.what()));
+      }
+      try {
+        PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), timeout);
+      } catch (const DurationUtil::OutOfRangeException& e) {
+        throw EnvoyException(
+            absl::StrCat("In http2_protocol_options.connection_keepalive timeout shall not be "
+                         "negative. Exception {}",
+                         e.what()));
+      }
     }
   } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::

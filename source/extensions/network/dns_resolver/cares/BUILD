@@ -18,6 +18,7 @@ envoy_cc_extension(
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
         "//envoy/network:dns_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/network:address_lib",

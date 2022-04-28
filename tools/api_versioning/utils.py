@@ -16,7 +16,7 @@ def get_api_version(input_path):
     """Returns the API version from a given API version input file.
 
     Args:
-      input_path: the file containing the API version (API_VERSION).
+      input_path: the file containing the API version (API_VERSION.txt).
 
     Returns:
       a namedtuple containing the major, minor, patch versions.

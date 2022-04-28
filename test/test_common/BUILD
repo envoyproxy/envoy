@@ -31,7 +31,6 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
-        "//test/common/runtime:utility_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": ["//source/common/signal:sigaction_lib"],
@@ -285,6 +284,14 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "status_utility_lib",
     hdrs = ["status_utility.h"],
+)
+
+envoy_cc_test(
+    name = "status_utility_test",
+    srcs = ["status_utility_test.cc"],
+    deps = [
+        ":status_utility_lib",
+    ],
 )
 
 envoy_cc_test(

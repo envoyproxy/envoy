@@ -8,6 +8,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,7 +24,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(IoSocketHandleImplTest, TestIoSocketError) {
+TEST(IoSocketHandleImpl, TestIoSocketError) {
   EXPECT_DEBUG_DEATH(IoSocketError(SOCKET_ERROR_AGAIN),
                      ".*assert failure: .* Details: Didn't use getIoSocketEagainInstance.*");
   EXPECT_EQ(errorDetails(SOCKET_ERROR_AGAIN),
@@ -98,6 +99,79 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
   EXPECT_THAT(io_handle.lastRoundTripTime(),
               Eq(std::chrono::duration_cast<std::chrono::milliseconds>(rtt)));
 }
+
+TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 0777;
+  Address::PipeInstance pipe(path, mode);
+  Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
+  SocketImpl socket(Socket::Type::Stream, address, nullptr, {});
+
+  EXPECT_TRUE(socket.ioHandle().isOpen()) << pipe.asString();
+
+  Api::SysCallIntResult result = socket.bind(address);
+  ASSERT_EQ(result.return_value_, 0);
+
+  EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
+}
+
+TEST(IoSocketHandleImpl, ExplicitDoesNotSupportGetifaddrs) {
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4));
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(false));
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+  EXPECT_FALSE(maybe_interface_name.has_value());
+}
+
+TEST(IoSocketHandleImpl, NullptrIfaddrs) {
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4));
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+            os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
+            return {0, 0};
+          }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
+        return {0, 0};
+      }));
+
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+  EXPECT_FALSE(maybe_interface_name.has_value());
+}
+
+class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
+
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+
+  if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    EXPECT_TRUE(maybe_interface_name.has_value());
+    EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
+  } else {
+    EXPECT_FALSE(maybe_interface_name.has_value());
+  }
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

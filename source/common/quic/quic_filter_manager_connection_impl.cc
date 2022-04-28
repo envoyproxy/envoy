@@ -61,7 +61,7 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // Currently read buffer is capped by connection level flow control. And write buffer limit is set
   // during construction. Changing the buffer limit during the life time of the connection is not
   // supported.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected call to setBufferLimits");
 }
 
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
@@ -127,7 +127,7 @@ Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
   // Network filter should stop iteration.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected call to rawWrite");
 }
 
 void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_bytes,
@@ -190,8 +190,8 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     codec_stats_->quic_version_rfc_v1_.inc();
     return;
   default:
-    ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
-                                 quic::QuicVersionToString(version.transport_version)));
+    IS_ENVOY_BUG(fmt::format("Unexpected QUIC version {}",
+                             quic::QuicVersionToString(version.transport_version)));
   }
 }
 
@@ -215,6 +215,47 @@ void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   for (auto callback : callbacks_) {
     callback->onBelowWriteBufferLowWatermark();
   }
+}
+
+absl::optional<std::chrono::milliseconds>
+QuicFilterManagerConnectionImpl::lastRoundTripTime() const {
+  if (quicConnection() == nullptr) {
+    return {};
+  }
+
+  const auto* rtt_stats = quicConnection()->sent_packet_manager().GetRttStats();
+  if (!rtt_stats->latest_rtt().IsZero()) {
+    return std::chrono::milliseconds(rtt_stats->latest_rtt().ToMilliseconds());
+  }
+
+  return std::chrono::milliseconds(rtt_stats->initial_rtt().ToMilliseconds());
+}
+
+void QuicFilterManagerConnectionImpl::configureInitialCongestionWindow(
+    uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt) {
+  if (quicConnection() != nullptr) {
+    quic::SendAlgorithmInterface::NetworkParams params(
+        quic::QuicBandwidth::FromBitsPerSecond(bandwidth_bits_per_sec),
+        quic::QuicTime::Delta::FromMicroseconds(rtt.count()),
+        /*allow_cwnd_to_decrease=*/false);
+    // NOTE: Different QUIC congestion controllers implement this method differently, for example,
+    // the cubic implementation does not respect |params.allow_cwnd_to_decrease|. Check the
+    // implementations for the exact behavior.
+    quicConnection()->AdjustNetworkParameters(params);
+  }
+}
+
+absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInBytes() const {
+  if (quicConnection() == nullptr) {
+    return {};
+  }
+
+  uint64_t cwnd = quicConnection()->sent_packet_manager().GetCongestionWindowInBytes();
+  if (cwnd == 0) {
+    return {};
+  }
+
+  return cwnd;
 }
 
 } // namespace Quic

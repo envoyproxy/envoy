@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -198,6 +198,11 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+
+  // Specify a set of default request mirroring policies for every route under this virtual host.
+  // It takes precedence over the route config mirror policy entirely.
+  // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
+  repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
 }
 
 // A filter-defined action type.
@@ -437,9 +442,31 @@ message WeightedCluster {
   // configuration file will be used as the default weight. See the :ref:`runtime documentation
   // <operations_runtime>` for how key names map to the underlying implementation.
   string runtime_key_prefix = 2;
+
+  oneof random_value_specifier {
+    // Specifies the header name that is used to look up the random value passed in the request header.
+    // This is used to ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    // If header is not present or invalid, Envoy will fall back to use the internally generated random value.
+    // This header is expected to be single-valued header as we only want to have one selected value throughout
+    // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
+    string header_name = 4;
+  }
 }
 
-// [#next-free-field: 14]
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
+
+  // If is_optional is not set or is set to false and the plugin defined by this message is not a
+  // supported type, the containing resource is NACKed. If is_optional is set to true, the resource
+  // would not be NACKed for this reason. In this case, routes referencing this plugin's name would
+  // not be treated as an illegal configuration, but would result in a failure if the route is
+  // selected.
+  bool is_optional = 2;
+}
+
+// [#next-free-field: 15]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -504,6 +531,17 @@ message RouteMatch {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
+
+    // If specified, the route is a path-separated prefix rule meaning that the
+    // ``:path`` header (without the query string) must either exactly match the
+    // ``path_separated_prefix`` or have it as a prefix, followed by ``/``
+    //
+    // For example, ``/api/dev`` would match
+    // ``/api/dev``, ``/api/dev/``, ``/api/dev/v1``, and ``/api/dev?param=true``
+    // but would not match ``/api/developer``
+    //
+    // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
+    string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -618,7 +656,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -895,13 +933,15 @@ message RouteAction {
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
 
-    // [#not-implemented-hide:]
-    // Name of the cluster specifier plugin to use to determine the cluster for
-    // requests on this route. The plugin name must be defined in the associated
-    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
-    // in the
-    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    // Name of the cluster specifier plugin to use to determine the cluster for requests on this route.
+    // The cluster specifier plugin name must be defined in the associated
+    // :ref:`cluster specifier plugins <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins>`
+    // in the :ref:`name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` field.
     string cluster_specifier_plugin = 37;
+
+    // Custom cluster specifier plugin configuration to use to determine the cluster for requests
+    // on this route.
+    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39;
   }
 
   // The HTTP status code to use when configured cluster is not found.
@@ -1097,7 +1137,9 @@ message RouteAction {
   // should not be set if this field is used.
   google.protobuf.Any retry_policy_typed_config = 33;
 
-  // Indicates that the route has request mirroring policies.
+  // Specify a set of route request mirroring policies.
+  // It takes precedence over the virtual host and route config mirror policy entirely.
+  // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
@@ -1573,7 +1615,7 @@ message DirectResponseAction {
       "envoy.api.v2.route.DirectResponseAction";
 
   // Specifies the HTTP response status to be returned.
-  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 100}];
+  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // Specifies the content of the response body. If this setting is omitted,
   // no body is included in the generated response.
@@ -1783,6 +1825,9 @@ message RateLimit {
     message HeaderValueMatch {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
+
+      // The key to use in the descriptor entry. Defaults to `header_match`.
+      string descriptor_key = 4;
 
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];

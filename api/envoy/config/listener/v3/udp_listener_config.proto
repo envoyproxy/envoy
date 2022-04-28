@@ -34,10 +34,6 @@ message UdpListenerConfig {
 
   // Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
   // to the default object to enable QUIC without modifying any additional options.
-  //
-  // .. warning::
-  //   QUIC support is currently alpha and should be used with caution. Please
-  //   see :ref:`here <arch_overview_http3>` for details.
   QuicProtocolOptions quic_options = 7;
 }
 

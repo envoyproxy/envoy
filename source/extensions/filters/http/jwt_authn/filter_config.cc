@@ -50,8 +50,6 @@ FilterConfigImpl::FilterConfigImpl(
     case RequirementRule::RequirementTypeCase::REQUIREMENT_TYPE_NOT_SET:
       rule_pairs_.emplace_back(Matcher::create(rule), nullptr);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

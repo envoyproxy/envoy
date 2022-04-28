@@ -167,7 +167,8 @@ public:
 
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override {
     // internal listener socket does not support bind semantic.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // TODO(lambdai) return an error.
+    PANIC("not implemented");
   }
 
   void close() override { ASSERT(io_handle_ == nullptr); }
@@ -225,6 +226,10 @@ public:
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
+  }
+
+  absl::optional<uint64_t> congestionWindowInBytes() const override {
+    return ioHandle().congestionWindowInBytes();
   }
 
   void dumpState(std::ostream& os, int indent_level) const override {

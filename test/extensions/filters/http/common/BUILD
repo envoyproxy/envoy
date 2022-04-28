@@ -72,15 +72,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "utility_test",
-    srcs = [
-        "utility_test.cc",
-    ],
-    deps = [
-        "//source/extensions/filters/http/common:utility_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)

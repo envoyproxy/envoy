@@ -28,6 +28,7 @@ DnsCacheImpl::DnsCacheImpl(
       resource_manager_(*scope_, context.runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
+      min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
       file_system_(context.api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
@@ -255,19 +256,26 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
 }
 
 void DnsCacheImpl::forceRefreshHosts() {
+  ENVOY_LOG(debug, "beginning DNS cache force refresh");
+  // Tell the underlying resolver to reset itself since we likely just went through a network
+  // transition and parameters may have changed.
+  resolver_->resetNetworking();
+
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     // Avoid holding the lock for longer than necessary by just triggering the refresh timer for
-    // each host IFF the host is not already refreshing.
-    // TODO(mattklein123): In the future we may want to cancel an ongoing refresh and start a new
-    // one to avoid a situation in which an older refresh races with a concurrent network change,
-    // for example.
-    if (primary_host.second->active_query_ == nullptr) {
-      ASSERT(!primary_host.second->timeout_timer_->enabled());
-      primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
-      ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'",
-                      primary_host.first);
+    // each host IFF the host is not already refreshing. Cancellation is assumed to be cheap for
+    // resolvers.
+    if (primary_host.second->active_query_ != nullptr) {
+      primary_host.second->active_query_->cancel(
+          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      primary_host.second->active_query_ = nullptr;
+      primary_host.second->timeout_timer_->disableTimer();
     }
+
+    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
+    ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'", primary_host.first);
   }
 }
 
@@ -351,18 +359,19 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     if (!from_cache) {
       addCacheEntry(host, new_address, address_list, response.front().addrInfo().ttl_);
     }
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_dns_ttl")) {
-      // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
-      dns_ttl =
-          std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().addrInfo().ttl_);
-    }
+    // Arbitrarily cap DNS re-resolution at min_refresh_interval_ to avoid constant DNS queries.
+    dns_ttl = std::max<std::chrono::seconds>(
+        std::chrono::duration_cast<std::chrono::seconds>(min_refresh_interval_),
+        response.front().addrInfo().ttl_);
     primary_host_info->host_info_->updateStale(resolution_time.value(), dns_ttl);
   }
 
   if (new_address != nullptr &&
       (current_address == nullptr || *current_address != *new_address ||
        DnsUtils::listChanged(address_list, primary_host_info->host_info_->addressList()))) {
-    ENVOY_LOG(debug, "host '{}' address has changed", host);
+    ENVOY_LOG_EVENT(
+        debug, "dns_cache_update_address", "host '{}' address has changed from {} to {}", host,
+        current_address ? current_address->asStringView() : "<empty>", new_address->asStringView());
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
@@ -376,6 +385,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (first_resolve || (address_changed && !primary_host_info->host_info_->isStale())) {
     notifyThreads(host, primary_host_info->host_info_);
   }
+
+  runResolutionCompleteCallbacks(host, primary_host_info->host_info_, status);
 
   // Kick off the refresh timer.
   if (status == Network::DnsResolver::ResolutionStatus::Success) {
@@ -396,6 +407,14 @@ void DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
                                          const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
     callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info);
+  }
+}
+
+void DnsCacheImpl::runResolutionCompleteCallbacks(const std::string& host,
+                                                  const DnsHostInfoSharedPtr& host_info,
+                                                  Network::DnsResolver::ResolutionStatus status) {
+  for (auto* callbacks : update_callbacks_) {
+    callbacks->callbacks_.onDnsResolutionComplete(host, host_info, status);
   }
 }
 

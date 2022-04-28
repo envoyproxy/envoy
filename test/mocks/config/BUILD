@@ -26,3 +26,12 @@ envoy_cc_mock(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_mock(
+    name = "custom_config_validators_mocks",
+    srcs = ["custom_config_validators.cc"],
+    hdrs = ["custom_config_validators.h"],
+    deps = [
+        "//source/common/config:custom_config_validators_interface",
+    ],
+)

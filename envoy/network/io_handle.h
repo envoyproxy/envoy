@@ -326,6 +326,19 @@ public:
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
+
+  /**
+   * @return the current congestion window in bytes, or unset if not available or not
+   * congestion-controlled.
+   * @note some congestion controller's cwnd is measured in number of packets, in that case the
+   * return value is cwnd(in packets) times the connection's MSS.
+   */
+  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+
+  /**
+   * @return the interface name for the socket, if the OS supports it. Otherwise, absl::nullopt.
+   */
+  virtual absl::optional<std::string> interfaceName() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

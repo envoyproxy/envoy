@@ -183,7 +183,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
       break;
     }
     num_bytes_read += rv;
-    if (num_bytes_read == max_length) {
+    if (static_cast<size_t>(rv) < slice_length || num_bytes_read == max_length) {
       break;
     }
   }
@@ -372,7 +372,7 @@ Api::IoCallUint64Result VclIoHandle::recvmsg(Buffer::RawSlice* slices, const uin
 }
 
 Api::IoCallUint64Result VclIoHandle::recvmmsg(RawSliceArrays&, uint32_t, RecvMsgOutput&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 bool VclIoHandle::supportsMmsg() const { return false; }
@@ -764,6 +764,8 @@ IoHandlePtr VclIoHandle::duplicate() {
 }
 
 absl::optional<std::chrono::milliseconds> VclIoHandle::lastRoundTripTime() { return {}; }
+
+absl::optional<uint64_t> VclIoHandle::congestionWindowInBytes() const { return {}; }
 
 } // namespace Vcl
 } // namespace Network

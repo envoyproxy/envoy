@@ -168,6 +168,15 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenFirstSuccess) {
   EXPECT_FALSE(impl_->connecting());
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, DisallowedFunctions) {
+  startConnect();
+
+  EXPECT_ENVOY_BUG(connection_callbacks_[0]->onAboveWriteBufferHighWatermark(),
+                   "Unexpected data written to happy eyeballs connection");
+  EXPECT_ENVOY_BUG(connection_callbacks_[0]->onBelowWriteBufferLowWatermark(),
+                   "Unexpected data drained from happy eyeballs connection");
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
   startConnect();
 
@@ -971,8 +980,8 @@ TEST_F(HappyEyeballsConnectionImplTest, NextProtocol) {
 TEST_F(HappyEyeballsConnectionImplTest, AddressProvider) {
   connectFirstAttempt();
 
-  const ConnectionInfoSetterImpl provider(std::make_shared<Address::Ipv4Instance>(80),
-                                          std::make_shared<Address::Ipv4Instance>(80));
+  ConnectionInfoSetterImpl provider(std::make_shared<Address::Ipv4Instance>(80),
+                                    std::make_shared<Address::Ipv4Instance>(80));
   EXPECT_CALL(*created_connections_[0], connectionInfoProvider()).WillOnce(ReturnRef(provider));
   impl_->connectionInfoProvider();
 }

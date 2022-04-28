@@ -1,14 +1,14 @@
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
-load("@rules_rust//rust:repositories.bzl", "rust_repositories")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
-load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
+load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
+load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 
 # go version for rules_go
 GO_VERSION = "1.17.5"
@@ -20,7 +20,21 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_register_toolchains(go_version)
     gazelle_dependencies()
     apple_rules_dependencies()
-    rust_repositories()
+    pip_dependencies()
+    rules_rust_dependencies()
+    rust_register_toolchains(
+        include_rustc_srcs = True,
+        extra_target_triples = [
+            "aarch64-apple-ios",
+            "aarch64-linux-android",
+            "armv7-linux-androideabi",
+            "i686-linux-android",
+            "wasm32-unknown-unknown",
+            "wasm32-wasi",
+            "x86_64-apple-ios",
+            "x86_64-linux-android",
+        ],
+    )
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
@@ -28,15 +42,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         oss_fuzz = True,
         honggfuzz = False,
     )
-    rules_cc_dependencies()
-    rules_cc_toolchains()
-
-    custom_exec_properties(
-        name = "envoy_large_machine_exec_property",
-        constants = {
-            "LARGE_MACHINE": create_rbe_exec_properties_dict(labels = dict(size = "large")),
-        },
-    )
+    emscripten_deps()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
@@ -83,12 +89,12 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_repository(
         name = "com_github_lyft_protoc_gen_star",
         importpath = "github.com/lyft/protoc-gen-star",
-        sum = "h1:sImehRT+p7lW9n6R7MQc5hVgzWGEkDVZU4AsBQ4Isu8=",
-        version = "v0.5.1",
+        sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
+        version = "v0.6.0",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2020-08-06"
+        # last_update = "2022-03-04"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L35-L40"
+        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",

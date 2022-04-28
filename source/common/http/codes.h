@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {

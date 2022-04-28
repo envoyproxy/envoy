@@ -68,10 +68,14 @@ public:
   void setBufferLimits(uint32_t limit) override;
   bool startSecureTransport() override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() override;
   std::string nextProtocol() const override;
+  // Note, this might change before connect finishes.
+  ConnectionInfoSetter& connectionInfoSetter() override;
   // Note, this might change before connect finishes.
   const ConnectionInfoProvider& connectionInfoProvider() const override;
   // Note, this might change before connect finishes.
@@ -119,13 +123,13 @@ private:
     void onAboveWriteBufferHighWatermark() override {
       // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected data written to happy eyeballs connection");
     }
 
     void onBelowWriteBufferLowWatermark() override {
       // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected data drained from happy eyeballs connection");
     }
 
     ClientConnection& connection() { return connection_; }

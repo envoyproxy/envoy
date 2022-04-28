@@ -58,11 +58,13 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           filter_state
               .getDataMutable<Network::UpstreamSocketOptionsFilterState>(
                   Network::UpstreamSocketOptionsFilterState::key())
-              .addOption(
+              ->addOption(
                   Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
         }
       }
 #endif
+      ENVOY_LOG(trace, "original_dst: set destination to {}", original_local_address->asString());
+
       // Restore the local address to the original one.
       socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
     }

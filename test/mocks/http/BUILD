@@ -10,11 +10,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_mock(
-    name = "alternate_protocols_cache_mocks",
-    srcs = ["alternate_protocols_cache.cc"],
-    hdrs = ["alternate_protocols_cache.h"],
+    name = "http_server_properties_cache_mocks",
+    srcs = ["http_server_properties_cache.cc"],
+    hdrs = ["http_server_properties_cache.h"],
     deps = [
-        "//envoy/http:alternate_protocols_cache_interface",
+        "//envoy/http:http_server_properties_cache_interface",
     ],
 )
 
@@ -76,6 +76,15 @@ envoy_cc_mock(
     hdrs = ["stream.h"],
     deps = [
         "//envoy/http:codec_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "stateful_session_mock",
+    srcs = ["stateful_session.cc"],
+    hdrs = ["stateful_session.h"],
+    deps = [
+        "//envoy/http:stateful_session_interface",
     ],
 )
 

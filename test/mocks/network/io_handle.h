@@ -61,8 +61,10 @@ public:
   MOCK_METHOD(void, resetFileEvents, ());
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
+  MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
+  MOCK_METHOD(absl::optional<std::string>, interfaceName, ());
 };
 
 } // namespace Network

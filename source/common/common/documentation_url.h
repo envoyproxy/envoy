@@ -2,7 +2,7 @@
 
 namespace Envoy {
 
-// TODO(ggreenway): replace 'latest' with the current version, pulled from the VERSION file at
+// TODO(ggreenway): replace 'latest' with the current version, pulled from the VERSION.txt file at
 // the root of the repo.
 #define ENVOY_DOC_URL_ROOT "https://www.envoyproxy.io/docs/envoy/latest"
 

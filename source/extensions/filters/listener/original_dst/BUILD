@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # ORIGINAL_DST iptables redirection listener filter
-# Public docs: docs/root/configuration/listener_filters/original_dst_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/listener_filters/original_dst_filter
 
 envoy_extension_package()
 

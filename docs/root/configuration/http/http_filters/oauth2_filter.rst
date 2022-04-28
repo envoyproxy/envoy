@@ -92,97 +92,107 @@ Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   static_resources:
     listeners:
-    - name:
+    - name: listener_0
       address:
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          http_filters:
-          - name: envoy.filters.http.oauth2
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
-              config:
-                token_endpoint:
-                  cluster: oauth
-                  uri: oauth.com/token
-                  timeout: 3s
-                authorization_endpoint: https://oauth.com/oauth/authorize/
-                redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
-                redirect_path_matcher:
-                  path:
-                    exact: /callback
-                signout_path:
-                  path:
-                    exact: /signout
-                credentials:
-                  client_id: foo
-                  token_secret:
-                    name: token
-                    sds_config:
-                      path: "/etc/envoy/token-secret.yaml"
-                  hmac_secret:
-                    name: hmac
-                    sds_config:
-                      path: "/etc/envoy/hmac.yaml"
-                # (Optional): defaults to 'user' scope if not provided
-                auth_scopes:
-                - user
-                - openid
-                - email
-                # (Optional): set resource parameter for Authorization request
-                resources:
-                - oauth2-resource
-                - http://example.com
-          - name: envoy.router
-          tracing: {}
-          codec_type: "AUTO"
-          stat_prefix: ingress_http
-          route_config:
-            virtual_hosts:
-            - name: service
-              domains: ["*"]
-              routes:
-              - match:
-                  prefix: "/"
-                route:
-                  cluster: service
-                  timeout: 5s
+        socket_address:
+          protocol: TCP
+          address: 127.0.0.1
+          port_value: 10000
+      filter_chains:
+      - filters:
+        - name: envoy.filters.network.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            http_filters:
+            - name: envoy.filters.http.oauth2
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+                config:
+                  token_endpoint:
+                    cluster: oauth
+                    uri: oauth.com/token
+                    timeout: 3s
+                  authorization_endpoint: https://oauth.com/oauth/authorize/
+                  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+                  redirect_path_matcher:
+                    path:
+                      exact: /callback
+                  signout_path:
+                    path:
+                      exact: /signout
+                  credentials:
+                    client_id: foo
+                    token_secret:
+                      name: token
+                      sds_config:
+                        path: "/etc/envoy/token-secret.yaml"
+                    hmac_secret:
+                      name: hmac
+                      sds_config:
+                        path: "/etc/envoy/hmac.yaml"
+                  # (Optional): defaults to 'user' scope if not provided
+                  auth_scopes:
+                  - user
+                  - openid
+                  - email
+                  # (Optional): set resource parameter for Authorization request
+                  resources:
+                  - oauth2-resource
+                  - http://example.com
+            - name: envoy.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+            tracing: {}
+            codec_type: "AUTO"
+            stat_prefix: ingress_http
+            route_config:
+              virtual_hosts:
+              - name: service
+                domains: ["*"]
+                routes:
+                - match:
+                    prefix: "/"
+                  route:
+                    cluster: service
+                    timeout: 5s
 
-  clusters:
-  - name: service
-    connect_timeout: 5s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: service
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8080
-  - name: oauth
-    connect_timeout: 5s
-    type: LOGICAL_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: oauth
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: auth.example.com
-                port_value: 443
-    tls_context:
-      sni: auth.example.com
+    clusters:
+    - name: service
+      connect_timeout: 5s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: service
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8080
+    - name: oauth
+      connect_timeout: 5s
+      type: LOGICAL_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: oauth
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: auth.example.com
+                  port_value: 443
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          sni: auth.example.com
 
 Finally, the following code block illustrates sample contents inside a yaml file containing both credential secrets.
 Both the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`

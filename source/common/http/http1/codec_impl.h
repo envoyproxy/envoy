@@ -60,7 +60,7 @@ public:
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
-  uint32_t bufferLimit() override;
+  uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
@@ -81,8 +81,6 @@ public:
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
-  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
-
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
 protected:
@@ -90,9 +88,6 @@ protected:
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
-
-  static const std::string CRLF;
-  static const std::string LAST_CHUNK;
 
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
@@ -105,15 +100,6 @@ protected:
   bool is_response_to_connect_request_ : 1;
 
 private:
-  /**
-   * Called to encode an individual header.
-   * @param key supplies the header to encode.
-   * @param key_size supplies the byte size of the key.
-   * @param value supplies the value to encode.
-   * @param value_size supplies the byte size of the value.
-   */
-  void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
-
   /**
    * Called to encode an individual header.
    * @param key supplies the header to encode as a string_view.
@@ -231,13 +217,8 @@ public:
    */
   uint64_t flushOutput(bool end_encode = false);
 
-  void addToBuffer(absl::string_view data);
-  void addCharToBuffer(char c);
-  void addIntToBuffer(uint64_t i);
   Buffer::Instance& buffer() { return *output_buffer_; }
-  uint64_t bufferRemainingSize();
-  void copyToBuffer(const char* data, uint64_t length);
-  void reserveBuffer(uint64_t size);
+
   void readDisable(bool disable) {
     if (connection_.state() == Network::Connection::State::Open) {
       connection_.readDisable(disable);
@@ -262,16 +243,12 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
-  bool sendStrict1xxAnd204Headers() const { return send_strict_1xx_and_204_headers_; }
-
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
   Envoy::Http::Status codec_status_;
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
-
-  bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
@@ -304,6 +281,7 @@ protected:
   const Http1Settings codec_settings_;
   std::unique_ptr<Parser> parser_;
   Buffer::Instance* current_dispatching_buffer_{};
+  Buffer::Instance* output_buffer_ = nullptr; // Not owned
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
@@ -315,11 +293,8 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool require_strict_1xx_and_204_headers_ : 1;
-  const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
-  const bool no_chunked_encoding_header_for_304_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
 
 private:
@@ -443,9 +418,6 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
-  // Buffer used to encode the HTTP message before moving it to the network connection's output
-  // buffer. This buffer is always allocated, never nullptr.
-  Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -499,8 +471,9 @@ private:
 
   // ParserCallbacks.
   Status onUrl(const char* data, size_t length) override;
-  Status onStatus(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Status onStatus(const char*, size_t) override { return okStatus(); }
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (active_request_) {
@@ -555,10 +528,9 @@ private:
   std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
-  // This defaults to 2, which functionally disables pipelining. If any users
-  // of Envoy wish to enable pipelining (which is dangerous and ill supported)
-  // we could make this configurable.
-  uint32_t max_outbound_responses_{};
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr owned_output_buffer_;
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
@@ -568,6 +540,8 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  const bool runtime_lazy_read_disable_{};
 };
 
 /**
@@ -593,7 +567,7 @@ private:
   bool cannotHaveBody();
 
   // ParserCallbacks.
-  Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Status onUrl(const char*, size_t) override { return okStatus(); }
   Status onStatus(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
@@ -640,6 +614,10 @@ private:
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
+
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr owned_output_buffer_;
 
   absl::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before

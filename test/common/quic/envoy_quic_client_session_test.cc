@@ -1,38 +1,28 @@
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "envoy/stats/stats_macros.h"
 
-#include "quiche/quic/core/crypto/null_encrypter.h"
-#include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_session_peer.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/codec_impl.h"
-#include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
-
-#include "envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::Invoke;
@@ -81,11 +71,12 @@ public:
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
-        envoy_quic_session_(
-            quic_config_, quic_version_,
-            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr, *dispatcher_,
-            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, store_),
+        envoy_quic_session_(quic_config_, quic_version_,
+                            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
+                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
+                            *dispatcher_,
+                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_,
+                            quic_stat_names_, {}, store_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
@@ -355,6 +346,17 @@ TEST_P(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
                                                            "Received server push stream"));
   quic::QuicStreamFrame stream_frame2(stream_id, false, 0, absl::string_view(payload.get(), 1));
   envoy_quic_session_.OnStreamFrame(stream_frame2);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
+  EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
+  // Just make sure the CWND is non-zero. We don't want to make strong assertions on what the value
+  // should be in this test, that is the job the congestion controllers' tests.
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 500);
+
+  envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
+  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
+            quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
 }
 
 } // namespace Quic

@@ -21,9 +21,12 @@ ASSERTs
 AST
 AWS
 BACKTRACE
+BEL
+BBR
 BSON
 BPF
 Repick
+TRA
 btree
 CAS
 CB
@@ -31,20 +34,33 @@ cbor
 CDN
 CDS
 CEL
+CWND
+DLE
 DSR
 DSS
 EBADF
+ENDIF
 ENOTCONN
+ENQ
+EOT
 EPIPE
+ESC
+ETB
+ETX
+FS
 HEXDIG
 HEXDIGIT
 LRU
+NAK
 OWS
 Preconnecting
 RCVBUF
 RTCP
 RTP
+SOH
+SPC
 STATNAME
+STX
 SkyWalking
 TIDs
 Timedout
@@ -131,6 +147,7 @@ FREEBIND
 FUZZER
 FUZZERS
 dereferencing
+differentially
 dnsresolvers
 guarddog
 GC
@@ -159,6 +176,7 @@ HTML
 HTTP
 HTTPS
 HV
+Hyperscan
 IAM
 IANA
 IDL
@@ -237,6 +255,9 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OD
+ODCDS
+oghttp
 OID
 OK
 OOM
@@ -251,6 +272,7 @@ OVFL
 PAYLOADLEN
 PB
 PCC
+PCRE
 PEERCRED
 PEM
 PERF
@@ -295,6 +317,7 @@ RTDS
 RTOS
 RTTI
 RUNDIR
+RVCM
 RW
 RX
 RXQ
@@ -316,6 +339,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIO
 SMTP
 SNI
 SOTW
@@ -329,11 +353,13 @@ SRCDIR
 SRDS
 SRV
 SS
+SSD
 SSL
 STDSTRING
 STL
 STRLEN
 STS
+SUBCOMMAND
 SVG
 SVID
 SXG
@@ -443,6 +469,7 @@ authlen
 authn
 auths
 authz
+automata
 autoscale
 backend
 backends
@@ -742,6 +769,7 @@ inflater
 inflight
 -ing
 init
+initialize
 initializer
 initializers
 inlined
@@ -755,6 +783,9 @@ interpretable
 intra
 ints
 invariance
+invoker
+iov
+iovcnt
 iovec
 iovecs
 ips
@@ -852,6 +883,7 @@ multi
 multicast
 multikill
 multimap
+multiple
 multivalue
 mutator
 mutex
@@ -1006,6 +1038,7 @@ ratelimited
 ratelimiter
 rawseti
 rc
+rdsone
 readded
 readonly
 readv
@@ -1068,6 +1101,7 @@ retriable
 retriggers
 revalidated
 revalidation
+rfield
 rmdir
 rocketmq
 rewriter
@@ -1085,6 +1119,7 @@ rver
 rxhash
 sandboxed
 sanitization
+sanitizations
 sanitizer
 satisfiable
 scalability
@@ -1127,6 +1162,7 @@ spdlog
 splitter
 spoofable
 src
+srtt
 ssize
 stackdriver
 stacktrace
@@ -1165,11 +1201,13 @@ subnets
 suboptimal
 subsecond
 subseconds
+subsegment
 subsequence
 subsetting
 substr
 substring
 substrings
+subtree
 subtrees
 subtype
 subtypes
@@ -1223,6 +1261,7 @@ transcoded
 transcoder
 transcoding
 transferral
+trds
 triaged
 trie
 tuple
@@ -1243,6 +1282,7 @@ underflowing
 unfreed
 unicast
 unicode
+unicodes
 unindexed
 uninstantiated
 uniq
@@ -1309,6 +1349,7 @@ zag
 zig
 zipkin
 zlib
+zstd
 OBQ
 SemVer
 SCM
@@ -1321,3 +1362,9 @@ suri
 transid
 routable
 vhosts
+infos
+ElastiCache
+pinterest
+NSS
+SSLKEYLOGFILE
+

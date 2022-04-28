@@ -15,6 +15,8 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/non_copyable.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -514,7 +516,7 @@ public:
       begin = end;
     }
 
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpectedly reached");
   }
 };
 
@@ -557,6 +559,11 @@ public:
       }
     }
     intervals_.insert(Interval(left, right));
+  }
+
+  bool test(Value value) const override {
+    const auto left_pos = intervals_.lower_bound(Interval(value, value + 1));
+    return left_pos != intervals_.end() && value >= left_pos->first && value < left_pos->second;
   }
 
   std::vector<Interval> toVector() const override {

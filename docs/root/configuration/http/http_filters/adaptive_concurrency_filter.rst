@@ -3,10 +3,6 @@
 Adaptive Concurrency
 ====================
 
-.. attention::
-
-  The adaptive concurrency filter is experimental and is currently under active development.
-
 This filter should be configured with the name ``envoy.filters.http.adaptive_concurrency``.
 
 See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.

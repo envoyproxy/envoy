@@ -70,7 +70,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
   auto* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
   NiceMock<MockResponseDecoder> decoder;
-  conn_pool_->newStream(decoder, callbacks_);
+  conn_pool_->newStream(decoder, callbacks_, {false, true});
 
   std::string next_protocol = "";
   if (protocol.has_value()) {
@@ -78,6 +78,11 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
                                                           : Http::Utility::AlpnNames::get().Http2);
   }
   EXPECT_CALL(*connection, nextProtocol()).WillOnce(Return(next_protocol));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+    EXPECT_EQ(536870912, state_.connecting_and_connected_stream_capacity_);
+  } else {
+    EXPECT_EQ(1, state_.connecting_and_connected_stream_capacity_);
+  }
 
   connection->raiseEvent(Network::ConnectionEvent::Connected);
   if (!protocol.has_value()) {

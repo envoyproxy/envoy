@@ -406,7 +406,6 @@ TEST_P(AdsIntegrationTest, DEPRECATED_FEATURE_TEST(RejectV2TransportConfigByDefa
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {cluster}, {cluster}, {}, "1");
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
-  EXPECT_GE(test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value(), 1);
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
@@ -1292,7 +1291,7 @@ public:
       // Path to EDS for ads_cluster
       const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server_xds.eds.ads_cluster.yaml", port_map_, version_);
-      ads_cluster_eds_config->set_path(eds_path);
+      ads_cluster_eds_config->mutable_path_config_source()->set_path(eds_path);
       ads_cluster_eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       // Add EDS static Cluster that uses ADS as config Source.

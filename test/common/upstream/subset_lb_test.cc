@@ -481,7 +481,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   ClusterStatNames stat_names_;
   ClusterStats stats_;
   PrioritySetImpl local_priority_set_;
@@ -515,9 +515,7 @@ TEST_F(SubsetLoadBalancerTest, SelectOverrideHost) {
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
 
-  LoadBalancerContext::OverrideHost expected_host{
-      "1.2.3.4", 1u << static_cast<size_t>(Host::Health::Healthy) |
-                     1u << static_cast<size_t>(Host::Health::Degraded)};
+  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
   EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
 
   // Mock membership update and update host map shared pointer in the lb.
@@ -2458,7 +2456,7 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
   // The first 'a' is the original, the next 2 instances of 'a' are duplicates (counted
   // in stat), and 'b' is another non-duplicate.
   for (auto& gauge : stats_store_.gauges()) {
-    ENVOY_LOG_MISC(error, "name {} value {}", gauge->name(), gauge->value());
+    ENVOY_LOG_MISC(debug, "name {} value {}", gauge->name(), gauge->value());
   }
   EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
                                       "testprefix.lb_subsets_single_host_per_subset_duplicate")

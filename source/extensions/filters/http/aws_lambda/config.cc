@@ -22,13 +22,13 @@ InvocationMode
 getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config) {
   using namespace envoy::extensions::filters::http::aws_lambda::v3;
   switch (proto_config.invocation_mode()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case Config_InvocationMode_ASYNCHRONOUS:
     return InvocationMode::Asynchronous;
   case Config_InvocationMode_SYNCHRONOUS:
     return InvocationMode::Synchronous;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace
@@ -37,15 +37,16 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
-  auto credentials_provider =
-      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), Extensions::Common::Aws::Utility::metadataFetcher);
-
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
     throw EnvoyException(fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.arn()));
   }
   const std::string region = arn->region();
+
+  auto credentials_provider =
+      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+          context.api(), Extensions::Common::Aws::Utility::fetchMetadata);
+
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
       service_name, region, std::move(credentials_provider),
       context.mainThreadDispatcher().timeSource(),

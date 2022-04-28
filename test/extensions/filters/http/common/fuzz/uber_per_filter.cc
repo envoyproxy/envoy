@@ -3,7 +3,6 @@
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/filters/http/common/utility.h"
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
@@ -94,13 +93,11 @@ void cleanTapConfig(Protobuf::Message* message) {
 
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
-  const std::string name = Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(
-      std::string(filter_name));
   // Map filter name to clean-up function.
   if (filter_name == "envoy.filters.http.grpc_json_transcoder") {
     // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
-  } else if (name == "envoy.filters.http.tap") {
+  } else if (filter_name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
   }

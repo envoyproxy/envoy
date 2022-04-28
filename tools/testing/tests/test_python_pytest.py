@@ -27,7 +27,15 @@ def test_pytest_add_arguments():
     runner.add_arguments(parser)
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
-        == [[('--cov-collect',),
+        == [[('--verbosity', '-v'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'info',
+              'help': 'Application log level'}],
+            [('--log-level', '-l'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'warn',
+              'help': 'Log level for non-application logs'}],
+            [('--cov-collect',),
              {'default': None, 'help': 'Collect coverage data to path'}]])
 
 
@@ -45,7 +53,7 @@ def test_pytest_pytest_args(patches):
 
 
 @pytest.mark.parametrize("cov_data", ["", "SOMEPATH"])
-def test_pytest_run(patches, cov_data):
+async def test_pytest_run(patches, cov_data):
     runner = python_pytest.PytestRunner("path1", "path2", "path3")
     patched = patches(
         ("PytestRunner.cov_collect", dict(new_callable=PropertyMock)),
@@ -57,7 +65,7 @@ def test_pytest_run(patches, cov_data):
 
     with patched as (m_cov_data, m_extra_args, m_py_args, m_cov_rc, m_main):
         m_cov_data.return_value = cov_data
-        assert runner.run() == m_main.return_value
+        assert await runner.run() == m_main.return_value
 
     if not cov_data:
         assert (
@@ -101,102 +109,37 @@ def test_plugin_command_main(patches):
         == [(m_command, patches), {}])
 
 
-@pytest.mark.parametrize("args", [None, (), tuple(f"ARG{i}" for i in range(0, 3))])
-@pytest.mark.parametrize("async_run", [None, True, False])
 @pytest.mark.parametrize("raises", [None, "main", "handler", "run"])
-def test_plugin__command_main(patches, args, async_run, raises):
-    patched = patches(
-        "_async_command_main",
-        prefix="tools.testing.plugin")
-    _args = ("arg0", "arg1", "arg2") if args is None else args
+def test_plugin__command_main(raises):
     _m_handler = MagicMock()
     _patches = MagicMock()
     _patches.return_value.__enter__.return_value = (_m_handler, )
-    main = MagicMock()
-    handler = MagicMock()
-    kwargs = {}
-    if args is not None:
-        kwargs["args"] = args
-    if async_run is not None:
-        kwargs["async_run"] = async_run
-    if raises != "main":
-        main.return_value = _m_handler.return_value.run.return_value
-    if raises != "handler":
-        _m_handler(*_args)
-    else:
-        _m_handler("SOMETHING", "ELSE")
-    if raises != "run":
-        _m_handler.return_value.run()
-    else:
-        _m_handler.return_value.run("NOT", "RUN")
-
-    with patched as (m_command, ):
-        if not raises or async_run:
-            result = plugin._command_main(_patches, main, handler, **kwargs)
-        else:
-            with pytest.raises(AssertionError) as e:
-                plugin._command_main(_patches, main, handler, **kwargs)
-
-    if async_run:
-        assert result == m_command.return_value
-        assert (
-            list(m_command.call_args)
-            == [(_patches,
-                 main,
-                 handler),
-                {'args': _args}])
-        assert not _patches.called
-        assert not main.called
-        return
-
-    assert not m_command.called
-    assert (
-        list(_patches.call_args)
-        == [(handler,), {}])
-    assert (
-        list(main.call_args)
-        == [_args, {}])
-
-    if not raises:
-        assert not result
-
-
-@pytest.mark.parametrize("raises", [None, "main", "aiorun", "handler", "run"])
-def test_plugin__async_command_main(raises):
-    _m_run = MagicMock()
-    _m_handler = MagicMock()
-    _patches = MagicMock()
-    _patches.return_value.__enter__.return_value = (_m_run, _m_handler)
     main = MagicMock()
     handler = MagicMock()
     handler.split.return_value = [f"PART{i}" for i in range(0, 3)]
     args = ("arg0", "arg1", "arg2")
 
     if raises != "main":
-        main.return_value = _m_run.return_value
+        main.return_value = _m_handler.return_value.return_value
 
-    if raises != "aiorun":
-        _m_run(_m_handler.return_value.run.return_value)
-    else:
-        _m_run("NOT", "AIORUN")
     if raises != "handler":
         _m_handler(*args)
     else:
         _m_handler("SOMETHING", "ELSE")
     if raises != "run":
-        _m_handler.return_value.run()
+        _m_handler.return_value()
     else:
-        _m_handler.return_value.run("NOT", "RUN")
+        _m_handler.return_value("NOT", "RUN")
 
     if not raises:
-        assert not plugin._async_command_main(_patches, main, handler, args)
+        assert not plugin._command_main(_patches, main, handler, args)
     else:
         with pytest.raises(AssertionError):
-            plugin._async_command_main(_patches, main, handler, args)
+            plugin._command_main(_patches, main, handler, args)
 
     assert (
         list(_patches.call_args)
-        == [('asyncio.run', 'PART2'), {'prefix': 'PART0.PART1'}])
+        == [('PART2', ), {'prefix': 'PART0.PART1'}])
     assert (
         list(handler.split.call_args)
         == [('.',), {}])

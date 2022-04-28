@@ -70,10 +70,10 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      bool ignore_global_conn_limit) override {
+                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                      bool bind_to_port, bool ignore_global_conn_limit) override {
     return Network::ListenerPtr{
-        createListener_(std::move(socket), cb, bind_to_port, ignore_global_conn_limit)};
+        createListener_(std::move(socket), cb, runtime, bind_to_port, ignore_global_conn_limit)};
   }
 
   Network::UdpListenerPtr
@@ -117,6 +117,9 @@ public:
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
     }
+    if (delete_immediately_) {
+      to_delete_.clear();
+    }
   }
 
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
@@ -139,7 +142,7 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               bool bind_to_port, bool ignore_global_conn_limit));
+               Runtime::Loader& runtime, bool bind_to_port, bool ignore_global_conn_limit));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                const envoy::config::core::v3::UdpSocketConfig& config));
@@ -167,6 +170,7 @@ public:
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
+  bool delete_immediately_{};
 
 private:
   const std::string name_;

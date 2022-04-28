@@ -16,8 +16,8 @@ namespace Upstream {
 
 namespace {
 
-Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                                   Stats::Store& stats) {
+Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
+                                         Stats::Store& stats) {
   return stats.createScope(fmt::format(
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
@@ -37,6 +37,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
 
   if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::cluster::v3::Cluster::STATIC:
       cluster_type = "envoy.cluster.static";
       break;
@@ -52,8 +53,6 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
     case envoy::config::cluster::v3::Cluster::EDS:
       cluster_type = "envoy.cluster.eds";
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   } else {
     cluster_type = cluster.cluster_type().name();
@@ -115,7 +114,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
               context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
               context.localInfo(), context.mainThreadDispatcher(), context.stats(),
               context.singletonManager(), context.threadLocal(), context.messageValidationVisitor(),
-              context.api(), context.options());
+              context.api(), context.options(), context.logManager());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, *transport_factory_context, std::move(stats_scope));
@@ -134,7 +133,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
 
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, context.mainThreadDispatcher(), context.runtime(),
-      context.outlierEventLogger()));
+      context.outlierEventLogger(), context.api().randomGenerator()));
 
   new_cluster_pair.first->setTransportFactoryContext(std::move(transport_factory_context));
   return new_cluster_pair;

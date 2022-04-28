@@ -3,6 +3,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +43,8 @@ DecompressorFilterConfig::DirectionConfig::DirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)),
-      decompression_enabled_(proto_config.enabled(), runtime) {}
+      decompression_enabled_(proto_config.enabled(), runtime),
+      ignore_no_transform_header_(proto_config.ignore_no_transform_header()) {}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
@@ -71,7 +73,16 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
   if (config_->responseDirectionConfig().decompressionEnabled() &&
       config_->requestDirectionConfig().advertiseAcceptEncoding()) {
-    headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.append_to_accept_content_encoding_only_once")) {
+      const std::string new_accept_encoding_header =
+          Http::HeaderUtility::addEncodingToAcceptEncoding(
+              headers.getInlineValue(accept_encoding_handle.handle()), config_->contentEncoding());
+      headers.setInline(accept_encoding_handle.handle(), new_accept_encoding_header);
+    } else {
+      headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
+    }
+
     ENVOY_STREAM_LOG(debug,
                      "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
                      *decoder_callbacks_, headers.getInlineValue(accept_encoding_handle.handle()));

@@ -7,6 +7,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/header_utility.h"
@@ -17,6 +18,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -386,7 +388,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
       config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
     if (!uri_sans_local_cert.empty()) {
-      client_cert_details.push_back(absl::StrCat("By=", uri_sans_local_cert[0]));
+      for (const std::string& uri : uri_sans_local_cert) {
+        client_cert_details.push_back(absl::StrCat("By=", uri));
+      }
     }
     const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
@@ -416,8 +420,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
       case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
         const auto sans = connection.ssl()->uriSanPeerCertificate();
-        const auto& uri_san = sans.empty() ? "" : sans[0];
-        client_cert_details.push_back(absl::StrCat("URI=", uri_san));
+        if (!sans.empty()) {
+          for (const std::string& uri : sans) {
+            client_cert_details.push_back(absl::StrCat("URI=", uri));
+          }
+        } else {
+          client_cert_details.push_back("URI=");
+        }
         break;
       }
       case ClientCertDetailsType::DNS: {
@@ -434,12 +443,14 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
+
+  ENVOY_BUG(config.forwardClientCert() == ForwardClientCertType::AppendForward ||
+                config.forwardClientCert() == ForwardClientCertType::SanitizeSet,
+            "error in client cert logic");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
     request_headers.appendForwardedClientCert(client_cert_details_str, ",");
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
-  } else {
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -447,6 +458,8 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
                                                      const RequestHeaderMap* request_headers,
                                                      ConnectionManagerConfig& config,
                                                      const std::string& via,
+                                                     const StreamInfo::StreamInfo& stream_info,
+                                                     absl::string_view proxy_name,
                                                      bool clear_hop_by_hop) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
@@ -483,6 +496,35 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
+  }
+
+  setProxyStatusHeader(response_headers, config, stream_info, proxy_name);
+}
+
+void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_headers,
+                                                    const ConnectionManagerConfig& config,
+                                                    const StreamInfo::StreamInfo& stream_info,
+                                                    absl::string_view proxy_name) {
+  if (auto* proxy_status_config = config.proxyStatusConfig(); proxy_status_config != nullptr) {
+    // Writing the Proxy-Status header is gated on the existence of
+    // |proxy_status_config|. The |details| field and other internals are generated in
+    // fromStreamInfo().
+    if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
+            StreamInfo::ProxyStatusUtils::fromStreamInfo(stream_info);
+        proxy_status.has_value()) {
+      response_headers.appendProxyStatus(
+          StreamInfo::ProxyStatusUtils::makeProxyStatusHeader(stream_info, *proxy_status,
+                                                              proxy_name, *proxy_status_config),
+          ", ");
+      // Apply the recommended response code, if configured and applicable.
+      if (proxy_status_config->set_recommended_response_code()) {
+        if (absl::optional<Http::Code> response_code =
+                StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
+            response_code.has_value()) {
+          response_headers.setStatus(std::to_string(enumToInt(*response_code)));
+        }
+      }
+    }
   }
 }
 

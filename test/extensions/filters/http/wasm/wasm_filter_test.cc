@@ -6,7 +6,6 @@
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/wasm_base.h"
 
 using testing::Eq;
@@ -101,7 +100,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_language_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_language_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 // Bad code in initial config.
 TEST_P(WasmHttpFilterTest, BadCode) {
@@ -932,10 +932,6 @@ TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
 }
 
 TEST_P(WasmHttpFilterTest, GrpcCall) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_call");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -943,7 +939,6 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1021,7 +1016,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1063,7 +1057,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1153,7 +1146,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1212,7 +1204,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1271,7 +1262,6 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
     proto_or_cluster.push_back("grpc_call_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     setupTest(id);
     setupFilter();
 
@@ -1368,10 +1358,6 @@ void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& cal
 }
 
 TEST_P(WasmHttpFilterTest, GrpcStream) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1379,7 +1365,6 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1434,10 +1419,6 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
 
 // Local close followed by remote close.
 TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1445,7 +1426,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1499,10 +1479,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
 
 // Remote close followed by local close.
 TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1510,7 +1486,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1570,7 +1545,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1614,10 +1588,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
 }
 
 TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
-  if (std::get<0>(GetParam()) == "wamr" && std::get<1>(GetParam()) == "rust") {
-    // WAMR hardcodes 16 KiB stack, which is too small to decode protobufs in Rust.
-    return;
-  }
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_stream");
   if (std::get<1>(GetParam()) == "cpp") {
@@ -1625,7 +1595,6 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     proto_or_cluster.push_back("grpc_stream_proto");
   }
   for (const auto& id : proto_or_cluster) {
-    TestScopedRuntime scoped_runtime;
     Grpc::RawAsyncStreamCallbacks* callbacks = nullptr;
     setupGrpcStreamTest(callbacks, id);
 
@@ -1734,10 +1703,10 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   StreamInfo::MockStreamInfo log_stream_info;
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 
-  const auto& result =
+  const auto* result =
       request_stream_info_.filterState()->getDataReadOnly<Filters::Common::Expr::CelState>(
           "wasm.wasm_request_set_key");
-  EXPECT_EQ("wasm_request_set_value", result.value());
+  EXPECT_EQ("wasm_request_set_value", result->value());
 
   filter().onDestroy();
   filter().onDestroy(); // Does nothing.

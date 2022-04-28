@@ -1,10 +1,11 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load("//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 
 licenses(["notice"])  # Apache 2
 
@@ -424,8 +425,18 @@ config_setting(
 )
 
 config_setting(
-    name = "wasm_none",
+    name = "wasm_disabled",
     values = {"define": "wasm=disabled"},
+)
+
+# This config setting enables Universal Header Validator and disables
+# HTTP header compliance checks in codecs.
+# This setting is temporary to transition header validation into UHV without
+# impacting production builds of Envoy.
+# This setting is enabled for the bazel.compile_time_options CI target.
+config_setting(
+    name = "uhv_enabled",
+    values = {"define": "uhv=enabled"},
 )
 
 # Alias pointing to the selected version of BoringSSL:
@@ -512,6 +523,11 @@ config_setting(
 )
 
 config_setting(
+    name = "ios_sim_arm64",
+    values = {"cpu": "ios_sim_arm64"},
+)
+
+config_setting(
     name = "ios_arm64e",
     values = {"cpu": "ios_arm64e"},
 )
@@ -564,6 +580,7 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":ios_x86_64",
     ],
 )
@@ -589,6 +606,31 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "not_x86",
+    match_any = [
+        ":darwin_arm64",
+        ":ios_arm64",
+        ":ios_arm64e",
+        ":ios_armv7",
+        ":ios_armv7s",
+        ":ios_i386",
+        ":ios_sim_arm64",
+        ":linux_aarch64",
+        ":linux_mips64",
+        ":linux_ppc",
+        ":linux_s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_x86_or_wasm_disabled",
+    match_any = [
+        ":not_x86",
+        ":wasm_disabled",
+    ],
+)
+
 alias(
     name = "remote_jdk11",
     actual = "@bazel_tools//tools/jdk:remote_jdk11",
@@ -601,5 +643,88 @@ alias(
 
 json_data(
     name = "repository_locations",
-    data = REPOSITORY_LOCATIONS_SPEC,
+    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
+)
+
+json_data(
+    name = "all_repository_locations",
+    data = merge_dicts(
+        load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
+        load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
+    ),
+)
+
+platform(
+    name = "android_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_armeabi",
+    constraint_values = [
+        "@platforms//cpu:arm",  # TODO(keith): This should be armv7 https://github.com/bazelbuild/bazel/issues/14982
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_x86",
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+)
+
+platform(
+    name = "macos_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
+)
+
+platform(
+    name = "ios_x86_64_platform",  # TODO(keith): Resolve duplicate name issue
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+        "@build_bazel_apple_support//constraints:simulator",
+    ],
+)
+
+platform(
+    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+        "@build_bazel_apple_support//constraints:simulator",
+    ],
+)
+
+platform(
+    name = "ios_arm64_platform",  # TODO(keith): Resolve duplicate name issue
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+        "@build_bazel_apple_support//constraints:device",
+    ],
 )
