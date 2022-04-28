@@ -183,7 +183,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 }
 
 SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
-                                               Server::Configuration::FactoryContext&)
+                                               Server::Configuration::ServerFactoryContext&)
     : interface_matcher_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
@@ -257,8 +257,8 @@ RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadat
   return nullptr;
 }
 
-MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list,
-                                     Server::Configuration::FactoryContext& context) {
+RouteConfigImpl::RouteConfigImpl(const RouteConfigList& route_config_list,
+                                 Server::Configuration::ServerFactoryContext& context, bool) {
   for (const auto& route_config : route_config_list) {
     route_matcher_list_.emplace_back(
         std::make_unique<SingleRouteMatcherImpl>(route_config, context));
@@ -266,8 +266,8 @@ MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list,
   ENVOY_LOG(debug, "route matcher list size {}", route_matcher_list_.size());
 }
 
-RouteConstSharedPtr MultiRouteMatcher::route(const MessageMetadata& metadata,
-                                             uint64_t random_value) const {
+RouteConstSharedPtr RouteConfigImpl::route(const MessageMetadata& metadata,
+                                           uint64_t random_value) const {
   for (const auto& route_matcher : route_matcher_list_) {
     auto route = route_matcher->route(metadata, random_value);
     if (nullptr != route) {
@@ -277,16 +277,6 @@ RouteConstSharedPtr MultiRouteMatcher::route(const MessageMetadata& metadata,
 
   return nullptr;
 }
-
-class DefaultRouteMatcherConfigFactory : public RouteMatcherFactoryBase<MultiRouteMatcher> {
-public:
-  DefaultRouteMatcherConfigFactory() : RouteMatcherFactoryBase(RouteMatcherType::Default) {}
-};
-
-/**
- * Static registration for the Dubbo protocol. @see RegisterFactory.
- */
-REGISTER_FACTORY(DefaultRouteMatcherConfigFactory, NamedRouteMatcherConfigFactory);
 
 } // namespace Router
 } // namespace DubboProxy

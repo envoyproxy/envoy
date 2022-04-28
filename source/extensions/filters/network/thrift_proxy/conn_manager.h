@@ -147,6 +147,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
     MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
     bool responseSuccess() override { return parent_.responseSuccess(); }
+    void onReset() override { parent_.onReset(); }
 
     ActiveRpc& parent_;
   };
@@ -262,6 +263,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
     MessageMetadataSharedPtr responseMetadata() override { return response_decoder_->metadata_; }
     bool responseSuccess() override { return response_decoder_->success_.value_or(false); }
+    void onReset() override;
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
@@ -317,7 +319,6 @@ private:
     void finalizeRequest();
 
     void createFilterChain();
-    void onReset();
     void onError(const std::string& what);
 
     ConnectionManager& parent_;
