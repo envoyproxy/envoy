@@ -109,8 +109,8 @@ public:
 
   // Below members are open to access by ActiveTcpSocket.
   Network::ConnectionHandler& parent_;
-  const std::chrono::milliseconds listener_filters_timeout_;
-  const bool continue_on_listener_filters_timeout_;
+  std::chrono::milliseconds listener_filters_timeout_;
+  bool continue_on_listener_filters_timeout_;
 
 protected:
   /**

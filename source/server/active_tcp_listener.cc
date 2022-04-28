@@ -67,6 +67,10 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
   ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
+  // `listener_filters_timeout` and `continue_on_listener_filters_timeout` can be
+  // in-place updated
+  listener_filters_timeout_ = config.listenerFiltersTimeout();
+  continue_on_listener_filters_timeout_ = config.continueOnListenerFiltersTimeout();
 }
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {

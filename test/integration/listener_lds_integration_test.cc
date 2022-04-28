@@ -780,6 +780,45 @@ public:
     }
   }
 
+  void initializeWithLds() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add the static cluster to serve LDS.
+      auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lds_cluster->set_name("lds_cluster");
+      ConfigHelper::setHttp2(*lds_cluster);
+    });
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name("test_listener");
+      listener_config_.set_continue_on_listener_filters_timeout(false);
+      listener_config_.mutable_listener_filters_timeout()->MergeFrom(
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+      ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+      setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+    });
+    on_server_init_function_ = [&]() {
+      createLdsStream();
+      sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    };
+    use_lds_ = false;
+    initialize();
+    test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+    test_server_->waitUntilListenersReady();
+    // NOTE: The line above doesn't tell you if listener is up and listening.
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    // Workers not started, the LDS added test_listener is in active_listeners_ list.
+    EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+    registerTestServerPorts({"test_listener"});
+  }
+
   envoy::config::listener::v3::Listener listener_config_;
   FakeHttpConnectionPtr lds_connection_;
   FakeStreamPtr lds_stream_{};
@@ -949,7 +988,7 @@ TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilter
 
 // Only update the order of listener filters, ensure the listener filters
 // was update.
-TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
+TEST_P(ListenerFilterIntegrationTest, InplaceUpdateListenerFilterOrder) {
   // Add two listener filters. The first filter will peek 5 bytes data,
   // the second filter will drain 2 bytes data. Expect the upstream will
   // receive 3 bytes data.
@@ -968,42 +1007,8 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
         max_read_bytes: 5
         close_connection: false
         )EOF");
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // Add the static cluster to serve LDS.
-    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-    lds_cluster->set_name("lds_cluster");
-    ConfigHelper::setHttp2(*lds_cluster);
-  });
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
-    listener_config_.set_name("test_listener");
-    listener_config_.set_continue_on_listener_filters_timeout(false);
-    listener_config_.mutable_listener_filters_timeout()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
-    ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
-    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
-    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
-    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
-    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
-  });
-  on_server_init_function_ = [&]() {
-    createLdsStream();
-    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
-  };
-  use_lds_ = false;
-  initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  test_server_->waitUntilListenersReady();
-  // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  // Workers not started, the LDS added test_listener is in active_listeners_ list.
-  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
-  registerTestServerPorts({"test_listener"});
+  
+  initializeWithLds();
 
   std::string data = "hello";
   std::string data_after_drain = data.substr(2, std::string::npos);
@@ -1036,6 +1041,84 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   FakeRawConnectionPtr fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(long_data.size() - 2, &long_data_after_drain));
+  tcp_client3->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InplaceUpdateListenerFilterConfig) {
+  // Add listener filter expects 5 bytes data.
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data2
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+  
+  initializeWithLds();
+
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  // Change the first filter's name.
+  listener_config_.mutable_listener_filters(0)->set_name("another_name");
+  ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InplaceUpdateListenerFilterContinueOnTimeout) {
+  // Add listener filter expects 5 bytes data.
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 5
+        close_connection: false
+        )EOF");
+
+  initializeWithLds();
+
+  // Send enough bytes, and expects upstream recevie the data.
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  // Only send 2 bytes data, and expects the listener filter timeout and close the
+  // connection.
+  std::string short_data = "ab";
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client2->write(short_data));
+  tcp_client2->waitForDisconnect();
+
+  listener_config_.set_continue_on_listener_filters_timeout(true);
+  ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+
+  // Also only send 2 bytes data, but expects the connection can be continued.
+  IntegrationTcpClientPtr tcp_client3 = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client3->write(short_data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(short_data.size(), &short_data));
   tcp_client3->close();
 }
 
