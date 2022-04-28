@@ -141,6 +141,15 @@ TEST_P(HttpConnPoolIntegrationTest, DrainConnectionsWithPredicate) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
+
+  // Now do a drain that matches.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 1);
+  test_server_->server().dispatcher().post([this] {
+    test_server_->server().clusterManager().drainConnections(
+        "cluster_0", [](const Upstream::Host&) { return true; });
+  });
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 0);
 }
 
 // Verify that the drainConnections() cluster manager API works correctly.
