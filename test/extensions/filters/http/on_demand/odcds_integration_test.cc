@@ -251,33 +251,25 @@ public:
         });
   }
 
-  void TearDown() override {
-    if (doCleanUpXdsConnection_) {
-      cleanUpXdsConnection();
-    }
-  }
-
   void initialize() override {
-    // Controls how many addFakeUpstream() will happen in
-    // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
-    // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
-    // config that you use!
-    setUpstreamCount(1);                                  // The xDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
-
-    // BaseIntegrationTest::initialize() does many things:
-    // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
-    // 2) It updates your bootstrap config with the ports your fake upstreams are actually listening
-    //    on (since you're supposed to leave them as 0).
-    // 3) It creates and starts an IntegrationTestServer - the thing that wraps the almost-actual
-    //    Envoy used in the tests.
-    // 4) Bringing up the server usually entails waiting to ensure that any listeners specified in
-    //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
+    // create_xds_upstream_ will create a fake upstream for odcds_cluster
+    setUpstreamCount(0);
+    // We want to have xds upstream available through xds_upstream_
+    create_xds_upstream_ = true;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Change cluster_0 to serve on-demand CDS.
+      auto* odcds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      odcds_cluster->set_name("odcds_cluster");
+      ConfigHelper::setHttp2(*odcds_cluster);
+    });
     HttpIntegrationTest::initialize();
 
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    // Create an upstream for the cluster returned by ODCDS. Needs to be called after initialize to
+    // avoid asserts around port setup in BaseIntegrationTest.
+    new_cluster_upstream_idx_ = fake_upstreams_.size();
+    addFakeUpstream(Http::CodecType::HTTP2);
     new_cluster_ = ConfigHelper::buildStaticCluster(
-        "new_cluster", fake_upstreams_[1]->localAddress()->ip()->port(),
+        "new_cluster", fake_upstreams_[new_cluster_upstream_idx_]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(ipVersion()));
 
     test_server_->waitUntilListenersReady();
@@ -285,8 +277,8 @@ public:
   }
 
   FakeStreamPtr odcds_stream_;
+  std::size_t new_cluster_upstream_idx_;
   envoy::config::cluster::v3::Cluster new_cluster_;
-  bool doCleanUpXdsConnection_ = true;
 };
 
 using OdCdsIntegrationTest = OdCdsIntegrationTestBase;
@@ -301,7 +293,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -312,10 +304,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
                                                  {"Pick-This-Cluster", "new_cluster"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  auto result = // xds_connection_ is filled with the new FakeHttpConnection.
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
@@ -325,13 +315,14 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
       Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
 
-  waitForNextUpstreamRequest(1);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
 
+  cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
 
@@ -344,7 +335,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
 //  - no odcds happens, because the cluster is known
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -355,10 +346,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
                                                  {"Pick-This-Cluster", "new_cluster"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  auto result = // xds_connection_ is filled with the new FakeHttpConnection.
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
@@ -368,7 +357,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
       Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
 
-  waitForNextUpstreamRequest(1);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -377,11 +366,12 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
 
   // next request should be handled right away
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest(1);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
 
+  cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
 
@@ -392,7 +382,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -403,10 +393,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
                                                  {"Pick-This-Cluster", "new_cluster"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  auto result = // xds_connection_ is filled with the new FakeHttpConnection.
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
@@ -417,6 +405,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
 
+  cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
 
@@ -427,7 +416,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
 //  - request is resumed
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
                     "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -438,10 +427,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
                                                  {"Pick-This-Cluster", "new_cluster"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  auto result = // xds_connection_ is filled with the new FakeHttpConnection.
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
 
@@ -454,6 +441,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
 
+  cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
 
@@ -463,9 +451,8 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
 //  - making a request to an unknown cluster
 //  - request fails
 TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtRouteLevelWorks) {
-  doCleanUpXdsConnection_ = false;
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500),
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
                     "integration", {});
   addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", "odcds_route");
   initialize();
@@ -492,9 +479,8 @@ TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtRouteLevelWorks) {
 //  - making a request to an unknown cluster
 //  - request fails
 TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtVirtualHostLevelWorks) {
-  doCleanUpXdsConnection_ = false;
   addOnDemandConfig(OdCdsIntegrationHelper::createOnDemandConfig(
-      OdCdsIntegrationHelper::createOdCdsConfigSource("cluster_0"), 2500));
+      OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500));
   addPerRouteConfig(OdCdsIntegrationHelper::PerRouteConfig(), "integration", {});
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -520,11 +506,11 @@ public:
     AdsIntegrationTest::initialize();
 
     test_server_->waitUntilListenersReady();
-    fake_upstream_idx_ = fake_upstreams_.size();
-    auto& upstream = addFakeUpstream(FakeHttpConnection::Type::HTTP2);
-    new_cluster_ =
-        ConfigHelper::buildStaticCluster("new_cluster", upstream.localAddress()->ip()->port(),
-                                         Network::Test::getLoopbackAddressString(ipVersion()));
+    new_cluster_upstream_idx_ = fake_upstreams_.size();
+    addFakeUpstream(Http::CodecType::HTTP2);
+    new_cluster_ = ConfigHelper::buildStaticCluster(
+        "new_cluster", fake_upstreams_[new_cluster_upstream_idx_]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()));
   }
 
   envoy::config::listener::v3::Listener buildListener() {
@@ -567,7 +553,7 @@ public:
     registerTestServerPorts({"http"});
   }
 
-  std::size_t fake_upstream_idx_;
+  std::size_t new_cluster_upstream_idx_;
   envoy::config::cluster::v3::Cluster new_cluster_;
 };
 
@@ -601,7 +587,7 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) 
                                                                   {new_cluster_}, {}, "3");
   EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
 
-  waitForNextUpstreamRequest(fake_upstream_idx_);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -634,7 +620,7 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredClust
                                                                   {new_cluster_}, {}, "3");
   EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
 
-  waitForNextUpstreamRequest(fake_upstream_idx_);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -643,7 +629,7 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredClust
 
   // next request should be handled right away
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest(fake_upstream_idx_);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
