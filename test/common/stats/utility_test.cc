@@ -276,12 +276,12 @@ TEST_P(StatsUtilityTest, ScopeTextReadoutOnce) { scopeOnce<TextReadout>(makeText
 TEST_P(StatsUtilityTest, ScopeTextReadoutAll) { scopeAll<TextReadout>(makeTextReadout()); }
 
 TEST_P(StatsUtilityTest, SanitizeStatsName) {
-  EXPECT_EQ("a.b.c", , Utility::sanitizeStatsName("a.b.c."));
-  EXPECT_EQ("a.b.c", , Utility::sanitizeStatsName(".a.b.c"));
-  EXPECT_EQ("a__b", , Utility::sanitizeStatsName("a::b"));
-  EXPECT_EQ("a", , Utility::sanitizeStatsName("a.\0"));
-  EXPECT_EQ("a_b", , Utility::sanitizeStatsName("a://b"));
-  EXPECT_EQ("a_b", , Utility::sanitizeStatsName("a:/b"));
+  EXPECT_EQ("a.b.c", Utility::sanitizeStatsName("a.b.c."));
+  EXPECT_EQ("a.b.c", Utility::sanitizeStatsName(".a.b.c"));
+  EXPECT_EQ("a__b", Utility::sanitizeStatsName("a::b"));
+  EXPECT_EQ("a", Utility::sanitizeStatsName("a.\0"));
+  EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
+  EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
 }
 
 } // namespace
