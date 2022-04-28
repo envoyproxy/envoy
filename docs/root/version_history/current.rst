@@ -11,7 +11,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* dns: allow propagating DNS responses with no records back to callers like strict_dns cluster, guarded by ``envoy.reloadable_features.cares_accept_nodata``
+* dns: allow propagating DNS responses with no records back to callers like strict_dns cluster, guarded by ``envoy.reloadable_features.cares_accept_nodata``.
 * thrift: add validate_clusters in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` to override the default behavior of cluster validation.
 * tls: if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
 * tls: removed SHA-1 cipher suites from the server-side defaults.
