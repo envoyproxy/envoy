@@ -1092,7 +1092,7 @@ TEST_P(ListenerFilterIntegrationTest, InplaceUpdateListenerFilterContinueOnTimeo
 
   initializeWithLds();
 
-  // Send enough bytes, and expects upstream recevie the data.
+  // Send enough bytes, and expects upstream receive the data.
   std::string data = "hello";
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
   ASSERT_TRUE(tcp_client->write(data));
