@@ -15,6 +15,8 @@ routing PRs, questions, etc. to the right place.
   * Cronvoy.
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
   * iOS (swift/objective-c) platform bindings.
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * Envoy, HTTP/3, upstream connection management.
 
 # Friends of Envoy Mobile
 
