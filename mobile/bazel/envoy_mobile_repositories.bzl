@@ -82,6 +82,13 @@ def swift_repos():
         url = "https://github.com/bazelbuild/rules_swift/releases/download/0.27.0/rules_swift.0.27.0.tar.gz",
     )
 
+    http_archive(
+        name = "SwiftLint",
+        build_file_content = """exports_files(["swiftlint"])""",
+        sha256 = "61d335766a39ba8fa499017a560950bd9fa0b0e5bc318559a9c1c7f4da679256",
+        url = "https://github.com/realm/SwiftLint/releases/download/0.47.1/portable_swiftlint.zip",
+    )
+
 def kotlin_repos():
     http_archive(
         name = "rules_jvm_external",
