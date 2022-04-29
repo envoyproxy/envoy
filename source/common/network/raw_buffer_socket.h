@@ -39,6 +39,7 @@ public:
   TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 };
 
 } // namespace Network
