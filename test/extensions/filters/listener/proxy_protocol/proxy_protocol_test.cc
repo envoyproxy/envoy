@@ -233,8 +233,8 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
-  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use proxy
-  // protocol
+  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // proxy protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
@@ -251,8 +251,8 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
 }
 
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
-  // allows a large request (more bytes than v1/v2 signature) through even though it doesn't use proxy
-  // protocol
+  // allows a large request (more bytes than v1/v2 signature) through even though it doesn't use
+  // proxy protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
