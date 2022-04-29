@@ -187,6 +187,52 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
 }
 
+TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationCustomTag) {
+  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
+  config.set_log_name("test-log");
+  config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  // Force a flush for every log entry.
+  config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
+
+  envoy::type::tracing::v3::CustomTag tag;
+  const auto tag_yaml = R"EOF(
+tag: host_name
+literal:
+  value: test_host_name
+  )EOF";
+  TestUtility::loadFromYaml(tag_yaml, tag);
+  config.mutable_common_config()->add_custom_tags() = tag;
+
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test-log"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+        - key: "host_name"
+          value:
+            string_value: "test_host_name"
+    instrumentation_library_logs:
+      - logs:
+          - severity_text: "test-severity-text"
+  )EOF");
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace AccessLoggers
