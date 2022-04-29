@@ -19,8 +19,9 @@ std::string captureBaseOffset(bool log_to_stderr) {
   mach_port_t object_name;
   mach_msg_type_number_t count;
   mach_vm_address_t address = 1;
-  kern_return_t rc = mach_vm_region(mach_task_self(), &address, &size, VM_REGION_BASIC_INFO,
-                                    (vm_region_info_t)&info, &count, &object_name);
+  kern_return_t rc =
+      mach_vm_region(mach_task_self(), &address, &size, VM_REGION_BASIC_INFO,
+                     reinterpret_cast<vm_region_info_t>(&info), &count, &object_name);
 
   if (rc != KERN_SUCCESS) {
     if (log_to_stderr) {
