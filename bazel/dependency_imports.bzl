@@ -26,6 +26,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         include_rustc_srcs = True,
         extra_target_triples = [
             "aarch64-apple-ios",
+            "aarch64-apple-ios-sim",
             "aarch64-linux-android",
             "armv7-linux-androideabi",
             "i686-linux-android",

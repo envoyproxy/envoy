@@ -69,8 +69,9 @@ public:
   const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
     return cluster_timeout_budget_stat_names_;
   }
-  MOCK_METHOD(void, drainConnections, (const std::string& cluster));
-  MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(void, drainConnections,
+              (const std::string& cluster, DrainConnectionsHostPredicate predicate));
+  MOCK_METHOD(void, drainConnections, (DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, checkActiveStaticCluster, (const std::string& cluster));
   MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
               (const envoy::config::core::v3::ConfigSource& odcds_config,
