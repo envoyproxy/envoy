@@ -23,7 +23,7 @@ std::unique_ptr<char, decltype(std::free)*> getExecutablePath() {
                                                      std::free};
 }
 
-std::string captureBaseOffset(bool log_to_stderr_) {
+std::string captureBaseOffset(bool log_to_stderr) {
   // Borrow a trick from abseil and read `/proc/self/task/{pid}/maps` instead of
   // `/proc/self/maps`. The latter requires the kernel to stop all threads, which
   // is significantly slower when there are many threads.
@@ -31,7 +31,7 @@ std::string captureBaseOffset(bool log_to_stderr_) {
   snprintf(maps_path.data(), maps_path.size(), "/proc/self/task/%d/maps", getpid());
   std::ifstream maps_stream(maps_path.data());
   if (!maps_stream.is_open()) {
-    if (log_to_stderr_) {
+    if (log_to_stderr) {
       std::cerr << "Failed to open (" << maps_path.data() << "), will not find base address\n";
     } else {
       ENVOY_LOG_MISC(critical, "Failed to open ({}), will not find base address", maps_path.data());
@@ -42,7 +42,7 @@ std::string captureBaseOffset(bool log_to_stderr_) {
 
   auto my_path = getExecutablePath();
   if (my_path == nullptr) {
-    if (log_to_stderr_) {
+    if (log_to_stderr) {
       std::cerr << "Failed to get current executable's path!\n";
     } else {
       ENVOY_LOG_MISC(critical, "Failed to get current executable's path!");
@@ -77,7 +77,7 @@ std::string captureBaseOffset(bool log_to_stderr_) {
     return absl::StrCat("0x", split_addresses[0]);
   }
 
-  if (log_to_stderr_) {
+  if (log_to_stderr) {
     std::cerr << "Failed to find start memory address, program line not found in ("
               << maps_path.data() << ")\n";
   } else {
