@@ -418,7 +418,8 @@ FilterStatus ConnectionManager::ResponseDecoder::setEnd() {
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
-  const FilterStatus status = parent_.applyDecoderFilters(DecoderEvent::Default, absl::any(), this);
+  const FilterStatus status =
+      parent_.applyDecoderFilters(DecoderEvent::ContinueDecode, absl::any(), this);
   if (status == FilterStatus::Continue) {
     // All filters have been executed for the current decoder state.
     if (parent_.pending_transport_end_) {
@@ -437,7 +438,7 @@ void ConnectionManager::ActiveRpcEncoderFilter::continueEncoding() {
 
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(DecoderEvent state, absl::any data,
                                                                ActiveRpcDecoderFilter* filter) {
-  ASSERT(filter_action_ == nullptr || state == DecoderEvent::Default);
+  ASSERT(filter_action_ == nullptr || state == DecoderEvent::ContinueDecode);
   prepareFilterAction(state, data);
 
   if (local_response_sent_) {
@@ -461,15 +462,15 @@ FilterStatus
 ConnectionManager::ActiveRpc::applyEncoderFilters(DecoderEvent state, absl::any data,
                                                   ProtocolConverterSharedPtr protocol_converter,
                                                   ActiveRpcEncoderFilter* filter) {
-  ASSERT(filter_action_ == nullptr || state == DecoderEvent::Default);
+  ASSERT(filter_action_ == nullptr || state == DecoderEvent::ContinueDecode);
   prepareFilterAction(state, data);
 
-  if (applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_, protocol_converter) !=
-      FilterStatus::Continue) {
-    throw EnvoyException("Not supported.");
-  }
+  FilterStatus status =
+      applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_, protocol_converter);
+  // Not support FilterStatus::StopIteration.
+  ASSERT(status == FilterStatus::Continue);
 
-  return FilterStatus::Continue;
+  return status;
 }
 
 template <typename FilterType>
@@ -519,8 +520,9 @@ ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
 }
 
 void ConnectionManager::ActiveRpc::prepareFilterAction(DecoderEvent event, absl::any data) {
-  // Keep the previous status.
-  if (event == DecoderEvent::Default) {
+  // DecoderEvent::ContinueDecode indicates we're handling previous filter action with the
+  // filter chain. Therefore, we should not reset filter_action_ and filter_context_.
+  if (event == DecoderEvent::ContinueDecode) {
     return;
   }
   filter_context_ = data;

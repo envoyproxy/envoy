@@ -40,7 +40,7 @@ enum class DecoderEvent {
   SetEnd,
   MapBegin,
   MapEnd,
-  Default
+  ContinueDecode
 };
 
 class DecoderEventHandler {

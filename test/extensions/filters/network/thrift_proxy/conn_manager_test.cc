@@ -1658,15 +1658,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
-
-  // Not support StopIteration for encoder filters.
-  ON_CALL(*custom_encoder_filter_, messageBegin(_))
-      .WillByDefault(Return(FilterStatus::StopIteration));
-  writeFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x01);
-  FramedTransportImpl transport;
-  BinaryProtocolImpl proto;
-  callbacks->startUpstreamResponse(transport, proto);
-  EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 }
 
 // Tests stop iteration/resume with multiple filters when iteration is stopped during
