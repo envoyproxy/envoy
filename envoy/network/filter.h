@@ -550,6 +550,12 @@ public:
   const ConnectionInfoProvider& connectionInfoProvider() const {
     return socket().connectionInfoProvider();
   }
+
+  const Address::Instance& localAddress() const { return *connectionInfoProvider().localAddress(); }
+
+  const Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
 };
 
 /**
