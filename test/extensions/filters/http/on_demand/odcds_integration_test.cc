@@ -850,7 +850,7 @@ key:
                        picked_vhost_config, picked_route_config);
   }
 
-  void serve_od_cds_expect_200(IntegrationStreamDecoderPtr response) {
+  void serveOdCdsExpect200(IntegrationStreamDecoderPtr response) {
     createXdsConnection();
     auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
     RELEASE_ASSERT(result, result.message());
@@ -873,7 +873,7 @@ key:
     cleanUpXdsConnection();
   }
 
-  void no_od_cds_expect_503(IntegrationStreamDecoderPtr response) {
+  void noOdCdsExpect503(IntegrationStreamDecoderPtr response) {
     EXPECT_FALSE(fake_upstreams_[odcds_upstream_idx_]->waitForHttpConnection(
         *dispatcher_, xds_connection_, std::chrono::milliseconds(1000)));
 
@@ -887,13 +887,15 @@ key:
   envoy::config::cluster::v3::Cluster new_cluster_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OdCdsScopedRdsIntegrationTestBase,
+using OdCdsScopedRdsIntegrationTest = OdCdsScopedRdsIntegrationTestBase;
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OdCdsScopedRdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test the an update of scoped route config is performed on demand. Since the config contains the
 // cluster-header action and HCM config enables on demand cluster discovery, it kicks in too. After
 // all this, the HTTP request should succeed.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDS) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDS) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -903,14 +905,14 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDS) {
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::None));
-  serve_od_cds_expect_200(std::move(response));
+  serveOdCdsExpect200(std::move(response));
   cleanupUpstreamAndDownstream();
 }
 
 // Test the an update of scoped route config is performed on demand. Since the config contains the
 // cluster-header action and the scoped route config enables on demand cluster discovery on a vhost
 // level, it kicks in too. After all this, the HTTP request should succeed.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInVHost) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInVHost) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -918,14 +920,14 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInVHost
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::Enable, RouteOdCdsConfig::None));
-  serve_od_cds_expect_200(std::move(response));
+  serveOdCdsExpect200(std::move(response));
   cleanupUpstreamAndDownstream();
 }
 
 // Test the an update of scoped route config is performed on demand. Since the config contains the
 // cluster-header action and the scoped route config enables on demand cluster discovery on a route
 // level, it kicks in too. After all this, the HTTP request should succeed.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateSuccessRDSThenCDSInRoute) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -933,13 +935,13 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateSuccessRDSThenCDSInRoute
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::Enable));
-  serve_od_cds_expect_200(std::move(response));
+  serveOdCdsExpect200(std::move(response));
   cleanupUpstreamAndDownstream();
 }
 
 // Test that an update of scoped route config is performed on demand. Despite the fact that config
 // contains the cluster-header action, the request will fail, because ODCDS is not enabled.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisabled) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabled) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -947,7 +949,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::None));
-  no_od_cds_expect_503(std::move(response));
+  noOdCdsExpect503(std::move(response));
 
   cleanupUpstreamAndDownstream();
 }
@@ -955,7 +957,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
 // Test that an update of scoped route config is performed on demand. Despite the fact that config
 // contains the cluster-header action and ODCDS is enabled in HCM, the request will fail, because
 // ODCDS is disabled in virtual host.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisabledInVHost) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledInVHost) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -965,14 +967,14 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::Disable, RouteOdCdsConfig::None));
-  no_od_cds_expect_503(std::move(response));
+  noOdCdsExpect503(std::move(response));
   cleanupUpstreamAndDownstream();
 }
 
 // Test that an update of scoped route config is performed on demand. Despite the fact that config
 // contains the cluster-header action and ODCDS is enabled in HCM, the request will fail, because
 // ODCDS is disabled in route.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisabledInRoute) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledInRoute) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -982,7 +984,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::None, RouteOdCdsConfig::Disable));
-  no_od_cds_expect_503(std::move(response));
+  noOdCdsExpect503(std::move(response));
 
   cleanupUpstreamAndDownstream();
 }
@@ -990,7 +992,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
 // Test that an update of scoped route config is performed on demand. Despite the fact that config
 // contains the cluster-header action and ODCDS is enabled in vhost, the request will fail, because
 // ODCDS is disabled in route.
-TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisabledInRoute2) {
+TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledInRoute2) {
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -998,7 +1000,7 @@ TEST_P(OdCdsScopedRdsIntegrationTestBase, OnDemandUpdateFailsBecauseOdCdsIsDisab
 
   auto response = initialRDSCommunication(
       getRouteConfigTemplate(VHostOdCdsConfig::Enable, RouteOdCdsConfig::Disable));
-  no_od_cds_expect_503(std::move(response));
+  noOdCdsExpect503(std::move(response));
 
   cleanupUpstreamAndDownstream();
 }
