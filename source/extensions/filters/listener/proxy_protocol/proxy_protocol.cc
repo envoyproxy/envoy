@@ -408,17 +408,20 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
 
   if (config_.get()->allowRequestsWithoutProxyProtocol()) {
 
-    if (memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
-               std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_)) &&
-        memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
-               std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_))) {
+    auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
+    auto matchv1 = !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_));
+
+    if (!matchv2 && !matchv1) {
       // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
       // short-circuit
       ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
       return ReadOrParseState::SkipFilter;
     }
 
-    if (raw_slice.len_ < PROXY_PROTO_V2_SIGNATURE_LEN) {
+    auto sig_len = matchv1 ? PROXY_PROTO_V1_SIGNATURE_LEN : PROXY_PROTO_V2_SIGNATURE_LEN;
+    if (raw_slice.len_ < sig_len) {
       ENVOY_LOG(debug, "request does not have enough bytes to determine if v1 or v2 proxy "
                        "protocol, waiting for more bytes");
       return ReadOrParseState::TryAgainLater;
