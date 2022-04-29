@@ -128,7 +128,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     if (params_.used_only_ && !stat->used()) {
       return true;
     }
-    // Capture the name once if we did not early-exit due to &usedonly -- we'll
+    // Capture the name once if we did not early-exit due to used_only -- we'll
     // use the name for both filtering and for capturing the stat in the map.
     std::string name = stat->name();
     if (params_.filter_.has_value()) {
