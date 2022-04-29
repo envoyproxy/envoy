@@ -92,6 +92,7 @@ TEST(CryptoMbProviderTest, TestEcdsaSigning) {
 }
 
 TEST(CryptoMbProviderTest, TestRsaPkcs1Signing) {
+  // PKCS #1 v1.5 is not supported.
   Event::SimulatedTimeSystem time_system;
   Stats::TestUtil::TestStore server_stats_store;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system);
@@ -109,66 +110,11 @@ TEST(CryptoMbProviderTest, TestRsaPkcs1Signing) {
   uint8_t in[32] = {0x7f};
 
   ssl_private_key_result_t res;
-  TestCallbacks cbs[8];
+  TestCallbacks cb;
+  CryptoMbPrivateKeyConnection op(cb, *dispatcher, bssl::UpRef(pkey), queue);
 
-  // First request
-  CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
-  res =
-      rsaPrivateKeySignForTest(&op0, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-
-  res = privateKeyCompleteForTest(&op0, nullptr, nullptr, 128);
-  // No processing done yet after first request
-  EXPECT_EQ(res, ssl_private_key_retry);
-
-  // Second request
-  CryptoMbPrivateKeyConnection op1(cbs[1], *dispatcher, bssl::UpRef(pkey), queue);
-  res =
-      rsaPrivateKeySignForTest(&op1, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-
-  res = privateKeyCompleteForTest(&op1, nullptr, nullptr, 128);
-  // No processing done yet after second request
-  EXPECT_EQ(res, ssl_private_key_retry);
-
-  // Six more requests
-  CryptoMbPrivateKeyConnection op2(cbs[2], *dispatcher, bssl::UpRef(pkey), queue);
-  CryptoMbPrivateKeyConnection op3(cbs[3], *dispatcher, bssl::UpRef(pkey), queue);
-  CryptoMbPrivateKeyConnection op4(cbs[4], *dispatcher, bssl::UpRef(pkey), queue);
-  CryptoMbPrivateKeyConnection op5(cbs[5], *dispatcher, bssl::UpRef(pkey), queue);
-  CryptoMbPrivateKeyConnection op6(cbs[6], *dispatcher, bssl::UpRef(pkey), queue);
-  CryptoMbPrivateKeyConnection op7(cbs[7], *dispatcher, bssl::UpRef(pkey), queue);
-  res =
-      rsaPrivateKeySignForTest(&op2, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-  res =
-      rsaPrivateKeySignForTest(&op3, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-  res =
-      rsaPrivateKeySignForTest(&op4, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-  res =
-      rsaPrivateKeySignForTest(&op5, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-  res =
-      rsaPrivateKeySignForTest(&op6, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-  res =
-      rsaPrivateKeySignForTest(&op7, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
-  EXPECT_EQ(res, ssl_private_key_retry);
-
-  size_t out_len = 0;
-  uint8_t out[128] = {0};
-
-  res = privateKeyCompleteForTest(&op0, out, &out_len, 128);
-  // Since the status is set only from the event loop (which is not run) this should be still
-  // "retry". The cryptographic result is present anyway.
-  EXPECT_EQ(res, ssl_private_key_retry);
-
-  op0.mb_ctx_->setStatus(RequestStatus::Success);
-  res = privateKeyCompleteForTest(&op0, out, &out_len, 128);
-  EXPECT_EQ(res, ssl_private_key_success);
-  EXPECT_NE(out_len, 0);
+  res = rsaPrivateKeySignForTest(&op, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
+  EXPECT_EQ(res, ssl_private_key_failure);
 }
 
 TEST(CryptoMbProviderTest, TestRsaPssSigning) {
@@ -393,8 +339,7 @@ TEST(CryptoMbProviderTest, TestRSATimer) {
 
   // First request
   CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
-  res =
-      rsaPrivateKeySignForTest(&op0, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
+  res = rsaPrivateKeySignForTest(&op0, nullptr, nullptr, 128, SSL_SIGN_RSA_PSS_SHA256, in, in_len);
   EXPECT_EQ(res, ssl_private_key_retry);
 
   res = privateKeyCompleteForTest(&op0, nullptr, nullptr, 128);
@@ -415,8 +360,7 @@ TEST(CryptoMbProviderTest, TestRSATimer) {
   fakeIpp->injectErrors(true);
 
   CryptoMbPrivateKeyConnection op1(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
-  res =
-      rsaPrivateKeySignForTest(&op1, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
+  res = rsaPrivateKeySignForTest(&op1, nullptr, nullptr, 128, SSL_SIGN_RSA_PSS_SHA256, in, in_len);
   EXPECT_EQ(res, ssl_private_key_retry);
 
   res = privateKeyCompleteForTest(&op1, nullptr, nullptr, 128);
