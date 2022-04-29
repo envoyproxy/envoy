@@ -77,7 +77,8 @@ public:
     virtual void onFailure() {
       ASSERT(conn_pool_ != nullptr);
       conn_pool_->callbacks_->onGenericPoolFailure(
-          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", host_);
+          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "remote_connection_failure",
+          host_);
     }
 
   protected:

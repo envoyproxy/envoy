@@ -317,6 +317,7 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
+    stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
     parent_.onUpstreamReset(reason, transport_failure_reason, *this);
   } else {
     deferred_reset_reason_ = reason;
@@ -405,8 +406,6 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   case ConnectionPool::PoolFailureReason::Timeout:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
-
-  stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
