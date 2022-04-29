@@ -104,14 +104,17 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
     return;
   }
 
-  Buffer::OwnedImpl buffer;
-  const DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
+  DirectResponse::ResponseType result = DirectResponse::ResponseType::Exception;
 
-  Buffer::OwnedImpl response_buffer;
-  metadata.setProtocol(protocol_->type());
-  transport_->encodeFrame(response_buffer, metadata, buffer);
+  if (!metadata.hasMessageType() || metadata.messageType() != MessageType::Oneway) {
+    Buffer::OwnedImpl buffer;
+    result = response.encode(metadata, *protocol_, buffer);
+    Buffer::OwnedImpl response_buffer;
+    metadata.setProtocol(protocol_->type());
+    transport_->encodeFrame(response_buffer, metadata, buffer);
 
-  read_callbacks_->connection().write(response_buffer, end_stream);
+    read_callbacks_->connection().write(response_buffer, end_stream);
+  }
   if (end_stream) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }

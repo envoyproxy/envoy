@@ -1,6 +1,10 @@
+#pragma once
+
+#include "envoy/server/admin.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
@@ -33,8 +37,7 @@ public:
 // Implements the Render interface for simple textual representation of stats.
 class StatsTextRender : public StatsRender {
 public:
-  explicit StatsTextRender(Utility::HistogramBucketsMode histogram_buckets_mode)
-      : histogram_buckets_mode_(histogram_buckets_mode) {}
+  explicit StatsTextRender(const StatsParams& params);
 
   // StatsRender
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override;
@@ -56,7 +59,7 @@ private:
 class StatsJsonRender : public StatsRender {
 public:
   StatsJsonRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                  Utility::HistogramBucketsMode histogram_buckets_mode);
+                  const StatsParams& params);
 
   // StatsRender
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override;

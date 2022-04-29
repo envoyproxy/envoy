@@ -718,6 +718,10 @@ public:
         dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
+    resetChannel();
+  }
+
+  void resetChannel() {
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
@@ -928,9 +932,7 @@ TEST_P(DnsImplTest, DestructCallback) {
 
   // This simulates destruction thanks to another query setting the dirty_channel_ bit, thus causing
   // a subsequent result to call ares_destroy.
-  peer_->resetChannelTcpOnly(zeroTimeout());
-  ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
+  resetChannel();
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -1021,6 +1023,25 @@ TEST_P(DnsImplTest, CallbackException) {
                             "unknown");
 }
 
+// Verify that resetNetworking() correctly dirties and recreates the channel.
+TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
+  ASSERT_FALSE(peer_->isChannelDirty());
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  resolver_->resetNetworking();
+  EXPECT_TRUE(peer_->isChannelDirty());
+  resetChannel();
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 // Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
 // ARES_ECONNREFUSED as its callback status.
 TEST_P(DnsImplTest, DestroyChannelOnRefused) {
@@ -1054,11 +1075,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   EXPECT_FALSE(peer_->isChannelDirty());
 
   // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
-  if (tcpOnly()) {
-    peer_->resetChannelTcpOnly(zeroTimeout());
-  }
-  ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
+  resetChannel();
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,

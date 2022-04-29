@@ -172,3 +172,10 @@ envoy_quiche_platform_impl_cc_library(
         "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
     ],
 )
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_lower_case_string_impl_lib",
+    hdrs = ["quiche_lower_case_string_impl.h"],
+    tags = ["nofips"],
+    deps = ["//envoy/http:header_map_interface"],
+)

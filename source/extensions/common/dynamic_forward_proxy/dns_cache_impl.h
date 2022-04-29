@@ -203,6 +203,9 @@ private:
                      std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {});
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
+  void runResolutionCompleteCallbacks(const std::string& host,
+                                      const DnsHostInfoSharedPtr& host_info,
+                                      Network::DnsResolver::ResolutionStatus status);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
   void onReResolve(const std::string& host);

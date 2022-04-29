@@ -13,7 +13,6 @@
 #include "source/server/admin/stats_request.h"
 
 namespace Envoy {
-
 namespace Server {
 
 const uint64_t RecentLookupsCapacity = 100;
@@ -72,58 +71,35 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream& /*admin_stream*/) {
+  StatsParams params;
+  Buffer::OwnedImpl response;
+  Http::Code code = params.parse(path, response);
+  if (code != Http::Code::OK) {
+    return Admin::makeStaticTextRequest(response, code);
+  }
+
+  if (params.format_ == StatsFormat::Prometheus) {
+    // TODO(#16139): modify streaming algorithm to cover Prometheus.
+    //
+    // This may be easiest to accomplish by populating the set
+    // with tagExtractedName(), and allowing for vectors of
+    // stats as multiples will have the same tag-extracted names.
+    // Ideally we'd find a way to do this without slowing down
+    // the non-Prometheus implementations.
+    Buffer::OwnedImpl response;
+    prometheusFlushAndRender(params, response);
+    return Admin::makeStaticTextRequest(response, code);
+  }
+
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
 
-  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path);
-
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  Buffer::OwnedImpl response;
-  if (!Utility::filterParam(params, response, regex)) {
-    return Admin::makeStaticTextRequest(response, Http::Code::BadRequest);
-  }
-
-  // If the histogram_buckets query param does not exist histogram output should contain quantile
-  // summary data. Using histogram_buckets will change output to show bucket data. The
-  // histogram_buckets query param has two possible values: cumulative or disjoint.
-  Utility::HistogramBucketsMode histogram_buckets_mode = Utility::HistogramBucketsMode::NoBuckets;
-  absl::Status histogram_buckets_status =
-      Utility::histogramBucketsParam(params, histogram_buckets_mode);
-  if (!histogram_buckets_status.ok()) {
-    return Admin::makeStaticTextRequest(histogram_buckets_status.message(), Http::Code::BadRequest);
-  }
-
-  const absl::optional<std::string> format_value = Utility::formatParam(params);
-  bool json = false;
-  if (format_value.has_value()) {
-    if (format_value.value() == "prometheus") {
-      // TODO(#16139): modify streaming algorithm to cover Prometheus.
-      //
-      // This may be easiest to accomplish by populating the set
-      // with tagExtractedName(), and allowing for vectors of
-      // stats as multiples will have the same tag-extracted names.
-      // Ideally we'd find a way to do this without slowing down
-      // the non-Prometheus implementations.
-      Buffer::OwnedImpl response;
-      Http::Code code = prometheusStats(path, response);
-      return Admin::makeStaticTextRequest(response, code);
-    } else if (format_value.value() == "json") {
-      json = true;
-    } else {
-      return Admin::makeStaticTextRequest(
-          "usage: /stats?format=json  or /stats?format=prometheus \n\n", Http::Code::BadRequest);
-    }
-  }
-
-  return makeRequest(server_.stats(), used_only, json, histogram_buckets_mode, regex);
+  return makeRequest(server_.stats(), params);
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, bool used_only, bool json,
-                                            Utility::HistogramBucketsMode histogram_buckets_mode,
-                                            const absl::optional<std::regex>& regex) {
-  return std::make_unique<StatsRequest>(stats, used_only, json, histogram_buckets_mode, regex);
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params) {
+  return std::make_unique<StatsRequest>(stats, params);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
@@ -134,23 +110,31 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 
 Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
                                          Buffer::Instance& response) {
-  const Http::Utility::QueryParams params =
-      Http::Utility::parseAndDecodeQueryString(path_and_query);
-  const bool used_only = params.find("usedonly") != params.end();
-  const bool text_readouts = params.find("text_readouts") != params.end();
-
-  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      text_readouts ? server_.stats().textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
-
-  absl::optional<std::regex> regex;
-  if (!Utility::filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
+  StatsParams params;
+  Http::Code code = params.parse(path_and_query, response);
+  if (code != Http::Code::OK) {
+    return code;
   }
-
-  PrometheusStatsFormatter::statsAsPrometheus(
-      server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
-      text_readouts_vec, response, used_only, regex, server_.api().customStatNamespaces());
+  prometheusFlushAndRender(params, response);
   return Http::Code::OK;
+}
+
+void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+}
+
+void StatsHandler::prometheusRender(Stats::Store& stats,
+                                    const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const StatsParams& params, Buffer::Instance& response) {
+  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+      params.prometheus_text_readouts_ ? stats.textReadouts()
+                                       : std::vector<Stats::TextReadoutSharedPtr>();
+  PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
+                                              text_readouts_vec, response, params,
+                                              custom_namespaces);
 }
 
 Http::Code StatsHandler::handlerContention(absl::string_view,

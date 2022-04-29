@@ -586,6 +586,24 @@ public:
 };
 
 /**
+ * SystemTimeFormatter (FormatterProvider) for upstream cert start time from the StreamInfo's
+ * upstreamInfo.
+ */
+class UpstreamPeerCertVStartFormatter : public SystemTimeFormatter {
+public:
+  UpstreamPeerCertVStartFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for upstream cert end time from the StreamInfo's
+ * upstreamInfo.
+ */
+class UpstreamPeerCertVEndFormatter : public SystemTimeFormatter {
+public:
+  UpstreamPeerCertVEndFormatter(const std::string& format);
+};
+
+/**
  * FormatterProvider for environment. If no valid environment value then
  */
 class EnvironmentFormatter : public FormatterProvider {
