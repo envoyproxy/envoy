@@ -8,6 +8,14 @@ if [ -z "$ENVOY_FORMAT_ACTION" ]; then
   ENVOY_FORMAT_ACTION="check"
 fi
 
+if [[ $(uname) == "Darwin" ]]; then
+  if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+    ./bazelw run --run_under="cd $PWD && " @SwiftLint//:swiftlint -- --fix --quiet 2>/dev/null
+  else
+    ./bazelw run --run_under="cd $PWD && " @SwiftLint//:swiftlint -- --strict --quiet 2>/dev/null
+  fi
+fi
+
 TARGET_PATH="$2"
 
 # TODO(mattklein123): WORKSPACE is excluded due to warning about @bazel_tools reference. Fix here
