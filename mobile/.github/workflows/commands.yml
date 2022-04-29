@@ -1,0 +1,16 @@
+name: commands
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  retest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Re-Test Action
+        uses: ./.github/actions/retest-action
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

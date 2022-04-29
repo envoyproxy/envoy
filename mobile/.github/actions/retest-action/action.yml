@@ -1,0 +1,11 @@
+name: 'Re-Test'
+description: 'Re-Runs the failing jobs from the last workflow for a PR'
+inputs:
+  token:
+    description: 'GitHub API Token'
+    required: true
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    GITHUB_TOKEN: ${{ inputs.token }}
