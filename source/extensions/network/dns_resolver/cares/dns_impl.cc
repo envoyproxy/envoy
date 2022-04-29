@@ -1,7 +1,5 @@
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
-#include <sys/socket.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
