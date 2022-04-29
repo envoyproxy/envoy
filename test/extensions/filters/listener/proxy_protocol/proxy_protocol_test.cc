@@ -1103,11 +1103,11 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  write("PROXY TCP4");
+  write("PRO"); // intentionally smaller than the size of v1/v2 header
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  write(" 25"); // intentionally smaller than the size of v1/v2 header
+  write("XY TCP4 25");
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
