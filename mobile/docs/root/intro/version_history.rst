@@ -14,7 +14,7 @@ Bugfixes:
 
 Features:
 
-- None
+- api: add option to extend the keepalive timeout when any frame is received on the owning HTTP/2 connection. (:issue:`#2229 <2229>`)
 
 0.4.6 (April 26, 2022)
 ========================

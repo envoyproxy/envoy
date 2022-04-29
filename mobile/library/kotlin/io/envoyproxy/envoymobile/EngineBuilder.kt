@@ -44,6 +44,7 @@ open class EngineBuilder(
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
+  private var h2ExtendKeepaliveTimeout = false
   private var h2RawDomains = listOf<String>()
   private var maxConnectionsPerHost = 7
   private var statsFlushSeconds = 60
@@ -259,6 +260,18 @@ open class EngineBuilder(
    */
   fun addH2ConnectionKeepaliveTimeoutSeconds(timeoutSeconds: Int): EngineBuilder {
     this.h2ConnectionKeepaliveTimeoutSeconds = timeoutSeconds
+    return this
+  }
+
+  /**
+   * Extend the keepalive timeout when *any* frame is received on the owning HTTP/2 connection.
+   *
+   * @param h2ExtendKeepaliveTimeout whether to extend the keepalive timeout.
+   *
+   * @return This builder.
+   */
+  fun h2ExtendKeepaliveTimeout(h2ExtendKeepaliveTimeout: Boolean): EngineBuilder {
+    this.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout
     return this
   }
 
@@ -495,6 +508,7 @@ open class EngineBuilder(
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
+      h2ExtendKeepaliveTimeout,
       h2RawDomains,
       maxConnectionsPerHost,
       statsFlushSeconds,

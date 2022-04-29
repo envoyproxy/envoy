@@ -304,7 +304,7 @@ void Engine::flushStats() {
 void Engine::drainConnections() {
   ASSERT(dispatcher_->isThreadSafe(),
          "drainConnections must be called from the dispatcher's context");
-  server_->clusterManager().drainConnections();
+  server_->clusterManager().drainConnections(nullptr);
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {

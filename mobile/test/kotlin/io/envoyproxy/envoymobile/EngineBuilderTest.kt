@@ -161,6 +161,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `enabling h2 keepalive extension overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.h2ExtendKeepaliveTimeout(true)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.h2ExtendKeepaliveTimeout).isTrue()
+  }
+
+  @Test
   fun `specifying h2 hostnames overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

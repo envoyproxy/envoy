@@ -250,6 +250,20 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingH2ExtendKeepaliveTimeoutAddsToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with h2ExtendKeepaliveTimeout")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.h2ExtendKeepaliveTimeout)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .h2ExtendKeepaliveTimeout(true)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testAddingH2RawDomainsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -420,6 +434,7 @@ final class EngineBuilderTests: XCTestCase {
       enforceTrustChainVerification: false,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
+      h2ExtendKeepaliveTimeout: true,
       h2RawDomains: ["h2-raw.domain"],
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
@@ -451,9 +466,10 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
 
+    // HTTP/2
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_idle_interval 0.001s"))
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_timeout 333s"))
-
+    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout true"))
     XCTAssertTrue(resolvedYAML.contains("&h2_raw_domains [\"h2-raw.domain\"]"))
 
     XCTAssertTrue(resolvedYAML.contains("&max_connections_per_host 100"))
@@ -496,6 +512,7 @@ final class EngineBuilderTests: XCTestCase {
       enforceTrustChainVerification: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
+      h2ExtendKeepaliveTimeout: false,
       h2RawDomains: [],
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
@@ -519,6 +536,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
+    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout false"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -537,6 +555,7 @@ final class EngineBuilderTests: XCTestCase {
       enforceTrustChainVerification: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 222,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
+      h2ExtendKeepaliveTimeout: false,
       h2RawDomains: [],
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
