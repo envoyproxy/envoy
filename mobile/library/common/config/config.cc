@@ -55,6 +55,7 @@ const std::string config_header = R"(
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
+- &h2_delay_keepalive_timeout false
 - &h2_raw_domains []
 - &max_connections_per_host 7
 - &metadata {}
@@ -464,6 +465,7 @@ layered_runtime:
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
             override_request_timeout_by_gateway_timeout: false
+            http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
 )"
 // Needed due to warning in
 // https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546

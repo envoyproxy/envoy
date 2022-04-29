@@ -49,6 +49,7 @@ class EnvoyConfigurationTest {
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
+    h2ExtendKeepaliveTimeout: Boolean = false,
     h2RawDomains: List<String> = listOf("h2-raw.example.com"),
     maxConnectionsPerHost: Int = 543,
     statsFlushSeconds: Int = 567,
@@ -77,6 +78,7 @@ class EnvoyConfigurationTest {
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
+      h2ExtendKeepaliveTimeout,
       h2RawDomains,
       maxConnectionsPerHost,
       statsFlushSeconds,
@@ -161,7 +163,8 @@ class EnvoyConfigurationTest {
       enableDnsFilterUnroutableFamilies = true,
       enableHappyEyeballs = true,
       enableHttp3 = true,
-      enableInterfaceBinding = true
+      enableInterfaceBinding = true,
+      h2ExtendKeepaliveTimeout = true
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
@@ -172,6 +175,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": true}")
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
+
+    // H2
+    assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
 
     // H3
     assertThat(resolvedTemplate).contains(APCF_INSERT);

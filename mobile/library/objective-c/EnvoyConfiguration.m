@@ -19,6 +19,7 @@
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
+                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                                      h2RawDomains:(NSArray<NSString *> *)h2RawDomains
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
@@ -56,6 +57,7 @@
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
+  self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
   self.h2RawDomains = h2RawDomains;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
   self.statsFlushSeconds = statsFlushSeconds;
@@ -143,6 +145,8 @@
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
                             self.enableHappyEyeballs ? @"true" : @"false"];
+  [definitions appendFormat:@"- &h2_delay_keepalive_timeout %@\n",
+                            self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &dns_resolver_name envoy.network.dns_resolver.apple\n"];
   // No additional values are currently needed for Apple-based DNS resolver.

@@ -23,6 +23,7 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
       .enableHappyEyeballs(true)
+      .h2ExtendKeepaliveTimeout(true)
       .enableInterfaceBinding(true)
       // swiftlint:disable:next line_length
       .addNativeFilter(name: "envoy.filters.http.buffer", typedConfig: "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
