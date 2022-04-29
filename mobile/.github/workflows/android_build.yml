@@ -41,7 +41,7 @@ jobs:
           ./bazelw build \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            --fat_apk_cpu=x86 \
+            --fat_apk_cpu=x86_64 \
             //:android_dist_ci
   javahelloworld:
     name: java_helloworld
@@ -70,7 +70,7 @@ jobs:
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start java app'
         env:
@@ -79,7 +79,7 @@ jobs:
           ./bazelw build \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            --fat_apk_cpu=x86 \
+            --fat_apk_cpu=x86_64 \
             //examples/java/hello_world:hello_envoy
           adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -113,7 +113,7 @@ jobs:
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
@@ -122,7 +122,7 @@ jobs:
           ./bazelw build \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            --fat_apk_cpu=x86 \
+            --fat_apk_cpu=x86_64 \
             //examples/kotlin/hello_world:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -156,7 +156,7 @@ jobs:
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
@@ -165,7 +165,7 @@ jobs:
           ./bazelw build \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            --fat_apk_cpu=x86 \
+            --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/baseline:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -199,7 +199,7 @@ jobs:
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
@@ -208,7 +208,7 @@ jobs:
           ./bazelw build \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            --fat_apk_cpu=x86 \
+            --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
