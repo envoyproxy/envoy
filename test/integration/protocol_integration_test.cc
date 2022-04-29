@@ -3510,6 +3510,11 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
 TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
   config_helper_.disableDelayClose();
   // we only care about upstream protocol.
+#ifdef ENVOY_ENABLE_UHV
+  // permissive parsing is enabled
+  return;
+#endif
+
   if (downstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
