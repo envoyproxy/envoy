@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package Envoy.Extensions.HttpFilters.Cache.FileSystemHttpCache;
+
+import "google/protobuf/timestamp.proto";
+import "source/extensions/filters/http/cache/key.proto";
+
+// The full structure of a cache file is:
+// 4 byte cache file identifier (used to ignore files that don't belong to the cache)
+// 4 byte cache version identifier (if mismatched, the cache file is invalid and is deleted)
+// 4 byte header size
+// 4 byte trailer size
+// 8 byte body size
+// body
+// serialized CacheFileTrailer
+// serialized CacheFileHeader
+//
+// The opening block is necessary to allow the sizes to be at the front of the file, but
+// (necessarily) written last - you can't easily insert things into a serialized proto, so
+// a flat layout is necessary.
+//
+// The CacheFileHeader is at the end of the file to allow it to be easily replaced during
+// updateHeaders. To avoid races, the CacheFileHeader is kept in memory during ordinary
+// usage, and only loaded from disk as part of populateFromDisk during cache warmup.
+//
+// One slightly special case is the cache file for an entry with 'vary' headers involved
+// - for this case at the 'hub' entry there is no trailer or body, and the only header
+// is a 'vary' header, which indicates that the actual cache key will include some headers
+// from the request.
+message CacheFileHeader {
+  Key key = 1;
+  google.protobuf.Timestamp metadata_response_time = 2;
+  message Header {
+    string key = 1;
+    string value = 2;
+  }
+  repeated Header headers = 3;
+};
+
+message CacheFileTrailer {
+  message Trailer {
+    string key = 1;
+    string value = 2;
+  }
+  repeated Trailer trailers = 3;
+};

@@ -20,7 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: FileSystemHttpCache CacheFilter storage plugin]
 // [#not-implemented-hide:]
-// [#comment: TODO: when extension is added make this #extension: envoy.http.cache.file_system_http_cache]
+// [#extension: envoy.extensions.http.cache.file_system_http_cache]
 //
 // Configuration for a cache implementation that caches in the local filesystem.
 //
