@@ -439,11 +439,19 @@ modify different aspects of the server:
 
   .. http:get:: /stats?filter=regex
 
-  Filters the returned stats to those with names matching the regular expression
-  ``regex``. Compatible with ``usedonly``. Performs partial matching by default, so
-  ``/stats?filter=server`` will return all stats containing the word ``server``.
-  Full-string matching can be specified with begin- and end-line anchors. (i.e.
-  ``/stats?filter=^server.concurrency$``)
+  Filters the returned stats to those with names matching the regular
+  expression ``regex`` using Ecmascript syntax. Compatible with
+  ``usedonly``. Performs partial matching by default, so
+  ``/stats?filter=server`` will return all stats containing the word
+  ``server``.  Full-string matching can be specified with begin- and
+  end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
+
+  .. http:get:: /stats?filter=regex&safe
+
+  Works like ``filter`` except that the regex uses the :ref:`Google
+  RE2 syntax
+  <envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2>
+  rules` rather than as Ecmascript, and is substantially faster.
 
   .. http:get:: /stats?histogram_buckets=cumulative
 
