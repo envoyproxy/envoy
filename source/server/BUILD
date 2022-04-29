@@ -13,11 +13,22 @@ envoy_package()
 
 envoy_cc_library(
     name = "backtrace_lib",
-    srcs = ["backtrace.cc"],
+    srcs = select({
+        "//bazel:windows_x86_64": [
+            "backtrace.win.cc",
+        ],
+        "//bazel:apple": [
+            "backtrace.apple.cc",
+        ],
+        "//conditions:default": [
+            "backtrace.nix.cc",
+        ],
+    }),
     hdrs = ["backtrace.h"],
     external_deps = [
         "abseil_stacktrace",
         "abseil_symbolize",
+        "abseil_synchronization",
     ],
     tags = ["backtrace"],
     deps = [

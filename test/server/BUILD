@@ -35,6 +35,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
     tags = ["backtrace"],
     deps = [
         "//source/server:backtrace_lib",

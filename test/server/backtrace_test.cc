@@ -1,3 +1,6 @@
+#include <iostream>
+#include <sstream>
+
 #include "source/server/backtrace.h"
 
 #include "test/test_common/logging.h"
@@ -15,6 +18,19 @@ TEST(Backward, Basic) {
   tracer.capture();
   EXPECT_LOG_CONTAINS("critical", "Envoy version:", tracer.logTrace());
   BackwardsTrace::setLogToStderr(save_log_to_stderr);
+}
+
+TEST(Backward, FindsBaseAddress) {
+  BackwardsTrace tracer;
+  // Envoy base address always gets logged -- so we don't need to bother
+  // setting up a real trace.
+  std::stringstream logged;
+  tracer.printTrace(logged);
+  auto as_string = logged.str();
+  std::vector<absl::string_view> lines = absl::StrSplit(as_string, '\n');
+  // Assert the first line is a base offset, and contains a hex start.
+  EXPECT_FALSE(lines.empty());
+  EXPECT_NE(lines[0].find("ENVOY_BASE_OFFSET: 0x"), absl::string_view::npos);
 }
 
 TEST(Backward, InvalidUsageTest) {

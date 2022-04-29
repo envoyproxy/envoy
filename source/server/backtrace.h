@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 
 #include "source/common/common/logger.h"
 #include "source/common/version/version.h"
@@ -91,6 +92,7 @@ public:
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
     ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
 
+    ENVOY_LOG(critical, "ENVOY_BASE_OFFSET: {}", getBaseOffset());
     visitTrace([](int index, const char* symbol, void* address) {
       if (symbol != nullptr) {
         ENVOY_LOG(critical, "#{}: {} [{}]", index, symbol, address);
@@ -105,6 +107,7 @@ public:
   }
 
   void printTrace(std::ostream& os) {
+    os << "ENVOY_BASE_OFFSET: " << getBaseOffset() << "\n";
     visitTrace([&](int index, const char* symbol, void* address) {
       if (symbol != nullptr) {
         os << "#" << index << " " << symbol << " [" << address << "]\n";
@@ -116,6 +119,11 @@ public:
 
 private:
   static bool log_to_stderr_;
+
+  /**
+   * Get the base address of the offset.
+   */
+  std::string getBaseOffset();
 
   /**
    * Visit the previously captured stack trace.

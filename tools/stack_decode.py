@@ -20,7 +20,7 @@ import sys
 # contain backtrace output extract the address and call add2line to get the file
 # and line information. Output appended to end of original backtrace line. Output
 # any nonmatching lines unmodified. End when EOF received.
-def decode_stacktrace_log(object_file, input_source, address_offset=0):
+def decode_stacktrace_log(object_file, input_source, address_offset):
     traces = {}
     # Match something like:
     #     [backtrace] [bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
@@ -33,12 +33,21 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
     # Match something like:
     #     #10 0xLOCATION (BINARY+0xADDR)
     asan_re = re.compile(" *#\d+ *0x[0-9a-fA-F]+ *\([^+]*\+(0x[0-9a-fA-F]+)\)")
+    # Match something like:
+    #     ENVOY_BASE_OFFSET: 0xaaaaaaaa
+    offset_re = re.compile("ENVOY_BASE_OFFSET:\s(0x[0-9a-fA-F]+)")
+    has_logged_warning = False
 
     try:
         while True:
             line = input_source.readline()
             if line == "":
                 return  # EOF
+            if address_offset is None: # Still allow it being manually overriden.
+                offset_match = offset_re.search(line)
+                if offset_match:
+                    base_addr = offset_match.groups()[0]
+                    address_offset = int(base_addr, base=16)
             stackaddr_match = stackaddr_re.search(line)
             if not stackaddr_match:
                 stackaddr_match = asan_re.search(line)
@@ -46,6 +55,13 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
                 address = stackaddr_match.groups()[0]
                 if address_offset != 0:
                     address = hex(int(address, 16) - address_offset)
+                elif not has_logged_warning:
+                    sys.stdout.write((
+                        "WARN: address offset not found most environments run"
+                        " with ASLR which will cause us to not find symbols, please ensure"
+                        " to include the `ENVOY_BASE_OFFSET:` line."
+                    ))
+                    has_logged_warning = True
                 file_and_line_number = run_addr2line(object_file, address)
                 file_and_line_number = trim_proc_cwd(file_and_line_number)
                 if address_offset != 0:
@@ -116,7 +132,7 @@ def ignore_decoding_errors(io_wrapper):
 
 if __name__ == "__main__":
     if len(sys.argv) > 2 and sys.argv[1] == '-s':
-        decode_stacktrace_log(sys.argv[2], ignore_decoding_errors(sys.stdin))
+        decode_stacktrace_log(sys.argv[2], ignore_decoding_errors(sys.stdin), None)
         sys.exit(0)
     elif len(sys.argv) > 1:
         rununder = subprocess.Popen(
