@@ -60,16 +60,12 @@ public:
    * @param filter string interpreted as regex to filter stats
    * @return the Http Code and the response body as a string.
    */
-  CodeResponse statsAsJsonHandler(const bool used_only,
-                                  absl::optional<std::string> filter = absl::nullopt) {
-
+  CodeResponse statsAsJsonHandler(const bool used_only, std::string filter = "") {
     std::string url = "stats?format=json";
     if (used_only) {
       url += "&usedonly";
     }
-    if (filter.has_value()) {
-      absl::StrAppend(&url, "&filter=", filter.value());
-    }
+    absl::StrAppend(&url, filter);
     return handlerStats(url);
   }
 
@@ -382,6 +378,10 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
     ]
 })EOF";
 
+  EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
+
+  code_response = handlerStats(url + "&usedonly&filter=h1&safe");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
 }
 
@@ -842,7 +842,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  const std::string actual_json = statsAsJsonHandler(false, "[a-z]1").second;
+  const std::string actual_json = statsAsJsonHandler(false, "&filter=[a-z]1").second;
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -946,7 +946,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   h3.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-  const std::string actual_json = statsAsJsonHandler(true, "h[12]").second;
+  const std::string actual_json = statsAsJsonHandler(true, "&filter=h[12]&safe").second;
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
