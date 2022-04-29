@@ -201,7 +201,7 @@ literal:
   value: test_host_name
   )EOF";
   TestUtility::loadFromYaml(tag_yaml, tag);
-  config.add_custom_tags(tag)
+  config.add_custom_tags(tag);
 
   GrpcAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
