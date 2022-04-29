@@ -26,7 +26,7 @@ std::unique_ptr<char, decltype(std::free)*> getExecutablePath() {
 std::string captureBaseOffset(bool log_to_stderr_) {
   // Borrow a trick from abseil and read `/proc/self/task/{pid}/maps` instead of
   // `/proc/self/maps`. The latter requires the kernel to stop all threads, which
-  // is signficantly slower when there are many threads.
+  // is significantly slower when there are many threads.
   std::array<char, 80> maps_path;
   snprintf(maps_path.data(), maps_path.size(), "/proc/self/task/%d/maps", getpid());
   std::ifstream maps_stream(maps_path.data());

@@ -43,7 +43,7 @@ def decode_stacktrace_log(object_file, input_source, address_offset):
             line = input_source.readline()
             if line == "":
                 return  # EOF
-            if address_offset is None: # Still allow it being manually overriden.
+            if address_offset is None:  # Still allow it being manually overriden.
                 offset_match = offset_re.search(line)
                 if offset_match:
                     base_addr = offset_match.groups()[0]
@@ -59,8 +59,7 @@ def decode_stacktrace_log(object_file, input_source, address_offset):
                     sys.stdout.write((
                         "WARN: address offset not found most environments run"
                         " with ASLR which will cause us to not find symbols, please ensure"
-                        " to include the `ENVOY_BASE_OFFSET:` line."
-                    ))
+                        " to include the `ENVOY_BASE_OFFSET:` line."))
                     has_logged_warning = True
                 file_and_line_number = run_addr2line(object_file, address)
                 file_and_line_number = trim_proc_cwd(file_and_line_number)
