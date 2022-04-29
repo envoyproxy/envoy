@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "envoy/common/exception.h"
+#include "envoy/http/header_formatter.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
@@ -146,26 +147,21 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
       throw EnvoyException(absl::StrCat("invalid header transport header count ", num_headers));
     }
 
+    Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter = metadata.headers().formatter();
     while (num_headers-- > 0) {
-      if (!metadata.headerKeysCaseSensitive()) {
-        std::string key_string = drainVarString(buffer, header_size, "header key");
-        // LowerCaseString doesn't allow '\0', '\n', and '\r'.
-        key_string =
-            absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
-        const Http::LowerCaseString key = Http::LowerCaseString(key_string);
-        const std::string value = drainVarString(buffer, header_size, "header value");
-        metadata.headers().addCopy(key, value);
-      } else {
-        Http::HeaderString key;
-        std::string key_string = drainVarString(buffer, header_size, "header key");
-        key.setCopy(key_string.c_str(), key_string.size());
+      std::string key_string = drainVarString(buffer, header_size, "header key");
+      // LowerCaseString doesn't allow '\0', '\n', and '\r'.
+      key_string =
+          absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
 
-        Http::HeaderString value;
-        std::string val_string = drainVarString(buffer, header_size, "header value");
-        value.setCopy(val_string.c_str(), val_string.size());
-
-        metadata.headers().addViaMove(std::move(key), std::move(value));
+      if (formatter) {
+        // TODO(rgs1): do we also want to preserve the removed characters from above?
+        formatter->processKey(key_string);
       }
+
+      const Http::LowerCaseString key = Http::LowerCaseString(key_string);
+      const std::string value = drainVarString(buffer, header_size, "header value");
+      metadata.headers().addCopy(key, value);
     }
   }
 
@@ -224,11 +220,15 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     // Num headers
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers.size()));
 
-    headers.iterate([&header_buffer](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      writeVarString(header_buffer, header.key().getStringView());
-      writeVarString(header_buffer, header.value().getStringView());
-      return Http::HeaderMap::Iterate::Continue;
-    });
+    const auto formatter = headers.formatter();
+
+    headers.iterate(
+        [&header_buffer, formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          const auto header_key = header.key().getStringView();
+          writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
+          writeVarString(header_buffer, header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        });
   }
 
   uint64_t header_size = header_buffer.length();

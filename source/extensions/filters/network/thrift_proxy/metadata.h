@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/header_formatter.h"
 
 #include "source/common/common/macros.h"
 #include "source/common/http/header_map_impl.h"
@@ -19,6 +20,29 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+namespace {
+
+// This is copied from the PreserveCaseHeaderFormatter extension, because it'd be weird for
+// ThriftProxy to depend on an optional HTTP extension and it's not that much code anyway.
+class PreserveCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
+public:
+  PreserveCaseHeaderFormatter() = default;
+
+  // Envoy::Http::StatefulHeaderKeyFormatter
+  std::string format(absl::string_view key) const override {
+    const auto remembered_key_itr = original_header_keys_.find(key);
+    return remembered_key_itr != original_header_keys_.end() ? *remembered_key_itr
+                                                             : std::string(key);
+  }
+  void processKey(absl::string_view key) override { original_header_keys_.emplace(key); }
+  void setReasonPhrase(absl::string_view) override {}
+  absl::string_view getReasonPhrase() const override { return ""; }
+
+private:
+  StringUtil::CaseUnorderedSet original_header_keys_;
+};
+
+} // namespace
 
 /**
  * MessageMetadata encapsulates metadata about Thrift messages. The various fields are considered
@@ -28,7 +52,13 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata() = default;
+  MessageMetadata(bool case_sensitive = false) {
+    auto headers = Http::RequestHeaderMapImpl::create();
+    if (case_sensitive) {
+      headers->setFormatter(std::make_unique<PreserveCaseHeaderFormatter>());
+    }
+    headers_ = std::move(headers);
+  }
 
   std::shared_ptr<MessageMetadata> clone() const {
     auto copy = std::make_shared<MessageMetadata>();
@@ -181,11 +211,6 @@ public:
   absl::optional<bool> sampled() const { return sampled_; }
   void setSampled(bool sampled) { sampled_ = sampled; }
 
-  bool headerKeysCaseSensitive() const { return header_keys_case_sensitive_; }
-  void setHeaderKeysCaseSensitive(bool header_keys_case_sensitive) {
-    header_keys_case_sensitive_ = header_keys_case_sensitive;
-  }
-
 private:
   absl::optional<uint32_t> frame_size_{};
   absl::optional<ProtocolType> proto_{};
@@ -194,7 +219,7 @@ private:
   absl::optional<int32_t> seq_id_{};
   absl::optional<MessageType> msg_type_{};
   absl::optional<ReplyType> reply_type_{};
-  Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
+  Http::HeaderMapPtr headers_;
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
@@ -206,7 +231,6 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
-  bool header_keys_case_sensitive_{false};
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

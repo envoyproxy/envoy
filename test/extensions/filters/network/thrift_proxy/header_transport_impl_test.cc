@@ -436,12 +436,11 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
   }
 }
 
-void testInfoBlock(bool case_sensitive = false) {
+MessageMetadata testInfoBlock(bool case_sensitive = false) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
-  MessageMetadata metadata;
+  MessageMetadata metadata(case_sensitive);
 
-  metadata.setHeaderKeysCaseSensitive(case_sensitive);
   metadata.headers().addCopy(Http::LowerCaseString("not"), "empty");
 
   const char* key = case_sensitive ? "Key" : "key";
@@ -463,13 +462,10 @@ void testInfoBlock(bool case_sensitive = false) {
   buffer.writeByte(0); // empty key
   buffer.writeByte(0); // empty value
   buffer.writeByte(0); // padding
+
   Http::TestRequestHeaderMapImpl expected_headers;
   expected_headers.addCopy(Http::LowerCaseString("not"), "empty");
-  Http::HeaderString key_string;
-  key_string.setCopy(key, std::strlen(key));
-  Http::HeaderString value_string;
-  value_string.setCopy(value, std::strlen(value));
-  expected_headers.addViaMove(std::move(key_string), std::move(value_string));
+  expected_headers.addCopy(Http::LowerCaseString("key"), value);
   expected_headers.addCopy(Http::LowerCaseString("key2"), std::string(128, 'x'));
   expected_headers.addCopy(Http::LowerCaseString(""), "");
 
@@ -478,11 +474,27 @@ void testInfoBlock(bool case_sensitive = false) {
 
   EXPECT_EQ(expected_headers, metadata.headers());
   EXPECT_EQ(buffer.length(), 0);
+
+  return metadata;
 }
 
 TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(); }
 
-TEST(HeaderTransportTest, InfoBlockCaseSensitive) { testInfoBlock(true /* case-sensitive */); }
+TEST(HeaderTransportTest, InfoBlockCaseSensitive) {
+  auto metadata = testInfoBlock(true /* case-sensitive */);
+  HeaderTransportImpl transport;
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl msg;
+  msg.add("fake message");
+  transport.encodeFrame(buffer, metadata, msg);
+  EXPECT_EQ(0, msg.length());
+  EXPECT_EQ(std::string("\0\0\0\xBA\xF\xFF\0\0\0\0\0\x1\0)\0\0\x1\x4\x3not\x5"
+                        "empty\x3Key\x5Value\x4key2\x80\x1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        "xxxxxxxxxxxxx\0\0\0\0\0fake message",
+                        190),
+            buffer.toString());
+}
 
 TEST(HeaderTransportTest, DecodeFrameEnd) {
   HeaderTransportImpl transport;

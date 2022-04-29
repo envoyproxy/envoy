@@ -436,8 +436,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
   if (!frame_started_) {
     // Look for start of next frame.
     if (!metadata_) {
-      metadata_ = std::make_shared<MessageMetadata>();
-      metadata_->setHeaderKeysCaseSensitive(callbacks_.headerKeysCaseSensitive());
+      metadata_ = std::make_shared<MessageMetadata>(callbacks_.headerKeysCaseSensitive());
     }
 
     if (!transport_.decodeFrameStart(data, *metadata_)) {
