@@ -95,6 +95,7 @@ proto_library(
         "//envoy/extensions/filters/http/aws_request_signing/v3:pkg",
         "//envoy/extensions/filters/http/bandwidth_limit/v3:pkg",
         "//envoy/extensions/filters/http/buffer/v3:pkg",
+        "//envoy/extensions/filters/http/cache/file_system_http_cache/v3:pkg",
         "//envoy/extensions/filters/http/cache/v3:pkg",
         "//envoy/extensions/filters/http/cdn_loop/v3:pkg",
         "//envoy/extensions/filters/http/composite/v3:pkg",
