@@ -51,11 +51,7 @@ template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
   // Note that this duplicates logic in StatsRequest::populateStatsFromScopes,
   // but differs in one subtle way: in Prometheus we only use metric.name() for
-  // filtering, and do not actually render the metric using its raw name -- we
-  // render with tag-extracted names. So if there's no filter_ or safe_filter_
-  // defined in the params object, there is no reason to construct the
-  // serialized Metric::name(), which makes about a 5% difference in benchmark
-  // performance for BM_AllCountersPrometheus in stats_handler_speed_test.
+  // filtering, not rendering, so we only grab the name if there's a filter.
   if (params.used_only_ && !metric.used()) {
     return false;
   }
