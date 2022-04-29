@@ -40,7 +40,7 @@ stateful_session:
     typed_config: {}
 )EOF";
 
-constexpr absl::string_view EmptyRouteYaml = R"EOF(
+constexpr absl::string_view EmptyStatefulSessionRouteYaml = R"EOF(
 stateful_session: {}
 )EOF";
 
@@ -59,7 +59,8 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   TestUtility::loadFromYamlAndValidate(std::string(RouteConfigYaml), proto_route_config);
   TestUtility::loadFromYamlAndValidate(std::string(DisableYaml), disabled_config);
   TestUtility::loadFromYamlAndValidate(std::string(NotExistYaml), not_exist_config);
-  TestUtility::loadFromYamlAndValidate(std::string(EmptyRouteYaml), empty_proto_route_config);
+  TestUtility::loadFromYamlAndValidate(std::string(EmptyStatefulSessionRouteYaml),
+                                       empty_proto_route_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
