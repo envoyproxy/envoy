@@ -18,15 +18,13 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
     name.remove_prefix(1);
   }
 
-  std::string stats_name = std::string(name);
-  absl::StrReplaceAll(
-      {
-          {"://", "_"},
-          {":/", "_"},
-          {":", "_"},
-          {"\0", "_"},
-      },
-      &stats_name);
+  std::string stats_name = absl::StrReplaceAll(name, {
+                                                         {"://", "_"},
+                                                         {":/", "_"},
+                                                         {":", "_"},
+                                                     });
+  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
+
   return stats_name;
 }
 
