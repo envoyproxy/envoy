@@ -32,7 +32,7 @@
 #include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
@@ -233,7 +233,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
-  // allows a small request (less bytes than v1/v2 header) through even though it doesn't use proxy
+  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use proxy
   // protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
@@ -241,7 +241,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
 
   std::string msg = "data";
   EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
-  EXPECT_GT(PROXY_PROTO_V2_HEADER_LEN, msg.length());
+  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
 
   write(msg);
 
@@ -251,7 +251,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
 }
 
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
-  // allows a large request (more bytes than v1/v2 header) through even though it doesn't use proxy
+  // allows a large request (more bytes than v1/v2 signature) through even though it doesn't use proxy
   // protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
@@ -259,7 +259,7 @@ TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
 
   std::string msg = "more data more data more data";
   EXPECT_GT(msg.length(), PROXY_PROTO_V1_SIGNATURE_LEN);
-  EXPECT_GT(msg.length(), PROXY_PROTO_V2_HEADER_LEN);
+  EXPECT_GT(msg.length(), PROXY_PROTO_V2_SIGNATURE_LEN);
 
   write(msg);
 
