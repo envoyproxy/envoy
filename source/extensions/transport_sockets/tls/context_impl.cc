@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -484,13 +485,13 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-absl::optional<size_t> ContextImpl::daysUntilFirstCertExpires() const {
-  absl::optional<size_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+absl::optional<int32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  absl::optional<int32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
   if (!daysUntilExpiration.has_value()) {
     return absl::nullopt;
   }
   for (auto& ctx : tls_contexts_) {
-    const absl::optional<size_t> tmp =
+    const absl::optional<int32_t> tmp =
         Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
     if (!tmp.has_value()) {
       return absl::nullopt;

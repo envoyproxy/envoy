@@ -36,7 +36,7 @@ public:
    * @return the number of days until the next certificate being managed will expire, the value is
    * set when not expired.
    */
-  virtual absl::optional<size_t> daysUntilFirstCertExpires() const PURE;
+  virtual absl::optional<int32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
    * Iterates through the contexts currently attached to a listener.
