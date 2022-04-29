@@ -315,6 +315,8 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
+  std::list<DrainingListener> pending_remove_listeners_;
+
   std::vector<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;

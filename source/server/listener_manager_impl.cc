@@ -669,17 +669,35 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   ASSERT(existing_active_listener != active_listeners_.end());
   ASSERT(*existing_active_listener != nullptr);
 
-  for (const auto& worker : workers_) {
-    // Explicitly override the existing listener with a new listener config.
-    addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
-  }
-
   auto previous_listener = std::move(*existing_active_listener);
   *existing_active_listener = std::move(*existing_warming_listener);
+  bool filter_chain_changed = ListenerMessageUtil::filterChainChanged(
+      previous_listener->config(), (*existing_active_listener)->config());
 
-  // Skip draining if there is no different filter chain.
-  if (ListenerMessageUtil::filterChainChanged(previous_listener->config(),
-                                              (*existing_active_listener)->config())) {
+  if (!filter_chain_changed) {
+    std::list<DrainingListener>::iterator pending_remove_it = pending_remove_listeners_.emplace(
+        pending_remove_listeners_.begin(), std::move(previous_listener), workers_.size());
+    for (const auto& worker : workers_) {
+      // Explicitly override the existing listener with a new listener config.
+      addListenerToWorker(*worker, listener.listenerTag(), listener,
+                          [this, pending_remove_it]() -> void {
+                            // After the listener added to all the workers, it means no active
+                            // listeners uses the old listener anymore. Then we can destroy it. The
+                            // completion is called on the worker thread. We post back to the main
+                            // thread to avoid locking.
+                            server_.dispatcher().post([this, pending_remove_it]() -> void {
+                              if (--pending_remove_it->workers_pending_removal_ == 0) {
+                                pending_remove_it->listener_->debugLog("destroy listener");
+                                pending_remove_listeners_.erase(pending_remove_it);
+                              }
+                            });
+                          });
+    }
+  } else {
+    for (const auto& worker : workers_) {
+      // Explicitly override the existing listener with a new listener config.
+      addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
+    }
     // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
     // their state.
     drainFilterChains(std::move(previous_listener), **existing_active_listener);
