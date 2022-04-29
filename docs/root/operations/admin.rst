@@ -448,9 +448,9 @@ modify different aspects of the server:
 
   .. http:get:: /stats?filter=regex&safe
 
-  Works like ``filter`` except that the regex is specified in the
-  :ref:`Google RE2 <https://github.com/google/re2>` syntax rather
-  than as Ecmascript, and is substantially faster.
+  Works like ``filter=regex`` except that the regex is specified in the
+  `Google RE2 <https://github.com/google/re2>` syntax rather than as Ecmascript, 
+  and is substantially faster.
 
   .. http:get:: /stats?histogram_buckets=cumulative
 
