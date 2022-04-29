@@ -814,7 +814,7 @@ if __name__ == "__main__":
     # Otherwise git pre-push hook checks it for merged commits.
     paths = [
         path for path in paths
-        if not path.startswith('./third_party/') and not path.startswith('./third_party/')
+        if not path.startswith('./third_party/')
     ]
 
     exts = ['.cc', '.h', '.proto']
