@@ -97,26 +97,18 @@ message TransportProtocolInput {
 message ApplicationProtocolInput {
 }
 
-// Input that matches the authentication attributes for a downstream.
-// [#extension: envoy.matching.inputs.authenticated]
-message AuthenticatedInput {
-  enum Field {
-    // It is not allowed to use and an exception will be throw if it is used. On of the following
-    // fields should be chosen.
-    FIELD_TYPE_UNSPECIFIED = 0;
+// Input that matches the URIs in the SAN field of the peer certificate for a downstream.
+// [#extension: envoy.matching.inputs.uri_san]
+message UriSanInput {
+}
 
-    // The URIs in the SAN field of the certificate. Certificate with multiple URIs will be
-    // concatenated into a ','-delimited list.
-    URI_SAN = 1;
+// Input that matches the DNS entries in the SAN field of the peer certificate for a downstream.
+// [#extension: envoy.matching.inputs.dns_san]
+message DnsSanInput {
+}
 
-    // The DNS entries in the SAN field of the certificate. Certificate with multiple DNS
-    // entries will be concatenated into a ','-delimited list.
-    DNS_SAN = 2;
-
-    // The subject field of the certificate in RFC 2253 format.
-    SUBJECT = 3;
-  }
-
-  // The field in the peer certificate which should be matched on.
-  Field field = 1 [(validate.rules).enum = {defined_only: true}];
+// Input that matches the subject field of the peer certificate in RFC 2253 format for a
+// downstream.
+// [#extension: envoy.matching.inputs.subject]
+message SubjectInput {
 }

@@ -842,7 +842,17 @@ envoy.matching.inputs.application_protocol:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.authenticated:
+envoy.matching.inputs.uri_san:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.dns_san:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.subject:
   categories:
   - envoy.matching.network.input
   security_posture: unknown

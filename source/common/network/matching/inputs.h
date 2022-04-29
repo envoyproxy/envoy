@@ -255,84 +255,63 @@ public:
   ApplicationProtocolInputFactory() : BaseFactory("application_protocol") {}
 };
 
-template <class MatchingDataType>
-class AuthenticatedInput : public Matcher::DataInput<MatchingDataType> {
+template <class MatchingDataType> class UriSanInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  explicit AuthenticatedInput(
-      envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::Field field)
-      : field_(field) {}
-
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto& ssl = data.ssl();
-    if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    const auto uri = data.ssl()->uriSanPeerCertificate();
+    if (!uri.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              absl::StrJoin(uri, ",")};
     }
-
-    switch (field_) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::URI_SAN: {
-      const auto& uri = ssl->uriSanPeerCertificate();
-      if (!uri.empty()) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-                absl::StrJoin(uri, ",")};
-      }
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::DNS_SAN: {
-      const auto& dns = ssl->dnsSansPeerCertificate();
-      if (!dns.empty()) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-                absl::StrJoin(dns, ",")};
-      }
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::SUBJECT: {
-      const auto& subject = ssl->subjectPeerCertificate();
-      if (!subject.empty()) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-                ssl->subjectPeerCertificate()};
-      }
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
-    case envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::
-        FIELD_TYPE_UNSPECIFIED: {
-      PANIC("unhandled value");
-    }
-    }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
-
-private:
-  const envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::Field field_;
 };
 
-template <class MatchingDataType>
-class AuthenticatedInputBaseFactory
-    : public BaseFactory<
-          AuthenticatedInput<MatchingDataType>,
-          envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput,
-          MatchingDataType> {
+template <class MatchingDataType> class UriSanInputBaseFactory {
 public:
-  AuthenticatedInputBaseFactory()
-      : BaseFactory<AuthenticatedInput<MatchingDataType>,
-                    envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput,
-                    MatchingDataType>("authenticated") {}
+  UriSanInputBaseFactory()
+      : BaseFactory<UriSanInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::UriSanInput,
+                    MatchingDataType>("uri_san") {}
+};
 
-  Matcher::DataInputFactoryCb<MatchingDataType>
-  createDataInputFactoryCb(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput&>(
-        config, validation_visitor);
-
-    auto field = typed_config.field();
-    if (field == envoy::extensions::matching::common_inputs::network::v3::AuthenticatedInput::
-                     FIELD_TYPE_UNSPECIFIED) {
-      throw EnvoyException("Field type unspecified.");
+template <class MatchingDataType> class DnsSanInput : public Matcher::DataInput<MatchingDataType> {
+public:
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto uri = data.ssl()->dnsSansPeerCertificate();
+    if (!uri.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              absl::StrJoin(uri, ",")};
     }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
+};
 
-    return [field] { return std::make_unique<AuthenticatedInput<MatchingDataType>>(field); };
-  };
+template <class MatchingDataType> class DnsSanInputBaseFactory {
+public:
+  DnsSanInputBaseFactory()
+      : BaseFactory<DnsSanInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::DnsSanInput,
+                    MatchingDataType>("dns_san") {}
+};
+
+template <class MatchingDataType> class SubjectInput : public Matcher::DataInput<MatchingDataType> {
+public:
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto uri = data.ssl()->subjectPeerCertificate();
+    if (!uri.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::string(uri)};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
+};
+
+template <class MatchingDataType> class SubjectInputBaseFactory {
+public:
+  SubjectInputBaseFactory()
+      : BaseFactory<SubjectInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::SubjectInput,
+                    MatchingDataType>("subject") {}
 };
 
 } // namespace Matching

@@ -52,7 +52,9 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
-* :ref:`Authenticated <extension_envoy.matching.inputs.authenticated>`.
+* :ref:`URI SAN <extension_envoy.matching.inputs.uri_san>`.
+* :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
+* :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
 These input functions are available for matching TCP connections:
 
