@@ -215,7 +215,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
-  } else if (accept_nodata_ && isResponseWithNoRecords(status) &&!dual_resolution_) {
+  } else if (accept_nodata_ && isResponseWithNoRecords(status)) {
     // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success to populate back the
     // "empty records" response.
     pending_response_.status_ = ResolutionStatus::Success;

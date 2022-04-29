@@ -1337,7 +1337,8 @@ TEST_P(DnsImplTest, WithNoRecord) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::Auto));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
+  EXPECT_NE(nullptr,
+            resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::All));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1353,7 +1354,8 @@ TEST_P(DnsImplTest, WithNoRecordAndAcceptNodataDisabled) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::Auto));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
+  EXPECT_NE(nullptr,
+            resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::All));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1469,8 +1471,8 @@ TEST_P(DnsImplTest, WithBothAAndAAAARecord) {
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success, {"201.134.56.7"}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
                                              DnsResolver::ResolutionStatus::Success,
@@ -1497,8 +1499,8 @@ TEST_P(DnsImplTest, WithBothAAndAAAARecordAndAcceptNodataDisabled) {
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success, {"201.134.56.7"}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
                                              DnsResolver::ResolutionStatus::Success,
