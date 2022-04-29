@@ -14,11 +14,14 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     filter_string_ = filter_iter->second;
     if (query_.find("safe") != query_.end()) {
       safe_filter_ = std::make_shared<re2::RE2>(filter_string_);
+      filter_ = absl::nullopt;
       if (!safe_filter_->ok()) {
         response.add("Invalid safe regex");
         return Http::Code::BadRequest;
       }
-    } else if (!Utility::filterParam(query_, response, filter_)) {
+    } else if (Utility::filterParam(query_, response, filter_)) {
+      safe_filter_.reset();
+    } else {
       return Http::Code::BadRequest;
     }
   }

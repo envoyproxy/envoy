@@ -48,10 +48,26 @@ std::string sanitizeValue(const absl::string_view value) {
  * not show it if we only wanted used metrics.
  */
 template <class StatType>
-static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                             const absl::optional<std::regex>& regex) {
-  return ((!used_only || metric.used()) &&
-          (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
+static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
+  // Note that this duplicates logic in StatsRequest::populateStatsFromScopes,
+  // but differs in one subtle way: in Prometheus we only use metric.name() for
+  // filtering, and do not actually render the metric using its raw name -- we
+  // render with tag-extracted names. So if there's no filter_ or safe_filter_
+  // defined in the params object, there is no reason to construct the
+  // serialized Metric::name(), which makes about a 5% difference in benchmark
+  // performance for BM_AllCountersPrometheus in stats_handler_speed_test.
+  if (params.used_only_ && !metric.used()) {
+    return false;
+  }
+  if (params.filter_.has_value()) {
+    if (!std::regex_search(metric.name(), params.filter_.value())) {
+      return false;
+    }
+  } else if (params.safe_filter_ != nullptr &&
+             !re2::RE2::PartialMatch(metric.name(), *params.safe_filter_)) {
+    return false;
+  }
+  return true;
 }
 
 /*
@@ -119,14 +135,12 @@ uint64_t outputStatType(
   std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan> groups(
       global_symbol_table);
 
-  StatsParams::CallOnStatFn<StatType> add_stat = [&groups](const Stats::RefcountPtr<StatType>& stat,
-                                                           const std::string&) {
-    groups[stat->tagExtractedStatName()].push_back(stat.get());
-  };
-
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
-    params.callIfShouldShowStat(metric, add_stat);
+    if (!shouldShowMetric(*metric, params)) {
+      continue;
+    }
+    groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
   auto result = groups.size();
