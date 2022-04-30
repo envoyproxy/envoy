@@ -15,7 +15,7 @@ read -ra ENVOY_DOCKER_OPTIONS <<< "${ENVOY_DOCKER_OPTIONS:-}"
 export HTTP_PROXY="${http_proxy:-}"
 export HTTPS_PROXY="${https_proxy:-}"
 export NO_PROXY="${no_proxy:-}"
-export GO_PROXY="${go_proxy:-}"
+export GOPROXY="${go_proxy:-}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
@@ -56,6 +56,9 @@ fi
 ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
+DEFAULT_GOPROXY="https://proxy.golang.org,direct"
+[[ -z "${GOPROXY}" ]] && GOPROXY="${DEFAULT_GOPROXY}"
+
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=("-it")
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=(-v "$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)")
 [[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
@@ -73,7 +76,7 @@ docker run --rm \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
-       -e GO_PROXY \
+       -e GOPROXY \
        -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
        -e BAZEL_EXTRA_TEST_OPTIONS \
