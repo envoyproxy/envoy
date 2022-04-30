@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.dubbo_proxy.v3;
 
-import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/filters/network/dubbo_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -46,7 +46,7 @@ message Drds {
   string route_config_name = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DubboProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy";
@@ -65,7 +65,8 @@ message DubboProxy {
   // .. note::
   //
   //   This field is deprecated. Please use ``drds`` or ``multiple_route_config`` first.
-  repeated RouteConfiguration route_config = 4 [deprecated = true];
+  repeated RouteConfiguration route_config = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   oneof route_specifier {
     // Use xDS to fetch the route configuration. It is invalid to define both *route_config* and *drds*.
@@ -73,6 +74,7 @@ message DubboProxy {
 
     MultipleRouteConfiguration multiple_route_config = 7;
   }
+
   // A list of individual Dubbo filters that make up the filter chain for requests made to the
   // Dubbo proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no dubbo_filters are specified, a default Dubbo router filter

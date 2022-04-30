@@ -5,7 +5,6 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "source/extensions/filters/network/dubbo_proxy/config.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter_config.h"
 

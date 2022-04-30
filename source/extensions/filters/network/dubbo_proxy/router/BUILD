@@ -77,7 +77,7 @@ envoy_cc_library(
     deps = [
         ":router_interface",
         "//envoy/rds:rds_interface",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )
 
