@@ -40,9 +40,9 @@ message Drds {
   // In case of *api_config_source* only aggregated *api_type* is supported.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  // The name of the route configuration. This allows to use different route
-  // configurations. Tells which route configuration should be fetched from the configuration source.
-  // Leave unspecified is also valid and means the unnamed route configuration.
+  // The name of the multiple route configuration. This allows to use different multiple route
+  // configurations. Tells which multiple route configuration should be fetched from the configuration
+  // source. Leave unspecified is also valid and means the unnamed multiple route configuration.
   string route_config_name = 2;
 }
 
