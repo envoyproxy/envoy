@@ -194,8 +194,6 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
   // second pool, which is why the log message is expected 2 times. If the initial pool was not
   // cleaned up, only 1 pool would be created.
   EXPECT_LOG_CONTAINS_N_TIMES("debug", "Allocating TCP conn pool", 2, {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle",
-                                      "true");
     initialize();
 
     std::string request1("request1");
