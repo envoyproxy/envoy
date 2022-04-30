@@ -1079,7 +1079,7 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  write("PROXY TCP4");
+  write("PROXY TCP4"); // intentionally larger than the size of v1 proxy protocol signature
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -1103,7 +1103,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  write("PRO"); // intentionally smaller than the size of v1/v2 signature
+  write("PRO"); // intentionally smaller than the size of v1 proxy protocol signature
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -1136,6 +1136,68 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
 
   for (size_t i = 0; i < sizeof(buffer); i += 9) {
     write(&buffer[i], 9);
+    if (i == 0) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  expectData("moredata");
+
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
+  // A well-formed ipv4/tcp header, delivered with part of the signature,
+  // part of the header, rest of header + body
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
+                                0x49, 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02,
+                                0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00,
+                                0x02, 'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  // using 18 intentionally as it is larger than v2 signature length and divides evenly into
+  // len(buffer)
+  auto buffer_incr_size = 18;
+  EXPECT_LT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
+  for (size_t i = 0; i < sizeof(buffer); i += buffer_incr_size) {
+    write(&buffer[i], buffer_incr_size);
+    if (i == 0) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  expectData("moredata");
+
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
+  // A well-formed ipv4/tcp header, delivered with part of the signature,
+  // part of the header, rest of header + body
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
+                                0x49, 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02,
+                                0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00,
+                                0x02, 'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  // using 3 intentionally as it is smaller than v2 signature length and divides evenly into
+  // len(buffer)
+  auto buffer_incr_size = 3;
+  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
+  for (size_t i = 0; i < sizeof(buffer); i += buffer_incr_size) {
+    write(&buffer[i], buffer_incr_size);
     if (i == 0) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
