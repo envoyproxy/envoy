@@ -390,11 +390,12 @@ actions:
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "2001:abcd:ef01:2345::/64"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"remote_address", "2001:abcd:ef01:2345::/64"}}}}),
               testing::ContainerEq(descriptors_));
-  EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"remote_address", "2001:abcd:ef01:2345::/64"}}}}),
-      testing::ContainerEq(local_descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
+                  {{{{"remote_address", "2001:abcd:ef01:2345::/64"}}}}),
+              testing::ContainerEq(local_descriptors_));
 }
 
 // Verify no descriptor is emitted if remote is a pipe.
