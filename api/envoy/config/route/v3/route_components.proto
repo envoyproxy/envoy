@@ -1798,7 +1798,15 @@ message RateLimit {
     message RemoteAddress {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
+    }
 
+    // The following descriptor entry is appended to the descriptor and is populated using the
+    // masked address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("masked_remote_address", "<masked address from x-forwarded-for>")
+    message MaskedRemoteAddress {
       // Length of prefix mask len(e.g. 0, 32), enable rate limit base on cidr format.
       // Defaults to 32 when unset.
       // For example, trusted address from x-forwarded-for is `192.168.1.1`,
@@ -1945,6 +1953,9 @@ message RateLimit {
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
       // [#extension-category: envoy.rate_limit_descriptors]
       core.v3.TypedExtensionConfig extension = 9;
+
+      // Rate limit on masked remote address.
+      MaskedRemoteAddress masked_remote_address = 10;
     }
   }
 

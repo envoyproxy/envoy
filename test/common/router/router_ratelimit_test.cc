@@ -340,10 +340,10 @@ actions:
               testing::ContainerEq(local_descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, RemoteAddressWithPrefixLen) {
+TEST_F(RateLimitPolicyEntryTest, MaskedRemoteAddressIpv4) {
   const std::string yaml = R"EOF(
 actions:
-- remote_address:
+- masked_remote_address:
     v4_prefix_mask_len: 16
   )EOF";
 

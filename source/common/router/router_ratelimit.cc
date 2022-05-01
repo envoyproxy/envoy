@@ -109,11 +109,26 @@ bool RemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
     return false;
   }
 
+  descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
+
+  return true;
+}
+
+bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                   const std::string&,
+                                                   const Http::RequestHeaderMap&,
+                                                   const StreamInfo::StreamInfo& info) const {
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
   uint32_t mask_len = v4_prefix_mask_len_;
-  uint32_t default_mask_len = RemoteAddressAction::V4_PREFIX_LEN_UNSET;
+  uint32_t default_mask_len = MaskedRemoteAddressAction::V4_PREFIX_LEN_UNSET;
   if (remote_address->ip()->version() == Network::Address::IpVersion::v6) {
     mask_len = v6_prefix_mask_len_;
-    default_mask_len = RemoteAddressAction::V6_PREFIX_LEN_UNSET;
+    default_mask_len = MaskedRemoteAddressAction::V6_PREFIX_LEN_UNSET;
   }
 
   if (mask_len == default_mask_len) {
@@ -210,7 +225,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRemoteAddress:
-      actions_.emplace_back(new RemoteAddressAction(action.remote_address()));
+      actions_.emplace_back(new RemoteAddressAction());
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kGenericKey:
       actions_.emplace_back(new GenericKeyAction(action.generic_key()));
@@ -243,6 +258,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       break;
     }
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
+      actions_.emplace_back(new MaskedRemoteAddressAction(action.masked_remote_address()));
+      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       throw EnvoyException("invalid config");
     }

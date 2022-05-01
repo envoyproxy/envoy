@@ -88,7 +88,19 @@ private:
  */
 class RemoteAddressAction : public RateLimit::DescriptorProducer {
 public:
-  RemoteAddressAction(const envoy::config::route::v3::RateLimit::Action::RemoteAddress& action)
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+};
+
+/**
+ * Action for masked remote address rate limiting.
+ */
+class MaskedRemoteAddressAction : public RateLimit::DescriptorProducer {
+public:
+  MaskedRemoteAddressAction(const envoy::config::route::v3::RateLimit::Action::MaskedRemoteAddress& action)
       : v4_prefix_mask_len_(
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, V4_PREFIX_LEN_UNSET)),
         v6_prefix_mask_len_(
