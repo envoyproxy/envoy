@@ -1726,7 +1726,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
