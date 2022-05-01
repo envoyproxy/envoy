@@ -17,6 +17,8 @@ Minor Behavior Changes
   any frame is received the assumption is that the connection is working. This behavior change
   can be reverted by setting the ``envoy.reloadable_features.http2_delay_keepalive_timeout`` runtime
   flag to false.
+* lua: export symbols of LuaJit by default. This is useful in cases where you have a lua script
+  that loads shared object libraries, such as those installed via luarocks.
 * thrift: add validate_clusters in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` to override the default behavior of cluster validation.
 * tls: if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
 * tls: removed SHA-1 cipher suites from the server-side defaults.
