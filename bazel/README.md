@@ -670,7 +670,7 @@ The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
   This config will exports all symbols and results in larger binary size. If partial symbols export
-  is required, then `bazel/exported_symbols.txt` can be used to land it.
+  is required and target platform is Linux, then `bazel/exported_symbols.txt` can be used to land it.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`

@@ -51,14 +51,13 @@ def _envoy_exported_symbols_input():
     return ["@envoy//bazel:exported_symbols.txt"]
 
 # Default symbols to be exported.
+# TODO(wbpcode): make this work correctly for apple/darwin and windows.
 def _envoy_default_exported_symbols():
     return select({
-        "@envoy//bazel:apple": [
-            "-Wl,-exported_symbols_list $(location @envoy//bazel:exported_symbols.txt)",
-        ],
-        "//conditions:default": [
+        "@envoy//bazel:linux": [
             "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
         ],
+        "//conditions:default": [],
     })
 
 # Select the given values if exporting is enabled in the current build.
