@@ -17,7 +17,7 @@ def envoy_cc_binary(
         visibility = None,
         external_deps = [],
         repository = "",
-        stamped = True,
+        stamped = False,
         deps = [],
         linkopts = [],
         tags = [],
