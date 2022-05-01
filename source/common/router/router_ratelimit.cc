@@ -125,15 +125,8 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
   }
 
   uint32_t mask_len = v4_prefix_mask_len_;
-  uint32_t default_mask_len = MaskedRemoteAddressAction::V4_PREFIX_LEN_UNSET;
   if (remote_address->ip()->version() == Network::Address::IpVersion::v6) {
     mask_len = v6_prefix_mask_len_;
-    default_mask_len = MaskedRemoteAddressAction::V6_PREFIX_LEN_UNSET;
-  }
-
-  if (mask_len == default_mask_len) {
-    descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
-    return true;
   }
 
   Network::Address::CidrRange cidr_entry =
