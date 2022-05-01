@@ -54,7 +54,7 @@ def _envoy_exported_symbols_input():
 def _envoy_default_exported_symbols():
     return select({
         "@envoy//bazel:apple": [
-            "-Wl,-exported_symbols_list=$(location @envoy//bazel:exported_symbols.txt)",
+            "-Wl,-exported_symbols_list $(location @envoy//bazel:exported_symbols.txt)",
         ],
         "//conditions:default": [
             "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
