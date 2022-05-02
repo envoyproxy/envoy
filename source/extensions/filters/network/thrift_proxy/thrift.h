@@ -37,6 +37,9 @@ public:
   // Auto-detection transport
   const std::string AUTO = "auto";
 
+  // Returned when transport type unknown, likely due to a bug.
+  const std::string UNKNOWN = "unknown";
+
   const std::string& fromType(TransportType type) const {
     switch (type) {
     case TransportType::Framed:
@@ -49,7 +52,7 @@ public:
       return AUTO;
     }
     IS_ENVOY_BUG("unexpected transport type");
-    return AUTO;
+    return UNKNOWN;
   }
 };
 
@@ -86,6 +89,9 @@ public:
   // Auto-detection protocol
   const std::string AUTO = "auto";
 
+  // Returned when transport type unknown, likely due to a bug.
+  const std::string UNKNOWN = "unknown";
+
   const std::string& fromType(ProtocolType type) const {
     switch (type) {
     case ProtocolType::Binary:
@@ -100,7 +106,7 @@ public:
       return AUTO;
     }
     IS_ENVOY_BUG("unexpected protocol type");
-    return AUTO;
+    return UNKNOWN;
   }
 };
 

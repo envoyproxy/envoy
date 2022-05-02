@@ -92,6 +92,7 @@ absl::optional<Http::Code> ConfigUtility::parseRedirectResponseCode(
   case envoy::config::route::v3::RedirectAction::PERMANENT_REDIRECT:
     return absl::make_optional(Http::Code::PermanentRedirect);
   }
+  IS_ENVOY_BUG("unexpected redirect response code");
   return absl::nullopt;
 }
 
@@ -144,7 +145,7 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
   }
-  IS_ENVOY_BUG("unexpected cluster not found code");
+  IS_ENVOY_BUG("unexpected cluster not found response code");
   return Http::Code::NotFound;
 }
 

@@ -146,7 +146,8 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
-    break; // Panic below.
+    IS_ENVOY_BUG("custom tag type case not set");
+    return nullptr;
   }
   IS_ENVOY_BUG("unexpected custom tag type case");
   return nullptr;

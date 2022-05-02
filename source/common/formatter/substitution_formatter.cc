@@ -1549,7 +1549,7 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
   case HeaderType::ResponseTrailers:
     return response_trailers.byteSize();
   }
-  IS_ENVOY_BUG("unexpected request header type");
+  IS_ENVOY_BUG("unexpected header type");
   return 0;
 }
 
