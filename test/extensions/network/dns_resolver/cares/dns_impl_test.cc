@@ -236,12 +236,12 @@ private:
       if (parent_.refused_) {
         DNS_HEADER_SET_RCODE(response_base, REFUSED);
       } else if (q_type == T_A && parent_.error_on_a_) {
-        // Use FORMERR here as a most of the error codes (SERVFAIL, NOTIMP, REFUSED) result in a
-        // dirty channel. See DnsImplTest::DestroyChannelOnRefused for details.
+        // Use `FORMERR` here as a most of the error codes (`SERVFAIL`, `NOTIMP`, `REFUSED`) result
+        // in a dirty channel. See `DnsImplTest::DestroyChannelOnRefused` for details.
         DNS_HEADER_SET_RCODE(response_base, FORMERR);
       } else if (q_type == T_AAAA && parent_.error_on_aaaa_) {
-        // Use FORMERR here as a most of the error codes (SERVFAIL, NOTIMP, REFUSED) result in a
-        // dirty channel. See DnsImplTest::DestroyChannelOnRefused for details.
+        // Use `FORMERR` here as a most of the error codes (`SERVFAIL`, `NOTIMP`, `REFUSED`) result
+        // in a dirty channel. See `DnsImplTest::DestroyChannelOnRefused` for details.
         DNS_HEADER_SET_RCODE(response_base, FORMERR);
       } else {
         DNS_HEADER_SET_RCODE(response_base, answer_count > 0 ? NOERROR : NXDOMAIN);
