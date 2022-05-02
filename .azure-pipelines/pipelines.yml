@@ -555,7 +555,7 @@ stages:
   dependsOn: ["precheck"]
   jobs:
   - job: release
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool:
       vmImage: "windows-2019"
     steps:
