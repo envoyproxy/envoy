@@ -109,12 +109,11 @@ public:
     return source;
   }
 
-  static OnDemandCdsConfig createOnDemandCdsConfig(envoy::config::core::v3::ConfigSource config_source,
-                                                   int timeout_millis) {
+  static OnDemandCdsConfig
+  createOnDemandCdsConfig(envoy::config::core::v3::ConfigSource config_source, int timeout_millis) {
     OnDemandCdsConfig config;
     *config.mutable_source() = std::move(config_source);
-    *config.mutable_timeout() =
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    *config.mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
     return config;
   }
 

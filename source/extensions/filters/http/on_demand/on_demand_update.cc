@@ -51,10 +51,9 @@ DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandleP
 
 namespace {
 
-DecodeHeadersBehaviorPtr
-createDecodeHeadersBehavior(OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
-                            Upstream::ClusterManager& cm,
-                            ProtobufMessage::ValidationVisitor& validation_visitor) {
+DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
+    OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!odcds_config.has_value()) {
     return DecodeHeadersBehavior::rds();
   }
@@ -87,14 +86,14 @@ OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(createDecodeHeadersBehavior(
-          getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    : OnDemandFilterConfig(
+          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(createDecodeHeadersBehavior(
-          getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    : OnDemandFilterConfig(
+          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
 
 OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
     : config_(std::move(config)) {
