@@ -58,14 +58,15 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
     return DecodeHeadersBehavior::rds();
   }
   Upstream::OdCdsApiHandlePtr odcds;
-  if (odcds_config->has_resources_locator()) {
+  if (odcds_config->resources_locator().empty()) {
+    odcds = cm.allocateOdCdsApi(odcds_config->source(), absl::nullopt, validation_visitor);
+  } else {
     auto locator = Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator());
     odcds = cm.allocateOdCdsApi(odcds_config->source(), locator, validation_visitor);
-  } else {
-    odcds = cm.allocateOdCdsApi(odcds_config->source(), absl::nullopt, validation_visitor);
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
-  auto timeout = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(odcds_config, timeout, 5000));
+  auto timeout =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(odcds_config.ref(), timeout, 5000));
   return DecodeHeadersBehavior::cdsRds(std::move(odcds), timeout);
 }
 
