@@ -28,7 +28,7 @@ arn: "arn:aws:lambda:region:424242:function:fun"
   )EOF";
   LambdaConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  //proto_config.get_invoke_config().clear_invoke_config();
+  // proto_config.get_invoke_config().clear_invoke_config();
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
   factory.createFilterFactoryFromProto(proto_config, "stats", context);
