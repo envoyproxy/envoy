@@ -64,6 +64,7 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
   h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
   h1_settings.accept_http_10_ = settings.accept_http_10();
   h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
+  h1_settings.enable_trailers_ = settings.enable_trailers();
 
   return h1_settings;
 }
@@ -163,9 +164,9 @@ public:
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
              bool end_stream, StreamResetCallbackFn stream_reset_callback,
-             ConnectionContext& context)
+             ConnectionContext& context, const bool http1_enable_trailers)
       : http_protocol_(client.protocol()), stream_reset_callback_(stream_reset_callback),
-        context_(context) {
+        context_(context), http1_enable_trailers_(http1_enable_trailers) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
 
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
@@ -294,8 +295,7 @@ public:
       break;
     }
     case test::common::http::DirectionalAction::kTrailers: {
-      // Trailers can by-configuration only be used for http2.
-      if (http_protocol_ == Protocol::Http2 && state.isLocalOpen() &&
+      if ((http_protocol_ > Protocol::Http11 || http1_enable_trailers_) && state.isLocalOpen() &&
           state.stream_state_ == StreamState::PendingDataOrTrailers) {
         if (response) {
           state.response_encoder_->encodeTrailers(
@@ -446,6 +446,7 @@ public:
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  bool http1_enable_trailers_{false};
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -685,7 +686,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
               should_close_connection = true;
             }
           },
-          connection_context);
+          connection_context, input.h1_settings().server().enable_trailers());
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }

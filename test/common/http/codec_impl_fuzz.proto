@@ -91,6 +91,7 @@ message Http1ServerSettings {
   bool allow_absolute_url = 1;
   bool accept_http_10 = 2;
   string default_host_for_http_10 = 3;
+  bool enable_trailers = 4;
 }
 
 message Http1ClientServerSettings {
