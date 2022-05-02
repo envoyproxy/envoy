@@ -313,7 +313,7 @@ htmlhelp_basename = 'envoydoc'
 # TODO(phlax): add redirect diff (`rediraffe_branch` setting)
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
-rediraffe_redirects = "envoy-redirects.txt"
+rediraffe_redirects = "redirects.txt"
 
 intersphinx_mapping = {
     'v1.5': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', "inventories/v1.5/objects.inv"),
