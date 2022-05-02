@@ -703,6 +703,7 @@ message RouteAction {
     // exist in the cluster manager configuration.
     string cluster = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
+    // [#not-implemented-hide:]
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the
     // header is not found or the referenced cluster does not exist, Envoy will

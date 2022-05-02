@@ -376,8 +376,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
 }
 
-const envoy::config::route::v3::RouteAction::RequestMirrorPolicy&
-validateClusterSpecifier(const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
+void validateClusterSpecifier(const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {
     throw EnvoyException(
         "Only one of cluster or cluster_header in request mirror policy can be specified");
@@ -385,7 +384,6 @@ validateClusterSpecifier(const envoy::config::route::v3::RouteAction::RequestMir
     throw EnvoyException(
         "At least one of cluster or cluster_header in request mirror policy need to be specified");
   }
-  return config;
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config)
@@ -538,9 +536,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-    shadow_policies_.push_back(
-        std::make_shared<ShadowPolicyImpl>(validateClusterSpecifier(mirror_policy_config)));
+    validateClusterSpecifier(mirror_policy_config);
+    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
   // Inherit policies from the virtual host, which might be from the route config.
@@ -1540,9 +1539,10 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
-    shadow_policies_.push_back(
-        std::make_shared<ShadowPolicyImpl>(validateClusterSpecifier(mirror_policy_config)));
+    validateClusterSpecifier(mirror_policy_config);
+    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
   // Inherit policies from the global config.
@@ -1839,9 +1839,10 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
   if (!config.request_mirror_policies().empty()) {
+    shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
-      shadow_policies_.push_back(
-          std::make_shared<ShadowPolicyImpl>(validateClusterSpecifier(mirror_policy_config)));
+      validateClusterSpecifier(mirror_policy_config);
+      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
     }
   }
 
