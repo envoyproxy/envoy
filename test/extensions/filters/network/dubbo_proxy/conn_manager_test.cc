@@ -1146,18 +1146,20 @@ TEST_F(ConnectionManagerTest, Routing) {
 stat_prefix: test
 protocol_type: Dubbo
 serialization_type: Hessian2
-route_config:
-  - name: test1
-    interface: org.apache.dubbo.demo.DemoService
-    routes:
-      - match:
-          method:
-            name:
-              safe_regex:
-                google_re2: {}
-                regex: "(.*?)"
-        route:
-            cluster: user_service_dubbo_server
+multiple_route_config:
+  name: test_routes
+  route_config:
+    - name: test1
+      interface: org.apache.dubbo.demo.DemoService
+      routes:
+        - match:
+            method:
+              name:
+                safe_regex:
+                  google_re2: {}
+                  regex: "(.*?)"
+          route:
+              cluster: user_service_dubbo_server
 )EOF";
 
   initializeFilter(yaml);

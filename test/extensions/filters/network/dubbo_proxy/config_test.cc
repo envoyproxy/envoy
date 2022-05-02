@@ -100,7 +100,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
 TEST_F(DubboFilterConfigTest, DubboProxyWithExplicitRouterConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: dubbo
-    route_config:
+    multiple_route_config:
       name: local_route
     dubbo_filters:
       - name: envoy.filters.dubbo.router
@@ -114,7 +114,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithExplicitRouterConfig) {
 TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
   const std::string yaml = R"EOF(
     stat_prefix: dubbo
-    route_config:
+    multiple_route_config:
       name: local_route
     dubbo_filters:
       - name: no_such_filter
@@ -131,7 +131,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
 TEST_F(DubboFilterConfigTest, DubboProxyWithMultipleFilters) {
   const std::string yaml = R"EOF(
     stat_prefix: ingress
-    route_config:
+    multiple_route_config:
       name: local_route
     dubbo_filters:
       - name: envoy.filters.dubbo.mock_filter
@@ -156,7 +156,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithMultipleFilters) {
 TEST_F(DubboFilterConfigTest, CreateFilterChain) {
   const std::string yaml = R"EOF(
     stat_prefix: ingress
-    route_config:
+    multiple_route_config:
       name: local_route
     dubbo_filters:
       - name: envoy.filters.dubbo.mock_filter
@@ -213,6 +213,7 @@ resources:
   EXPECT_EQ(0, dump.static_route_configs().size());
 }
 
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
 TEST_F(DubboFilterConfigTest, DubboProxyBothDrdsAndRouteConfig) {
   const std::string yaml = R"EOF(
 stat_prefix: ingress
@@ -245,8 +246,9 @@ multiple_route_config:
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "both mutiple_route_config and route_config is present in DubboProxy");
 }
+#endif
 
-TEST_F(DubboFilterConfigTest, ThriftProxyDrdsApiConfigSource) {
+TEST_F(DubboFilterConfigTest, DubboProxyDrdsApiConfigSource) {
   const std::string yaml = R"EOF(
 stat_prefix: ingress
 drds:
