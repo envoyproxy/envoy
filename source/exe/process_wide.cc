@@ -5,31 +5,29 @@
 #include "source/common/http/http2/nghttp2.h"
 #include "source/server/proto_descriptors.h"
 
-#include "absl/base/call_once.h"
 #include "ares.h"
 
 namespace Envoy {
 namespace {
+
+struct InitData {
+  uint32_t count_ ABSL_GUARDED_BY(mutex_){};
+  absl::Mutex mutex_;
+};
+
 // Static variable to count initialization pairs. For tests like
 // main_common_test, we need to count to avoid double initialization or
 // shutdown.
-std::atomic<uint32_t>& processWideInitialized() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<uint32_t>);
-};
-
-// Per absl documentation it is safe for this to be a namespace-scoped global variable.
-absl::once_flag create_once;
-
+InitData& processWideInitData() { MUTABLE_CONSTRUCT_ON_FIRST_USE(InitData); };
 } // namespace
 
 ProcessWide::ProcessWide() {
-  // Increment the process count atomic so shutdown can be tracked.
-  processWideInitialized()++;
+  // Note that the following lock has the dual use of making sure that initialization is complete
+  // before a second caller can enter and leave this function.
+  auto& init_data = processWideInitData();
+  absl::MutexLock lock(&init_data.mutex_);
 
-  // Make sure that any racing calls allow only a single initializer but block all other callers
-  // until initialization is complete. This can happen in certain library use cases such as
-  // Envoy Mobile.
-  absl::call_once(create_once, [] {
+  if (init_data.count_++ == 0) {
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
@@ -49,14 +47,16 @@ ProcessWide::ProcessWide() {
     // It appears that grpc_init() started instantiating threads in grpc 1.22.1,
     // which was integrated in https://github.com/envoyproxy/envoy/pull/8196,
     // around the time the flakes in #8282 started being reported.
-  });
+  }
 }
 
 ProcessWide::~ProcessWide() {
-  auto& process_wide_initialized = processWideInitialized();
-  ASSERT(process_wide_initialized > 0);
-  if (--process_wide_initialized == 0) {
-    process_wide_initialized = false;
+  auto& init_data = processWideInitData();
+  absl::MutexLock lock(&init_data.mutex_);
+
+  ASSERT(init_data.count_ > 0);
+  if (--init_data.count_ == 0) {
+    init_data.count_ = false;
     ares_library_cleanup();
   }
 }
