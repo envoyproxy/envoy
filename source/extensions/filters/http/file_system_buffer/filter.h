@@ -112,14 +112,14 @@ private:
 
   BufferedStreamState request_state_;
   BufferedStreamState response_state_;
-  Http::RequestHeaderMap* request_headers_;
-  Http::ResponseHeaderMap* response_headers_;
+  Http::RequestHeaderMap* request_headers_ = nullptr;
+  Http::ResponseHeaderMap* response_headers_ = nullptr;
 
   const std::shared_ptr<FileSystemBufferFilterConfig> base_config_;
   // config_ is a merge of the base config and any per-route config.
   absl::optional<FileSystemBufferFilterMergedConfig> config_;
-  Http::StreamDecoderFilterCallbacks* request_callbacks_;
-  Http::StreamEncoderFilterCallbacks* response_callbacks_;
+  Http::StreamDecoderFilterCallbacks* request_callbacks_ = nullptr;
+  Http::StreamEncoderFilterCallbacks* response_callbacks_ = nullptr;
   bool aborted_ = false;
 
   CancelFunction cancel_in_flight_async_action_;
