@@ -21,7 +21,6 @@ static_resources {
         }
       }
     }
-    use_tcp_for_dns_lookups: true
     maglev_lb_config {
       table_size {
       }
