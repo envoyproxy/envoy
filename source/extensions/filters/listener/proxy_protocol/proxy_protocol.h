@@ -68,7 +68,7 @@ public:
 
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
-  bool allow_requests_without_proxy_protocol_{};
+  const bool allow_requests_without_proxy_protocol_{};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
