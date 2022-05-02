@@ -24,6 +24,7 @@ namespace {
 
 class OdCdsIntegrationHelper {
 public:
+  using OnDemandCdsConfig = envoy::extensions::filters::http::on_demand::v3::OnDemandCds;
   using OnDemandConfig = envoy::extensions::filters::http::on_demand::v3::OnDemand;
   using PerRouteConfig = envoy::extensions::filters::http::on_demand::v3::PerRouteConfig;
 
@@ -108,13 +109,20 @@ public:
     return source;
   }
 
+  static OnDemandCdsConfig createOnDemandCdsConfig(envoy::config::core::v3::ConfigSource config_source,
+                                                   int timeout_millis) {
+    OnDemandCdsConfig config;
+    *config.mutable_source() = std::move(config_source);
+    *config.mutable_timeout() =
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    return config;
+  }
+
   template <typename OnDemandConfigType>
   static OnDemandConfigType createConfig(envoy::config::core::v3::ConfigSource config_source,
                                          int timeout_millis) {
     OnDemandConfigType on_demand;
-    *on_demand.mutable_odcds_config() = std::move(config_source);
-    *on_demand.mutable_odcds_timeout() =
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    *on_demand.mutable_odcds() = createOnDemandCdsConfig(std::move(config_source), timeout_millis);
     return on_demand;
   }
 
@@ -771,15 +779,16 @@ key:
         typed_per_filter_config:
           envoy.filters.http.on_demand:
             "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-            odcds_config:
-              resource_api_version: V3
-              api_config_source:
-                api_type: DELTA_GRPC
-                transport_api_version: V3
-                grpc_services:
-                  envoy_grpc:
-                    cluster_name: odcds_cluster
-            odcds_timeout: "2.5s"
+            odcds:
+              source:
+                resource_api_version: V3
+                api_config_source:
+                  api_type: DELTA_GRPC
+                  transport_api_version: V3
+                  grpc_services:
+                    envoy_grpc:
+                      cluster_name: odcds_cluster
+              timeout: "2.5s"
 )EOF";
     static const absl::string_view vhost_config_disabled = R"EOF(
         typed_per_filter_config:
@@ -790,15 +799,16 @@ key:
           typed_per_filter_config:
             envoy.filters.http.on_demand:
               "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
-              odcds_config:
-                resource_api_version: V3
-                api_config_source:
-                  api_type: DELTA_GRPC
-                  transport_api_version: V3
-                  grpc_services:
-                    envoy_grpc:
-                      cluster_name: odcds_cluster
-              odcds_timeout: "2.5s"
+              odcds:
+                source:
+                  resource_api_version: V3
+                  api_config_source:
+                    api_type: DELTA_GRPC
+                    transport_api_version: V3
+                    grpc_services:
+                      envoy_grpc:
+                        cluster_name: odcds_cluster
+                timeout: "2.5s"
 )EOF";
     static const absl::string_view route_config_disabled = R"EOF(
           typed_per_filter_config:
