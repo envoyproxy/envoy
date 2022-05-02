@@ -53,7 +53,7 @@ message ProxyProtocol {
   //
   //   While incredibly rare, requests of 12 or fewer bytes that match the
   //   proxy protocol v2 signature and requests of 6 or fewer bytes that match
-  //   the proxy protocol v1 signature will timeout. (envoy is unable to
-  //   differentiate these requests from incomplete proxy protocol requests)
+  //   the proxy protocol v1 signature will timeout (Envoy is unable to
+  //   differentiate these requests from incomplete proxy protocol requests).
   bool allow_requests_without_proxy_protocol = 2;
 }

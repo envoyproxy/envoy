@@ -233,7 +233,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
-  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // Allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
   // proxy protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
@@ -241,7 +241,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
 
   std::string msg = "data";
   EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN,
-            msg.length()); // ensure we attempt parsing byte by byte using `search_index_`
+            msg.length()); // Ensure we attempt parsing byte by byte using `search_index_`
   EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
 
   write(msg);
@@ -252,14 +252,14 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
-  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // Allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
   // proxy protocol v1/v2 (but it does match parts of both signatures)
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  // first two bytes proxy protocol v1, second two bytes proxy protocol v2.
-  // this ensures our byte by byte parsing (search_index_) has persistence built-in to
+  // First two bytes are proxy protocol v1, second two bytes are proxy protocol v2.
+  // This ensures our byte by byte parsing (`search_index_`) has persistence built-in to
   // remember whether the previous bytes were also valid for the signature
   std::string msg = "PR\r\n";
   EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
@@ -273,14 +273,14 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
-  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // Allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
   // proxy protocol v1/v2 (but it does match parts of both signatures)
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  // first two bytes proxy protocol v2, second two bytes proxy protocol v1.
-  // this ensures our byte by byte parsing (search_index_) has persistence built-in to
+  // First two bytes are proxy protocol v2, second two bytes are proxy protocol v1.
+  // This ensures our byte by byte parsing (`search_index_`) has persistence built-in to
   // remember whether the previous bytes were also valid for the signature
   std::string msg = "\r\nOX";
   EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
@@ -294,7 +294,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
 }
 
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
-  // allows a large request (more bytes than v1/v2 signature) through even though it doesn't use
+  // Allows a large request (more bytes than v1/v2 signature) through even though it doesn't use
   // proxy protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
@@ -302,7 +302,7 @@ TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
 
   std::string msg = "more data more data more data";
   EXPECT_GT(msg.length(),
-            PROXY_PROTO_V2_HEADER_LEN); // ensure we attempt parsing as v2 proxy protocol up front
+            PROXY_PROTO_V2_HEADER_LEN); // Ensure we attempt parsing as v2 proxy protocol up front
                                         // rather than parsing byte by byte using `search_index_`
 
   write(msg);
@@ -1147,7 +1147,7 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  write("PROXY TCP4"); // intentionally larger than the size of v1 proxy protocol signature
+  write("PROXY TCP4"); // Intentionally larger than the size of v1 proxy protocol signature
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -1170,7 +1170,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  write("PRO"); // intentionally smaller than the size of v1 proxy protocol signature
+  write("PRO"); // Intentionally smaller than the size of v1 proxy protocol signature
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -1228,7 +1228,7 @@ TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  // using 18 intentionally as it is larger than v2 signature length and divides evenly into
+  // Using 18 intentionally as it is larger than v2 signature length and divides evenly into
   // len(buffer)
   auto buffer_incr_size = 18;
   EXPECT_LT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
@@ -1259,7 +1259,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  // using 3 intentionally as it is smaller than v2 signature length and divides evenly into
+  // Using 3 intentionally as it is smaller than v2 signature length and divides evenly into
   // len(buffer)
   auto buffer_incr_size = 3;
   EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
