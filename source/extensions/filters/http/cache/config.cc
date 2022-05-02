@@ -19,6 +19,8 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
   }
 
   // Capture the cache instance as a reference; the factory must own it.
+  // TODO: getCache should be returning a shared_ptr (and using SingletonManager), to avoid
+  // keeping potentially large structures in static variables.
   auto cache = std::ref(http_cache_factory->getCache(config, context));
 
   return [config, stats_prefix, &context,
