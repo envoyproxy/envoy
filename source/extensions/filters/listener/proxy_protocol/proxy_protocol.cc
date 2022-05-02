@@ -406,17 +406,30 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   auto raw_slice = buffer.rawSlice();
   const char* buf = static_cast<const char*>(raw_slice.mem_);
 
+  if (config_.get()->allowRequestsWithoutProxyProtocol()) {
+    auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
+    auto matchv1 = !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_));
+    if (!matchv2 && !matchv1) {
+      // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
+      // short-circuit
+      ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
+      return ReadOrParseState::SkipFilter;
+    }
+    auto sig_len = matchv1 ? PROXY_PROTO_V1_SIGNATURE_LEN : PROXY_PROTO_V2_SIGNATURE_LEN;
+    if (raw_slice.len_ < sig_len) {
+      ENVOY_LOG(debug, "request does not have enough bytes to determine if v1 or v2 proxy "
+                       "protocol, waiting for more bytes");
+      return ReadOrParseState::TryAgainLater;
+    }
+  }
+
   if (raw_slice.len_ >= PROXY_PROTO_V2_HEADER_LEN) {
     const char* sig = PROXY_PROTO_V2_SIGNATURE;
     if (!memcmp(buf, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
       header_version_ = V2;
     } else if (memcmp(buf, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
-      if (config_.get()->allowRequestsWithoutProxyProtocol()) {
-        // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
-        // short-circuit
-        ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
-        return ReadOrParseState::SkipFilter;
-      }
       // It is not v2, and can't be v1, so no sense hanging around: it is invalid
       ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v1 header len)");
       return ReadOrParseState::Error;
@@ -458,18 +471,6 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     for (; search_index_ < raw_slice.len_; search_index_++) {
       if (buf[search_index_] == '\n' && buf[search_index_ - 1] == '\r') {
         if (search_index_ == 1) {
-          if (config_.get()->allowRequestsWithoutProxyProtocol()) {
-            // We need to check if what we have already could be v2 proxy protocol;
-            // if it cannot be, then we might as well forward now
-            auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
-                                   std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
-            if (!matchv2) {
-              // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can
-              // safely short-circuit
-              ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
-              return ReadOrParseState::SkipFilter;
-            }
-          }
           // There is not enough data to determine if it contains the v2 protocol signature, so wait
           // for more data.
           break;
@@ -478,14 +479,6 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
           search_index_++;
         }
         break;
-      } else if (config_.get()->allowRequestsWithoutProxyProtocol()) {
-        if (search_index_ < PROXY_PROTO_V1_SIGNATURE_LEN &&
-            buf[search_index_] != PROXY_PROTO_V1_SIGNATURE[search_index_]) {
-          // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
-          // short-circuit
-          ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
-          return ReadOrParseState::SkipFilter;
-        }
       }
     }
 
