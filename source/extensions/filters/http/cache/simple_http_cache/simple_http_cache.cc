@@ -297,14 +297,11 @@ InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_co
   return std::make_unique<SimpleInsertContext>(*lookup_context, *this);
 }
 
-std::string staticName() {
-  static std::string name = "envoy.extensions.http.cache.simple";
-  return name;
-}
+constexpr absl::string_view Name = "envoy.extensions.http.cache.simple";
 
 CacheInfo SimpleHttpCache::cacheInfo() const {
   CacheInfo cache_info;
-  cache_info.name_ = staticName();
+  cache_info.name_ = Name;
   return cache_info;
 }
 
@@ -313,7 +310,7 @@ SINGLETON_MANAGER_REGISTRATION(simple_http_cache_singleton);
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
   // From UntypedFactory
-  std::string name() const override { return staticName(); }
+  std::string name() const override { return std::string(Name); }
   // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
