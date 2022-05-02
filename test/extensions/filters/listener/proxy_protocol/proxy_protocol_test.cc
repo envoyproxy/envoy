@@ -250,6 +250,24 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
   disconnect();
 }
 
+TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatch) {
+  // allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // proxy protocol
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  std::string msg = "PR\r\n"; // partial v1 proxy protocol signature match
+  EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
+  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
+
+  write(msg);
+
+  expectData(msg);
+
+  disconnect();
+}
+
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
   // allows a large request (more bytes than v1/v2 signature) through even though it doesn't use
   // proxy protocol

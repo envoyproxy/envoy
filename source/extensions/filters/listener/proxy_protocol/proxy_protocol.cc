@@ -456,8 +456,17 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   } else {
     // continue searching buffer from where we left off
     for (; search_index_ < raw_slice.len_; search_index_++) {
-
-      if (config_.get()->allowRequestsWithoutProxyProtocol()) {
+      if (buf[search_index_] == '\n' && buf[search_index_ - 1] == '\r') {
+        if (search_index_ == 1) {
+          // There is not enough data to determine if it contains the v2 protocol signature, so wait
+          // for more data.
+          break;
+        } else {
+          header_version_ = V1;
+          search_index_++;
+        }
+        break;
+      } else if (config_.get()->allowRequestsWithoutProxyProtocol()) {
         if (search_index_ < PROXY_PROTO_V1_SIGNATURE_LEN &&
             buf[search_index_] != PROXY_PROTO_V1_SIGNATURE[search_index_]) {
           possibly_v1_ = false;
@@ -472,18 +481,6 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
           ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
           return ReadOrParseState::SkipFilter;
         }
-      }
-
-      if (buf[search_index_] == '\n' && buf[search_index_ - 1] == '\r') {
-        if (search_index_ == 1) {
-          // There is not enough data to determine if it contains the v2 protocol signature, so wait
-          // for more data.
-          break;
-        } else {
-          header_version_ = V1;
-          search_index_++;
-        }
-        break;
       }
     }
 
