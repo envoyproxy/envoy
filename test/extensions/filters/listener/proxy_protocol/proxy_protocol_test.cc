@@ -608,6 +608,19 @@ TEST_P(ProxyProtocolTest, V2ShortV4) {
   expectProxyProtoError();
 }
 
+TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(false, &proto_config);
+
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+}
+
 TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
   // An ipv4/tcp connection that has insufficient header-length encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -684,6 +697,18 @@ TEST_P(ProxyProtocolTest, V2WrongVersion) {
 TEST_P(ProxyProtocolTest, V1TooLong) {
   constexpr uint8_t buffer[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
   connect(false);
+  write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100");
+  for (size_t i = 0; i < 256; i += sizeof(buffer)) {
+    write(buffer, sizeof(buffer));
+  }
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
+  constexpr uint8_t buffer[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(false, &proto_config);
   write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100");
   for (size_t i = 0; i < 256; i += sizeof(buffer)) {
     write(buffer, sizeof(buffer));
