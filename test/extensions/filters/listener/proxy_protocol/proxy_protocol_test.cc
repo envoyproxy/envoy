@@ -1074,7 +1074,6 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 }
 
 TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
-
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
@@ -1098,7 +1097,6 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
-
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
