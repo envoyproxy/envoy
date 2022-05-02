@@ -22,8 +22,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-// This is copied from the PreserveCaseHeaderFormatter extension, because it'd be weird for
-// ThriftProxy to depend on an optional HTTP extension and it's not that much code anyway.
+// TODO(rgs1): this is copied from the PreserveCaseHeaderFormatter extension, so move it to a common
+// path.
 class PreserveCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
 public:
   PreserveCaseHeaderFormatter() = default;
