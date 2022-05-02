@@ -290,11 +290,10 @@ TEST_F(IpTaggingFilterTest, InvalidConfig) {
   initializeFilter(internal_request_yaml);
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
   TestUtility::loadFromYaml(internal_request_yaml, config);
-  config.set_request_type(static_cast<envoy::extensions::filters::http::ip_tagging::v3::IPTagging_RequestType>(123));
-  EXPECT_ENVOY_BUG(
-    std::make_shared<IpTaggingFilterConfig>(config, "prefix", stats_, runtime_), 
-    "unexpected request type enum"
-  );
+  config.set_request_type(
+      static_cast<envoy::extensions::filters::http::ip_tagging::v3::IPTagging_RequestType>(123));
+  EXPECT_ENVOY_BUG(std::make_shared<IpTaggingFilterConfig>(config, "prefix", stats_, runtime_),
+                   "unexpected request type enum");
 }
 
 } // namespace
