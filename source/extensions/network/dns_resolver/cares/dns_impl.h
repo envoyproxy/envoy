@@ -115,7 +115,7 @@ private:
 
   private:
     void startResolutionImpl(int family);
-    static bool isResponseWithNoRecords(int status);
+    bool isResponseWithNoRecords(int status);
 
     // Holds the availability of non-loopback network interfaces for the system.
     struct AvailableInterfaces {

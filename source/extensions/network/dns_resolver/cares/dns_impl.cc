@@ -127,7 +127,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 // Treat responses with `ARES_ENODATA` or `ARES_ENOTFOUND` status as DNS response with no records.
 // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for details.
 bool DnsResolverImpl::AddrInfoPendingResolution::isResponseWithNoRecords(int status) {
-  return status == ARES_ENODATA || status == ARES_ENOTFOUND;
+  return accept_nodata_ && (status == ARES_ENODATA || status == ARES_ENOTFOUND);
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
@@ -135,7 +135,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
   ASSERT(pending_resolutions_ > 0);
   pending_resolutions_--;
 
-  if (status != ARES_SUCCESS && (!isResponseWithNoRecords(status) || !accept_nodata_)) {
+  if (status != ARES_SUCCESS && !isResponseWithNoRecords(status)) {
     ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                     "dns resolution for {} failed with c-ares status {}", dns_name_, status);
   }
@@ -215,7 +215,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
-  } else if (accept_nodata_ && isResponseWithNoRecords(status)) {
+  } else if (isResponseWithNoRecords(status)) {
     // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success to populate back the
     // "empty records" response.
     pending_response_.status_ = ResolutionStatus::Success;
