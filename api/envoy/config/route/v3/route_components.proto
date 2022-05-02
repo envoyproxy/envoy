@@ -688,6 +688,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -695,10 +696,33 @@ message RouteAction {
     reserved 2;
 
     reserved "runtime_key";
-
+    
+    // Only one of *cluster* and *cluster_header* can be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+    string cluster = 1 [
+      (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier" 
+    ];
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // HTTP header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist, Envoy will
+    // return a 404 response.
+    //
+    // .. attention::
+    //
+    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
+    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
+    string cluster_header = 5 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+    ];
+
 
     // If not specified, all requests to the target cluster will be mirrored.
     //

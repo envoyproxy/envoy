@@ -376,9 +376,20 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
-  cluster_ = config.cluster();
+const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& validateClusterSpecifier(
+  const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
+  if (!config.cluster().empty() && !config.cluster_header().empty()) {
+    throw EnvoyException(
+        "Only one of cluster or cluster_header in request mirror policy can be specified");
+  } else if (config.cluster().empty() && config.cluster_header().empty()) {
+    throw EnvoyException(
+        "At least one of cluster or cluster_header in request mirror policy need to be specified");
+  }
+  return config;
+}
 
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) 
+  : cluster_(config.cluster()), cluster_header_(config.cluster_header()) {
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
     default_value_ = config.runtime_fraction().default_value();
@@ -528,7 +539,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+    shadow_policies_.push_back(
+      std::make_shared<ShadowPolicyImpl>(validateClusterSpecifier(mirror_policy_config)));
   }
 
   // Inherit policies from the virtual host, which might be from the route config.
@@ -1529,7 +1541,8 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
-    shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+    shadow_policies_.push_back(
+      std::make_shared<ShadowPolicyImpl>(validateClusterSpecifier(mirror_policy_config)));
   }
 
   // Inherit policies from the global config.
@@ -1827,7 +1840,8 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
   if (!config.request_mirror_policies().empty()) {
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
-      shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
+      shadow_policies_.push_back(
+        std::make_shared<ShadowPolicyImpl>(validateClusterSpecifier(mirror_policy_config)));
     }
   }
 
