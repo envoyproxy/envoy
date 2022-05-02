@@ -45,7 +45,7 @@ class HashPolicyImplFactory {
 public:
   static HashPolicyImplPtr
   create(const Protobuf::RepeatedPtrField<
-         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>
+         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>&
              hash_policies);
 };
 
