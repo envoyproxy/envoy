@@ -17,15 +17,22 @@ loaded on demand in the :ref:`Scoped RouteConfiguration <envoy_v3_api_msg_config
 The contents of the HTTP header is used to find the scope and create the on-demand request.
 
 The on-demand update filter can also be used to request a cluster when the target cluster name is only known after receiving
-a request and the cluster is missing - this is a scenario that could happen with the cluster_header route action. For an on demand
-request to be created, :ref:`odcds_config <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds_config>`
-(or its :ref:`per route counterpart <envoy_v3_api_field_extensions.filters.http.on_demand.v3.PerRouteConfig.odcds_config>`)
-must be specified and a header specified in cluster_header action must be present in the HTTP request.
+a request and the cluster is missing - this is a scenario that could happen with
+the :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` route action. For an on demand
+request to be created, :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>`
+(or its :ref:`per route counterpart <envoy_v3_api_field_extensions.filters.http.on_demand.v3.PerRouteConfig.odcds>`)
+must be specified and a header specified in :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>`
+action must be present in the HTTP request.
 
 On-demand VHDS and on-demand S/RDS can not be used at the same time at this point.
 
-On-demand CDS can also be enabled or disabled per virtual host or route. Specifying an extension config in :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or the
-:ref:`route's typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` without the odcds_config field disables the on demand CDS for requests using this virtual host or route. Conversely, if odcds_config is specified, on demand CDS is enabled for requests using this virtual host or route.
+On-demand CDS can also be enabled or disabled per virtual host or route. Specifying an extension config
+in :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
+the :ref:`route's typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` without
+the :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` field disables
+the on demand CDS for requests using this virtual host or route. Conversely,
+if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
+on demand CDS is enabled for requests using this virtual host or route.
 
 Configuration
 -------------
