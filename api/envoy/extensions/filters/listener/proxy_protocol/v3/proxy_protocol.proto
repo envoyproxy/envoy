@@ -51,10 +51,9 @@ message ProxyProtocol {
   //   For more information on the security implications of this feature, see
   //   https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt
   //
-  //   While incredibly rare, requests of less than 12 bytes that match the
-  //   beginning of the proxy protocol v2 format and requests of less than 6
-  //   bytes that match the beginning of proxy protocol v1 format will timeout.
-  //   (envoy is unable to differentiate these requests from incomplete proxy
-  //   protocol requests)
+  //   While incredibly rare, requests of 12 or fewer bytes that match the
+  //   proxy protocol v2 signature and requests of 6 or fewer bytes that match
+  //   the proxy protocol v1 signature will timeout. (envoy is unable to
+  //   differentiate these requests from incomplete proxy protocol requests)
   bool allow_requests_without_proxy_protocol = 2;
 }

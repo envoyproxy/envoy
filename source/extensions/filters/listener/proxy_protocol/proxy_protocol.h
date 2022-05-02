@@ -127,6 +127,9 @@ private:
   // The index in buf_ where the search for '\r\n' should continue from
   size_t search_index_{1};
 
+  bool possibly_v1_{true};
+  bool possibly_v2_{true};
+
   ProxyProtocolVersion header_version_{Unknown};
 
   ConfigSharedPtr config_;
