@@ -417,12 +417,6 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
       return ReadOrParseState::SkipFilter;
     }
-    auto sig_len = matchv1 ? PROXY_PROTO_V1_SIGNATURE_LEN : PROXY_PROTO_V2_SIGNATURE_LEN;
-    if (raw_slice.len_ < sig_len) {
-      ENVOY_LOG(debug, "request does not have enough bytes to determine if v1 or v2 proxy "
-                       "protocol, waiting for more bytes");
-      return ReadOrParseState::TryAgainLater;
-    }
   }
 
   if (raw_slice.len_ >= PROXY_PROTO_V2_HEADER_LEN) {
