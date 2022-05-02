@@ -412,7 +412,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       header_version_ = V2;
     } else if (memcmp(buf, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
       if (config_.get()->allowRequestsWithoutProxyProtocol()) {
-        // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
+        // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
         // short-circuit
         ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
         return ReadOrParseState::SkipFilter;
@@ -443,7 +443,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
                 hdr_addr_len, addr_len);
       return ReadOrParseState::Error;
     }
-    // waiting for more data if there is not enough data for address.
+    // waiting for more data if there is no enough data for address.
     if (raw_slice.len_ >= static_cast<size_t>(PROXY_PROTO_V2_HEADER_LEN + addr_len)) {
       // The TLV remain, they are parsed in `parseTlvs()` which is called from the
       // parent (if needed).
@@ -459,12 +459,12 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       if (buf[search_index_] == '\n' && buf[search_index_ - 1] == '\r') {
         if (search_index_ == 1) {
           if (config_.get()->allowRequestsWithoutProxyProtocol()) {
-            // we need to check if what we have already could be v2 proxy protocol;
+            // We need to check if what we have already could be v2 proxy protocol;
             // if it cannot be, then we might as well forward now
             auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
                                    std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
             if (!matchv2) {
-              // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can
+              // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can
               // safely short-circuit
               ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
               return ReadOrParseState::SkipFilter;
@@ -481,7 +481,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       } else if (config_.get()->allowRequestsWithoutProxyProtocol()) {
         if (search_index_ < PROXY_PROTO_V1_SIGNATURE_LEN &&
             buf[search_index_] != PROXY_PROTO_V1_SIGNATURE[search_index_]) {
-          // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
+          // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
           // short-circuit
           ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
           return ReadOrParseState::SkipFilter;
