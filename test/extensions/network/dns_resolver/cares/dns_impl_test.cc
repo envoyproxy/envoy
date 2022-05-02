@@ -387,6 +387,7 @@ public:
     resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
                                                (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
   }
+  bool isCaresDefaultTheOnlyNameserver() { return resolver_->isCaresDefaultTheOnlyNameserver(); }
 
 private:
   DnsResolverImpl* resolver_;
@@ -450,7 +451,26 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
   auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
 
-  // convert the address and options into typed_dns_resolver_config
+  // First, create a resolver with no fallback. Check to see if cares default is
+  // the only nameserver.
+  bool only_has_default = false;
+  {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+    Network::DnsResolverFactory& dns_resolver_factory =
+        createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    auto resolver =
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+    auto peer =
+        std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+    only_has_default = peer->isCaresDefaultTheOnlyNameserver();
+  }
+
+  // Now create a resolver with a failover resolver.
   envoy::config::core::v3::Address dns_resolvers;
   Network::Utility::addressToProtobufAddress(
       Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
@@ -458,10 +478,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.set_use_resolvers_as_fallback(true);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-
   // copy over dns_resolver_options_
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
-
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
@@ -470,14 +488,19 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   auto resolver =
       dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
 
-  // Given that the local machine will have a working conf in resolve.conf the resolver will not
-  // use the fallback given.
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
   EXPECT_EQ(resolvers->family, AF_INET);
-  EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  if (only_has_default) {
+    // If cares default was the only resolver, the fallbacks will be used.
+    EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  } else {
+    // In the common case, where cares default was not the only resolver, the fallback will not be
+    // used.
+    EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  }
   ares_free_data(resolvers);
 }
 
@@ -574,6 +597,8 @@ public:
   }
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
+  absl::string_view addressType() const override { PANIC("not implemented"); }
+
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {
     return SocketInterfaceSingleton::get();
@@ -693,6 +718,10 @@ public:
         dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
+    resetChannel();
+  }
+
+  void resetChannel() {
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
@@ -903,9 +932,7 @@ TEST_P(DnsImplTest, DestructCallback) {
 
   // This simulates destruction thanks to another query setting the dirty_channel_ bit, thus causing
   // a subsequent result to call ares_destroy.
-  peer_->resetChannelTcpOnly(zeroTimeout());
-  ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
+  resetChannel();
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -996,6 +1023,25 @@ TEST_P(DnsImplTest, CallbackException) {
                             "unknown");
 }
 
+// Verify that resetNetworking() correctly dirties and recreates the channel.
+TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
+  ASSERT_FALSE(peer_->isChannelDirty());
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  resolver_->resetNetworking();
+  EXPECT_TRUE(peer_->isChannelDirty());
+  resetChannel();
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 // Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
 // ARES_ECONNREFUSED as its callback status.
 TEST_P(DnsImplTest, DestroyChannelOnRefused) {
@@ -1029,11 +1075,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   EXPECT_FALSE(peer_->isChannelDirty());
 
   // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
-  if (tcpOnly()) {
-    peer_->resetChannelTcpOnly(zeroTimeout());
-  }
-  ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
+  resetChannel();
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,

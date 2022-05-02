@@ -114,6 +114,11 @@ public:
    * reply.
    */
   virtual bool responseSuccess() PURE;
+
+  /**
+   * Called when upstream connection gets reset.
+   */
+  virtual void onReset() PURE;
 };
 
 /**

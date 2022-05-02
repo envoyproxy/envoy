@@ -21,6 +21,7 @@ ASSERTs
 AST
 AWS
 BACKTRACE
+BEL
 BBR
 BSON
 BPF
@@ -34,20 +35,32 @@ CDN
 CDS
 CEL
 CWND
+DLE
 DSR
 DSS
 EBADF
+ENDIF
 ENOTCONN
+ENQ
+EOT
 EPIPE
+ESC
+ETB
+ETX
+FS
 HEXDIG
 HEXDIGIT
 LRU
+NAK
 OWS
 Preconnecting
 RCVBUF
 RTCP
 RTP
+SOH
+SPC
 STATNAME
+STX
 SkyWalking
 TIDs
 Timedout
@@ -134,6 +147,7 @@ FREEBIND
 FUZZER
 FUZZERS
 dereferencing
+differentially
 dnsresolvers
 guarddog
 GC
@@ -156,6 +170,7 @@ HC
 HCM
 HDS
 HMAC
+HOL
 HPACK
 HTAB
 HTML
@@ -243,6 +258,7 @@ Oauth
 OCSP
 OD
 ODCDS
+oghttp
 OID
 OK
 OOM
@@ -338,11 +354,13 @@ SRCDIR
 SRDS
 SRV
 SS
+SSD
 SSL
 STDSTRING
 STL
 STRLEN
 STS
+SUBCOMMAND
 SVG
 SVID
 SXG
@@ -370,6 +388,7 @@ UA
 UBSAN
 UDP
 UDS
+UHV
 UNC
 URI
 URL
@@ -767,6 +786,8 @@ intra
 ints
 invariance
 invoker
+iov
+iovcnt
 iovec
 iovecs
 ips
@@ -1082,6 +1103,7 @@ retriable
 retriggers
 revalidated
 revalidation
+rfield
 rmdir
 rocketmq
 rewriter
@@ -1099,6 +1121,7 @@ rver
 rxhash
 sandboxed
 sanitization
+sanitizations
 sanitizer
 satisfiable
 scalability
@@ -1261,6 +1284,7 @@ underflowing
 unfreed
 unicast
 unicode
+unicodes
 unindexed
 uninstantiated
 uniq
@@ -1327,6 +1351,7 @@ zag
 zig
 zipkin
 zlib
+zstd
 OBQ
 SemVer
 SCM

@@ -134,11 +134,12 @@ TEST_F(InputsIntegrationTest, SourceTypeInput) {
 }
 
 TEST_F(InputsIntegrationTest, ServerNameInput) {
-  initialize("ServerNameInput", "example.com");
+  const auto host = "example.com";
+  initialize("ServerNameInput", host);
 
   Network::MockConnectionSocket socket;
   MatchingDataImpl data(socket);
-  EXPECT_CALL(socket, requestedServerName).WillOnce(testing::Return("example.com"));
+  socket.connection_info_provider_->setRequestedServerName(host);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
@@ -199,8 +200,7 @@ protected:
 TEST_F(UdpInputsIntegrationTest, DestinationIPInput) {
   initialize("DestinationIPInput", "127.0.0.1");
 
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
   const auto result = match_tree_()->match(data);
@@ -211,8 +211,7 @@ TEST_F(UdpInputsIntegrationTest, DestinationIPInput) {
 TEST_F(UdpInputsIntegrationTest, DestinationPortInput) {
   initialize("DestinationPortInput", "8080");
 
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
   const auto result = match_tree_()->match(data);
@@ -223,8 +222,7 @@ TEST_F(UdpInputsIntegrationTest, DestinationPortInput) {
 TEST_F(UdpInputsIntegrationTest, SourceIPInput) {
   initialize("SourceIPInput", "127.0.0.1");
 
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
   const auto result = match_tree_()->match(data);
@@ -235,8 +233,7 @@ TEST_F(UdpInputsIntegrationTest, SourceIPInput) {
 TEST_F(UdpInputsIntegrationTest, SourcePortInput) {
   initialize("SourcePortInput", "8080");
 
-  const Address::InstanceConstSharedPtr ip =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
+  const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
 
   const auto result = match_tree_()->match(data);

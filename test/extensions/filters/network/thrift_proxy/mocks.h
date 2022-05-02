@@ -211,7 +211,6 @@ public:
   // ThriftProxy::ThriftFilters::DecoderFilter
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
-  MOCK_METHOD(void, resetUpstreamConnection, ());
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
   // ThriftProxy::DecoderEventHandler
@@ -261,6 +260,7 @@ public:
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
   MOCK_METHOD(bool, responseSuccess, ());
+  MOCK_METHOD(void, onReset, ());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;

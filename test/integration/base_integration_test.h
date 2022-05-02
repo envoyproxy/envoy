@@ -28,6 +28,22 @@
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
+#if defined(ENVOY_CONFIG_COVERAGE)
+#define DISABLE_UNDER_COVERAGE return
+#else
+#define DISABLE_UNDER_COVERAGE                                                                     \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 
 struct ApiFilesystemConfig {
@@ -345,6 +361,8 @@ public:
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
     return *fake_upstreams_.back();
   }
+
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
 
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,

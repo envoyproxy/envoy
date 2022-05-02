@@ -3,10 +3,6 @@
 Admission Control
 =================
 
-.. attention::
-
-  The admission control filter is experimental and is currently under active development.
-
 See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` for details on each configuration parameter.
 
 Overview

@@ -112,25 +112,6 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_hostname_utils_impl_lib",
-    srcs = [
-        "quiche_hostname_utils_impl.cc",
-    ],
-    hdrs = [
-        "quiche_hostname_utils_impl.h",
-    ],
-    external_deps = [
-        "abseil_str_format",
-        "quiche_quic_platform_base",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/http:utility_lib",
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quiche_error_code_wrappers_impl_lib",
     hdrs = [
         "quiche_error_code_wrappers_impl.h",
@@ -190,4 +171,11 @@ envoy_quiche_platform_impl_cc_library(
         "//source/common/buffer:buffer_lib",
         "@com_github_google_quiche//:quiche_common_buffer_allocator_lib",
     ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_lower_case_string_impl_lib",
+    hdrs = ["quiche_lower_case_string_impl.h"],
+    tags = ["nofips"],
+    deps = ["//envoy/http:header_map_interface"],
 )

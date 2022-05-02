@@ -16,6 +16,12 @@ namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
 
+enum class Http2Impl {
+  Nghttp2,
+  WrappedNghttp2,
+  Oghttp2,
+};
+
 /**
  * HTTP codec client used during integration testing.
  */
@@ -115,6 +121,7 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
+  void setupHttp2Overrides(Http2Impl implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
@@ -267,6 +274,12 @@ protected:
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
+
+  // Test sending and receiving large request and response bodies with autonomous upstream.
+  void testGiantRequestAndResponse(
+      uint64_t request_size, uint64_t response_size, bool set_content_length_header,
+      std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.

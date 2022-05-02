@@ -18,25 +18,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "route_matcher_interface",
-    hdrs = ["route.h"],
-    deps = [
-        ":router_interface",
-        "//envoy/config:typed_config_interface",
-        "//envoy/server:filter_config_interface",
-        "//source/common/config:utility_lib",
-        "//source/common/singleton:const_singleton",
-        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "route_matcher",
     srcs = ["route_matcher.cc"],
     hdrs = ["route_matcher.h"],
     deps = [
-        ":route_matcher_interface",
         ":router_interface",
         "//envoy/router:router_interface",
         "//source/common/common:logger_lib",

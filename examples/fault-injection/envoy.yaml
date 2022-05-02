@@ -41,6 +41,8 @@ static_resources:
                   numerator: 0
                   denominator: HUNDRED
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: local_service
     type: STRICT_DNS

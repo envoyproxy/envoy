@@ -34,14 +34,6 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
-#if defined(ENVOY_CONFIG_COVERAGE)
-#define DISABLE_UNDER_COVERAGE return
-#else
-#define DISABLE_UNDER_COVERAGE                                                                     \
-  do {                                                                                             \
-  } while (0)
-#endif
-
 namespace Envoy {
 namespace Quic {
 
@@ -180,7 +172,7 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-    OptRef<Http::AlternateProtocolsCache> cache;
+    OptRef<Http::HttpServerPropertiesCache> cache;
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         quic::QuicServerId{

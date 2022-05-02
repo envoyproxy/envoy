@@ -52,6 +52,7 @@ class RouteEntryImplBase : public RouteEntry,
 public:
   RouteEntryImplBase(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
+  void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -95,7 +96,11 @@ private:
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
-    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const Http::LowerCaseString& clusterHeader() const override {
+      // Weighted cluster entries don't have a cluster header based on proto.
+      ASSERT(parent_.clusterHeader().get().empty());
+      return parent_.clusterHeader();
+    }
     const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
     requestMirrorPolicies() const override {
       return parent_.requestMirrorPolicies();
@@ -184,7 +189,10 @@ private:
 
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&);
+  // validation_clusters = absl::nullopt means that clusters are not validated.
+  RouteMatcher(
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
@@ -217,9 +225,9 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public ThriftFilters::DecoderFilter {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
-         Runtime::Loader& runtime, ShadowWriter& shadow_writer)
+         Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool close_downstream_on_error)
       : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
-        shadow_writer_(shadow_writer) {}
+        shadow_writer_(shadow_writer), close_downstream_on_error_(close_downstream_on_error) {}
 
   ~Router() override = default;
 
@@ -238,6 +246,7 @@ public:
   void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
     callbacks_->sendLocalReply(response, end_stream);
   }
+  void onReset() override { callbacks_->onReset(); }
 
   // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -311,6 +320,8 @@ private:
   Runtime::Loader& runtime_;
   ShadowWriter& shadow_writer_;
   std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_{};
+
+  bool close_downstream_on_error_;
 };
 
 } // namespace Router

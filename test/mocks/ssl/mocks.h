@@ -181,6 +181,7 @@ public:
                   TrustChainVerification,
               trustChainVerification, (), (const));
   MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
+  MOCK_METHOD(absl::optional<uint32_t>, maxVerifyDepth, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
