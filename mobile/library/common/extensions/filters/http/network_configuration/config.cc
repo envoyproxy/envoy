@@ -13,12 +13,13 @@ Http::FilterFactoryCb NetworkConfigurationFilterFactory::createFilterFactoryFrom
     const std::string&, Server::Configuration::FactoryContext& context) {
 
   auto network_configurator = Network::ConfiguratorFactory{context}.get();
+  bool enable_drain_post_dns_refresh = proto_config.enable_drain_post_dns_refresh();
   bool enable_interface_binding = proto_config.enable_interface_binding();
 
-  return [network_configurator,
+  return [network_configurator, enable_drain_post_dns_refresh,
           enable_interface_binding](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<NetworkConfigurationFilter>(
-        network_configurator, enable_interface_binding));
+        network_configurator, enable_drain_post_dns_refresh, enable_interface_binding));
   };
 }
 

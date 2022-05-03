@@ -672,7 +672,7 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
-TEST(MainInterfaceTest, DrainConnections) {
+TEST(MainInterfaceTest, ResetConnectivityState) {
   engine_test_context test_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
                                       auto* engine_running =
@@ -688,7 +688,7 @@ TEST(MainInterfaceTest, DrainConnections) {
   run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  ASSERT_EQ(ENVOY_SUCCESS, drain_connections(engine_handle));
+  ASSERT_EQ(ENVOY_SUCCESS, reset_connectivity_state(engine_handle));
 
   terminate_engine(engine_handle);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));

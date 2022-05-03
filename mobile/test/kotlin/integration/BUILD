@@ -86,9 +86,9 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
-    name = "drain_connections_test",
+    name = "reset_connectivity_state_test",
     srcs = [
-        "DrainConnectionsTest.kt",
+        "ResetConnectivityStateTest.kt",
     ],
     native_deps = [
         "//library/common/jni:libjava_jni_lib.so",

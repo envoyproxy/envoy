@@ -590,8 +590,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   terminate_engine(_engineHandle);
 }
 
-- (void)drainConnections {
-  drain_connections(_engineHandle);
+- (void)resetConnectivityState {
+  reset_connectivity_state(_engineHandle);
 }
 
 #pragma mark - Private

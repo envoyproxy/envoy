@@ -316,11 +316,11 @@ public class JniLibrary {
                                                      JvmStringAccessorContext context);
 
   /**
-   * Drain all connections owned by this Engine.
+   * Refresh DNS, and drain connections owned by this Engine.
    *
    * @param engine Handle to the engine for which to drain connections.
    */
-  protected static native int drainConnections(long engine);
+  protected static native int resetConnectivityState(long engine);
 
   /**
    * Update the network interface to the preferred network for opening new

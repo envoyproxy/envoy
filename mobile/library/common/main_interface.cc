@@ -68,7 +68,7 @@ envoy_status_t reset_stream(envoy_engine_t engine, envoy_stream_t stream) {
 envoy_status_t set_preferred_network(envoy_engine_t engine, envoy_network_t network) {
   envoy_netconf_t configuration_key = Envoy::Network::Configurator::setPreferredNetwork(network);
   Envoy::EngineHandle::runOnEngineDispatcher(engine, [configuration_key](auto& engine) -> void {
-    engine.networkConfigurator().refreshDns(configuration_key);
+    engine.networkConfigurator().refreshDns(configuration_key, true);
   });
   // TODO(snowp): Should this return failure ever?
   return ENVOY_SUCCESS;
@@ -188,9 +188,7 @@ envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char*
 
 void terminate_engine(envoy_engine_t engine) { Envoy::EngineHandle::terminateEngine(engine); }
 
-envoy_status_t drain_connections(envoy_engine_t e) {
-  // This will change once multiple engine support is in place.
-  // https://github.com/envoyproxy/envoy-mobile/issues/332
+envoy_status_t reset_connectivity_state(envoy_engine_t e) {
   return Envoy::EngineHandle::runOnEngineDispatcher(
-      e, [](auto& engine) { engine.drainConnections(); });
+      e, [](auto& engine) { engine.networkConfigurator().resetConnectivityState(); });
 }

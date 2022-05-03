@@ -52,7 +52,7 @@ class EngineImpl constructor(
     return envoyEngine.dumpStats()
   }
 
-  override fun drainConnections() {
-    envoyEngine.drainConnections()
+  override fun resetConnectivityState() {
+    envoyEngine.resetConnectivityState()
   }
 }

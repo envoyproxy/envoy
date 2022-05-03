@@ -21,6 +21,7 @@ void NetworkConfigurationFilter::setDecoderFilterCallbacks(
 
   auto options = std::make_shared<Network::Socket::Options>();
   network_configurator_->setInterfaceBindingEnabled(enable_interface_binding_);
+  network_configurator_->setDrainPostDnsRefreshEnabled(enable_drain_post_dns_refresh_);
   extra_stream_info_->configuration_key_ = network_configurator_->addUpstreamSocketOptions(options);
   decoder_callbacks_->addUpstreamSocketOptions(options);
 }

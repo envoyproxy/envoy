@@ -60,6 +60,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mDnsPreresolveHostnames = "[]";
   private List<String> mDnsFallbackNameservers = Collections.emptyList();
   private boolean mEnableDnsFilterUnroutableFamilies = false;
+  private boolean mEnableDrainPostDnsRefresh = false;
   private boolean mEnableHttp3 = false;
   private boolean mEnableHappyEyeballs = false;
   private boolean mEnableInterfaceBinding = false;
@@ -123,8 +124,8 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mAdminInterfaceEnabled, mGrpcStatsDomain, mStatsDPort, mConnectTimeoutSeconds,
         mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
         mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames,
-        mDnsFallbackNameservers, mEnableDnsFilterUnroutableFamilies, mEnableHttp3,
-        mEnableHappyEyeballs, mEnableInterfaceBinding,
+        mDnsFallbackNameservers, mEnableDnsFilterUnroutableFamilies, mEnableDrainPostDnsRefresh,
+        mEnableHttp3, mEnableHappyEyeballs, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mH2ExtendKeepaliveTimeout, mH2RawDomains, mMaxConnectionsPerHost, mStatsFlushSeconds,
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,

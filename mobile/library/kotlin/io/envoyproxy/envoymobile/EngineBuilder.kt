@@ -39,6 +39,7 @@ open class EngineBuilder(
   private var dnsQueryTimeoutSeconds = 25
   private var dnsMinRefreshSeconds = 60
   private var dnsPreresolveHostnames = "[]"
+  private var enableDrainPostDnsRefresh = false
   private var enableHttp3 = false
   private var enableHappyEyeballs = false
   private var enableInterfaceBinding = false
@@ -196,6 +197,21 @@ open class EngineBuilder(
    */
   fun enableDNSFilterUnroutableFamilies(dnsFilterUnroutableFamilies: Boolean): EngineBuilder {
     this.dnsFilterUnroutableFamilies = dnsFilterUnroutableFamilies
+    return this
+  }
+
+  /**
+   * Specify whether to drain connections after the resolution of a soft DNS refresh. A refresh may
+   * be triggered directly via the Engine API, or as a result of a network status update provided by
+   * the OS. Draining connections does not interrupt existing connections or requests, but will
+   * establish new connections for any further requests.
+   *
+   * @param enableDrainPostDnsRefresh whether to drain connections after soft DNS refresh.
+   *
+   * @return This builder.
+   */
+  fun enableDrainPostDnsRefresh(enableDrainPostDnsRefresh: Boolean): EngineBuilder {
+    this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh
     return this
   }
 
@@ -503,6 +519,7 @@ open class EngineBuilder(
       dnsPreresolveHostnames,
       dnsFallbackNameservers,
       dnsFilterUnroutableFamilies,
+      enableDrainPostDnsRefresh,
       enableHttp3,
       enableHappyEyeballs,
       enableInterfaceBinding,

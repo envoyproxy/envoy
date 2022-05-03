@@ -35,7 +35,7 @@ interface Engine {
   fun dumpStats(): String
 
   /**
-   * Drain all connections owned by this Engine.
+   * Refresh DNS, and drain connections owned by this Engine.
    */
-  fun drainConnections()
+  fun resetConnectivityState()
 }

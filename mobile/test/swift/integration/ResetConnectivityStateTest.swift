@@ -3,8 +3,8 @@ import EnvoyEngine
 import Foundation
 import XCTest
 
-final class DrainConnectionsTest: XCTestCase {
-  func testDrainConnections() {
+final class ResetConnectivityStateTest: XCTestCase {
+  func testResetConnectivityState() {
     // swiftlint:disable:next line_length
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
     // swiftlint:disable:next line_length
@@ -77,7 +77,7 @@ static_resources:
 
     XCTAssertEqual(XCTWaiter.wait(for: [expectation1], timeout: 1), .completed)
 
-    engine.drainConnections()
+    engine.resetConnectivityState()
 
     let expectation2 =
       self.expectation(description: "Run called with expected http status first request")

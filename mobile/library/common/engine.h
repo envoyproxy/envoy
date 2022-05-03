@@ -123,11 +123,6 @@ public:
   void flushStats();
 
   /**
-   * Drain all upstream connections associated with this Engine.
-   */
-  void drainConnections();
-
-  /**
    * Get cluster manager from the Engine.
    */
   Upstream::ClusterManager& getClusterManager();
