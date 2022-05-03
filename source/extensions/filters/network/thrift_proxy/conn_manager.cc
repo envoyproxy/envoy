@@ -467,7 +467,7 @@ ConnectionManager::ActiveRpc::applyEncoderFilters(DecoderEvent state, absl::any 
 
   FilterStatus status =
       applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_, protocol_converter);
-  // Not support FilterStatus::StopIteration.
+  // FilterStatus::StopIteration is currently not supported.
   ASSERT(status == FilterStatus::Continue);
 
   return status;
