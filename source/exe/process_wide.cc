@@ -28,6 +28,8 @@ ProcessWide::ProcessWide() {
   absl::MutexLock lock(&init_data.mutex_);
 
   if (init_data.count_++ == 0) {
+    // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
+    // edge case where something does init/destroy/init/destroy.
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
@@ -56,7 +58,6 @@ ProcessWide::~ProcessWide() {
 
   ASSERT(init_data.count_ > 0);
   if (--init_data.count_ == 0) {
-    init_data.count_ = false;
     ares_library_cleanup();
   }
 }
