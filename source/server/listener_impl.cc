@@ -701,9 +701,12 @@ void ListenerImpl::buildOriginalDstListenerFilter() {
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             "envoy.filters.listener.original_dst");
 
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
-        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
+    Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_ );
+    auto cfg_provider = parent_.getTcpListenerConfigProviderManager();
+    auto filter_config_provider = cfg_provider.createStaticFilterConfigProvider(
+        callback, "envoy.filters.listener.original_dst");
+    listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
 
@@ -716,9 +719,14 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             "envoy.filters.listener.proxy_protocol");
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+
+    Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
         envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
-        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
+        nullptr, *listener_factory_context_ );
+    auto cfg_provider = parent_.getTcpListenerConfigProviderManager();
+    auto filter_config_provider = cfg_provider.createStaticFilterConfigProvider(
+        callback, "envoy.filters.listener.proxy_protocol");
+    listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
 

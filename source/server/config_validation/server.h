@@ -148,15 +148,17 @@ public:
     return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
         filters, filter_chain_factory_context);
   }
-  std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createListenerFilterFactoryList_(
+        filters, context, listener_manager_->getTcpListenerConfigProviderManager());
   }
-  std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+  UdpListenerFilterFactoriesList createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+        filters, context, listener_manager_->getUdpListenerConfigProviderManager());
   }
   Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,

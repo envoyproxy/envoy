@@ -169,7 +169,8 @@ public:
                                       ProtobufTypes::MessagePtr&& default_config,
                                       bool last_filter_in_filter_chain,
                                       const std::string& filter_chain_type,
-                                      absl::string_view stat_prefix)
+                                      absl::string_view stat_prefix,
+                                      const Network::ListenerFilterMatcherSharedPtr&)
       : DynamicFilterConfigProviderImpl(subscription, require_type_urls, factory_context,
                                         std::move(default_config), last_filter_in_filter_chain,
                                         filter_chain_type, stat_prefix),
@@ -203,17 +204,19 @@ public:
       const absl::flat_hash_set<std::string>& require_type_urls,
       Server::Configuration::ListenerFactoryContext& factory_context,
       ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type, absl::string_view stat_prefix)
+      const std::string& filter_chain_type, absl::string_view stat_prefix,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl<FactoryCb>(
             subscription, require_type_urls, factory_context, std::move(default_config),
             last_filter_in_filter_chain, filter_chain_type, stat_prefix),
-        factory_context_(factory_context) {}
+        factory_context_(factory_context), listener_filter_matcher_(listener_filter_matcher){}
 
   void validateMessage(const std::string&, const Protobuf::Message&,
                        const std::string&) const override {}
 
 protected:
   Server::Configuration::ListenerFactoryContext& factory_context_;
+  const Network::ListenerFilterMatcherSharedPtr listener_filter_matcher_;
 };
 
 class TcpListenerDynamicFilterConfigProviderImpl
@@ -227,8 +230,7 @@ private:
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
             getFactoryByType(message.GetTypeName());
-    // TODO(yanjunxiang): Change nullptr to actual listener filter matcher.
-    return factory->createListenerFilterFactoryFromProto(message, nullptr, factory_context_);
+    return factory->createListenerFilterFactoryFromProto(message, listener_filter_matcher_, factory_context_);
   }
 };
 
@@ -385,7 +387,8 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, FactoryCtx& factory_context,
       const std::string& stat_prefix, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type) override {
+      const std::string& filter_chain_type,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.top_level_ecds_stats")) {
@@ -421,7 +424,7 @@ public:
 
     auto provider = createFilterConfigProviderImpl(
         subscription, require_type_urls, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix);
+        last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix, listener_filter_matcher);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
@@ -476,10 +479,11 @@ private:
       FilterConfigSubscriptionSharedPtr& subscription,
       const absl::flat_hash_set<std::string>& require_type_urls, FactoryCtx& factory_context,
       ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type, absl::string_view stat_prefix) {
+      const std::string& filter_chain_type, absl::string_view stat_prefix,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
     return std::make_unique<DynamicFilterConfigImpl>(
         subscription, require_type_urls, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, stat_prefix);
+        last_filter_in_filter_chain, filter_chain_type, stat_prefix, listener_filter_matcher);
   }
 };
 

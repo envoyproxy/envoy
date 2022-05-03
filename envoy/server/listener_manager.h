@@ -14,6 +14,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/filter/config_provider_manager.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -88,9 +89,9 @@ public:
    * Creates a list of listener filter factories.
    * @param filters supplies the JSON configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Network::ListenerFilterFactoryCb> the list of filter factories.
+   * @return ListenerFilterFactoriesList the list of filter factories.
    */
-  virtual std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  virtual Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
@@ -98,9 +99,9 @@ public:
    * Creates a list of UDP listener filter factories.
    * @param filters supplies the configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
+   * @return UdpListenerFilterFactoriesList the list of filter factories.
    */
-  virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+  virtual Filter::UdpListenerFilterFactoriesList createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 

@@ -103,7 +103,8 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_, "xds.", last_filter_config, getFilterType());
+        config_source, name, factory_context_, "xds.", last_filter_config, getFilterType(),
+        getFilterMatcher());
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
@@ -153,6 +154,7 @@ public:
 
   virtual const std::string getTypeUrl() const PURE;
   virtual const std::string getFilterType() const PURE;
+  virtual const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const PURE;
   virtual const std::string getConfigReloadCounter() const PURE;
   virtual const std::string getConfigFailCounter() const PURE;
 
@@ -173,6 +175,9 @@ public:
     return "envoy.extensions.filters.http.router.v3.Router";
   }
   const std::string getFilterType() const override { return "http"; }
+  const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
+    return nullptr;
+  }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_reload";
   }
@@ -189,6 +194,9 @@ class TcpListenerFilterConfigDiscoveryImplTest
 public:
   const std::string getTypeUrl() const override { return "google.protobuf.Struct"; }
   const std::string getFilterType() const override { return "listener"; }
+  const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
+    return nullptr;
+  }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_reload";
   }
@@ -208,6 +216,9 @@ public:
     return "test.integration.filters.TestUdpListenerFilterConfig";
   }
   const std::string getFilterType() const override { return "listener"; }
+  const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
+    return nullptr;
+  }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_reload";
   }

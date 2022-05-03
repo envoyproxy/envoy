@@ -89,21 +89,23 @@ protected:
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+            Invoke([this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                           filters,
                       Configuration::ListenerFactoryContext& context)
-                       -> std::vector<Network::ListenerFilterFactoryCb> {
+                   -> Filter::ListenerFilterFactoriesList {
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                    context);
+                                                                                    context,
+                                                                                    manager_->getTcpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+            Invoke([this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                           filters,
                       Configuration::ListenerFactoryContext& context)
-                       -> std::vector<Network::UdpListenerFilterFactoryCb> {
+                   -> Filter::UdpListenerFilterFactoriesList {
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
-                                                                                       context);
+                                                                                       context,
+                                                                                       manager_->getUdpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
       return listener_tag_++;

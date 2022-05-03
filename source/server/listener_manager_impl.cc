@@ -108,11 +108,11 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
   return ret;
 }
 
-std::vector<Network::ListenerFilterFactoryCb>
-ProdListenerComponentFactory::createListenerFilterFactoryList_(
+Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
-    Configuration::ListenerFactoryContext& context) {
-  std::vector<Network::ListenerFilterFactoryCb> ret;
+    Configuration::ListenerFactoryContext& context,
+    Filter::TcpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::ListenerFilterFactoriesList ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -120,24 +120,57 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
+    // dynamic listener filter configuration
+    if (proto_config.config_type_case() ==
+      envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      auto& config_discovery = proto_config.config_discovery();
+      auto& name = proto_config.name();
+      ENVOY_LOG(debug, "   Listener filter:   dynamic filter name: {}", name);
+      if (config_discovery.apply_default_config_without_warming() &&
+        !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+        "Error: listener filter config {} applied without warming but has no default config.", name));
+      }
+      for (const auto& type_url : config_discovery.type_urls()) {
+        auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        auto* factory = Registry::FactoryRegistry<
+           Server::Configuration::NamedListenerFilterConfigFactory>::getFactoryByType(factory_type_url);
+        if (factory == nullptr) {
+          throw EnvoyException(
+            fmt::format("Error: no listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+      auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name, context, "tcp_listener.", false, "listener",
+          createListenerFilterMatcher(proto_config));
+      ret.push_back(std::move(filter_config_provider));
+      return ret;
+    }
 
-    // Now see if there is a factory that will accept the config.
+    // For static configuration, now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createListenerFilterFactoryFromProto(
-        *message, createListenerFilterMatcher(proto_config), context));
+
+    Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
+        *message, createListenerFilterMatcher(proto_config), context);
+
+    auto filter_config_provider = config_provider_manager.createStaticFilterConfigProvider(
+        callback, proto_config.name());
+
+    ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
+    ret.push_back(std::move(filter_config_provider));
   }
   return ret;
 }
 
-std::vector<Network::UdpListenerFilterFactoryCb>
-ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+Filter::UdpListenerFilterFactoriesList ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
-    Configuration::ListenerFactoryContext& context) {
-  std::vector<Network::UdpListenerFilterFactoryCb> ret;
+    Configuration::ListenerFactoryContext& context,
+    Filter::UdpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::UdpListenerFilterFactoriesList ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -145,15 +178,47 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
+    // dynamic UDP listener filter configuration
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      auto& config_discovery = proto_config.config_discovery();
+      auto& name = proto_config.name();
+      ENVOY_LOG(debug, " UDP  Listener filter:   dynamic filter name: {}", name);
 
-    // Now see if there is a factory that will accept the config.
+      if (config_discovery.apply_default_config_without_warming() &&
+          !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+            "Error: listener filter config {} applied without warming but has no default config.", name));
+      }
+
+      for (const auto& type_url : config_discovery.type_urls()) {
+        auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        auto* factory = Registry::FactoryRegistry<
+            Server::Configuration::NamedUdpListenerFilterConfigFactory>::getFactoryByType(factory_type_url);
+        if (factory == nullptr) {
+          throw EnvoyException(
+              fmt::format("Error: no UDP listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+
+      auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name,   context, "udp_listener.", false, "listener", nullptr);
+      ret.push_back(std::move(filter_config_provider));
+      return ret;
+    }
+
+    // For static configuration, Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
             proto_config);
-
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+    Network::UdpListenerFilterFactoryCb callback = factory.createFilterFactoryFromProto(
+        *message,  context);
+    auto filter_config_provider = config_provider_manager.createStaticFilterConfigProvider(
+        callback, proto_config.name());
+    ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
+    ret.push_back(std::move(filter_config_provider));
   }
   return ret;
 }
@@ -253,6 +318,9 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
   }
+  // Create TCP/UDP listener filter config provider manager instance.
+  tcp_listener_config_provider_manager_ = std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>();
+  udp_listener_config_provider_manager_ = std::make_unique<Filter::UdpListenerFilterConfigProviderManagerImpl>();
 }
 
 ProtobufTypes::MessagePtr
