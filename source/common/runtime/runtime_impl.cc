@@ -65,7 +65,7 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
       maybeSetDeprecatedInts(it.first, it.second.uint_value_.value());
     }
   }
-  runtimeIsInitialized();
+  markRuntimeInitialized();
 }
 
 } // namespace

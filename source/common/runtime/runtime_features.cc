@@ -178,7 +178,7 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   return default_value;
 }
 
-void runtimeIsInitialized() {
+void markRuntimeInitialized() {
   maybeSetRuntimeGuard("envoy.reloadable_features.runtime_initialized", true);
 }
 
