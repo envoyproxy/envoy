@@ -69,5 +69,8 @@ new_features:
 - area: on_demand
   change: |
     :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
+- area: proxy_protcol
+  change: |
+    added support for allowing requests without proxy protocol on the listener from trusted downstreams as an opt-in flag.
 
 deprecated:
