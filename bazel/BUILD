@@ -16,6 +16,7 @@ exports_files([
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
+    "exported_symbols.txt",
 ])
 
 genrule(
