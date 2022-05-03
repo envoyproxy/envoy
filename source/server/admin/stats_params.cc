@@ -13,7 +13,9 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   if (filter_iter != query_.end()) {
     filter_string_ = filter_iter->second;
     if (query_.find("safe") != query_.end()) {
-      safe_filter_ = std::make_shared<re2::RE2>(filter_string_);
+      re2::RE2::Options options;
+      options.set_log_errors(false);
+      safe_filter_ = std::make_shared<re2::RE2>(filter_string_, options);
       filter_ = absl::nullopt;
       if (!safe_filter_->ok()) {
         response.add("Invalid safe regex");
