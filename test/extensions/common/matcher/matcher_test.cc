@@ -46,9 +46,6 @@ public:
 };
 
 TEST_F(TapMatcherTest, InvalidRule) {
-  // const std::string matcher_yaml = "";
-  // const envoy::config::common::matcher::v3::MatchPredicate config;
-  // TestUtility::loadFromYaml(matcher_yaml, config_);
   EXPECT_ENVOY_BUG(buildMatcher(config_, matchers_), "matcher predicate rule not set");
 }
 

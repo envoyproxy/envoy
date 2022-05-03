@@ -61,11 +61,6 @@ public:
   std::string key_;
 };
 
-TEST_F(HashPolicyImplBaseTest, FooWhat) {
-  setup();
-  EXPECT_EQ(hash_policy_, nullptr);
-}
-
 // Check if generate correct hash
 TEST_F(HashPolicyImplSourceIpTest, SourceIpHash) {
   setup();

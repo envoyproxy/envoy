@@ -268,7 +268,7 @@ TEST_F(HttpConnManFinalizerImplTest, EmptyTagCase) {
   TestUtility::loadFromYaml("{}", custom_tag);
   custom_tag.clear_type();
   EXPECT_ENVOY_BUG(CustomTagUtility::createCustomTag(custom_tag),
-                   "unexpected custom tag type case");
+                   "custom tag type case not set");
 }
 
 TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
