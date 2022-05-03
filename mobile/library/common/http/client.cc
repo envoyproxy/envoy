@@ -590,12 +590,6 @@ namespace {
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
 const LowerCaseString ProtocolHeader{"x-envoy-mobile-upstream-protocol"};
 
-// Alternate clusters included here are a stopgap to make it less likely for a given connection
-// class to suffer "catastrophic" failure of all outbound requests due to a network blip, by
-// distributing requests across a minimum of two potential connections per connection class.
-// Long-term we will be working to generally provide more responsive connection handling within
-// Envoy itself.
-
 const char* BaseCluster = "base";
 const char* H2Cluster = "base_h2";
 const char* H3Cluster = "base_h3";
