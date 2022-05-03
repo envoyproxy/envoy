@@ -55,7 +55,7 @@ using PerRouteStatefulSessionConfigSharedPtr = std::shared_ptr<PerRouteStatefulS
 class StatefulSession : public Http::PassThroughFilter,
                         public Logger::Loggable<Logger::Id::filter> {
 public:
-  StatefulSession(const StatefulSessionConfig* config) : config_(config) {}
+  StatefulSession(StatefulSessionConfigSharedPtr config) : config_(std::move(config)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -68,7 +68,7 @@ public:
 private:
   Http::SessionStatePtr session_state_;
 
-  const StatefulSessionConfig* config_{nullptr};
+  StatefulSessionConfigSharedPtr config_{};
 };
 
 } // namespace StatefulSession
