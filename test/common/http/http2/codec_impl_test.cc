@@ -1939,7 +1939,7 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlInPendingRecvData) {
   ASSERT_EQ(initial_stream_window, 65535);
 
   // Set artificially small watermarks to make the recv buffer easy to overrun. In production,
-  // the recv buffer can be overrun by a client which negotiates a larger
+  // the recv buffer can be overrun by a client that negotiates a larger
   // SETTINGS_MAX_FRAME_SIZE but there's no current easy way to tweak that in
   // envoy (without sending raw HTTP/2 frames) so we lower the buffer limit instead.
   server_->getStream(1)->setWriteBufferWatermarks(20);
@@ -1957,11 +1957,11 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlInPendingRecvData) {
   Buffer::OwnedImpl data2(std::string(65495, 'a'));
 
   if (defer_processing_backedup_streams_) {
-    // Writes will be deferred
+    // Writes will be deferred.
     request_encoder_->encodeData(data2, false);
     driveToCompletion();
   } else {
-    // Writes will be pushed through
+    // Writes will be pushed through.
     EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
     request_encoder_->encodeData(data2, false);
     driveToCompletion();
@@ -1981,6 +1981,12 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlInPendingRecvData) {
   server_->getStream(1)->readDisable(false);
   driveToCompletion();
   EXPECT_EQ(getStreamReceiveWindowSize(server_, 1), initial_stream_window);
+
+  if (process_buffered_data_callback != nullptr) {
+    EXPECT_TRUE(process_buffered_data_callback->enabled());
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    process_buffered_data_callback->invokeCallback();
+  }
 }
 
 // Test that pending_recv_data_ buffer is bounded with defer processing
@@ -2017,12 +2023,10 @@ TEST_P(Http2CodecImplFlowControlTest, PendingRecvBufferBoundedWhenDeferProcessin
 
   // Toggling read disable, enable will grant additional window as we're not
   // above high watermark.
-  NiceMock<Event::MockSchedulableCallback>* process_buffered_data_callback{nullptr};
-  if (defer_processing_backedup_streams_) {
-    process_buffered_data_callback =
-        new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
-  }
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
   server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled());
   driveToCompletion();
   EXPECT_EQ(getStreamReceiveWindowSize(server_, 1), initial_stream_window);
 

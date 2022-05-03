@@ -182,7 +182,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
-    stream_manager_.chunk_size_ = buffer_limit;
+    stream_manager_.defer_processing_segment_size_ = buffer_limit;
   }
 }
 
@@ -505,20 +505,21 @@ void ConnectionImpl::StreamImpl::decodeData() {
     return;
   }
 
-  // Buffered data may be consumed. Restore if not all consumed.
+  // Some buffered body will be consumed. If there remains buffered body after
+  // this call, set this to true.
   stream_manager_.body_buffered_ = false;
 
   bool already_drained_data = false;
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
-    const bool decodeDataInChunk = defer_processing_backedup_streams_ &&
-                                   stream_manager_.decodeAsChunks() &&
-                                   pending_recv_data_->length() > stream_manager_.chunk_size_;
-    if (decodeDataInChunk) {
+    const bool decode_data_in_chunk =
+        defer_processing_backedup_streams_ && stream_manager_.decodeAsChunks() &&
+        pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
+    if (decode_data_in_chunk) {
       Buffer::OwnedImpl chunk_buffer;
       // TODO(kbaichoo): Consider implementing an approximate move for chunking.
-      chunk_buffer.move(*pending_recv_data_, stream_manager_.chunk_size_);
+      chunk_buffer.move(*pending_recv_data_, stream_manager_.defer_processing_segment_size_);
 
       // With the current implementation this should always be true,
       // though this can change with approximation.
