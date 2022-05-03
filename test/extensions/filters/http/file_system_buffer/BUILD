@@ -8,6 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# TODO(ravenblack): switch all of these to extension targets when extension is named
 envoy_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],

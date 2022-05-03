@@ -55,8 +55,6 @@ std::string smallRequestBufferConfig() {
       testTmpDir());
 }
 
-// Integration test //
-
 using FileSystemBufferIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, FileSystemBufferIntegrationTest,
