@@ -376,7 +376,8 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
 }
 
-void validateClusterSpecifier(const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
+void validateClusterSpecifier(
+    const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {
     throw EnvoyException(
         "Only one of cluster or cluster_header in request mirror policy can be specified");
