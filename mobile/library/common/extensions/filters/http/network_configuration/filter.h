@@ -22,9 +22,10 @@ class NetworkConfigurationFilter final : public Http::PassThroughFilter,
                                          public Logger::Loggable<Logger::Id::filter> {
 public:
   NetworkConfigurationFilter(Network::ConfiguratorSharedPtr network_configurator,
-                             bool enable_interface_binding)
+                             bool enable_drain_post_dns_refresh, bool enable_interface_binding)
       : network_configurator_(network_configurator),
         extra_stream_info_(nullptr), // always set in setDecoderFilterCallbacks
+        enable_drain_post_dns_refresh_(enable_drain_post_dns_refresh),
         enable_interface_binding_(enable_interface_binding) {}
 
   // Http::StreamDecoderFilter
@@ -37,6 +38,7 @@ public:
 private:
   Network::ConfiguratorSharedPtr network_configurator_;
   StreamInfo::ExtraStreamInfo* extra_stream_info_;
+  bool enable_drain_post_dns_refresh_;
   bool enable_interface_binding_;
 };
 

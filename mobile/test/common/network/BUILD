@@ -11,6 +11,7 @@ envoy_cc_test(
     deps = [
         "//library/common/network:configurator_lib",
         "@envoy//test/extensions/common/dynamic_forward_proxy:mocks",
+        "@envoy//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 

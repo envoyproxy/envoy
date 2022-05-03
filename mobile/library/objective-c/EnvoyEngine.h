@@ -539,7 +539,7 @@ extern const int kEnvoyFailure;
 
 - (void)terminate;
 
-- (void)drainConnections;
+- (void)resetConnectivityState;
 
 @end
 

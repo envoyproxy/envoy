@@ -46,7 +46,7 @@ internal class MockEnvoyEngine : EnvoyEngine {
 
   override fun dumpStats(): String = ""
 
-  override fun drainConnections() = Unit
+  override fun resetConnectivityState() = Unit
 
   override fun setPreferredNetwork(network: EnvoyNetworkType) = Unit
 }

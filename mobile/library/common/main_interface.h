@@ -203,11 +203,11 @@ envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char*
 void terminate_engine(envoy_engine_t engine);
 
 /**
- * Drain all upstream connections associated with an engine
+ * Refresh DNS, and drain connections associated with an engine.
  * @param engine, handle to the engine to drain.
  * @return envoy_status_t, the resulting status of the operation.
  */
-envoy_status_t drain_connections(envoy_engine_t engine);
+envoy_status_t reset_connectivity_state(envoy_engine_t engine);
 
 #ifdef __cplusplus
 } // functions

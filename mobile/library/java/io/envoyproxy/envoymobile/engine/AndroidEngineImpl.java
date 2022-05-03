@@ -90,8 +90,8 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void drainConnections() {
-    envoyEngine.drainConnections();
+  public void resetConnectivityState() {
+    envoyEngine.resetConnectivityState();
   }
 
   @Override

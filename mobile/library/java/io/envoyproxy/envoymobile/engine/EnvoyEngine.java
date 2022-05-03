@@ -116,9 +116,9 @@ public interface EnvoyEngine {
   String dumpStats();
 
   /**
-   * Drain all connections owned by this Engine.
+   * Refresh DNS, and drain connections owned by this Engine.
    */
-  void drainConnections();
+  void resetConnectivityState();
 
   /**
    * Update the network interface to the preferred network for opening new

@@ -70,7 +70,7 @@ extension EngineImpl: Engine {
     self.engine.terminate()
   }
 
-  func drainConnections() {
-    self.engine.drainConnections()
+  func resetConnectivityState() {
+    self.engine.resetConnectivityState()
   }
 }

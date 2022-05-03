@@ -20,6 +20,6 @@ public protocol Engine: AnyObject {
   /// Terminates the running engine.
   func terminate()
 
-  /// Drain all connections owned by this Engine.
-  func drainConnections()
+  /// Refresh DNS, and drain connections owned by this Engine.
+  func resetConnectivityState()
 }

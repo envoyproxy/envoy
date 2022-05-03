@@ -55,7 +55,7 @@ static_resources:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
 
-class DrainConnectionsTest {
+class ResetConnectivityStateTest {
 
   init {
     JniLibrary.loadTestLibrary()
@@ -91,7 +91,7 @@ class DrainConnectionsTest {
 
     headersExpectation.await(10, TimeUnit.SECONDS)
 
-    engine.drainConnections()
+    engine.resetConnectivityState()
 
     var resultHeaders2: ResponseHeaders? = null
     var resultEndStream2: Boolean? = null

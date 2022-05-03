@@ -5,7 +5,9 @@
 
 #include "envoy/network/socket.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "library/common/types/c_types.h"
@@ -60,11 +62,34 @@ using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedP
  * Object responsible for tracking network state, especially with respect to multiple interfaces,
  * and providing auxiliary configuration to network connections, in the form of upstream socket
  * options.
+ *
+ * Code is largely structured to be run exclusively on the engine's main thread. However,
+ * setPreferredNetwork is allowed to be called from any thread, and the internal NetworkState that
+ * it modifies owns a mutex used to synchronize all access to that state.
+ * (Note NetworkState was originally designed to fit into an atomic, and could still feasibly be
+ * switched to one.)
+ *
+ * This object is a singleton per-engine. Note that several pieces of functionality assume a DNS
+ * cache adhering to the one set up in base configuration will be present, but will become no-ops
+ * if that cache is missing either due to alternate configurations, or lifecycle-related timing.
+ *
  */
-class Configurator : public Logger::Loggable<Logger::Id::upstream>, public Singleton::Instance {
+class Configurator : public Logger::Loggable<Logger::Id::upstream>,
+                     public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
+                     public Singleton::Instance {
 public:
-  Configurator(DnsCacheManagerSharedPtr dns_cache_manager)
-      : enable_interface_binding_{false}, dns_cache_manager_(dns_cache_manager) {}
+  Configurator(Upstream::ClusterManager& cluster_manager,
+               DnsCacheManagerSharedPtr dns_cache_manager)
+      : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {}
+
+  // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
+  void onDnsHostAddOrUpdate(
+      const std::string& /*host*/,
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override {}
+  void onDnsHostRemove(const std::string& /*host*/) override {}
+  void onDnsResolutionComplete(const std::string& /*host*/,
+                               const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
+                               Network::DnsResolver::ResolutionStatus) override;
 
   /**
    * @returns a list of local network interfaces supporting IPv4.
@@ -108,11 +133,20 @@ public:
   void reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault);
 
   /**
-   * Sets the current OS default/preferred network class.
+   * Sets the current OS default/preferred network class. Note this function is allowed to be
+   * called from any thread.
    * @param network, the OS-preferred network.
    * @returns configuration key to associate with any related calls.
    */
   static envoy_netconf_t setPreferredNetwork(envoy_network_t network);
+
+  /**
+   * Configure whether connections should be drained after a triggered DNS refresh. Currently this
+   * may happen either due to an external call to refreshConnectivityState or an update to
+   * setPreferredNetwork.
+   * @param enabled, whether to enable connection drain after DNS refresh.
+   */
+  void setDrainPostDnsRefreshEnabled(bool enabled);
 
   /**
    * Sets whether subsequent calls for upstream socket options may leverage options that bind
@@ -124,8 +158,14 @@ public:
   /**
    * Refresh DNS in response to preferred network update. May be no-op.
    * @param configuration_key, key provided by this class representing the current configuration.
+   * @param drain_connections, request that connections be drained after next DNS resolution.
    */
-  void refreshDns(envoy_netconf_t configuration_key);
+  void refreshDns(envoy_netconf_t configuration_key, bool drain_connections);
+
+  /**
+   * Drain all upstream connections associated with this Engine.
+   */
+  void resetConnectivityState();
 
   /**
    * @returns the current socket options that should be used for connections.
@@ -152,7 +192,21 @@ private:
   Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(envoy_network_t network);
   InterfacePair getActiveAlternateInterface(envoy_network_t network, unsigned short family);
 
-  bool enable_interface_binding_;
+  /**
+   * Returns the default DNS cache set up in base configuration. This cache may be missing either
+   * due to engine lifecycle-related timing or alternate configurations. If it is, operations
+   * that use it should revert to no-ops.
+   *
+   * @returns the default DNS cache set up in base configuration or nullptr.
+   */
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache();
+
+  bool enable_drain_post_dns_refresh_{false};
+  bool enable_interface_binding_{false};
+  bool pending_drain_{false};
+  Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
+      dns_callbacks_handle_{nullptr};
+  Upstream::ClusterManager& cluster_manager_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
   static NetworkState network_state_;
 };
@@ -164,7 +218,7 @@ using ConfiguratorSharedPtr = std::shared_ptr<Configurator>;
  */
 class ConfiguratorFactory {
 public:
-  ConfiguratorFactory(Server::Configuration::FactoryContextBase& context) : context_(context) {}
+  ConfiguratorFactory(Server::Configuration::CommonFactoryContext& context) : context_(context) {}
 
   /**
    * @returns singleton Configurator instance.
@@ -172,7 +226,7 @@ public:
   ConfiguratorSharedPtr get();
 
 private:
-  Server::Configuration::FactoryContextBase& context_;
+  Server::Configuration::CommonFactoryContext& context_;
 };
 
 /**
