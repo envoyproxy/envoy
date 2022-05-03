@@ -181,25 +181,32 @@ void Configurator::reportNetworkUsage(envoy_netconf_t configuration_key, bool ne
 }
 
 void Configurator::onDnsResolutionComplete(
-    const std::string& host, const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
+    const std::string& resolved_host,
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
     Network::DnsResolver::ResolutionStatus) {
-  if (enable_drain_post_dns_refresh_ && pending_drain_) {
-    pending_drain_ = false;
+  if (enable_drain_post_dns_refresh_) {
+    // Check if the set of hosts pending drain contains the current resolved host.
+    if (hosts_to_drain_.erase(resolved_host) == 0) {
+      return;
+    }
 
     // We ignore whether DNS resolution has succeeded here. If it failed, we may be offline and
     // should probably drain connections. If it succeeds, we may have new DNS entries and so we
     // drain connections. It may be possible to refine this logic in the future.
     // TODO(goaway): check the set of cached hosts from the last triggered DNS refresh for this
     // host, and if present, remove it and trigger connection drain for this host specifically.
-    ENVOY_LOG_EVENT(debug, "netconf_post_dns_drain_cx", host);
-    cluster_manager_.drainConnections(nullptr);
+    ENVOY_LOG_EVENT(debug, "netconf_post_dns_drain_cx", resolved_host);
+
+    // Pass predicate to only drain connections to the resolved host (for any cluster).
+    cluster_manager_.drainConnections(
+        [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; });
   }
 }
 
 void Configurator::setDrainPostDnsRefreshEnabled(bool enabled) {
   enable_drain_post_dns_refresh_ = enabled;
   if (!enabled) {
-    pending_drain_ = false;
+    hosts_to_drain_.clear();
   } else if (!dns_callbacks_handle_) {
     // Register callbacks once, on demand, using the handle as a sentinel. There may not be
     // a DNS cache during initialization, but if one is available, it should always exist by the
@@ -229,9 +236,15 @@ void Configurator::refreshDns(envoy_netconf_t configuration_key, bool drain_conn
 
   if (auto dns_cache = dnsCache()) {
     ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", std::to_string(configuration_key));
-    pending_drain_ = drain_connections && enable_drain_post_dns_refresh_;
-    // TODO(goaway): capture the list of currently cached hosts here in a set, to be checked
-    // for draining when DNS resolutions occur.
+
+    if (drain_connections && enable_drain_post_dns_refresh_) {
+      dns_cache->iterateHostMap(
+          [&](absl::string_view host,
+              const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
+            hosts_to_drain_.emplace(host);
+          });
+    }
+
     dns_cache->forceRefreshHosts();
   }
 }
