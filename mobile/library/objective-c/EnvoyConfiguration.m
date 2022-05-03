@@ -15,6 +15,7 @@
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
+                        enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
@@ -53,6 +54,7 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableInterfaceBinding = enableInterfaceBinding;
+  self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -149,6 +151,8 @@
                             self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &dns_resolver_name envoy.network.dns_resolver.apple\n"];
+  [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
+                            self.enableDrainPostDnsRefresh ? @"true" : @"false"];
   // No additional values are currently needed for Apple-based DNS resolver.
   [definitions
       appendFormat:@"- &dns_resolver_config "
