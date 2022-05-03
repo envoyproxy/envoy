@@ -20,8 +20,10 @@ template <class FactoryCb>
 using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvider<FactoryCb>>;
 
 // Listener filter config provider aliases
-using ListenerFilterFactoriesList = std::vector<FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>>;
-using UdpListenerFilterFactoriesList = std::vector<FilterConfigProviderPtr<Network::UdpListenerFilterFactoryCb>>;
+using ListenerFilterFactoriesList =
+    std::vector<FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>>;
+using UdpListenerFilterFactoriesList =
+    std::vector<FilterConfigProviderPtr<Network::UdpListenerFilterFactoryCb>>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider
@@ -41,7 +43,8 @@ public:
    * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
    * configured chain
    * @param filter_chain_type is the filter chain type
-   * @param listener_filter_matcher is the filter matcher for TCP listener filter. nullptr for other filter types.
+   * @param listener_filter_matcher is the filter matcher for TCP listener filter. nullptr for other
+   * filter types.
    */
   virtual DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,

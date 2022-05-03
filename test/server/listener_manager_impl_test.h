@@ -88,24 +88,22 @@ protected:
                   filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                          filters,
-                      Configuration::ListenerFactoryContext& context)
-                   -> Filter::ListenerFilterFactoriesList {
-              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                    context,
-                                                                                    manager_->getTcpListenerConfigProviderManager());
+        .WillByDefault(Invoke(
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                       filters,
+                   Configuration::ListenerFactoryContext& context)
+                -> Filter::ListenerFilterFactoriesList {
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(
+                  filters, context, manager_->getTcpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                          filters,
-                      Configuration::ListenerFactoryContext& context)
-                   -> Filter::UdpListenerFilterFactoriesList {
-              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
-                                                                                       context,
-                                                                                       manager_->getUdpListenerConfigProviderManager());
+        .WillByDefault(Invoke(
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                       filters,
+                   Configuration::ListenerFactoryContext& context)
+                -> Filter::UdpListenerFilterFactoriesList {
+              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+                  filters, context, manager_->getUdpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
       return listener_tag_++;

@@ -37,7 +37,7 @@ private:
  */
 class TestTcpListenerFilter : public Network::ListenerFilter {
 public:
-  TestTcpListenerFilter(const uint32_t drain_bytes) : drain_bytes_(drain_bytes){}
+  TestTcpListenerFilter(const uint32_t drain_bytes) : drain_bytes_(drain_bytes) {}
 
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks&) override {
     return Network::FilterStatus::StopIteration;

@@ -135,10 +135,10 @@ public:
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
   Filter::TcpListenerFilterConfigProviderManagerImpl& getTcpListenerConfigProviderManager() {
-     return *tcp_listener_config_provider_manager_;
+    return *tcp_listener_config_provider_manager_;
   }
   Filter::UdpListenerFilterConfigProviderManagerImpl& getUdpListenerConfigProviderManager() {
-     return *udp_listener_config_provider_manager_;
+    return *udp_listener_config_provider_manager_;
   }
 
   Instance& server_;
@@ -262,8 +262,10 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
-  std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl> tcp_listener_config_provider_manager_;
-  std::unique_ptr<Filter::UdpListenerFilterConfigProviderManagerImpl> udp_listener_config_provider_manager_;
+  std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
+  std::unique_ptr<Filter::UdpListenerFilterConfigProviderManagerImpl>
+      udp_listener_config_provider_manager_;
 };
 
 /**
@@ -318,16 +320,18 @@ public:
   Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    ListenerManagerImpl * listener_manager = dynamic_cast<ListenerManagerImpl *>(&(server_.listenerManager()));
-    return createListenerFilterFactoryList_(filters, context,
-                                            listener_manager->getTcpListenerConfigProviderManager());
+    ListenerManagerImpl* listener_manager =
+        dynamic_cast<ListenerManagerImpl*>(&(server_.listenerManager()));
+    return createListenerFilterFactoryList_(
+        filters, context, listener_manager->getTcpListenerConfigProviderManager());
   }
   Filter::UdpListenerFilterFactoriesList createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    ListenerManagerImpl * listener_manager = dynamic_cast<ListenerManagerImpl *>(&(server_.listenerManager()));
-    return createUdpListenerFilterFactoryList_(filters, context,
-                                               listener_manager->getUdpListenerConfigProviderManager());
+    ListenerManagerImpl* listener_manager =
+        dynamic_cast<ListenerManagerImpl*>(&(server_.listenerManager()));
+    return createUdpListenerFilterFactoryList_(
+        filters, context, listener_manager->getUdpListenerConfigProviderManager());
   }
   Network::SocketSharedPtr createListenSocket(
       Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,

@@ -209,7 +209,7 @@ public:
       : DynamicFilterConfigProviderImpl<FactoryCb>(
             subscription, require_type_urls, factory_context, std::move(default_config),
             last_filter_in_filter_chain, filter_chain_type, stat_prefix),
-        factory_context_(factory_context), listener_filter_matcher_(listener_filter_matcher){}
+        factory_context_(factory_context), listener_filter_matcher_(listener_filter_matcher) {}
 
   void validateMessage(const std::string&, const Protobuf::Message&,
                        const std::string&) const override {}
@@ -230,7 +230,8 @@ private:
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
             getFactoryByType(message.GetTypeName());
-    return factory->createListenerFilterFactoryFromProto(message, listener_filter_matcher_, factory_context_);
+    return factory->createListenerFilterFactoryFromProto(message, listener_filter_matcher_,
+                                                         factory_context_);
   }
 };
 
@@ -422,9 +423,10 @@ public:
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
 
-    auto provider = createFilterConfigProviderImpl(
-        subscription, require_type_urls, factory_context, std::move(default_config),
-        last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix, listener_filter_matcher);
+    auto provider = createFilterConfigProviderImpl(subscription, require_type_urls, factory_context,
+                                                   std::move(default_config),
+                                                   last_filter_in_filter_chain, filter_chain_type,
+                                                   provider_stat_prefix, listener_filter_matcher);
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {

@@ -702,7 +702,7 @@ void ListenerImpl::buildOriginalDstListenerFilter() {
             "envoy.filters.listener.original_dst");
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_ );
+        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
     auto cfg_provider = parent_.getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider.createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.original_dst");
@@ -721,8 +721,8 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
             "envoy.filters.listener.proxy_protocol");
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
-        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
-        nullptr, *listener_factory_context_ );
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(), nullptr,
+        *listener_factory_context_);
     auto cfg_provider = parent_.getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider.createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.proxy_protocol");

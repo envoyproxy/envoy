@@ -47,7 +47,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     cb_ = &cb;
     ENVOY_LOG(warn, "Listener filter: new connection accepted while missing configuration. "
-              "Close socket and stop the iteration onAccept.");
+                    "Close socket and stop the iteration onAccept.");
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   }
@@ -61,9 +61,8 @@ private:
   Network::ListenerFilterCallbacks* cb_{};
 };
 
-
-bool FilterChainUtility::buildFilterChain(
-    Network::ListenerFilterManager& filter_manager, const Filter::ListenerFilterFactoriesList& factories) {
+bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
+                                          const Filter::ListenerFilterFactoriesList& factories) {
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : factories) {
     auto config = filter_config_provider->config();
@@ -74,18 +73,17 @@ bool FilterChainUtility::buildFilterChain(
     }
     // If a filter config is missing after warming, stop iteration.
     if (!added_missing_config_filter) {
-      ENVOY_LOG_MISC(trace, "Missing filter config for a provider {}", filter_config_provider->name());
+      ENVOY_LOG_MISC(trace, "Missing filter config for a provider {}",
+                     filter_config_provider->name());
       filter_manager.addAcceptFilter(nullptr, std::make_unique<MissingConfigTcpListenerFilter>());
       added_missing_config_filter = true;
     } else {
       ENVOY_LOG_MISC(trace, "Provider {} missing a filter config", filter_config_provider->name());
     }
-
   }
 
   return true;
 }
-
 
 class MissingConfigUdpListenerFilter : public Network::UdpListenerReadFilter {
 public:
@@ -116,11 +114,13 @@ void FilterChainUtility::buildUdpFilterChain(
     }
     // If a UDP filter config is missing after warming, stop iteration.
     if (!added_missing_config_filter) {
-      ENVOY_LOG_MISC(trace, "Missing UDP filter config for a provider {}", filter_config_provider->name());
+      ENVOY_LOG_MISC(trace, "Missing UDP filter config for a provider {}",
+                     filter_config_provider->name());
       filter_manager.addReadFilter(std::make_unique<MissingConfigUdpListenerFilter>(callbacks));
       added_missing_config_filter = true;
     } else {
-      ENVOY_LOG_MISC(trace, "Provider {} missing a UDP filter config", filter_config_provider->name());
+      ENVOY_LOG_MISC(trace, "Provider {} missing a UDP filter config",
+                     filter_config_provider->name());
     }
   }
 }
