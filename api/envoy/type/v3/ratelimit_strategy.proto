@@ -7,6 +7,8 @@ import "envoy/type/v3/token_bucket.proto";
 
 import "xds/annotations/v3/status.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -53,33 +55,4 @@ message RateLimitStrategy {
     // the token bucket.
     TokenBucket token_bucket = 3;
   }
-}
-
-// Queue all requests. Useful as an intermediate strategy while loading actual
-// rate limiting assignment asynchronously (f.e. from a remote service).
-// To avoid memory exhaust, queue configuration allows to
-// to impose constraints on the maximum number of pending requests
-// in the queue.
-message RateLimitStrategyQueue {
-  // Controls the order in which requests are discarded when the queue length
-  // is reached.
-  enum QueueFullBehavior {
-    // When the queue limit is reached, discard requests from the front of the
-    // queue (the oldest requests).
-    // The new requests are added to the back of the queue as usual.
-    DISCARD_OLD = 0;
-
-    // When the queue limit is reached, discard new requests.
-    DISCARD_NEW = 1;
-  }
-
-  // Limit the length of the queue.
-  uint32 max_length = 1 [(validate.rules).uint32 = {gte: 1}];
-
-  // When the length is reached, whether discard old requests or new requests.
-  QueueFullBehavior queue_full_behavior = 2;
-
-  // Whether to deny the requests discarded due to queue lengths limit.
-  // If unset, allow all.
-  RateLimitStrategy.BlanketRule spillover_discard_strategy = 3;
 }

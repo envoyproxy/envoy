@@ -615,7 +615,6 @@ deleter
 delim
 denylist
 deque
-dequeuing
 deprecations
 dereference
 dereferences

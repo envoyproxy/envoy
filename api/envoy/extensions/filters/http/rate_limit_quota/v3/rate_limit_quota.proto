@@ -47,49 +47,88 @@ message RateLimitQuotaFilterConfig {
 
 // [#next-free-field: 6]
 message RateLimitQuotaBucketSettings {
-  // Configures the behavior when the first request has been matched to
-  // the bucket, and the data plane is waiting for the RLQS to return the
-  // first quota assignment.
+  // Configures the behavior after the first request has been matched to the bucket, and before the
+  // the RLQS server returns the first quota assignment.
   message NoAssignmentBehavior {
-    oneof behavior {
+    // Blocking behavior: wait for the RLQS server to return the first assignment before
+    // processing any requests.
+    // [#not-implemented-hide:]
+    message BlockingBehavior {
+      // Limit the time the requests are blocked until the RLQS server to returns
+      // the first assignment. If the server doesn't respond within the configured time,
+      // all pending requests will be processed according to the :ref:`on_timeout
+      // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior.BlockingBehavior.on_timeout>`
+      // field.
+      google.protobuf.Duration timeout = 1 [(validate.rules).duration = {
+        required: true
+        gt {}
+      }];
+
+      // Allow or Deny the requests after the duration specified in the :ref:`timeout
+      // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior.BlockingBehavior.timeout>`
+      // field reached.
+      //
+      // If unset, the default behavior is to allow all requests (:ref:`BlanketRule.ALLOW_ALL
+      // <envoy_v3_api_enum_value_type.v3.RateLimitStrategy.BlanketRule.ALLOW_ALL>`).
+      type.v3.RateLimitStrategy.BlanketRule on_timeout = 2;
+    }
+
+    oneof no_assignment_behavior {
       option (validate.required) = true;
 
-      // Allow or Deny the requests until the bucket is assigned a quota.
-      // If unset, allow all.
-      type.v3.RateLimitStrategy.BlanketRule blanket_rule = 1;
+      // Apply the rate limiting strategy to the requests matched into the bucket
+      // until the RLQS server returns the first assignment.
+      type.v3.RateLimitStrategy fallback_rate_limit = 1;
 
-      // Queue the requests until the bucket is assigned a quota.
-      // The data plane maintains a separate queue for each bucket that has
-      // pending requests.
-      // When the server returns quota assignment, the data plane begins
-      // dequeuing the requests in the FIFO order, and processing them according
-      // to the assignment. No individual request/response matching needed.
-      //
-      // .. note::
-      //   To avoid memory exhaust, queue configuration allows to
-      //   to impose constraints on the maximum number of pending requests
-      //   in the queue, and choose what to do with the request over the limit.
-      type.v3.RateLimitStrategyQueue queue_requests = 2;
+      // Block all requests matched into the bucket until the RLQS server returns
+      // the first quota assignment.
+      // [#not-implemented-hide:]
+      BlockingBehavior block_requests = 2;
     }
   }
 
-  // Specifies the behavior when the bucket's assignment has expired, and
-  // hasn't been refreshed due to server's unavailability.
+  // Specifies the behavior when the bucket's assignment has expired, and can't be refreshed
+  // due to the RLQS server's unavailability.
   message ExpiredAssignmentBehavior {
-    message FallbackLastAssignment {
-      // Limit the time the last assignment is used as a fallback.
-      // [#comment:TODO(sergiitk): what to do after that?]
-      google.protobuf.Duration time_to_live = 1;
+    // Reuse the last known quota assignment, effectively extending it for  the duration
+    // specified in the :ref:`expired_assignment_behavior_timeout
+    // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
+    // field.
+    message ReuseLastAssignment {
     }
 
-    oneof behavior {
+    // Limit the time :ref:`ExpiredAssignmentBehavior
+    // <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior>`
+    // is applied. If the server doesn't respond within this duration:
+    //
+    // 1. Selected ``ExpiredAssignmentBehavior`` is no longer applied.
+    // 2. The assignment is abandoned: the bucket is purged from the memory and not tracked until
+    //    a new request matched into the bucket.
+    // 3. Until the server returns a new assignment, :ref:`no_assignment_behavior
+    //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
+    //    configuration takes over.
+    //
+    // When the field is not set, the ``ExpiredAssignmentBehavior`` time is **not limited**:
+    // it's applied until the server returns a new assignment.
+    //
+    // .. attention::
+    //   Zero-second ``Duration`` expires **immediately**, while unset Duration **doesn't expire**.
+    google.protobuf.Duration expired_assignment_behavior_timeout = 1
+        [(validate.rules).duration = {gte {}}];
+
+    oneof expired_assignment_behavior {
       option (validate.required) = true;
 
-      // Pre-configured local rate limit strategy.
-      type.v3.RateLimitStrategy fallback_rate_limit = 1;
+      // Apply the rate limiting strategy to all requests matched into the bucket until the RLQS
+      // server returns the new assignment, or :ref:`expired_assignment_behavior_timeout
+      // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
+      // runs out.
+      type.v3.RateLimitStrategy fallback_rate_limit = 2;
 
-      // Reuse last quota assignment associated to the bucket.
-      FallbackLastAssignment fallback_last_assignment = 2;
+      // Reuse the last known quota assignment until the RLQS server returns the new assignment, or
+      // :ref:`expired_assignment_behavior_timeout <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
+      // runs out.
+      ReuseLastAssignment reuse_last_assignment = 3;
     }
   }
 
@@ -247,13 +286,19 @@ message RateLimitQuotaBucketSettings {
   // <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings>`.
   DenyResponseSettings deny_response_settings = 3;
 
-  // How the data plane should treat requests matched into this bucket
-  // while waiting for the first assignment returned by the RLQS server.
-  // When unset, the default behavior is to allow all requests.
+  // Configures the behavior in the "no assignment" state: after the first request has been
+  // matched to the bucket, and before the the RLQS server returns the first quota assignment.
+  //
+  // If not set, the default behavior is to allow all requests.
   NoAssignmentBehavior no_assignment_behavior = 4;
 
-  // Specifies a behavior when the bucket's assignment has expired, and
-  // hasn't been refresh due to server's unavailability.
+  // Configures the behavior when the bucket's assignment has expired, and can't be refreshed
+  // due to the RLQS server's unavailability.
+  //
+  // If not set, the assignment is discarded immediately, and the bucket state returned to
+  // "no assignment" (prior to receiving the first assignment). Thus :ref:`no_assignment_behavior
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
+  // configuration takes over.
   ExpiredAssignmentBehavior expired_assignment_behavior = 5;
 }
 
