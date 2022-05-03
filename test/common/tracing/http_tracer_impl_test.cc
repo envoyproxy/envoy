@@ -267,8 +267,7 @@ TEST_F(HttpConnManFinalizerImplTest, EmptyTagCase) {
   envoy::type::tracing::v3::CustomTag custom_tag;
   TestUtility::loadFromYaml("{}", custom_tag);
   custom_tag.clear_type();
-  EXPECT_ENVOY_BUG(CustomTagUtility::createCustomTag(custom_tag),
-                   "custom tag type case not set");
+  EXPECT_ENVOY_BUG(CustomTagUtility::createCustomTag(custom_tag), "custom tag type case not set");
 }
 
 TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
