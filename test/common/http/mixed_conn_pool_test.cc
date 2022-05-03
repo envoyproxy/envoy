@@ -46,16 +46,7 @@ public:
         cache_(std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()),
         mock_cache_(*(dynamic_cast<MockHttpServerPropertiesCache*>(cache_.get()))),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_,
-                                                         origin_, cache_)) {
-    {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-        expected_capacity_ = 536870912;
-      } else {
-        expected_capacity_ = 1;
-      }
-    }
-  }
+                                                         origin_, cache_)) {}
 
   ~MixedConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -74,7 +65,9 @@ public:
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
 
   void testAlpnHandshake(absl::optional<Protocol> protocol);
-  uint32_t expected_capacity_;
+  TestScopedRuntime scoped_runtime;
+  // The default capacity for HTTP/2 streams.
+  uint32_t expected_capacity_{536870912};
 };
 
 TEST_F(MixedConnPoolImplTest, AlpnTest) {
@@ -113,7 +106,10 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
   conn_pool_.reset();
 }
 
-TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshake) { testAlpnHandshake({}); }
+TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshake) {
+  expected_capacity_ = 1; // The old code assumes HTTP/1.1
+  testAlpnHandshake({});
+}
 
 TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimit) {
   TestScopedRuntime scoped_runtime;
@@ -126,8 +122,49 @@ TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimit) {
 }
 
 TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) { testAlpnHandshake(Protocol::Http11); }
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
 
-TEST_F(MixedConnPoolImplTest, Http2AlpnHandshake) { testAlpnHandshake(Protocol::Http2); }
+  expected_capacity_ = 5;
+  EXPECT_CALL(mock_cache_, getConcurrentStreams(_)).WillOnce(Return(5));
+  testAlpnHandshake({});
+}
+
+TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimitCapped) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
+
+  EXPECT_CALL(mock_cache_, getConcurrentStreams(_))
+      .WillOnce(Return(std::numeric_limits<uint32_t>::max()));
+  testAlpnHandshake({});
+}
+
+TEST_F(MixedConnPoolImplTest, Http1AlpnHandshakeOld) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
+
+  expected_capacity_ = 1; // The old code assumes HTTP/1.1
+  testAlpnHandshake(Protocol::Http11);
+}
+
+TEST_F(MixedConnPoolImplTest, Http2AlpnHandshakeOld) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
+  expected_capacity_ = 1; // The old code assumes HTTP/1.1
+  testAlpnHandshake(Protocol::Http2);
+}
+
+TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
+  testAlpnHandshake(Protocol::Http11);
+}
+
+TEST_F(MixedConnPoolImplTest, Http2AlpnHandshake) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
+  testAlpnHandshake(Protocol::Http2);
+}
 
 } // namespace
 } // namespace Http

@@ -19,6 +19,9 @@ Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveC
       uint32_t cached_concurrency =
           http_server_properties_cache_->getConcurrentStreams(origin_.value());
       if (cached_concurrency != 0 && cached_concurrency < initial_streams) {
+        // Only use the cached concurrency if lowers the streams below the
+        // configured max_concurrent_streams as Envoy should never send more
+        // than max_concurrent_streams at once.
         initial_streams = cached_concurrency;
       }
     }

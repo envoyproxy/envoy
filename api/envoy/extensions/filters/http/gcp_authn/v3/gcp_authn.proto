@@ -29,9 +29,8 @@ message GcpAuthnFilterConfig {
   config.core.v3.RetryPolicy retry_policy = 2;
 }
 
+// Audience is the URL of the receiving service that performs token authentication.
+// It will be provided to the filter through cluster's typed_filter_metadata.
 message Audience {
-  // The map of audience key to audience value.
-  // The key is defined as the contract with control plane in the configuration. It is fixed string "audience_key".
-  // The value is URL of the receiving service that performs token authentication.
-  map<string, string> audience_map = 1;
+  string url = 1 [(validate.rules).string = {min_len: 1}];
 }

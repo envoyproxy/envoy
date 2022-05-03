@@ -74,26 +74,6 @@ private:
   }
 };
 
-class RouteMatcherTypeMapper {
-public:
-  using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v3::ProtocolType;
-  using RouteMatcherTypeMap = absl::flat_hash_map<ConfigProtocolType, Router::RouteMatcherType>;
-
-  static Router::RouteMatcherType lookupRouteMatcherType(ConfigProtocolType type) {
-    const auto& iter = routeMatcherTypeMap().find(type);
-    ASSERT(iter != routeMatcherTypeMap().end());
-    return iter->second;
-  }
-
-private:
-  static const RouteMatcherTypeMap& routeMatcherTypeMap() {
-    CONSTRUCT_ON_FIRST_USE(RouteMatcherTypeMap,
-                           {
-                               {ConfigProtocolType::Dubbo, Router::RouteMatcherType::Default},
-                           });
-  }
-};
-
 // class ConfigImpl.
 ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
                        Server::Configuration::FactoryContext& context)
@@ -102,9 +82,8 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
       serialization_type_(
           SerializationTypeMapper::lookupSerializationType(config.serialization_type())),
       protocol_type_(ProtocolTypeMapper::lookupProtocolType(config.protocol_type())) {
-  auto type = RouteMatcherTypeMapper::lookupRouteMatcherType(config.protocol_type());
-  route_matcher_ = Router::NamedRouteMatcherConfigFactory::getFactory(type).createRouteMatcher(
-      config.route_config(), context);
+  route_matcher_ = std::make_unique<Router::RouteConfigImpl>(
+      config.route_config(), context.getServerFactoryContext(), false);
   if (config.dubbo_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
 

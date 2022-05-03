@@ -80,7 +80,7 @@ struct MetricLessThan {
  */
 template <class StatType>
 uint64_t outputStatType(
-    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
+    Buffer::Instance& response, const StatsParams& params,
     const std::vector<Stats::RefcountPtr<StatType>>& metrics,
     const std::function<std::string(
         const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
@@ -122,7 +122,7 @@ uint64_t outputStatType(
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
 
-    if (!shouldShowMetric(*metric, used_only, regex)) {
+    if (!shouldShowMetric(*metric, params.used_only_, params.filter_)) {
       continue;
     }
 
@@ -256,26 +256,22 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex,
-    const Stats::CustomStatNamespaces& custom_namespaces) {
+    const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
-  metric_name_count += outputStatType<Stats::Counter>(response, used_only, regex, counters,
+  metric_name_count += outputStatType<Stats::Counter>(response, params, counters,
                                                       generateNumericOutput<Stats::Counter>,
                                                       "counter", custom_namespaces);
 
-  metric_name_count +=
-      outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
-                                   generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
+  metric_name_count += outputStatType<Stats::Gauge>(
+      response, params, gauges, generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
   // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
-  metric_name_count +=
-      outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
-                                         generateTextReadoutOutput, "gauge", custom_namespaces);
+  metric_name_count += outputStatType<Stats::TextReadout>(
+      response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
-                                                              histograms, generateHistogramOutput,
-                                                              "histogram", custom_namespaces);
+  metric_name_count += outputStatType<Stats::ParentHistogram>(
+      response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
 
   return metric_name_count;
 }

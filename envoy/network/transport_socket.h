@@ -265,6 +265,8 @@ public:
 
   /**
    * Returns the default SNI for transport sockets created by this factory.
+   * This will return an empty string view if the transport sockets created are
+   * not client-side TLS sockets.
    */
   virtual absl::string_view defaultServerNameIndication() const PURE;
 
