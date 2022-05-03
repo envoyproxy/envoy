@@ -23,7 +23,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
   auto request_type = requestTypeEnum(config.request_type());
   if (!request_type.has_value()) {
-    throw EnvoyException("Could not create request type");
+    throw EnvoyException("Could not create request type: bad proto request type");
   }
   request_type_ = request_type.value();
 

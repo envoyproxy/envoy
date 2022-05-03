@@ -46,6 +46,11 @@ public:
   void incTotal() { incCounter(total_); }
 
 private:
+  /**
+   * Gets request type enum from IP tagging proto.
+   * NOTE: Does not emit ENVOY_ERROR when unexpected proto request_type is passed.
+   *  Instead it should be checked by caller and throw.
+   */
   static absl::optional<const FilterRequestType> requestTypeEnum(
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
     switch (request_type) {
@@ -57,7 +62,6 @@ private:
     case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::EXTERNAL:
       return absl::make_optional(FilterRequestType::EXTERNAL);
     }
-    IS_ENVOY_BUG("unexpected request type enum");
     return absl::nullopt;
   }
 
