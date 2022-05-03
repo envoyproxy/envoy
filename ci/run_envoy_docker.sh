@@ -56,9 +56,6 @@ fi
 ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
-DEFAULT_GOPROXY="https://proxy.golang.org,direct"
-[[ -z "${GOPROXY}" ]] && GOPROXY="${DEFAULT_GOPROXY}"
-
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=("-it")
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=(-v "$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)")
 [[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
