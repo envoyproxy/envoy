@@ -705,6 +705,7 @@ public:
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
 
   Event::DispatcherPtr& dispatcher() { return dispatcher_; }
+  absl::Mutex& lock() { return lock_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
