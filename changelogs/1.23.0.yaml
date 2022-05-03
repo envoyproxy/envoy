@@ -23,6 +23,10 @@ minor_behavior_changes:
     any frame is received the assumption is that the connection is working. This behavior change
     can be reverted by setting the ``envoy.reloadable_features.http2_delay_keepalive_timeout`` runtime
     flag to false.
+- area: lua
+  change: |
+    export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
+    that loads shared object libraries, such as those installed via luarocks.
 
 bug_fixes:
 
@@ -62,5 +66,8 @@ new_features:
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: on_demand
+  change: |
+    :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
 
 deprecated:
