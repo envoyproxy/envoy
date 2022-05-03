@@ -64,13 +64,26 @@ TEST_F(ConfiguratorTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefresh) {
   EXPECT_CALL(*dns_cache_, addUpdateCallbacks_(Ref(*configurator_)));
   configurator_->setDrainPostDnsRefreshEnabled(true);
 
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  EXPECT_CALL(*dns_cache_, iterateHostMap(_))
+      .WillOnce(
+          Invoke([&](Extensions::Common::DynamicForwardProxy::DnsCache::IterateHostMapCb callback) {
+            callback("cached.example.com", host_info);
+            callback("cached2.example.com", host_info);
+          }));
+
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());
   envoy_netconf_t configuration_key = configurator_->getConfigurationKey();
   configurator_->refreshDns(configuration_key, true);
 
   EXPECT_CALL(cm_, drainConnections(_));
   configurator_->onDnsResolutionComplete(
-      "example.com", std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
+      "cached.example.com",
+      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
+      Network::DnsResolver::ResolutionStatus::Success);
+  configurator_->onDnsResolutionComplete(
+      "not-cached.example.com",
+      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
       Network::DnsResolver::ResolutionStatus::Success);
 }
 

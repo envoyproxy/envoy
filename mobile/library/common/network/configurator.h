@@ -203,7 +203,7 @@ private:
 
   bool enable_drain_post_dns_refresh_{false};
   bool enable_interface_binding_{false};
-  bool pending_drain_{false};
+  absl::flat_hash_set<std::string> hosts_to_drain_;
   Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
       dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
