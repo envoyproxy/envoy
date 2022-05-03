@@ -1,6 +1,11 @@
 #pragma once
 
+#include <netinet/tcp.h>
+
+#include <memory>
+
 #include "source/common/quic/envoy_quic_proof_verifier_base.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
 namespace Envoy {
@@ -18,11 +23,21 @@ private:
   bool is_valid_{false};
 };
 
+using CertVerifyResultPtr = std::unique_ptr<CertVerifyResult>();
+
+class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
+public:
+  virtual absl::string_view getEchNameOverrride() const PURE;
+  virtual Event::Dispatcher& dispatcher() PURE;
+};
+
+using EnvoyQuicProofVerifyContextPtr = std::unique_ptr<EnvoyQuicProofVerifyContext>;
+
 // A quic::ProofVerifier implementation which verifies cert chain using SSL
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
-  EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context)
+  explicit EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context)
       : context_(std::move(context)) {
     ASSERT(context_.get());
   }

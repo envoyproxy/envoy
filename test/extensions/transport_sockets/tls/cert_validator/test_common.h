@@ -24,8 +24,19 @@ public:
     return status_;
   }
 
+  SSL* ssl() override { return nullptr; }
+
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override { return nullptr; };
+
+  void onCertificateValidationCompleted(bool succeeded) override {
+    validate_result_ = succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
+  }
+
+  Ssl::ValidateResult certificateValidationResult() override { return validate_result_; }
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
+  Ssl::ValidateResult validate_result_{Ssl::ValidateResult::Pending};
 };
 
 class TestCertificateValidationContextConfig

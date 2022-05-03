@@ -27,14 +27,46 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+class SslHandshakerImpl;
+class SslExtendedSocketInfoImpl;
+
+class ValidateResultCallbackImpl : public Ssl::ValidateResultCallback {
+public:
+  ValidateResultCallbackImpl(Event::Dispatcher& dispatcher,
+                             SslExtendedSocketInfoImpl& extended_socket_info)
+      : dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {}
+
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+  void onCertValidationResult(bool succeeded, const std::string& error_details) override;
+
+  void onSslHandshakeCancelled();
+
+private:
+  Event::Dispatcher& dispatcher_;
+  OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
+};
+
 class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
+  explicit SslExtendedSocketInfoImpl(SslHandshakerImpl& handshaker) : ssl_handshaker_(handshaker) {}
+  ~SslExtendedSocketInfoImpl() override;
+
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override;
+  void onCertificateValidationCompleted(bool succeeded) override;
+  Ssl::ValidateResult certificateValidationResult() override { return cert_validation_result_; }
+  SSL* ssl() override;
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
+  SslHandshakerImpl& ssl_handshaker_;
+  // Latch the in-flight async cert validation callback.
+  // nullopt if there is none in-flight.
+  OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
+  Ssl::ValidateResult cert_validation_result_{Ssl::ValidateResult::Pending};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

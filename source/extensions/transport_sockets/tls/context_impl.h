@@ -1,5 +1,7 @@
 #pragma once
 
+#include <openssl/safestack.h>
+
 #include <array>
 #include <deque>
 #include <functional>
@@ -105,11 +107,20 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
+  // A SSL_CTX_set_custom_verify  callback for asynchronous cert validation.
+  static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
+
   bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
 
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
+
+  Ssl::ValidateResult
+  customVerifyCertChain(Ssl::ValidateResultCallbackPtr callback,
+                        Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+                        const Network::TransportSocketOptions* transport_socket_options, SSL* ssl,
+                        std::string* error_details, uint8_t* out_alert);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
@@ -147,6 +158,13 @@ public:
                     TimeSource& time_source);
 
   bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
+
+  Ssl::ValidateResult
+  customVerifyCertChainForQuic(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+                               Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+                               const Network::TransportSocketOptions* transport_socket_options,
+                               absl::string_view ech_name_override, std::string* error_details,
+                               uint8_t* out_alert);
 
 private:
   int newSessionKey(SSL_SESSION* session);

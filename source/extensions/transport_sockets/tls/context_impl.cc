@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
+#include <openssl/ssl.h>
+
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -28,6 +30,7 @@
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "cert_validator/cert_validator.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/pkcs12.h"
@@ -60,6 +63,17 @@ void logSslErrorChain() {
                    absl::NullSafeStringView(ERR_lib_error_string(err)),
                    absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
                    absl::NullSafeStringView(ERR_reason_error_string(err)));
+  }
+}
+
+enum ssl_verify_result_t ValidationResultToSslVerifyResult(Ssl::ValidateResult result) {
+  switch (result) {
+  case Ssl::ValidateResult::Failed:
+    return ssl_verify_invalid;
+  case Ssl::ValidateResult::Successful:
+    return ssl_verify_ok;
+  case Ssl::ValidateResult::Pending:
+    return ssl_verify_retry;
   }
 }
 
@@ -158,8 +172,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
-        SSL_CTX_set_verify(ctx, verify_mode, nullptr);
-        SSL_CTX_set_cert_verify_callback(ctx, verifyCallback, this);
+        SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
+        SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
       }
     }
   }
@@ -434,6 +448,54 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
           SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
       *cert, static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+}
+
+enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* out_alert) {
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+  if (extended_socket_info->certificateValidationResult() != Ssl::ValidateResult::Pending) {
+    // Already has a binary result, return immediately.
+    return ValidationResultToSslVerifyResult(extended_socket_info->certificateValidationResult());
+  }
+  SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
+  ContextImpl* context_impl = static_cast<ContextImpl*>(SSL_CTX_get_app_data(ssl_ctx));
+  auto* transport_socket_option =
+      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
+  Ssl::ValidateResult result = context_impl->customVerifyCertChain(
+      /*callback=*/nullptr, extended_socket_info, transport_socket_option, ssl,
+      /*error_details=*/nullptr, out_alert);
+  return ValidationResultToSslVerifyResult(result);
+}
+
+Ssl::ValidateResult
+ContextImpl::customVerifyCertChain(Ssl::ValidateResultCallbackPtr callback,
+                                   Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+                                   const Network::TransportSocketOptions* transport_socket_options,
+                                   SSL* ssl, std::string* error_details, uint8_t* out_alert) {
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (cert_chain == nullptr) {
+    *out_alert = SSL_AD_INTERNAL_ERROR;
+    if (extended_socket_info) {
+      extended_socket_info->setCertificateValidationStatus(
+          Envoy::Ssl::ClientValidationStatus::NotValidated);
+    }
+    stats_.fail_verify_error_.inc();
+    ENVOY_LOG(debug, "verify cert failed: no cert chain");
+    return Ssl::ValidateResult::Failed;
+  }
+  const char* name = nullptr;
+  size_t name_len = 0;
+  SSL_get0_ech_name_override(ssl, &name, &name_len);
+  absl::string_view ech_name_override(name, name_len);
+
+  Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
+      *cert_chain, std::move(callback), extended_socket_info, transport_socket_options,
+      SSL_get_SSL_CTX(ssl), ech_name_override, SSL_is_server(ssl), error_details, out_alert);
+  if (result != Ssl::ValidateResult::Pending && extended_socket_info != nullptr) {
+    extended_socket_info->onCertificateValidationCompleted(result ==
+                                                           Ssl::ValidateResult::Successful);
+  }
+  return result;
 }
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
@@ -1283,6 +1345,18 @@ void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
   UNREFERENCED_PARAMETER(pkey);
   UNREFERENCED_PARAMETER(key_path);
 #endif
+}
+
+Ssl::ValidateResult ClientContextImpl::customVerifyCertChainForQuic(
+    STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+    Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+    const Network::TransportSocketOptions* transport_socket_options,
+    absl::string_view ech_name_override, std::string* error_details, uint8_t* out_alert) {
+  Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
+      cert_chain, std::move(callback), extended_socket_info, transport_socket_options,
+      tls_contexts_[0].ssl_ctx_.get(), ech_name_override, /*is_server=*/false, error_details,
+      out_alert);
+  return result;
 }
 
 } // namespace Tls

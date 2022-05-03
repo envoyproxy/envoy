@@ -37,6 +37,8 @@ public:
    * unset.
    */
   virtual Network::TransportSocketCallbacks* transportSocketCallbacks() PURE;
+
+  virtual void onAsynchronousCertValidationComplete() PURE;
 };
 
 /**

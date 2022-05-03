@@ -1,5 +1,7 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include <memory>
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -8,6 +10,29 @@
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+
+class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
+public:
+  EnvoyQuicProofVerifyContextImpl(QuicSslConnectionInfo& ssl_info, Event::Dispatcher& dispatcher)
+      : ssl_info_(ssl_info), dispatcher_(dispatcher) {}
+
+  absl::string_view getEchNameOverrride() const override {
+    const char* name = nullptr;
+    size_t name_len = 0;
+    SSL_get0_ech_name_override(ssl_info_.ssl(), &name, &name_len);
+    return absl::string_view(name, name_len);
+  }
+
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+private:
+  QuicSslConnectionInfo& ssl_info_;
+  Event::Dispatcher& dispatcher_;
+};
+
+} // namespace
 
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
@@ -156,8 +181,9 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
-      server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
-      this, /*has_application_state = */ version().UsesHttp3());
+      server_id(), this,
+      std::make_unique<EnvoyQuicProofVerifyContextImpl>(*quic_ssl_info_, dispatcher_),
+      crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
 }
 
 void EnvoyQuicClientSession::setHttp3Options(

@@ -166,7 +166,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   return {action, bytes_read, end_stream};
 }
 
-void SslSocket::onPrivateKeyMethodComplete() {
+void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
+
+void SslSocket::resumeHandshake() {
   ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
   ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
 
@@ -348,6 +350,8 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
 std::string SslSocket::protocol() const { return ssl()->alpn(); }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
+
+void SslSocket::onAsynchronousCertValidationComplete() { resumeHandshake(); }
 
 namespace {
 SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {

@@ -51,6 +51,28 @@ public:
                     const Network::TransportSocketOptions* transport_socket_options) PURE;
 
   /**
+   * Called by customVerifyCallback to do the actual cert chain verification which could be
+   * asynchronous. If the verification is asynchronous, Pending will be returned. After the
+   * asynchronous verification is finished, the result should be passed back via a
+   * VerifyResultCallback object.
+   * @param cert_chain the cert chain with the leaf cert at the front.
+   * @param callback called after the asynchronous verification finishes to handle the result. Not
+   * used if doing synchronous verification.
+   * @param ssl_extended_info the info for storing the validation status
+   * @param transport_socket_options config options to verify cert.
+   * @param error_details used to return back the verification error.
+   * @param out_alert used to return back the verification error to boring SSL.
+   * @return ValidateResult Pending if doing asynchronous verification, otherwise Successful or
+   * Failed.
+   */
+  virtual Ssl::ValidateResult
+  doCustomVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+                          Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                          const Network::TransportSocketOptions* transport_socket_options,
+                          SSL_CTX* ssl_ctx, absl::string_view ech_name_override, bool is_server,
+                          std::string* error_details, uint8_t* out_alert) PURE;
+
+  /**
    * Called to initialize all ssl contexts
    *
    * @param contexts the store context

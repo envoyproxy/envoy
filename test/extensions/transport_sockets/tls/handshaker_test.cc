@@ -45,6 +45,7 @@ public:
   MOCK_METHOD(void, onSuccess, (SSL*), (override));
   MOCK_METHOD(void, onFailure, (), (override));
   MOCK_METHOD(Network::TransportSocketCallbacks*, transportSocketCallbacks, (), (override));
+  MOCK_METHOD(void, onAsynchronousCertValidationComplete, (), (override));
 };
 
 class HandshakerTest : public SslCertsTest {

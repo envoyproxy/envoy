@@ -71,6 +71,7 @@ public:
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
+  void onAsynchronousCertValidationComplete() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
@@ -88,6 +89,7 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
   void shutdownBasic();
+  void resumeHandshake();
 
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};

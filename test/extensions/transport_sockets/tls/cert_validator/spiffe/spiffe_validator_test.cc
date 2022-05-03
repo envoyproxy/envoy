@@ -390,9 +390,9 @@ typed_config:
     setSanMatchers({matcher});
     initialize(config);
     EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
-    EXPECT_EQ(1, stats().fail_verify_error_.value());
+    EXPECT_EQ(1, stats().fail_verify_san_.value());
     EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
-    stats().fail_verify_error_.reset();
+    stats().fail_verify_san_.reset();
   }
 }
 

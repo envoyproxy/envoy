@@ -149,7 +149,8 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   std::vector<SanMatcherPtr> san_matchers;
   san_matchers.push_back(SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   // Verify the certificate with correct SAN regex matcher.
-  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers,
+                                                 nullptr, nullptr),
             Envoy::Ssl::ClientValidationStatus::Validated);
   EXPECT_EQ(stats.fail_verify_san_.value(), 0);
 
@@ -157,9 +158,10 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   std::vector<SanMatcherPtr> invalid_san_matchers;
   invalid_san_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
+  std::string error;
   // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
-                                                 invalid_san_matchers),
+                                                 invalid_san_matchers, &error, nullptr),
             Envoy::Ssl::ClientValidationStatus::Failed);
   EXPECT_EQ(stats.fail_verify_san_.value(), 1);
 }
@@ -174,7 +176,8 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
           Event::GlobalTimeSystem().timeSystem());
 
   EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
-                                                 /*subject_alt_name_matchers=*/{}),
+                                                 /*subject_alt_name_matchers=*/{}, nullptr,
+                                                 nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
   EXPECT_EQ(default_validator->doVerifyCertChain(/*store_ctx=*/nullptr,
