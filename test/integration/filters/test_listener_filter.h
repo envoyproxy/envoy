@@ -32,4 +32,21 @@ private:
   static std::string alpn_;
 };
 
+/**
+ * Test UDP listener filter.
+ */
+class TestUdpListenerFilter : public Network::UdpListenerReadFilter {
+public:
+  TestUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks)
+      : UdpListenerReadFilter(callbacks) {}
+
+  // Network::UdpListenerReadFilter callbacks
+  Network::FilterStatus onData(Network::UdpRecvData&) override {
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+    return Network::FilterStatus::Continue;
+  }
+};
+
 } // namespace Envoy
