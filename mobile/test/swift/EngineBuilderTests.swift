@@ -431,6 +431,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: true,
       enableInterfaceBinding: true,
+      enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
@@ -465,6 +466,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
+    XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh false"))
 
     // HTTP/2
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_idle_interval 0.001s"))
@@ -509,6 +511,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: false,
       enableInterfaceBinding: false,
+      enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
@@ -537,6 +540,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
     XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout false"))
+    XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh true"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -552,6 +556,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: false,
       enableInterfaceBinding: false,
+      enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 222,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
