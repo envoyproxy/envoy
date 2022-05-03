@@ -22,8 +22,7 @@ message StatefulSession {
   // get address of the upstream host to which the session is assigned.
   //
   // [#extension-category: envoy.http.stateful_session]
-  config.core.v3.TypedExtensionConfig session_state = 1
-      [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig session_state = 1;
 }
 
 message StatefulSessionPerRoute {
