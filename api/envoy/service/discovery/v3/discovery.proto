@@ -309,10 +309,11 @@ message DynamicParameterConstraints {
     // A single constraint to evaluate.
     SingleConstraint constraint = 1;
 
-    // A list of constraints to be ORed together.
+    // A list of constraints that match if any one constraint in the list
+    // matches.
     ConstraintList or_constraints = 2;
 
-    // A list of constraints to be ANDed together.
+    // A list of constraints that must all match.
     ConstraintList and_constraints = 3;
 
     // The inverse (NOT) of a set of constraints.
