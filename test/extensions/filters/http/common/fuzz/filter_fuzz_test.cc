@@ -11,6 +11,12 @@ namespace Extensions {
 namespace HttpFilters {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
+
+  static const absl::flat_hash_set<absl::string_view> exclusion_list = {
+      "envoy.ext_proc", "envoy.filters.http.alternate_protocols_cache",
+      "envoy.filters.http.composite", "envoy.filters.http.ext_proc",
+      "envoy.filters.http.ext_authz"};
+
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::http::FilterFuzzTestCase* input, unsigned int seed) {
         // This ensures that the mutated configs all have valid filter names and type_urls. The list
@@ -22,9 +28,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         static const std::vector<absl::string_view> registered_names = Registry::FactoryRegistry<
             Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
         // Exclude filters that don't work with this test. See #20737
-        absl::flat_hash_set<absl::string_view> exclusion_list = {
-            "envoy.ext_proc", "envoy.filters.http.alternate_protocols_cache",
-            "envoy.filters.http.composite", "envoy.filters.http.ext_proc"};
         std::vector<absl::string_view> filter_names;
         filter_names.reserve(registered_names.size());
         std::for_each(registered_names.begin(), registered_names.end(),
@@ -58,6 +61,12 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
   try {
     // Catch invalid header characters.
     TestUtility::validate(input);
+    // Somehow (probably before the mutator was extended by a filter) the fuzzer picked up the
+    // extensions it can not fuzz (like the ext_* ones). Therefore reject these here.
+    if (exclusion_list.count(input.config().name()) != 0) {
+      ENVOY_LOG_MISC(debug, "Filter {} not supported.", input.config().name());
+      return;
+    }
     ENVOY_LOG_MISC(debug, "Filter configuration: {}", input.config().DebugString());
     // Fuzz filter.
     static UberFilterFuzzer fuzzer;
