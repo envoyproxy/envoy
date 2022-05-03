@@ -124,7 +124,7 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testEnforcingTrustChainVerificationAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled interface binding")
+    let expectation = self.expectation(description: "Run called with enforced cert verification")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertTrue(config.enforceTrustChainVerification)
       expectation.fulfill()
