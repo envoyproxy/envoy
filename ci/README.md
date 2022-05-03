@@ -61,7 +61,13 @@ In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the 
 invoking the build.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>'
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+```
+
+Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the defualt GOPROXY in China.
+
+```bash
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## On Linux
