@@ -11,6 +11,10 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* http cache filter: http cache filter `getCache` interface changed from returning a reference to
+  returning a shared_ptr - any third-party implementations of this interface will need to be
+  updated accordingly. See changes to `simple_http_cache.cc` and `simple_http_cache.h` in
+  [PR21114](https://github.com/envoyproxy/envoy/pull/21114) for example.
 * http: the behavior of the :ref:`timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
   field has been modified to extend the timeout when *any* frame is received on the owning HTTP/2
   connection. This negates the effect of head-of-line (HOL) blocking for slow connections. If
