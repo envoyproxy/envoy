@@ -551,7 +551,7 @@ TEST_F(RouterTestNoChildSpan, BasicFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(callbacks_.active_span_, injectContext(_));
+            EXPECT_CALL(callbacks_.active_span_, injectContext(_, _));
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;

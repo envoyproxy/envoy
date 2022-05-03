@@ -14,8 +14,6 @@ involved and how Envoy plays a role, read the CNCF
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
 
 
-A meaningless string to test why I can push code to the others repo.
-
 ## Documentation
 
 * [Official documentation](https://www.envoyproxy.io/)
