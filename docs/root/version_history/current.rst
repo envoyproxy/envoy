@@ -11,16 +11,16 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* http cache filter: http cache filter `getCache` interface changed from returning a reference to
-  returning a shared_ptr - any third-party implementations of this interface will need to be
-  updated accordingly. See changes to `simple_http_cache.cc` and `simple_http_cache.h` in
-  [PR21114](https://github.com/envoyproxy/envoy/pull/21114) for example.
 * http: the behavior of the :ref:`timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
   field has been modified to extend the timeout when *any* frame is received on the owning HTTP/2
   connection. This negates the effect of head-of-line (HOL) blocking for slow connections. If
   any frame is received the assumption is that the connection is working. This behavior change
   can be reverted by setting the ``envoy.reloadable_features.http2_delay_keepalive_timeout`` runtime
   flag to false.
+* http cache filter: http cache filter `getCache` interface changed from returning a reference to
+  returning a shared_ptr - any third-party implementations of this interface will need to be
+  updated accordingly. See changes to `simple_http_cache.cc` and `simple_http_cache.h` in
+  [PR21114](https://github.com/envoyproxy/envoy/pull/21114) for example.
 * lua: export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
   that loads shared object libraries, such as those installed via luarocks.
 * thrift: add validate_clusters in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` to override the default behavior of cluster validation.
