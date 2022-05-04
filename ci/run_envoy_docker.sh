@@ -79,6 +79,7 @@ docker run --rm \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_REMOTE_INSTANCE \
+       -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
        -e ENVOY_RBE \
