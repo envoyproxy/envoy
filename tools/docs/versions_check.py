@@ -2,13 +2,13 @@ import pathlib
 import re
 import sys
 from functools import cached_property
-from typing import Iterator, List, Pattern, Tuple
+from typing import Iterator, List, Pattern
 
 from packaging import version
 
 from aio.run import checker
 
-from tools.docs.project import Project, VERSION_HISTORY_SECTIONS
+from envoy.base.utils import IProject, Project
 
 INVALID_REFLINK = r"[^:]ref:`"
 REF_WITH_PUNCTUATION_REGEX = r".*\. <[^<]*>`\s*"
@@ -23,7 +23,8 @@ LINK_TICKS_REGEX = re.compile(r"[^`]`[^`].*`_")
 
 class VersionFile:
 
-    def __init__(self, changelog):
+    def __init__(self, project, changelog):
+        self.project = project
         self.changelog = changelog
 
     @cached_property
@@ -87,7 +88,7 @@ class VersionFile:
         for section, entries in self.changelog.data.items():
             if section == "date":
                 continue
-            if section not in VERSION_HISTORY_SECTIONS:
+            if section not in self.project.changelogs.sections:
                 errors.append(f"{self.changelog.version} Unrecognized changelog section: {section}")
             if section == "changes":
                 if version.Version(self.changelog.version) > version.Version("1.16"):
@@ -102,26 +103,17 @@ class VersionFile:
 class VersionsChecker(checker.Checker):
     checks = ("changelogs", "pending", "version")
 
-    @property
-    def changelogs(self) -> Tuple[pathlib.Path, ...]:
-        return tuple(pathlib.Path(p) for p in self.args.changelogs)
-
     @cached_property
-    def project(self):
-        return Project(self.version_path, self.changelogs)
-
-    @cached_property
-    def version_path(self):
-        return pathlib.Path(self.args.version_path)
+    def project(self) -> IProject:
+        return Project(self.args.version)
 
     def add_arguments(self, parser):
-        parser.add_argument("version_path")
-        parser.add_argument("changelogs", nargs="+")
+        parser.add_argument("version")
         super().add_arguments(parser)
 
     async def check_changelogs(self):
         for changelog in self.project.changelogs.values():
-            errors = VersionFile(changelog).run_checks()
+            errors = VersionFile(self.project, changelog).run_checks()
             if errors:
                 self.error("changelogs", errors)
             else:
@@ -134,28 +126,39 @@ class VersionsChecker(checker.Checker):
             if v.release_date == "Pending"
         ]
         all_good = (
-            not pending
-            or (self.project.is_dev and pending == [self.project.current_version.base_version]))
+            not pending or (self.project.is_dev and pending == [self.project.version.base_version]))
         if all_good:
             self.succeed("pending", [f"No extraneous pending versions found"])
             return
-        pending = [x for x in pending if x != self.project.current_version.base_version]
+        pending = [x for x in pending if x != self.project.version.base_version]
         if self.project.is_dev:
             self.error("pending", [f"Only current version should be pending, found: {pending}"])
         else:
             self.error("pending", [f"Nothing should be pending, found: {pending}"])
 
     async def check_version(self) -> None:
-        if self.project.is_current(self.project.current_changelog):
+        current_is_duplicated = (
+            pathlib.Path(f"changelogs/{self.project.version.base_version}.yaml")
+            in self.project.changelogs.paths)
+        if current_is_duplicated:
+            self.error(
+                "version", [
+                    f"A changelog file is present matching the version in VERSION.txt ({self.project.version.base_version}). "
+                    "The current version should be specified in `current.yaml`. "
+                    "Increase the version or remove the spurious changelog file."
+                ])
+        else:
+            self.succeed("version", ["Only `current.yaml` changelog found for current version"])
+        if self.project.is_current(self.project.changelogs.current):
             self.succeed("version", ["VERSION.txt version matches most recent changelog"])
         else:
             self.error("version", ["VERSION.txt does not match most recent changelog"])
         not_pending = (
             self.project.is_dev and
-            not self.project.changelogs[self.project.current_changelog].release_date == "Pending")
+            not self.project.changelogs[self.project.changelogs.current].release_date == "Pending")
         not_dev = (
             not self.project.is_dev
-            and self.project.changelogs[self.project.current_changelog].release_date == "Pending")
+            and self.project.changelogs[self.project.changelogs.current].release_date == "Pending")
         if not_pending:
             self.error(
                 "version",
