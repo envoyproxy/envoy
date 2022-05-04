@@ -3933,6 +3933,52 @@ virtual_hosts:
       "Proto constraint validation failed.*");
 }
 
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesClusterHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster_header: some_header
+        - cluster_header: some_header_2
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          runtime_fraction:
+            default_value:
+              numerator: 20
+              denominator: HUNDRED
+            runtime_key: foo
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  const auto& foo_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+
+  EXPECT_EQ(2, foo_shadow_policies.size());
+  EXPECT_EQ("some_header", foo_shadow_policies[0]->clusterHeader().get());
+  EXPECT_EQ("some_header_2", foo_shadow_policies[1]->clusterHeader().get());
+  EXPECT_EQ("", foo_shadow_policies[0]->cluster());
+  EXPECT_EQ("", foo_shadow_policies[1]->cluster());
+  EXPECT_EQ("", foo_shadow_policies[0]->runtimeKey());
+
+  const auto& bar_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, bar_shadow_policies.size());
+  EXPECT_EQ("some_cluster", bar_shadow_policies[0]->cluster());
+  EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
+}
+
 // Test if the higher level mirror policies are properly applied when routes
 // don't have one and not applied when they do.
 // In this test case, request_mirror_policies is set in route config level.
