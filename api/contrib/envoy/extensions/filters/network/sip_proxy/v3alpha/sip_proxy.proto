@@ -125,6 +125,7 @@ message CustomizedAffinity {
   bool stop_load_balance = 2;
 }
 
+// [#next-free-field: 6]
 message CustomizedAffinityEntry {
   // The header name to match, e.g. "From", if not specified, default is "Route"
   string header = 1;
