@@ -10,6 +10,7 @@ import "google/rpc/status.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v3";
 option java_outer_classname = "DiscoveryProto";
@@ -67,10 +68,12 @@ message DiscoveryRequest {
   repeated string resource_names = 3;
 
   // [#not-implemented-hide:]
-  // Alternative to resource_names field that allows specifying dynamic
+  // Alternative to *resource_names* field that allows specifying dynamic
   // parameters along with each resource name. Clients that populate this
   // field must be able to handle responses from the server where resources
   // are wrapped in a Resource message.
+  // Note that it is legal for a request to have some resources listed
+  // in *resource_names* and others in *resource_locators*.
   repeated ResourceLocator resource_locators = 7;
 
   // Type of the resource that is being requested, e.g.
@@ -209,13 +212,17 @@ message DeltaDiscoveryRequest {
   repeated string resource_names_unsubscribe = 4;
 
   // [#not-implemented-hide:]
-  // Alternative to resource_names_subscribe field that allows specifying dynamic parameters
+  // Alternative to *resource_names_subscribe* field that allows specifying dynamic parameters
   // along with each resource name.
+  // Note that it is legal for a request to have some resources listed
+  // in *resource_names_subscribe* and others in *resource_locators_subscribe*.
   repeated ResourceLocator resource_locators_subscribe = 8;
 
   // [#not-implemented-hide:]
-  // Alternative to resource_names_unsubscribe field that allows specifying dynamic parameters
+  // Alternative to *resource_names_unsubscribe* field that allows specifying dynamic parameters
   // along with each resource name.
+  // Note that it is legal for a request to have some resources listed
+  // in *resource_names_unsubscribe* and others in *resource_locators_unsubscribe*.
   repeated ResourceLocator resource_locators_unsubscribe = 9;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
@@ -278,8 +285,10 @@ message DeltaDiscoveryResponse {
 
 // A set of dynamic parameter constraints associated with a variant of an individual xDS resource.
 // These constraints determine whether the resource matches a subscription based on the set of
-// dynamic parameters in the subscription. This allows xDS implementations (clients, servers, and
-// caching proxies) to determine which variant of a resource is appropriate for a given client.
+// dynamic parameters in the subscription, as specified in the
+// :ref:`ResourceLocator.dynamic_parameters<envoy_v3_api_msg_service.discovery.v3.ResourceLocator.dynamic_parameters>`
+// field. This allows xDS implementations (clients, servers, and caching proxies) to determine
+// which variant of a resource is appropriate for a given client.
 message DynamicParameterConstraints {
   // A single constraint for a given key.
   message SingleConstraint {
@@ -290,6 +299,8 @@ message DynamicParameterConstraints {
     string key = 1;
 
     oneof constraint_type {
+      option (validate.required) = true;
+
       // Matches this exact value.
       string value = 2;
 
