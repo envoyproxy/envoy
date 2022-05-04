@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.rate_limit_quota.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
-import "envoy/extensions/common/ratelimit/v3/ratelimit_quota.proto";
 import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/ratelimit_strategy.proto";
 
@@ -46,7 +45,7 @@ message RateLimitQuotaFilterConfig {
   xds.type.matcher.v3.Matcher bucket_matchers = 3;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message RateLimitQuotaBucketSettings {
   // Configures the behavior when the first request has been matched to
   // the bucket, and the data plane is waiting for the RLQS to return the
@@ -120,19 +119,26 @@ message RateLimitQuotaBucketSettings {
   }
 
   // ``BucketIdBuilder`` makes it possible to build :ref:`BucketId
-  // <envoy_v3_api_msg_extensions.common.ratelimit.v3.BucketId>` with values substituted
-  // from the dynamic properties associated with the current request.
+  // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` with values substituted
+  // from the dynamic properties associated with each individual request. See usage examples in
+  // the docs to :ref:`bucket_id_builder
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`
+  // field.
   message BucketIdBuilder {
-    // Produces the value of the ``BucketId`` map.
+    // Produces the value of the :ref:`BucketId
+    // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map.
     message ValueBuilder {
       oneof value_specifier {
         option (validate.required) = true;
 
-        // Static ``string string_value`` - becomes the value in the ``BucketId`` map as is.
-        google.protobuf.StringValue string_value = 1;
+        // Static string value — becomes the value in the :ref:`BucketId
+        // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map as is.
+        string string_value = 1;
 
-        // Dynamic ``TypedExtensionConfig custom_value`` - evaluated for each request. Must produce
-        // a string output, which becomes the value in the the ``BucketId`` map.
+        // Dynamic value — evaluated for each request. Must produce a string output, which becomes
+        // the value in the :ref:`BucketId <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>`
+        // map.
+        // [#extension-category: envoy.matching.http.input]
         config.core.v3.TypedExtensionConfig custom_value = 2;
       }
     }
@@ -143,63 +149,84 @@ message RateLimitQuotaBucketSettings {
     //
     // The ``ValueBuilder value`` for the key can be:
     //
-    // * static ``StringValue string_value`` - becomes the value in the ``BucketId`` map as is.
-    // * dynamic ``TypedExtensionConfig custom_value`` - evaluated for each request. Must produce
+    // * static ``StringValue string_value`` — becomes the value in the ``BucketId`` map as is.
+    // * dynamic ``TypedExtensionConfig custom_value`` — evaluated for each request. Must produce
     //   a string output, which becomes the value in the the ``BucketId`` map.
+    //
+    // See usage examples in the docs to :ref:`bucket_id_builder
+    // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`
+    // field.
     map<string, ValueBuilder> bucket_id_builder = 1;
   }
 
-  oneof bucket_specifier {
-    option (validate.required) = true;
-
-    // Bucket ID.
-    //
-    // The bucket is uniquely identified with the map from the string key to the string value, and
-    // serves as a common bucket identifier on the control plane and the data plane.
-    //
-    // Example:
-    //
-    // .. validated-code-block:: yaml
-    //   :type-name: envoy.extensions.common.ratelimit.v3.BucketId
-    //
-    //   bucket:
-    //     name: my_bucket
-    //     env: staging
-    //
-    common.ratelimit.v3.BucketId bucket_id = 1;
-
-    // Bucket ID builder.
-    //
-    // Build the :ref:`BucketId <envoy_v3_api_msg_extensions.common.ratelimit.v3.BucketId>`
-    // on-the-fly from the dynamic properties associated with the each request.
-    //
-    // For example:
-    //
-    // .. validated-code-block:: yaml
-    //   :type-name: envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder
-    //
-    //   bucket_id_builder:
-    //     name:
-    //       string_value: my_bucket
-    //     env:
-    //       custom_value:
-    //         typed_config:
-    //           '@type': type.googleapis.com/envoy.type.matcher.v3.CelSelector
-    //           select_expression:
-    //             expr_raw: request.headers['env']
-    //
-    // for a request with the HTTP header ``env`` set to ``staging``, will produce the following
-    // Bucket ID:
-    //
-    // .. validated-code-block:: yaml
-    //   :type-name: envoy.extensions.common.ratelimit.v3.BucketId
-    //
-    //   bucket:
-    //     name: my_bucket
-    //     env: staging
-    //
-    BucketIdBuilder bucket_id_builder = 2;
-  }
+  // ``BucketId`` builder.
+  //
+  // :ref:`BucketId <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` is a map from
+  // the string key to the string value which serves as bucket identifier common for on
+  // the control plane and the data plane.
+  //
+  // While ``BucketId`` is always static, ``BucketIdBuilder`` allows to populate map values
+  // with the dynamic properties associated with the each individual request.
+  //
+  // Example 1: static fields only
+  //
+  // ``BucketIdBuilder``:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder
+  //
+  //   bucket_id_builder:
+  //     name:
+  //       string_value: my_bucket
+  //     hello:
+  //       string_value: world
+  //
+  // Produces the following ``BucketId`` for all requests:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.service.rate_limit_quota.v3.BucketId
+  //
+  //   bucket:
+  //     name: my_bucket
+  //     hello: world
+  //
+  // Example 2: static and dynamic fields
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder
+  //
+  //   bucket_id_builder:
+  //     name:
+  //       string_value: my_bucket
+  //     env:
+  //       custom_value:
+  //         typed_config:
+  //           '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //           header_name: environment
+  //
+  // In this example, the value of ``BucketId`` key ``env`` is substituted from the ``environment``
+  // request header.
+  //
+  // For the request with the HTTP header ``env`` set to ``staging``, the builder will produce
+  // the following ``BucketId``:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.service.rate_limit_quota.v3.BucketId
+  //
+  //   bucket:
+  //     name: my_bucket
+  //     env: staging
+  //
+  // For the request with the HTTP header ``environment`` set to ``prod``, will produce:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.service.rate_limit_quota.v3.BucketId
+  //
+  //   bucket:
+  //     name: my_bucket
+  //     env: prod
+  //
+  BucketIdBuilder bucket_id_builder = 1;
 
   // The interval at which the data plane is to report quota usage for
   // this bucket.
@@ -209,7 +236,7 @@ message RateLimitQuotaBucketSettings {
   // in that bucket. After that, the data plane is to submit the report
   // with the given reporting internal.
   // [#comment:nanos to seconds = 0.001 seconds]
-  google.protobuf.Duration reporting_interval = 3 [(validate.rules).duration = {
+  google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
     required: true
     gt {nanos: 1000000}
   }];
@@ -218,16 +245,16 @@ message RateLimitQuotaBucketSettings {
   // If not set, the filter will be configured as if an empty message is set,
   // and will behave according to the defaults specified in :ref:`DenyResponseSettings
   // <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings>`.
-  DenyResponseSettings deny_response_settings = 4;
+  DenyResponseSettings deny_response_settings = 3;
 
   // How the data plane should treat requests matched into this bucket
   // while waiting for the first assignment returned by the RLQS server.
   // When unset, the default behavior is to allow all requests.
-  NoAssignmentBehavior no_assignment_behavior = 5;
+  NoAssignmentBehavior no_assignment_behavior = 4;
 
   // Specifies a behavior when the bucket's assignment has expired, and
   // hasn't been refresh due to server's unavailability.
-  ExpiredAssignmentBehavior expired_assignment_behavior = 6;
+  ExpiredAssignmentBehavior expired_assignment_behavior = 5;
 }
 
 message RateLimitQuotaPerRoute {
