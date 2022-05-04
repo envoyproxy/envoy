@@ -235,7 +235,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
 
   if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
     auto upstream_address = stream_info.upstreamInfo()->upstreamHost()->address();
-    // TODO(wbpcode): separated `upstream_address` may be is meaningful to the downstream span.
+    // TODO(wbpcode): separated `upstream_address` may be meaningful to the downstream span.
     // But for the upstream span, `peer.address` should be used.
     span.setTag(Tracing::Tags::get().UpstreamAddress, upstream_address->asStringView());
     // TODO(wbpcode): may be set this tag in the setCommonTags.
