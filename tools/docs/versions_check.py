@@ -105,10 +105,9 @@ class VersionsChecker(checker.Checker):
 
     @cached_property
     def project(self) -> IProject:
-        return Project(self.args.version)
+        return Project()
 
     def add_arguments(self, parser):
-        parser.add_argument("version")
         super().add_arguments(parser)
 
     async def check_changelogs(self):
