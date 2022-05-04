@@ -24,6 +24,8 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   } else if (name == Tracing::Tags::get().Error) {
     span_entity_->setErrorStatus();
     span_entity_->addTag(std::string(name), std::string(value));
+  } else if (name == Tracing::Tags::get().PeerAddress) {
+    span_entity_->setPeer(std::string(value));
   } else {
     span_entity_->addTag(std::string(name), std::string(value));
   }
