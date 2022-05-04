@@ -78,5 +78,8 @@ new_features:
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
+- area: ratelimit
+  change: |
+    added support for masked_remote_address :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
 
 deprecated:
