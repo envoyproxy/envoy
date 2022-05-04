@@ -70,6 +70,7 @@ TEST_F(ConfiguratorTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefresh) {
           Invoke([&](Extensions::Common::DynamicForwardProxy::DnsCache::IterateHostMapCb callback) {
             callback("cached.example.com", host_info);
             callback("cached2.example.com", host_info);
+            callback("cached3.example.com", host_info);
           }));
 
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());
@@ -83,6 +84,10 @@ TEST_F(ConfiguratorTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefresh) {
       Network::DnsResolver::ResolutionStatus::Success);
   configurator_->onDnsResolutionComplete(
       "not-cached.example.com",
+      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
+      Network::DnsResolver::ResolutionStatus::Success);
+  configurator_->onDnsResolutionComplete(
+      "not-cached2.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
       Network::DnsResolver::ResolutionStatus::Success);
 }
