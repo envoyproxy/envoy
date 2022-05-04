@@ -192,6 +192,13 @@ void ConnectionManager::continueHandling(const std::string& key, bool try_next_a
           if (metadata->affinityIteration() != metadata->affinity().end()) {
             metadata->setState(State::HandleAffinity);
             continueHandling(metadata, decoder_event_handler);
+          } else {
+            // When onPoolFailure, continueHandling with try_next_affinity, but there is no next
+            // affinity, need throw exception and response with 503.
+            auto ex = AppException(
+                AppExceptionType::InternalError,
+                fmt::format("envoy can't establish connection to {}", key));
+            sendLocalReply(*(metadata), ex, false);
           }
         } else {
           continueHandling(metadata, decoder_event_handler);
