@@ -77,13 +77,16 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   const ReadOrParseState read_state = parseBuffer(buffer);
-  if (read_state == ReadOrParseState::Error) {
+  switch (read_state) {
+  case ReadOrParseState::Error:
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
-  } else if (read_state == ReadOrParseState::TryAgainLater) {
+  case ReadOrParseState::TryAgainLater:
     return Network::FilterStatus::StopIteration;
-  } else if (read_state == ReadOrParseState::SkipFilter) {
+  case ReadOrParseState::SkipFilter:
+    return Network::FilterStatus::Continue;
+  default:
     return Network::FilterStatus::Continue;
   }
   return Network::FilterStatus::Continue;
@@ -414,7 +417,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     if (!matchv2 && !matchv1) {
       // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
       // short-circuit
-      ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
+      ENVOY_LOG(trace, "request does not use v1 or v2 proxy protocol, forwarding as is");
       return ReadOrParseState::SkipFilter;
     }
   }

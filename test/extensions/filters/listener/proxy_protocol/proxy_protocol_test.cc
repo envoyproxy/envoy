@@ -240,14 +240,12 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
   connect(true, &proto_config);
 
   std::string msg = "data";
-  EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN,
+  ASSERT_GT(PROXY_PROTO_V1_SIGNATURE_LEN,
             msg.length()); // Ensure we attempt parsing byte by byte using `search_index_`
-  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
+  ASSERT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
 
   write(msg);
-
   expectData(msg);
-
   disconnect();
 }
 
@@ -262,13 +260,11 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
   // This ensures our byte by byte parsing (`search_index_`) has persistence built-in to
   // remember whether the previous bytes were also valid for the signature
   std::string msg = "PR\r\n";
-  EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
-  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
+  ASSERT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
+  ASSERT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
 
   write(msg);
-
   expectData(msg);
-
   disconnect();
 }
 
@@ -283,13 +279,11 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
   // This ensures our byte by byte parsing (`search_index_`) has persistence built-in to
   // remember whether the previous bytes were also valid for the signature
   std::string msg = "\r\nOX";
-  EXPECT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
-  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
+  ASSERT_GT(PROXY_PROTO_V1_SIGNATURE_LEN, msg.length());
+  ASSERT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, msg.length());
 
   write(msg);
-
   expectData(msg);
-
   disconnect();
 }
 
@@ -301,14 +295,12 @@ TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
   connect(true, &proto_config);
 
   std::string msg = "more data more data more data";
-  EXPECT_GT(msg.length(),
+  ASSERT_GT(msg.length(),
             PROXY_PROTO_V2_HEADER_LEN); // Ensure we attempt parsing as v2 proxy protocol up front
                                         // rather than parsing byte by byte using `search_index_`
 
   write(msg);
-
   expectData(msg);
-
   disconnect();
 }
 
@@ -609,7 +601,7 @@ TEST_P(ProxyProtocolTest, V2ShortV4) {
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
-  // An ipv4/tcp connection that has incorrect addr-len encoded
+  // An ipv4/tcp PROXY header that has incorrect addr-len encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
                                 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
@@ -1157,11 +1149,9 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
   write(" 1234\r\n...");
 
   expectData("...");
-
   EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
             "254.254.254.254");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
-
   disconnect();
 }
 
@@ -1184,11 +1174,9 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
   write(" 1234\r\n...");
 
   expectData("...");
-
   EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
             "254.254.254.254");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
-
   disconnect();
 }
 
@@ -1231,7 +1219,7 @@ TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
   // Using 18 intentionally as it is larger than v2 signature length and divides evenly into
   // len(buffer)
   auto buffer_incr_size = 18;
-  EXPECT_LT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
+  ASSERT_LT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
   for (size_t i = 0; i < sizeof(buffer); i += buffer_incr_size) {
     write(&buffer[i], buffer_incr_size);
     if (i == 0) {
@@ -1240,11 +1228,9 @@ TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
   }
 
   expectData("moredata");
-
   EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
-
   disconnect();
 }
 
@@ -1262,7 +1248,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
   // Using 3 intentionally as it is smaller than v2 signature length and divides evenly into
   // len(buffer)
   auto buffer_incr_size = 3;
-  EXPECT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
+  ASSERT_GT(PROXY_PROTO_V2_SIGNATURE_LEN, buffer_incr_size);
   for (size_t i = 0; i < sizeof(buffer); i += buffer_incr_size) {
     write(&buffer[i], buffer_incr_size);
     if (i == 0) {
@@ -1271,11 +1257,9 @@ TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
   }
 
   expectData("moredata");
-
   EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
-
   disconnect();
 }
 
