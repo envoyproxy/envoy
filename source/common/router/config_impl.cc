@@ -116,7 +116,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
         }
         // For shadow policies with `cluster_header_`, we only verify that this field is not empty
         // because the cluster name is not set yet at config time, though this branch should not be
-        // reachead after the validateClusterSpecifier check.
+        // reached after the validateClusterSpecifier check.
       } else if (shadow_policy->clusterHeader().get().empty()) {
         throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
       }
