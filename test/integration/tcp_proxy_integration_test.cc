@@ -554,7 +554,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
     config_blob->PackFrom(tcp_proxy_config);
   });
 
-  // Ensure we dont get an upstream connection.
+  // Ensure we don't get an upstream connection.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* lb_endpoint =
