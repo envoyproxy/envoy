@@ -1,0 +1,9 @@
+date: January 15, 2021
+
+changes:
+- area: http
+  change: |
+    fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+- area: tls
+  change: |
+    fix detection of the upstream connection close event.

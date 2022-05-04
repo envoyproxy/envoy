@@ -1915,12 +1915,7 @@ route_config:
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   NiceMock<MockDirectResponse> direct_response;
-  EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
-                           Buffer::Instance& buffer) -> DirectResponse::ResponseType {
-        buffer.add("response");
-        return DirectResponse::ResponseType::ErrorReply;
-      }));
+  EXPECT_CALL(direct_response, encode(_, _, _)).Times(0);
 
   EXPECT_CALL(*decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
