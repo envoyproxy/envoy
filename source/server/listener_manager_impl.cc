@@ -789,6 +789,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;
+  uint32_t i = 0;
 
   absl::BlockingCounter workers_waiting_to_run(workers_.size());
   Event::PostCb worker_started_running = [&workers_waiting_to_run]() {
@@ -822,10 +823,12 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
     }
   }
   for (const auto& worker : workers_) {
+    ENVOY_LOG(debug, "starting worker {}", i);
     worker->start(guard_dog, worker_started_running);
     if (enable_dispatcher_stats_) {
       worker->initializeStats(*scope_);
     }
+    i++;
   }
 
   // Wait for workers to start running.

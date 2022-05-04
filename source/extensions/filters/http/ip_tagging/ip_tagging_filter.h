@@ -48,7 +48,7 @@ public:
 private:
   /**
    * Gets request type enum from IP tagging proto.
-   * NOTE: Does not emit ENVOY_ERROR when unexpected proto request_type is passed.
+   * NOTE: Does not emit ENVOY_BUG when unexpected proto request_type is passed.
    *  Instead it should be checked by caller and throw.
    */
   static absl::optional<const FilterRequestType> requestTypeEnum(

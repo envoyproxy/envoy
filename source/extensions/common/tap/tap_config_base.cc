@@ -136,7 +136,7 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     if (http_trace->has_response() && http_trace->response().has_body()) {
       swapBytesToString(*http_trace->mutable_response()->mutable_body());
     }
-    break;
+    return;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::kHttpStreamedTraceSegment: {
     auto* http_trace = trace.mutable_http_streamed_trace_segment();
@@ -146,7 +146,7 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     if (http_trace->has_response_body_chunk()) {
       swapBytesToString(*http_trace->mutable_response_body_chunk());
     }
-    break;
+    return;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::kSocketBufferedTrace: {
     auto* socket_trace = trace.mutable_socket_buffered_trace();
@@ -158,7 +158,7 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
         swapBytesToString(*event.mutable_write()->mutable_data());
       }
     }
-    break;
+    return;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::kSocketStreamedTraceSegment: {
     auto& event = *trace.mutable_socket_streamed_trace_segment()->mutable_event();
@@ -167,12 +167,13 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     } else if (event.has_write()) {
       swapBytesToString(*event.mutable_write()->mutable_data());
     }
-    break;
-  }
-  case envoy::data::tap::v3::TraceWrapper::TraceCase::TRACE_NOT_SET:
-    IS_ENVOY_BUG("unexpected trace case");
     return;
   }
+  case envoy::data::tap::v3::TraceWrapper::TraceCase::TRACE_NOT_SET:
+    IS_ENVOY_BUG("case is not set");
+    return;
+  }
+  IS_ENVOY_BUG("unexpected trace case");
 }
 
 void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(TraceWrapperPtr&& trace) {

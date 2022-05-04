@@ -110,7 +110,7 @@ public:
                                    pair_data.first);
           ipv4_temp.insert(ip_prefix);
         } else {
-          IpPrefix<Ipv6> ip_prefix(Utility::Ip6ntohl(cidr_range.ip()->ipv6()->address()),
+          IpPrefix<Ipv6> ip_prefix(Utility::ip6ntohl(cidr_range.ip()->ipv6()->address()),
                                    cidr_range.length(), pair_data.first);
           ipv6_temp.insert(ip_prefix);
         }
@@ -187,7 +187,7 @@ public:
       Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
       return ipv4_trie_->getData(ip);
     } else {
-      Ipv6 ip = Utility::Ip6ntohl(ip_address->ip()->ipv6()->address());
+      Ipv6 ip = Utility::ip6ntohl(ip_address->ip()->ipv6()->address());
       return ipv6_trie_->getData(ip);
     }
   }

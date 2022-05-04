@@ -319,14 +319,14 @@ public:
    * @param address supplies the IPv6 address in network byte order.
    * @return the absl::uint128 IPv6 address in host byte order.
    */
-  static absl::uint128 Ip6ntohl(const absl::uint128& address);
+  static absl::uint128 ip6ntohl(const absl::uint128& address);
 
   /**
    * Converts IPv6 absl::uint128 in host byte order to network byte order.
    * @param address supplies the IPv6 address in host byte order.
    * @return the absl::uint128 IPv6 address in network byte order.
    */
-  static absl::uint128 Ip6htonl(const absl::uint128& address);
+  static absl::uint128 ip6htonl(const absl::uint128& address);
 
   /**
    * Copies the address instance into the protobuf representation of an address.

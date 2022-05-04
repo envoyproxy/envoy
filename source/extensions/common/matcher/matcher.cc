@@ -156,7 +156,7 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
       throw EnvoyException("http generic body match rule not set");
     default:
       throw EnvoyException(
-          absl::StrCat("unexpected http generic body match rule type", i.rule_case()));
+          absl::StrCat("unexpected http generic body match rule type: ", i.rule_case()));
     }
     // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
     overlap_size_ = std::max(overlap_size_, patterns_->back().length() - 1);

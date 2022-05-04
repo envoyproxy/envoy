@@ -81,8 +81,8 @@ bool CidrRange::isInRange(const Instance& address) const {
     }
     break;
   case IpVersion::v6:
-    if ((Utility::Ip6ntohl(address_->ip()->ipv6()->address()) >> (128 - length_)) ==
-        (Utility::Ip6ntohl(address.ip()->ipv6()->address()) >> (128 - length_))) {
+    if ((Utility::ip6ntohl(address_->ip()->ipv6()->address()) >> (128 - length_)) ==
+        (Utility::ip6ntohl(address.ip()->ipv6()->address()) >> (128 - length_))) {
       return true;
     }
     break;
@@ -183,9 +183,9 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     // Shifting the value to the left sets all bits between 128-length and 128 to zero.
     mask <<= (128 - length);
     // This will mask out the unused bits of the address.
-    absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address()) & mask;
+    absl::uint128 ip6 = Utility::ip6ntohl(address->ip()->ipv6()->address()) & mask;
 
-    absl::uint128 ip6_htonl = Utility::Ip6htonl(ip6);
+    absl::uint128 ip6_htonl = Utility::ip6htonl(ip6);
     static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
     safeMemcpy(&sa6.sin6_addr.s6_addr, &ip6_htonl);
     return std::make_shared<Ipv6Instance>(sa6);

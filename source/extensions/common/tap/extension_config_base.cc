@@ -16,7 +16,6 @@ ExtensionConfigBase::ExtensionConfigBase(
     : proto_config_(proto_config), config_factory_(std::move(config_factory)), tls_slot_(tls) {
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<TlsFilterConfig>(); });
 
-  // switch (proto_config_.config_type_case()) {
   switch (proto_config_.config_type_case()) {
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kAdminConfig: {
     admin_handler_ = AdminHandler::getSingleton(admin, singleton_manager, main_thread_dispatcher);

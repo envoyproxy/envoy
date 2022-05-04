@@ -465,7 +465,7 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
   return false;
 }
 
-absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
+absl::uint128 Utility::ip6ntohl(const absl::uint128& address) {
 #ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
 #else
@@ -473,7 +473,7 @@ absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
 #endif
 }
 
-absl::uint128 Utility::Ip6htonl(const absl::uint128& address) {
+absl::uint128 Utility::ip6htonl(const absl::uint128& address) {
 #ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
 #else
