@@ -57,8 +57,6 @@ Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCa
   return callback;
 }
 
-SSL* SslExtendedSocketInfoImpl::ssl() { return ssl_handshaker_.ssl(); }
-
 SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                                      Ssl::HandshakeCallbacks* handshake_callbacks)
     : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),

@@ -24,8 +24,6 @@ public:
     return status_;
   }
 
-  SSL* ssl() override { return nullptr; }
-
   Ssl::ValidateResultCallbackPtr createValidateResultCallback() override { return nullptr; };
 
   void onCertificateValidationCompleted(bool succeeded) override {

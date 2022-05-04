@@ -20,8 +20,6 @@ enum class ValidateResult {
   Pending,
 };
 
-class SslExtendedSocketInfo;
-
 class ValidateResultCallback {
 public:
   virtual ~ValidateResultCallback() = default;
@@ -47,10 +45,8 @@ public:
    **/
   virtual ClientValidationStatus certificateValidationStatus() const PURE;
 
-  virtual SSL* ssl() PURE;
-
   /**
-   * called only when doing asynchronous cert validation.
+   * Only called when doing asynchronous cert validation.
    * @return ValidateResultCallbackPtr a callback used to return the validation result.
    */
   virtual ValidateResultCallbackPtr createValidateResultCallback() PURE;

@@ -57,7 +57,6 @@ public:
   Ssl::ValidateResultCallbackPtr createValidateResultCallback() override;
   void onCertificateValidationCompleted(bool succeeded) override;
   Ssl::ValidateResult certificateValidationResult() override { return cert_validation_result_; }
-  SSL* ssl() override;
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
