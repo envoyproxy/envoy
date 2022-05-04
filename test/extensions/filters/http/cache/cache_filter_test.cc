@@ -1,9 +1,13 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/http/headers.h"
+
+#include "test/test_common/status_utility.h"
+#include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
-
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
@@ -17,6 +21,8 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+
 class CacheFilterTest : public ::testing::Test {
 protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
@@ -24,6 +30,8 @@ protected:
   CacheFilterSharedPtr makeFilter(HttpCache& cache) {
     auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
                                                 context_.timeSource(), cache);
+    filter_state_ =
+        std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
     filter->setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
@@ -31,10 +39,37 @@ protected:
 
   void SetUp() override {
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
+    ON_CALL(decoder_callbacks_.stream_info_, filterState())
+        .WillByDefault(::testing::ReturnRef(filter_state_));
     // Initialize the time source (otherwise it returns the real time)
     time_source_.setSystemTime(std::chrono::hours(1));
     // Use the initialized time source to set the response date header
     response_headers_.setDate(formatter_.now(time_source_));
+  }
+
+  absl::StatusOr<const CacheFilterLoggingInfo> cacheFilterLoggingInfo() {
+    if (!filter_state_->hasData<CacheFilterLoggingInfo>(
+            CacheFilterLoggingInfo::Key)) {
+      return absl::NotFoundError("cacheFilterLoggingInfo not found");
+    }
+    return *filter_state_->getDataReadOnly<CacheFilterLoggingInfo>(
+        CacheFilterLoggingInfo::Key);
+  }
+
+  absl::StatusOr<CacheLookupStatus> cacheLookupStatus() {
+    absl::StatusOr<const CacheFilterLoggingInfo> info_or = cacheFilterLoggingInfo();
+    if (info_or.ok()) {
+      return info_or.value().cache_lookup_status();
+    }
+    return info_or.status();
+  }
+
+  absl::StatusOr<CacheInsertStatus> cacheInsertStatus() {
+    absl::StatusOr<const CacheFilterLoggingInfo> info_or = cacheFilterLoggingInfo();
+    if (info_or.ok()) {
+      return info_or.value().cache_insert_status();
+    }
+    return info_or.status();
   }
 
   void testDecodeRequestMiss(CacheFilterSharedPtr filter) {
@@ -119,6 +154,8 @@ protected:
 
   SimpleHttpCache simple_cache_;
   envoy::extensions::filters::http::cache::v3::CacheConfig config_;
+  std::shared_ptr<StreamInfo::FilterState> filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
@@ -162,6 +199,13 @@ TEST_F(CacheFilterTest, UncacheableRequest) {
 
     // Encode response header
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::RequestNotCacheable));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::NoInsertRequestNotCacheable));
+
     filter->onDestroy();
   }
 }
@@ -180,6 +224,13 @@ TEST_F(CacheFilterTest, UncacheableResponse) {
 
     // Encode response headers.
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::NoInsertResponseNotCacheable));
+
     filter->onDestroy();
   }
 }
@@ -196,6 +247,13 @@ TEST_F(CacheFilterTest, CacheMiss) {
 
     // Encode response header
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+
     filter->onDestroy();
   }
 }
@@ -220,6 +278,12 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
 
     testDecodeRequestHitNoBody(filter);
 
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheHit));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::NoInsertCacheHit));
+
     filter->onDestroy();
   }
 }
@@ -240,6 +304,12 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+
     filter->onDestroy();
   }
   waitBeforeSecondRequest();
@@ -248,6 +318,12 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestHitWithBody(filter, body);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheHit));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::NoInsertCacheHit));
 
     filter->onDestroy();
   }
@@ -273,6 +349,11 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+
     filter->onDestroy();
   }
   waitBeforeSecondRequest();
@@ -329,6 +410,13 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
+    filter->onStreamComplete();
+    EXPECT_THAT(
+        cacheLookupStatus(),
+        IsOkAndHolds(CacheLookupStatus::StaleHitWithSuccessfulValidation));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::HeaderUpdate));
+
     filter->onDestroy();
   }
 }
@@ -353,6 +441,11 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+
     filter->onDestroy();
   }
   waitBeforeSecondRequest();
@@ -375,7 +468,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     // Encode new response.
     // Change the status code to make sure new headers are served, not the cached ones.
-    response_headers_.setStatus(201);
+    response_headers_.setStatus(204);
 
     // The filter should not stop encoding iteration as this is a new response.
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
@@ -383,7 +476,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(new_body, true), Http::FilterDataStatus::Continue);
 
     // The response headers should have the new status.
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "204"));
 
     // The filter should not encode any data.
     EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);
@@ -393,6 +486,12 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::StaleHitWithFailedValidation));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
 
     filter->onDestroy();
   }
@@ -413,6 +512,11 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+
     filter->onDestroy();
   }
   waitBeforeSecondRequest();
@@ -447,6 +551,13 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheHit));
+    EXPECT_THAT(cacheInsertStatus(),
+                IsOkAndHolds(CacheInsertStatus::NoInsertCacheHit));
+
     filter->onDestroy();
   }
 }
@@ -466,6 +577,11 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+
     filter->onDestroy();
   }
   waitBeforeSecondRequest();
@@ -497,6 +613,11 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheHit));
+
     filter->onDestroy();
   }
 }
@@ -516,6 +637,11 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+
     filter->onDestroy();
   }
   waitBeforeSecondRequest();
@@ -551,7 +677,13 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     // called) which should also be invoked.
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+    // This counts as a cache hit: we served an HTTP error, but we
+    // correctly got that info from the cache instead of upstream.
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheHit));
+
     filter->onDestroy();
   }
 }
@@ -571,6 +703,10 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
     EXPECT_EQ(filter->decodeTrailers(request_trailers), Http::FilterTrailersStatus::Continue);
 
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::RequestNotCacheable));
+
     filter->onDestroy();
   }
 }
@@ -593,6 +729,11 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
 
     // Encode response headers.
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::CacheMiss));
+
     filter->onDestroy();
   }
   {
@@ -605,6 +746,10 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // Destroy the filter
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(),
+                IsOkAndHolds(CacheLookupStatus::RequestIncomplete));
     filter->onDestroy();
     filter.reset();
 

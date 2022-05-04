@@ -9,6 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -29,6 +30,7 @@ public:
               HttpCache& http_cache);
   // Http::StreamFilterBase
   void onDestroy() override;
+  void onStreamComplete() override;
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -86,6 +88,14 @@ private:
   // Updates filter_state_ and continues the encoding stream if necessary.
   void finalizeEncodingCachedResponse();
 
+  // The result of this request's cache lookup.
+  CacheLookupStatus cacheLookupStatus() const;
+
+  // The final status of the insert operation or header update, or decision not
+  // to insert or update. If the request or insert is ongoing, assumes it's
+  // being cancelled.
+  CacheInsertStatus cacheInsertStatus() const;
+
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
@@ -114,7 +124,7 @@ private:
   enum class FilterState {
     Initial,
 
-    // Cache lookup found a cached response that requires validation
+    // Cache lookup found a cached response that requires validation.
     ValidatingCachedResponse,
 
     // Cache lookup found a fresh cached response and it is being added to the encoding stream.
@@ -127,6 +137,11 @@ private:
     // encoding).
     ResponseServedFromCache,
 
+    // The filter won't serve a response from the cache, whether because the
+    // request wasn't cacheable, there was no response in cache, or the response
+    // in cache couldn't be served. This may be set during decoding or encoding.
+    NotServingFromCache,
+
     // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
     // callbacks should be ignored.
     Destroyed
@@ -134,6 +149,9 @@ private:
 
   FilterState filter_state_ = FilterState::Initial;
   bool is_head_request_ = false;
+  // The status of the insert operation or header update, or decision not to insert or update.
+  // If it's too early to determine the final status, this is empty.
+  std::optional<CacheInsertStatus> insert_status_ = std::nullopt;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

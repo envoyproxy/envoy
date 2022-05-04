@@ -17,6 +17,8 @@ absl::string_view cacheEntryStatusString(CacheEntryStatus s) {
     return "RequiresValidation";
   case CacheEntryStatus::FoundNotModified:
     return "FoundNotModified";
+  case CacheEntryStatus::LookupError:
+    return "LookupError";
   }
   PANIC(absl::StrFormat("Unexpected CacheEntryStatus: %d", s));
 }

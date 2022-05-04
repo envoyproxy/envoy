@@ -5,6 +5,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
@@ -46,6 +47,15 @@ void CacheFilter::onDestroy() {
   }
 }
 
+void CacheFilter::onStreamComplete() {
+  CacheLookupStatus lookup_status = cacheLookupStatus();
+  CacheInsertStatus insert_status = cacheInsertStatus();
+  decoder_callbacks_->streamInfo().filterState()->setData(
+      CacheFilterLoggingInfo::Key,
+      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status),
+      StreamInfo::FilterState::StateType::ReadOnly);
+}
+
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
@@ -54,11 +64,14 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         debug,
         "CacheFilter::decodeHeaders ignoring request because it has body and/or trailers: {}",
         *decoder_callbacks_, headers);
+    filter_state_ = FilterState::NotServingFromCache;
     return Http::FilterHeadersStatus::Continue;
   }
   if (!CacheabilityUtils::canServeRequestFromCache(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
+    filter_state_ = FilterState::NotServingFromCache;
+    insert_status_ = CacheInsertStatus::NoInsertRequestNotCacheable;
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(decoder_callbacks_);
@@ -109,7 +122,13 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     insert_->insertHeaders(headers, metadata, end_stream);
+    if (end_stream) {
+      insert_status_ = CacheInsertStatus::InsertSucceeded;
+    }
+  } else {
+    insert_status_ = CacheInsertStatus::NoInsertResponseNotCacheable;
   }
+  filter_state_ = FilterState::NotServingFromCache;
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -128,6 +147,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // TODO(toddmgreer): Wait for the cache if necessary.
     insert_->insertBody(
         data, [](bool) {}, end_stream);
+    insert_status_ = CacheInsertStatus::InsertSucceeded;
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -276,8 +296,13 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
   case CacheEntryStatus::Unusable:
     decoder_callbacks_->continueDecoding();
     return;
+    case CacheEntryStatus::LookupError:
+      filter_state_ = FilterState::NotServingFromCache;
+      insert_status_ = CacheInsertStatus::NoInsertLookupError;
+      decoder_callbacks_->continueDecoding();
+      return;
   default:
-    ENVOY_LOG(error, "Unhandled CacheEntryStatus in CacheFilter::onHeaders: {}",
+    ENVOY_LOG(error, "Unhandled CacheLookupStatus in CacheFilter::onHeaders: {}",
               cacheEntryStatusString(lookup_result_->cache_entry_status_));
     // Treat unhandled status as a cache miss.
     decoder_callbacks_->continueDecoding();
@@ -343,6 +368,7 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 
 void CacheFilter::handleCacheHit() {
   filter_state_ = FilterState::DecodeServingFromCache;
+  insert_status_ = CacheInsertStatus::NoInsertCacheHit;
   encodeCachedResponse();
 }
 
@@ -354,6 +380,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
   }
   if (!lookup_result_->range_details_->satisfiable_) {
     filter_state_ = FilterState::DecodeServingFromCache;
+    insert_status_ = CacheInsertStatus::NoInsertCacheHit;
     lookup_result_->headers_->setStatus(
         static_cast<uint64_t>(Envoy::Http::Code::RangeNotSatisfiable));
     lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
@@ -380,6 +407,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
   }
 
   filter_state_ = FilterState::DecodeServingFromCache;
+  insert_status_ = CacheInsertStatus::NoInsertCacheHit;
 
   lookup_result_->headers_->setStatus(static_cast<uint64_t>(Envoy::Http::Code::PartialContent));
   lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
@@ -439,6 +467,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // Update metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     cache_.updateHeaders(*lookup_, response_headers, metadata);
+    insert_status_ = CacheInsertStatus::HeaderUpdate;
   }
 
   // A cache entry was successfully validated -> encode cached body and trailers.
@@ -541,6 +570,72 @@ void CacheFilter::finalizeEncodingCachedResponse() {
     encoder_callbacks_->continueEncoding();
   }
   filter_state_ = FilterState::ResponseServedFromCache;
+}
+CacheLookupStatus CacheFilter::cacheLookupStatus() const {
+  if (lookup_result_ == nullptr && lookup_ != nullptr) {
+    return CacheLookupStatus::RequestIncomplete;
+  }
+
+  if (lookup_result_ != nullptr) {
+    switch (lookup_result_->cache_entry_status_) {
+      case CacheEntryStatus::Ok:
+        return CacheLookupStatus::CacheHit;
+      case CacheEntryStatus::Unusable:
+        return CacheLookupStatus::CacheMiss;
+      case CacheEntryStatus::RequiresValidation:
+        // The CacheFilter sent the response upstream for validation; check the
+        // filter state to see whether and how the upstream responded. The
+        // filter currently won't send the stale entry if it can't reach the
+        // upstream or if the upstream responds with a 5xx, so don't include
+        // special handling for those cases.
+        switch (filter_state_) {
+          case FilterState::ValidatingCachedResponse:
+            return CacheLookupStatus::RequestIncomplete;
+          case FilterState::EncodeServingFromCache:
+          case FilterState::ResponseServedFromCache:
+            return CacheLookupStatus::StaleHitWithSuccessfulValidation;
+          case FilterState::NotServingFromCache:
+            return CacheLookupStatus::StaleHitWithFailedValidation;
+          default:
+            ENVOY_BUG(
+                false,
+                absl::StrCat(
+                    "Unexpected filter state in requestCacheStatus: cache "
+                    "lookup response required validation, but filter state is ",
+                    filter_state_));
+            return CacheLookupStatus::Unknown;
+        }
+      case CacheEntryStatus::FoundNotModified:
+        // TODO(capoferro): Report this as a FoundNotModified when we handle
+        // those.
+        return CacheLookupStatus::CacheHit;
+      case CacheEntryStatus::LookupError:
+        return CacheLookupStatus::LookupError;
+    }
+    PANIC("Unhandled CacheLookupStatus encountered when retrieving request cache status: " + std::to_string(static_cast<int>(filter_state_)));
+  }
+
+  // Either decodeHeaders decided not to do a cache lookup (because the
+  // request isn't cacheable), or decodeHeaders hasn't been called yet.
+  switch (filter_state_) {
+    case FilterState::Initial:
+      return CacheLookupStatus::RequestIncomplete;
+    case FilterState::NotServingFromCache:
+      return CacheLookupStatus::RequestNotCacheable;
+    default:
+      ENVOY_BUG(false,
+                absl::StrCat("Unexpected filter state in requestCacheStatus: "
+                             "lookup_result_ is empty but filter state is ",
+                             filter_state_));
+      return CacheLookupStatus::Unknown;
+  }
+}
+
+CacheInsertStatus CacheFilter::cacheInsertStatus() const {
+  return insert_status_.value_or(
+      (insert_ == nullptr)
+          ? CacheInsertStatus::NoInsertRequestIncomplete
+          : CacheInsertStatus::InsertAbortedResponseIncomplete);
 }
 
 } // namespace Cache
