@@ -164,8 +164,8 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
       const std::string i_str = absl::StrCat("", i);
       hash_key_buffer.insert(offset_start, i_str.begin(), i_str.end());
 
-      absl::string_view hash_key(static_cast<char*>(hash_key_buffer.data()),
-                                 hash_key_buffer.size());
+      size_t hash_key_length = offset_start - hash_key_buffer.data() + i_str.size();
+      absl::string_view hash_key(static_cast<char*>(hash_key_buffer.data()), hash_key_length);
 
       const uint64_t hash =
           (hash_function == HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2)
