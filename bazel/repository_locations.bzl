@@ -418,7 +418,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-06-17",
+        release_date = "2022-03-28",
         cpe = "N/A",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
