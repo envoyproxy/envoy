@@ -19,7 +19,7 @@ if [[ -n "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+=" --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}"
 
   if [[ -n "${GOOGLE_BES_PROJECT_ID}" ]]; then
-    export BAZEL_BUILD_EXTRA_OPTIONS+=" --config=google-bes --project_id=${GOOGLE_BES_PROJECT_ID}"
+    export BAZEL_BUILD_EXTRA_OPTIONS+=" --config=google-bes --bes_instance_name=${GOOGLE_BES_PROJECT_ID}"
   fi
 
 fi
