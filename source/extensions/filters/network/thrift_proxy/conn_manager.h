@@ -41,6 +41,7 @@ public:
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
 };
 
 /**
@@ -255,6 +256,7 @@ private:
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
+  void emitLogEntry();
 
   Config& config_;
   ThriftFilterStats& stats_;

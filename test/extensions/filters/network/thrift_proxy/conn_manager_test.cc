@@ -30,6 +30,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -78,6 +79,8 @@ public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
     route_config_provider_manager_ =
         std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
+    ON_CALL(*context_.access_log_manager_.file_, write(_))
+        .WillByDefault(SaveArg<0>(&access_log_data_));
   }
   ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -89,13 +92,23 @@ public:
                         const std::vector<std::string>& cluster_names = {}) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
     if (yaml.empty()) {
-      config.set_stat_prefix("test");
+      const std::string default_yaml = R"EOF(
+stat_prefix: test
+access_log:
+  - name: accesslog
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: /dev/null
+      log_format:
+        text_format_source:
+          inline_string: "%RESPONSE_FLAGS%\n"
+)EOF";
+      TestUtility::loadFromYaml(default_yaml, config);
     } else {
       TestUtility::loadFromYaml(yaml, config);
-      TestUtility::validate(config);
     }
 
-    config.set_stat_prefix("test");
+    TestUtility::validate(config);
 
     initializeFilter(config, cluster_names);
   }
@@ -410,6 +423,8 @@ public:
     EXPECT_EQ(1U, store_.counter("test.response_success").value());
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
+
+    EXPECT_EQ(access_log_data_, "-\n");
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -430,6 +445,7 @@ public:
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
   ThriftFilters::DecoderFilterSharedPtr custom_filter_;
+  StringViewSaver access_log_data_;
 };
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
@@ -444,6 +460,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
@@ -462,6 +480,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
@@ -501,6 +521,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
@@ -517,6 +539,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
 
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
@@ -530,6 +554,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
   EXPECT_EQ(1U, store_.counter("test.request_invalid_type").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
@@ -571,6 +597,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -587,6 +615,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) {
@@ -629,6 +659,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 // Tests that OnData handles non-thrift input. Regression test for crash on invalid input.
@@ -640,6 +672,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesGarbageRequest) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnEvent) {
@@ -761,6 +795,8 @@ route_config:
   callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponse) { testRequestResponse(false); }
@@ -799,6 +835,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 // Tests that the downstream request's sequence number is used for the response.
@@ -841,6 +879,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
@@ -876,6 +916,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
@@ -910,6 +952,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
@@ -945,6 +989,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
@@ -988,6 +1034,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+
+  // FIXME(rgs1): this be logged too.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
@@ -1030,6 +1079,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+
+  // FIXME(rgs1): this be logged too.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // Tests that a request is routed and a non-thrift response is handled.
@@ -1065,6 +1117,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  // FIXME(rgs1): this should be logged too.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
@@ -1107,6 +1162,8 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "-\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
@@ -1503,6 +1560,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
+
+  // FIXME(rgs1): local replies should be logged too.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // Tests multiple filters where one invokes sendLocalReply with an error reply.
@@ -1547,6 +1607,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
+
+  // FIXME(rgs1): local replies should be logged too.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // sendLocalReply does nothing, when the remote closed the connection.
@@ -1585,6 +1648,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  // FIXME(rgs1): local replies should be logged too.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // Tests a decoder filter that modifies data.
@@ -1660,6 +1726,9 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  // FIXME(rgs1): this should be logged.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // TODO(caitong93): use TEST_P to avoid duplicating test cases
@@ -1756,6 +1825,9 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  // FIXME(rgs1): should be logged.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndErrorResponse) {
@@ -1799,6 +1871,9 @@ payload_passthrough: true
   EXPECT_EQ(1U, store_.counter("test.response_passthrough").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
+
+  // FIXME(rgs1): should be logged.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndInvalidResponse) {
@@ -1842,6 +1917,9 @@ payload_passthrough: true
   EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  // FIXME(rgs1): should be logged.
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRouting) {

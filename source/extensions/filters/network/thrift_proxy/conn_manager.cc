@@ -40,6 +40,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
       if (metadata.messageType() == MessageType::Oneway) {
         ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
         half_closed_ = true;
+        emitLogEntry();
         return Network::FilterStatus::StopIteration;
       }
     }
@@ -49,6 +50,12 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   }
 
   return Network::FilterStatus::StopIteration;
+}
+
+void ConnectionManager::emitLogEntry() {
+  for (const auto& access_log : config_.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, read_callbacks_->connection().streamInfo());
+  }
 }
 
 void ConnectionManager::dispatch() {
@@ -94,6 +101,7 @@ void ConnectionManager::dispatch() {
     }
   }
 
+  emitLogEntry();
   stats_.request_decoding_error_.inc();
   resetAllRpcs(true);
 }
@@ -308,6 +316,8 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
     cm.stats_.response_invalid_type_.inc();
     break;
   }
+
+  cm.emitLogEntry();
 
   return FilterStatus::Continue;
 }
