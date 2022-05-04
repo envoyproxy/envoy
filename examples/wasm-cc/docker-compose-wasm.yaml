@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   wasm_compile_update:
-    image: envoyproxy/envoy-build-ubuntu:dafbde9825f965460288eb8aa1326187a9fee5e5
+    image: envoyproxy/envoy-build-ubuntu:ac5c9b6e73711ca8686de21cba7bc75c87de0ec8
     command: |
       bash -c "bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
     working_dir: /source
@@ -11,7 +11,7 @@ services:
     - ./lib:/build
 
   wasm_compile:
-    image: envoyproxy/envoy-build-ubuntu:dafbde9825f965460288eb8aa1326187a9fee5e5
+    image: envoyproxy/envoy-build-ubuntu:ac5c9b6e73711ca8686de21cba7bc75c87de0ec8
     command: |
       bash -c "bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
     working_dir: /source
