@@ -30,3 +30,27 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "internal_upstream_integration_test",
+    srcs = [
+        "internal_upstream_integration_test.cc",
+    ],
+    extension_names = ["envoy.bootstrap.internal_listener"],
+    deps = [
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/bootstrap/internal_listener:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/io_socket/user_space:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/integration:base_integration_test_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)
