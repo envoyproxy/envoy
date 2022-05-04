@@ -1,5 +1,11 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
+
+#include "source/common/runtime/runtime_impl.h"
+
+#include <chrono>
+#include <cstdint>
 #include <string>
 
 // Profiling support is provided in the release tcmalloc of `gperftools`, but not in the library
@@ -61,6 +67,30 @@ public:
    */
   static bool stopProfiler();
 };
+
+#ifdef TCMALLOC
+
+/**
+ * Default heap profiler which will be enabled when tcmalloc (not `gperftools`) is used.
+ */
+class TcmallocHeapProfiler {
+public:
+  TcmallocHeapProfiler() = default;
+
+  bool heapProfilerStarted() const { return heap_profile_started_; }
+
+  void startProfiler(absl::string_view path, std::chrono::milliseconds period);
+  void stopProfiler();
+
+private:
+  bool heap_profile_started_{};
+  uint64_t next_file_id_{};
+  std::string heap_file_path_;
+  std::chrono::milliseconds period_;
+  Event::TimerPtr flush_timer_;
+};
+
+#endif
 
 } // namespace Profiler
 } // namespace Envoy

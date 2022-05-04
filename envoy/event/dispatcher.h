@@ -29,8 +29,12 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
+#include "source/common/singleton/threadsafe_singleton.h"
+
 namespace Envoy {
 namespace Event {
+
+using MainDispatcherSingleton = InjectableSingleton<Dispatcher>;
 
 /**
  * All dispatcher stats. @see stats_macros.h
