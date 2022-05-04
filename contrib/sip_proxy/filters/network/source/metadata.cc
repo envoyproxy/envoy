@@ -1,5 +1,6 @@
-#include "re2/re2.h"
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
+
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +15,7 @@ void SipHeader::parseHeader() {
 
   std::size_t pos = 0;
   std::string pattern = "(.*)=(.*?)>*";
-  absl::string_view & header = raw_text_;
+  absl::string_view& header = raw_text_;
 
   // Has "SIP/2.0" in top line
   // Eg: INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0

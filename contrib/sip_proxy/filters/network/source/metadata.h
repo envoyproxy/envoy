@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
@@ -9,7 +11,6 @@
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/sip_proxy/filters/network/source/operation.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
-#include <vector>
 
 namespace Envoy {
 namespace Extensions {

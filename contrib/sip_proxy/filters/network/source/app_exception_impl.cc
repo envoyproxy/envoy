@@ -56,7 +56,7 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
   }
 
   // Via
-  for (const auto &via : metadata.listHeader(HeaderType::Via)) {
+  for (const auto& via : metadata.listHeader(HeaderType::Via)) {
     output << fmt::format("Via: {}\r\n", via.text());
   }
 
