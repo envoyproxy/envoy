@@ -129,9 +129,10 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
     mask_len = v6_prefix_mask_len_;
   }
 
+  // TODO: increase the efficiency, avoid string transform back and forth
   Network::Address::CidrRange cidr_entry =
       Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
-  descriptor_entry = {"remote_address", cidr_entry.asString()};
+  descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
 
   return true;
 }

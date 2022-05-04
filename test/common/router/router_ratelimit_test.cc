@@ -361,6 +361,23 @@ actions:
               testing::ContainerEq(local_descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, MaskedRemoteAddressIpv4Default) {
+  const std::string yaml = R"EOF(
+actions:
+- masked_remote_address: {}
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.1/32"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"masked_remote_address", "10.0.0.1/32"}}}}),
+      testing::ContainerEq(local_descriptors_));
+}
+
 TEST_F(RateLimitPolicyEntryTest, MaskedRemoteAddressIpv4) {
   const std::string yaml = R"EOF(
 actions:
@@ -372,11 +389,29 @@ actions:
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.0/16"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.0/16"}}}}),
               testing::ContainerEq(descriptors_));
   EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"remote_address", "10.0.0.0/16"}}}}),
+      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"masked_remote_address", "10.0.0.0/16"}}}}),
       testing::ContainerEq(local_descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryIpv6Test, MaskedRemoteAddressIpv6Default) {
+  const std::string yaml = R"EOF(
+actions:
+- masked_remote_address: {}
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
+                  {{{{"masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128"}}}}),
+              testing::ContainerEq(local_descriptors_));
 }
 
 TEST_F(RateLimitPolicyEntryIpv6Test, MaskedRemoteAddressIpv6) {
@@ -391,10 +426,10 @@ actions:
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
-                  {{{{"remote_address", "2001:abcd:ef01:2345::/64"}}}}),
+                  {{{{"masked_remote_address", "2001:abcd:ef01:2345::/64"}}}}),
               testing::ContainerEq(descriptors_));
   EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
-                  {{{{"remote_address", "2001:abcd:ef01:2345::/64"}}}}),
+                  {{{{"masked_remote_address", "2001:abcd:ef01:2345::/64"}}}}),
               testing::ContainerEq(local_descriptors_));
 }
 
