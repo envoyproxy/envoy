@@ -90,6 +90,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
 // Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+// Used to track if runtime is initialized.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
@@ -180,6 +182,14 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   }
   IS_ENVOY_BUG(absl::StrCat("requested an unsupported integer ", feature));
   return default_value;
+}
+
+void markRuntimeInitialized() {
+  maybeSetRuntimeGuard("envoy.reloadable_features.runtime_initialized", true);
+}
+
+bool isRuntimeInitialized() {
+  return runtimeFeatureEnabled("envoy.reloadable_features.runtime_initialized");
 }
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {
