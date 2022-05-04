@@ -331,6 +331,9 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
 
+  std::string getShadowCluster(const ShadowPolicy& shadow_policy,
+                               const Http::HeaderMap& headers) const;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

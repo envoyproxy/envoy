@@ -45,6 +45,7 @@ New Features
 * dns_resolver: added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
 * ext_proc: added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
 * thrift: added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+* http: added cluster_header in :ref:`request_mirror_policies <v1.22:envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
 
 Deprecated
 ----------

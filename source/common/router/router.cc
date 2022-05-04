@@ -99,7 +99,7 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
 
 bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
-  if (policy.cluster().empty()) {
+  if (policy.cluster().empty() && policy.clusterHeader().get().empty()) {
     return false;
   }
 
@@ -844,11 +844,33 @@ void Filter::cleanup() {
   }
 }
 
+std::string Filter::getShadowCluster(const ShadowPolicy& policy,
+                                     const Http::HeaderMap& headers) const {
+  if (!policy.cluster().empty()) {
+    return policy.cluster();
+  } else {
+    ASSERT(!policy.clusterHeader().get().empty());
+    const auto entry = headers.get(policy.clusterHeader());
+    if (!entry.empty()) {
+      return std::string(entry[0]->value().getStringView());
+    }
+    ENVOY_STREAM_LOG(warn, "There is no cluster name in header: {}", *callbacks_,
+                     policy.clusterHeader());
+    return "";
+  }
+}
+
 void Filter::maybeDoShadowing() {
   for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
-    ASSERT(!shadow_policy.cluster().empty());
+    const std::string cluster = getShadowCluster(shadow_policy, *downstream_headers_);
+
+    // The cluster name in cluster_header is empty
+    if (cluster.empty()) {
+      continue;
+    }
+
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
@@ -863,7 +885,7 @@ void Filter::maybeDoShadowing() {
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled());
-    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request), options);
+    config_.shadowWriter().shadow(cluster, std::move(request), options);
   }
 }
 

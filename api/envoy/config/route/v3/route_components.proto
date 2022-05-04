@@ -703,11 +703,11 @@ message RouteAction {
     // exist in the cluster manager configuration.
     string cluster = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
-    // [#not-implemented-hide:]
+    // Only one of *name* and *cluster_header* can be specified.
     // Envoy will determine the cluster to route to by reading the value of the
-    // HTTP header named by cluster_header from the request headers. If the
-    // header is not found or the referenced cluster does not exist, Envoy will
-    // return a 404 response.
+    // HTTP header named by cluster_header from the request headers. If the value is not found in headers,
+    // no shadow request will happen. Envoy will not wait for the shadow cluster to respond before returning
+    // the response from the primary cluster
     //
     // .. attention::
     //

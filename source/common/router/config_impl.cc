@@ -108,10 +108,17 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
   if (validation_clusters.has_value()) {
     route->validateClusters(*validation_clusters);
     for (const auto& shadow_policy : route->shadowPolicies()) {
-      ASSERT(!shadow_policy->cluster().empty());
-      if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-        throw EnvoyException(
-            fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+      if (!shadow_policy->cluster().empty()) {
+        ASSERT(shadow_policy->clusterHeader().get().empty());
+        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+          throw EnvoyException(
+              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+        }
+        // For shadow policies with `cluster_header_`, we only verify that this field is not empty
+        // because the cluster name is not set yet at config time, though this branch should not be
+        // reachead after the validateClusterSpecifier check.
+      } else if (shadow_policy->clusterHeader().get().empty()) {
+        throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
       }
     }
   }

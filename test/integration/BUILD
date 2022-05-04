@@ -405,6 +405,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "shadow_policy_integration_test",
+    srcs = ["shadow_policy_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/integration/filters:repick_cluster_filter_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "buffer_accounting_integration_test",
     size = "large",
     srcs = [

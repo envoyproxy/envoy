@@ -3625,6 +3625,24 @@ virtual_hosts:
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());
 }
 
+TEST_F(RouteMatcherTest, ClusterNotFound) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "route: unknown cluster*");
+}
+
 TEST_F(RouteMatcherTest, ShadowClusterNotFound) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3640,25 +3658,10 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-               EnvoyException);
-}
-
-TEST_F(RouteMatcherTest, ClusterNotFound) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains:
-  - www.lyft.com
-  routes:
-  - match:
-      prefix: "/foo"
-    route:
-      cluster: www2
-  )EOF";
-
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-               EnvoyException);
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "route: unknown shadow cluster*");
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundNotChecking) {
