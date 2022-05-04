@@ -389,12 +389,13 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
   // If there's more data in memory than there should be, put some into storage.
   if (state.memory_used_ > state.config_->memoryBufferBytesLimit() &&
       state.storage_used_ < state.config_->storageBufferBytesLimit()) {
+    auto dispatch = getSafeDispatch();
     if (!state.async_file_handle_) {
       // File isn't open yet - open it and then check again if we still need to store data.
       ENVOY_STREAM_LOG(debug, "memory buffer exceeded - creating buffer file", callbacks);
       cancel_in_flight_async_action_ = config_->asyncFileManager().createAnonymousFile(
-          config_->storageBufferPath(), [this, &state, dispatch = getSafeDispatch()](
-                                            absl::StatusOr<AsyncFileHandle> file_handle) {
+          config_->storageBufferPath(),
+          [this, &state, dispatch](absl::StatusOr<AsyncFileHandle> file_handle) {
             if (!file_handle.ok()) {
               dispatch([this, status = file_handle.status()]() {
                 filterError(fmt::format("{} failed to create buffer file: {}", filterName(),
@@ -418,8 +419,8 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
     state.storage_consumed_ += size;
     state.memory_used_ -= size;
     ENVOY_STREAM_LOG(debug, "sending buffer fragment (size={}) to storage", callbacks, size);
-    auto to_storage = fragment->toStorage(state.async_file_handle_, state.storage_offset_,
-                                          getSafeDispatch(), getOnFileActionCompleted());
+    auto to_storage = fragment->toStorage(state.async_file_handle_, state.storage_offset_, dispatch,
+                                          getOnFileActionCompleted());
     ASSERT(to_storage.ok());
     cancel_in_flight_async_action_ = to_storage.value();
     state.storage_offset_ += size;
