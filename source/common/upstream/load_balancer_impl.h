@@ -304,7 +304,7 @@ protected:
 
   /**
    * Index into priority_set via hosts source descriptor.
-   * If HostSource configuration is invalid, will returnn a nullptr.
+   * If HostSource configuration is invalid (i.e from corrupted enum) will return a nullptr.
    */
   const HostVector* hostSourceToHosts(HostsSource hosts_source) const;
 

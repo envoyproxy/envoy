@@ -197,6 +197,7 @@ public:
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
 private:
+  RouteEntryImplBaseConstSharedPtr routeEntryFromConfig(const envoy::extensions::filters::network::thrift_proxy::v3::Route&);
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 

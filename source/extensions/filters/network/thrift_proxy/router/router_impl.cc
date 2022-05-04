@@ -191,23 +191,29 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
   return nullptr;
 }
 
+RouteEntryImplBaseConstSharedPtr RouteMatcher::routeEntryFromConfig(
+  const envoy::extensions::filters::network::thrift_proxy::v3::Route& route_config) {
+  using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
+  switch (route_config.match().match_specifier_case()) {
+    case RouteMatch::MatchSpecifierCase::kMethodName:
+      return std::make_shared<MethodNameRouteEntryImpl>(route_config);
+    case RouteMatch::MatchSpecifierCase::kServiceName:
+      return std::make_shared<ServiceNameRouteEntryImpl>(route_config);
+    case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
+      throw EnvoyException("RouteMatcher route specifier not set");
+  }
+  throw EnvoyException(absl::StrCat("Unexpected RouteMatcher route specifier: ", route_config.match().match_specifier_case()));
+}
+
 RouteMatcher::RouteMatcher(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
-    RouteEntryImplBaseConstSharedPtr route_entry;
-    switch (route.match().match_specifier_case()) {
-    case RouteMatch::MatchSpecifierCase::kMethodName:
-      route_entry = std::make_shared<MethodNameRouteEntryImpl>(route);
-      break;
-    case RouteMatch::MatchSpecifierCase::kServiceName:
-      route_entry = std::make_shared<ServiceNameRouteEntryImpl>(route);
-      break;
-    case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
-      throw EnvoyException("RouteMatcher route specifier not set");
-    }
+    // Throws exceptions if route config has match specifier case not set or if
+    // specifier is corrupt.
+    RouteEntryImplBaseConstSharedPtr route_entry = routeEntryFromConfig(route);
 
     if (validation_clusters) {
       // Throw exception for unknown clusters.
