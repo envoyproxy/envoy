@@ -192,17 +192,18 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 }
 
 RouteEntryImplBaseConstSharedPtr RouteMatcher::routeEntryFromConfig(
-  const envoy::extensions::filters::network::thrift_proxy::v3::Route& route_config) {
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route_config) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
   switch (route_config.match().match_specifier_case()) {
-    case RouteMatch::MatchSpecifierCase::kMethodName:
-      return std::make_shared<MethodNameRouteEntryImpl>(route_config);
-    case RouteMatch::MatchSpecifierCase::kServiceName:
-      return std::make_shared<ServiceNameRouteEntryImpl>(route_config);
-    case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
-      throw EnvoyException("RouteMatcher route specifier not set");
+  case RouteMatch::MatchSpecifierCase::kMethodName:
+    return std::make_shared<MethodNameRouteEntryImpl>(route_config);
+  case RouteMatch::MatchSpecifierCase::kServiceName:
+    return std::make_shared<ServiceNameRouteEntryImpl>(route_config);
+  case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
+    throw EnvoyException("RouteMatcher route specifier not set");
   }
-  throw EnvoyException(absl::StrCat("Unexpected RouteMatcher route specifier: ", route_config.match().match_specifier_case()));
+  throw EnvoyException(absl::StrCat("Unexpected RouteMatcher route specifier: ",
+                                    route_config.match().match_specifier_case()));
 }
 
 RouteMatcher::RouteMatcher(
