@@ -576,7 +576,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   test_server_.reset();
   auto log_result = waitForAccessLog(access_log_path);
 
-  EXPECT_THAT(log_result, testing::StartsWith("delayed connect error:"));
+  std::string expected_transport_failure = "delayed connect error:";
+  std::replace(expected_transport_failure.begin(), expected_transport_failure.end(), ' ', '_');
+
+  EXPECT_THAT(log_result, testing::StartsWith(expected_transport_failure));
 }
 
 // Make sure no bytes are logged when no data is sent.
