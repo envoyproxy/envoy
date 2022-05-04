@@ -102,10 +102,8 @@ class MaskedRemoteAddressAction : public RateLimit::DescriptorProducer {
 public:
   MaskedRemoteAddressAction(
       const envoy::config::route::v3::RateLimit::Action::MaskedRemoteAddress& action)
-      : v4_prefix_mask_len_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, 32)),
-        v6_prefix_mask_len_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, 128)) {}
+      : v4_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, 32)),
+        v6_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, 128)) {}
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
