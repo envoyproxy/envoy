@@ -54,9 +54,8 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check
 CURRENT=spelling
 "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
 
-CURRENT=rst
-# TODO(phlax): Move this to general docs checking of all rst files
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:rst_check
+CURRENT=versions
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:versions_check
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

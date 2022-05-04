@@ -22,10 +22,15 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "file_system_buffer_test",
-    srcs = ["config_test.cc"],
+    srcs = [
+        "config_test.cc",
+        "filter_test.cc",
+    ],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
+        "//test/extensions/common/async_files:mocks",
         "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:upstream_mocks",
     ],
 )
