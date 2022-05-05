@@ -1035,7 +1035,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  // FIXME(rgs1): this be logged too.
+  // TODO(rgs1): this be logged too.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1080,7 +1080,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  // FIXME(rgs1): this be logged too.
+  // TODO(rgs1): this be logged too.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1118,7 +1118,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // FIXME(rgs1): this should be logged too.
+  // TODO(rgs1): this should be logged too.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1561,7 +1561,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
 
-  // FIXME(rgs1): local replies should be logged too.
+  // TODO(rgs1): local replies should be logged too.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1608,7 +1608,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
-  // FIXME(rgs1): local replies should be logged too.
+  // TODO(rgs1): local replies should be logged too.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1649,7 +1649,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // FIXME(rgs1): local replies should be logged too.
+  // TODO(rgs1): local replies should be logged too.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1727,7 +1727,7 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  // FIXME(rgs1): this should be logged.
+  // TODO(rgs1): this should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1826,7 +1826,7 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // FIXME(rgs1): should be logged.
+  // TODO(rgs1): should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1872,7 +1872,7 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
-  // FIXME(rgs1): should be logged.
+  // TODO(rgs1): should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -1918,7 +1918,7 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // FIXME(rgs1): should be logged.
+  // TODO(rgs1): should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
