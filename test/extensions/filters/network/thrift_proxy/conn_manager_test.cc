@@ -1915,12 +1915,7 @@ route_config:
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   NiceMock<MockDirectResponse> direct_response;
-  EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
-                           Buffer::Instance& buffer) -> DirectResponse::ResponseType {
-        buffer.add("response");
-        return DirectResponse::ResponseType::ErrorReply;
-      }));
+  EXPECT_CALL(direct_response, encode(_, _, _)).Times(0);
 
   EXPECT_CALL(*decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
@@ -1960,6 +1955,28 @@ route_config:
                           "unknown thrift cluster");
 }
 
+TEST_F(ThriftConnectionManagerTest, UnknownClusterWithValidateClustersDisabled) {
+  const std::string yaml = R"EOF(
+transport: FRAMED
+protocol: BINARY
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster: cluster1
+    - match:
+        method_name: name2
+      route:
+        cluster: cluster2
+  validate_clusters: false
+)EOF";
+
+  EXPECT_NO_THROW(initializeFilter(yaml));
+}
+
 TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster) {
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
   {
@@ -1982,6 +1999,27 @@ TEST_F(ThriftConnectionManagerTest, UnknownWeightedCluster) {
                           "unknown thrift weighted cluster");
   EXPECT_THROW_WITH_REGEX(initializeFilter(config, {"cluster2"}), EnvoyException,
                           "unknown thrift weighted cluster");
+}
+
+TEST_F(ThriftConnectionManagerTest, UnknownWeightedClusterWithValidateClustersDisabled) {
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
+  {
+    auto* route_config = config.mutable_route_config();
+    route_config->set_name("config");
+    auto* validate_clusters = route_config->mutable_validate_clusters();
+    validate_clusters->set_value(false);
+    auto* route = route_config->add_routes();
+    route->mutable_match()->set_method_name("foo");
+    auto* action = route->mutable_route();
+    auto* cluster1 = action->mutable_weighted_clusters()->add_clusters();
+    cluster1->set_name("cluster1");
+    cluster1->mutable_weight()->set_value(50);
+    auto* cluster2 = action->mutable_weighted_clusters()->add_clusters();
+    cluster2->set_name("cluster2");
+    cluster2->mutable_weight()->set_value(50);
+  }
+
+  EXPECT_NO_THROW(initializeFilter(config));
 }
 
 TEST_F(ThriftConnectionManagerTest, WeightedClusterNotSpecified) {
@@ -2026,6 +2064,25 @@ route_config:
   // Intentionally miss "unknown_cluster" cluster.
   EXPECT_THROW_WITH_REGEX(initializeFilter(yaml, {"cluster"}), EnvoyException,
                           "unknown thrift shadow cluster");
+}
+
+TEST_F(ThriftConnectionManagerTest, UnknownMirrorPolicyClusterWithValidateClustersDisabled) {
+  const std::string yaml = R"EOF(
+transport: FRAMED
+protocol: BINARY
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster: cluster
+        request_mirror_policies:
+          - cluster: unknown_cluster
+  validate_clusters: false
+)EOF";
+  EXPECT_NO_THROW(initializeFilter(yaml, {"cluster"}));
 }
 
 } // namespace ThriftProxy

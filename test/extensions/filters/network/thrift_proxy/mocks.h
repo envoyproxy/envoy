@@ -260,6 +260,7 @@ public:
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
   MOCK_METHOD(bool, responseSuccess, ());
+  MOCK_METHOD(void, onReset, ());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;

@@ -52,9 +52,7 @@ public:
         auto cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
         envoy::config::core::v3::Metadata* cluster_metadata = cluster_0->mutable_metadata();
         envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-        audience.mutable_audience_map()->insert(
-            {std::string(AudienceKey), std::string(AudienceValue)});
-
+        audience.set_url(std::string(AudienceValue));
         (*cluster_metadata->mutable_typed_filter_metadata())
             [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
                 .PackFrom(audience);

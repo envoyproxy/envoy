@@ -63,12 +63,12 @@ void HttpCacheImplementationTest::updateHeaders(
     absl::string_view request_path, const Http::TestResponseHeaderMapImpl& response_headers,
     const ResponseMetadata& metadata) {
   LookupContextPtr lookup_context = lookup(request_path);
-  cache().updateHeaders(*lookup_context, response_headers, metadata);
+  cache()->updateHeaders(*lookup_context, response_headers, metadata);
 }
 
 LookupContextPtr HttpCacheImplementationTest::lookup(absl::string_view request_path) {
   LookupRequest request = makeLookupRequest(request_path);
-  LookupContextPtr context = cache().makeLookupContext(std::move(request), decoder_callbacks_);
+  LookupContextPtr context = cache()->makeLookupContext(std::move(request), decoder_callbacks_);
   absl::Notification lookup_result_received;
   context->getHeaders([this, &lookup_result_received](LookupResult&& result) {
     lookup_result_ = std::move(result);
@@ -89,7 +89,7 @@ absl::Status HttpCacheImplementationTest::insert(
     LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
     const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
     std::chrono::milliseconds timeout) {
-  InsertContextPtr inserter = cache().makeInsertContext(std::move(lookup), encoder_callbacks_);
+  InsertContextPtr inserter = cache()->makeInsertContext(std::move(lookup), encoder_callbacks_);
   const ResponseMetadata metadata{time_system_.systemTime()};
   bool headers_end_stream = body.empty() && !trailers.has_value();
   inserter->insertHeaders(headers, metadata, headers_end_stream);
@@ -385,7 +385,7 @@ TEST_P(HttpCacheImplementationTest, StreamingPut) {
                                                    {"age", "2"},
                                                    {"cache-control", "public, max-age=3600"}};
   const std::string request_path("/path");
-  InsertContextPtr inserter = cache().makeInsertContext(lookup(request_path), encoder_callbacks_);
+  InsertContextPtr inserter = cache()->makeInsertContext(lookup(request_path), encoder_callbacks_);
   ResponseMetadata metadata{time_system_.systemTime()};
   inserter->insertHeaders(response_headers, metadata, false);
   inserter->insertBody(

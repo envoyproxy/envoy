@@ -453,6 +453,19 @@ message WeightedCluster {
   }
 }
 
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
+
+  // If is_optional is not set or is set to false and the plugin defined by this message is not a
+  // supported type, the containing resource is NACKed. If is_optional is set to true, the resource
+  // would not be NACKed for this reason. In this case, routes referencing this plugin's name would
+  // not be treated as an illegal configuration, but would result in a failure if the route is
+  // selected.
+  bool is_optional = 2;
+}
+
 // [#next-free-field: 15]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
@@ -643,7 +656,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -920,13 +933,15 @@ message RouteAction {
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
 
-    // [#not-implemented-hide:]
-    // Name of the cluster specifier plugin to use to determine the cluster for
-    // requests on this route. The plugin name must be defined in the associated
-    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
-    // in the
-    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    // Name of the cluster specifier plugin to use to determine the cluster for requests on this route.
+    // The cluster specifier plugin name must be defined in the associated
+    // :ref:`cluster specifier plugins <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins>`
+    // in the :ref:`name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` field.
     string cluster_specifier_plugin = 37;
+
+    // Custom cluster specifier plugin configuration to use to determine the cluster for requests
+    // on this route.
+    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39;
   }
 
   // The HTTP status code to use when configured cluster is not found.

@@ -34,14 +34,6 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
-#if defined(ENVOY_CONFIG_COVERAGE)
-#define DISABLE_UNDER_COVERAGE return
-#else
-#define DISABLE_UNDER_COVERAGE                                                                     \
-  do {                                                                                             \
-  } while (0)
-#endif
-
 namespace Envoy {
 namespace Quic {
 
