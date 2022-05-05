@@ -47,8 +47,8 @@ steps:
     SLACK_TOKEN: $(SLACK_TOKEN)
     REPO_URI: $(Build.Repository.Uri)
     BUILD_URI: $(Build.BuildUri)
-    GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
     ${{ if parameters.rbe }}:
+      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
