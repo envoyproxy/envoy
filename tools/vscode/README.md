@@ -24,6 +24,16 @@ For Chinese developers, you need to set `http_proxy` `https_proxy` `all_proxy` i
 
 If you see the following error message:
 ```
++ cmake -DCMAKE_AR=/usr/bin/ar '-DCMAKE_SHARED_LINKER_FLAGS=-shared -fuse-ld=/opt/llvm/bin/ld.lld -Wl,-no-as-needed -Wl,-z,relro,-z,now -B/opt/llvm/bin -lm -fuse-ld=lld -l:libstdc++.a' '-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=/opt/llvm/bin/ld.lld -Wl,-no-as-needed -Wl,-z,relro,-z,now -B/opt/llvm/bin -lm -fuse-ld=lld -l:libstdc++.a' -DBOOST_ROOT=/build/envoy-compdb/_bazel_vscode/2d35de14639eaad1ac7060a4dd7e3351/sandbox/processwrapper-sandbox/1270/execroot/envoy/external/org_boost -DBUILD_EXAMPLES=off -DCMAKE_INSTALL_LIBDIR=lib -DRAGEL=/build/envoy-compdb/_bazel_vscode/2d35de14639eaad1ac7060a4dd7e3351/sandbox/processwrapper-sandbox/1270/execroot/envoy/bazel-out/k8-fastbuild/bin/contrib/hyperscan/matching/input_matchers/source/hyperscan.ext_build_deps/ragel/bin/ragel -DCMAKE_BUILD_TYPE=Bazel -DCMAKE_INSTALL_PREFIX=/build/envoy-compdb/_bazel_vscode/2d35de14639eaad1ac7060a4dd7e3351/sandbox/processwrapper-sandbox/1270/execroot/envoy/bazel-out/k8-fastbuild/bin/contrib/hyperscan/matching/input_matchers/source/hyperscan -DCMAKE_PREFIX_PATH=/build/envoy-compdb/_bazel_vscode/2d35de14639eaad1ac7060a4dd7e3351/sandbox/processwrapper-sandbox/1270/execroot/envoy/bazel-out/k8-fastbuild/bin/contrib/hyperscan/matching/input_matchers/source/hyperscan.ext_build_deps -DCMAKE_RANLIB= -DCMAKE_MAKE_PROGRAM=ninja -G Ninja /build/envoy-compdb/_bazel_vscode/2d35de14639eaad1ac7060a4dd7e3351/sandbox/processwrapper-sandbox/1270/execroot/envoy/external/io_hyperscan
+CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 2.8.12 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value or use a ...<max> suffix to tell
+  CMake that the project does not need compatibility with older versions.
+
+......
+
 -- Performing Test HAVE_SSSE3
 -- Performing Test HAVE_SSSE3 - Failed
 -- Performing Test HAVE_AVX2
@@ -32,8 +42,12 @@ If you see the following error message:
 -- Performing Test HAVE_AVX512 - Failed
 -- Building without AVX2 support
 -- Building without AVX512 support
-CMake Error at cmake/arch.cmake:79 (message):
+CMake Error at cmake/arch.cmake:108 (message):
   A minimum of SSSE3 compiler support is required
+Call Stack (most recent call first):
+  CMakeLists.txt:340 (include)
+  
+......
 ```
 Please check the cpu info of your virtual machine (e.g., ssse3):
 
