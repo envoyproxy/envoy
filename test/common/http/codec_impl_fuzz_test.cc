@@ -528,7 +528,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<Network::MockConnection> client_connection;
   const envoy::config::core::v3::Http2ProtocolOptions client_http2_options{
       fromHttp2Settings(input.h2_settings().client())};
-  const Http1Settings client_http1settings;
+  const Http1Settings client_http1settings{fromHttp1Settings(input.h1_settings().server())};
   NiceMock<MockConnectionCallbacks> client_callbacks;
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
