@@ -669,8 +669,8 @@ The following optional features can be disabled on the Bazel build command-line:
 The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
-  This is useful in cases where you have a lua script that loads shared object libraries, such as
-  those installed via luarocks.
+  This config will exports all symbols and results in larger binary size. If partial symbols export
+  is required and target platform is Linux, then `bazel/exported_symbols.txt` can be used to land it.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
@@ -707,6 +707,13 @@ The extensions disabled by default can be enabled by adding the following parame
 The extensions enabled by default can be disabled by adding the following parameter to Bazel, for example to disable
 `envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
 Note not all extensions can be disabled.
+
+To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
+
+* `v8` (the default included engine)
+* `wamr`
+* `wasmtime`
+* `wavm`
 
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.

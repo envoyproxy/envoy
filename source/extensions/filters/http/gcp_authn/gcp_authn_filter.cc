@@ -35,10 +35,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     if (filter_it != filter_metadata.end()) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
       MessageUtil::unpackTo(filter_it->second, audience);
-      auto it = audience.audience_map().find(std::string(AudienceKey));
-      if (it != audience.audience_map().end()) {
-        audience_str = it->second;
-      }
+      audience_str = audience.url();
     }
   }
 

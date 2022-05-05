@@ -19,12 +19,14 @@ build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
+# silence absl logspam.
+build --copt=-DABSL_MIN_LOG_LEVEL=4
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
-build --action_env=CC
-build --action_env=CXX
-build --action_env=LLVM_CONFIG
-build --action_env=PATH
+build --action_env=CC --host_action_env=CC
+build --action_env=CXX --host_action_env=CXX
+build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
+build --action_env=PATH --host_action_env=PATH
 
 build --enable_platform_specific_config
 
@@ -96,6 +98,7 @@ build:macos --cxxopt=-std=c++17
 build:macos --action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
 build:macos --host_action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
 build:macos --define tcmalloc=disabled
+build:macos --define wasm=disabled
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -281,7 +284,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:142e6d5662b98277a84c327da26ed266ab0e3191
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:a37d5f539f04b44e284953b4a075826ead117279
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

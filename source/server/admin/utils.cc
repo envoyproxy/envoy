@@ -68,8 +68,9 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
       histogram_buckets_mode = HistogramBucketsMode::Cumulative;
     } else if (histogram_buckets_query_param.value() == "disjoint") {
       histogram_buckets_mode = HistogramBucketsMode::Disjoint;
-    } else {
+    } else if (histogram_buckets_query_param.value() == "none") {
       histogram_buckets_mode = HistogramBucketsMode::NoBuckets;
+    } else {
       return absl::InvalidArgumentError(
           "usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n");
     }
