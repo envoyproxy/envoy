@@ -410,7 +410,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                      host);
 
     upstream_request_started = false;
-    auto ret = messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
+    auto ret =
+        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
     if (upstream_request_started && ret == FilterStatus::StopIteration) {
       // Defer to handle in upstream request onPoolReady or onPoolFailure
       return FilterStatus::StopIteration;
