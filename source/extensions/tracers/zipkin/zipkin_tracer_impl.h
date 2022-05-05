@@ -72,7 +72,8 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Tracing::TraceContext& trace_context) override;
+  void injectContext(Tracing::TraceContext& trace_context,
+                     const Upstream::HostDescriptionConstSharedPtr&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
