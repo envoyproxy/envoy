@@ -46,13 +46,16 @@ void Span::finishSpan() {
   parent_tracer_.sendSegment(tracing_context_);
 }
 
-void Span::injectContext(Tracing::TraceContext& trace_context) {
+void Span::injectContext(Tracing::TraceContext& trace_context,
+                         const Upstream::HostDescriptionConstSharedPtr& upstream) {
+  const auto remote_address = upstream != nullptr ? upstream->address()->asString()
+                                                  : std::string(trace_context.authority());
   // TODO(wbpcode): Due to https://github.com/SkyAPM/cpp2sky/issues/83 in cpp2sky, it is necessary
   // to ensure that there is '\0' at the end of the string_view parameter to ensure that the
   // corresponding trace header is generated correctly. For this reason, we cannot directly use host
   // as argument. We need create a copy of std::string based on host and std::string will
   // automatically add '\0' to the end of the string content.
-  auto sw8_header = tracing_context_->createSW8HeaderValue(std::string(trace_context.authority()));
+  auto sw8_header = tracing_context_->createSW8HeaderValue(remote_address);
   if (sw8_header.has_value()) {
     trace_context.setByReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
   }

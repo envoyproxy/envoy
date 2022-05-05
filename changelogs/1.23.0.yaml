@@ -33,6 +33,9 @@ minor_behavior_changes:
   change: |
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
     that loads shared object libraries, such as those installed via luarocks.
+- area: skywalking
+  change: |
+    use upstream host address as ``addressUsedAtClient`` in propagation header.
 
 bug_fixes:
 
