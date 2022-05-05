@@ -80,3 +80,8 @@ new_features:
     :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
 
 deprecated:
+- area: dubbo_proxy
+  change: |
+    deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
+    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
+    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
