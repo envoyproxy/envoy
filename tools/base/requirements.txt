@@ -53,9 +53,9 @@ aio-core==0.8.2 \
     #   envoy-github-abstract
     #   envoy-github-release
     #   envoy-gpg-identity
-aio-run-checker==0.5.1 \
-    --hash=sha256:07e0c39031afa5370740e98a7e1628123e56646610fd8b9cf983ad85205d3adf \
-    --hash=sha256:c9dc570aa1bf16355a35aec2417d897ecb77d03b82bd5a4f56986966437ab947
+aio-run-checker==0.5.3 \
+    --hash=sha256:61197289953f2ff18029522fe9874fdde750192781ca08fc0f308a7e1aadf5dc \
+    --hash=sha256:6324625fae2b7c7f5ca718e96551e4207a24b0f09ec4b87a7d278a100b4ed3de
     # via
     #   -r requirements.in
     #   envoy-code-check
