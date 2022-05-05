@@ -27,6 +27,12 @@ public:
   const Network::ConnectionInfoProvider& connectionInfoProvider() const {
     return connection().connectionInfoProvider();
   }
+  const Network::Address::Instance& localAddress() const {
+    return *connectionInfoProvider().localAddress();
+  }
+  const Network::Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
 
   Http::RequestHeaderMapOptConstRef requestHeaders() const { return headers(); }
 };
