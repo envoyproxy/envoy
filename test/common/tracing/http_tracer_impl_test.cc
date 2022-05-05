@@ -740,6 +740,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  Upstream::HostDescriptionConstSharedPtr host{
+      new testing::NiceMock<Upstream::MockHostDescription>()};
 
   SpanPtr span_ptr =
       null_tracer.startSpan(config, request_headers, stream_info, {Reason::Sampling, true});
@@ -750,7 +752,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   span_ptr->setBaggage("key", "value");
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
-  span_ptr->injectContext(request_headers);
+  span_ptr->injectContext(request_headers, host);
   span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
@@ -843,6 +845,7 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq(expected_ip + ":0")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip + ":0")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake cluster")));
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
