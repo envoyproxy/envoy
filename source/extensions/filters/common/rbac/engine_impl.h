@@ -59,6 +59,8 @@ public:
 
 using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Matching::MatchingData>;
 
+void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log);
+
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules,

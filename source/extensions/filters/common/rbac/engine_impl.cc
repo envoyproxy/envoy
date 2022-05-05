@@ -32,6 +32,16 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionCont
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
 
+void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log) {
+  // If not shadow enforcement, set shared log metadata.
+  if (mode == EnforcementMode::Shadow) {
+    ProtobufWkt::Struct log_metadata;
+    auto& log_fields = *log_metadata.mutable_fields();
+    log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(log);
+    info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
+  }
+}
+
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
     ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)
@@ -70,13 +80,7 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
   case envoy::config::rbac::v3::RBAC::DENY:
     return !matched;
   case envoy::config::rbac::v3::RBAC::LOG: {
-    // If not shadow enforcement, set shared log metadata
-    if (mode_ != EnforcementMode::Shadow) {
-      ProtobufWkt::Struct log_metadata;
-      auto& log_fields = *log_metadata.mutable_fields();
-      log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(matched);
-      info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
-    }
+    generateLog(info, mode_, matched);
 
     return true;
   }
@@ -142,12 +146,8 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
     // If there is at least an LOG action in matchers, we have to turn on and off for shared log
     // metadata every time when there is a connection or request.
     auto rbac_action = action.action();
-    if (has_log_ && mode_ != EnforcementMode::Shadow) {
-      ProtobufWkt::Struct log_metadata;
-      auto& log_fields = *log_metadata.mutable_fields();
-      log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(
-          rbac_action == envoy::config::rbac::v3::RBAC::LOG);
-      info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
+    if (has_log_) {
+      generateLog(info, mode_, rbac_action == envoy::config::rbac::v3::RBAC::LOG);
     }
 
     switch (rbac_action) {
