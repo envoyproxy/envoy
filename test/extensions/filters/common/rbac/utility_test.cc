@@ -35,7 +35,7 @@ matcher:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
-  EXPECT_LOG_CONTAINS("warn", "rules are ignored",
+  EXPECT_LOG_CONTAINS("warn", "RBAC rules are ignored",
                       createEngine(config, factory_context,
                                    ProtobufMessage::getStrictValidationVisitor(),
                                    validation_visitor));
@@ -59,7 +59,7 @@ shadow_matcher:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
-  EXPECT_LOG_CONTAINS("warn", "shadow rules are ignored",
+  EXPECT_LOG_CONTAINS("warn", "RBAC shadow rules are ignored",
                       createShadowEngine(config, factory_context,
                                          ProtobufMessage::getStrictValidationVisitor(),
                                          validation_visitor));
