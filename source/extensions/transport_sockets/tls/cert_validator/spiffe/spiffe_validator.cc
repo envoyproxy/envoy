@@ -265,7 +265,7 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-absl::optional<int32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
+absl::optional<size_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
     return absl::make_optional(std::numeric_limits<int>::max());
   }

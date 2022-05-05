@@ -27,8 +27,8 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
     throwException();
   }
 
-  absl::optional<int32_t> daysUntilFirstCertExpires() const override {
-    return absl::make_optional(std::numeric_limits<int>::max());
+  absl::optional<size_t> daysUntilFirstCertExpires() const override {
+    return absl::make_optional(SIZE_MAX);
   }
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override {
     return absl::nullopt;
