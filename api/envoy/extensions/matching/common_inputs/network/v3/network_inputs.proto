@@ -97,12 +97,12 @@ message TransportProtocolInput {
 message ApplicationProtocolInput {
 }
 
-// Input that matches the URIs in the SAN field of the peer certificate for a downstream.
+// List of comma-delimited URIs in the SAN field of the peer certificate for a downstream.
 // [#extension: envoy.matching.inputs.uri_san]
 message UriSanInput {
 }
 
-// Input that matches the DNS entries in the SAN field of the peer certificate for a downstream.
+// List of comma-delimited DNS entries in the SAN field of the peer certificate for a downstream.
 // [#extension: envoy.matching.inputs.dns_san]
 message DnsSanInput {
 }
