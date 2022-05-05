@@ -277,7 +277,7 @@ TEST_P(StatsUtilityTest, SanitizeStatsName) {
   EXPECT_EQ("a.b.c", Utility::sanitizeStatsName("a.b.c."));
   EXPECT_EQ("a.b.c", Utility::sanitizeStatsName(".a.b.c"));
   EXPECT_EQ("a__b", Utility::sanitizeStatsName("a::b"));
-  EXPECT_EQ("a.b_c", Utility::sanitizeStatsName("a.b\0c"));
+  EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
 }
