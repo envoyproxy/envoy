@@ -1,5 +1,3 @@
-#include <cstddef>
-#include <iterator>
 #include <string>
 
 #include "envoy/stats/stats_macros.h"
