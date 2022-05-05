@@ -24,7 +24,7 @@ public class Tags: NSObject {
 
   /// Internal initializer used by builders.
   ///
-  /// - parameter Tags: Tags to set.
+  /// - parameter tags: Tags to set.
   required init(tags: [String: String]) {
     self.tags = tags
     super.init()

@@ -11,8 +11,10 @@ fi
 if [[ $(uname) == "Darwin" ]]; then
   if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
     ./bazelw run --run_under="cd $PWD && " @SwiftLint//:swiftlint -- --fix --quiet 2>/dev/null
+    ./bazelw run @DrString//:drstring format 2>/dev/null
   else
     ./bazelw run --run_under="cd $PWD && " @SwiftLint//:swiftlint -- --strict --quiet 2>/dev/null
+    ./bazelw run @DrString//:drstring check 2>/dev/null
   fi
 fi
 

@@ -83,6 +83,13 @@ def swift_repos():
     )
 
     http_archive(
+        name = "DrString",
+        build_file_content = """exports_files(["drstring"])""",
+        sha256 = "860788450cf9900613454a51276366ea324d5bfe71d1844106e9c1f1d7dfd82b",
+        url = "https://github.com/dduan/DrString/releases/download/0.5.2/drstring-x86_64-apple-darwin.tar.gz",
+    )
+
+    http_archive(
         name = "SwiftLint",
         build_file_content = """exports_files(["swiftlint"])""",
         sha256 = "61d335766a39ba8fa499017a560950bd9fa0b0e5bc318559a9c1c7f4da679256",

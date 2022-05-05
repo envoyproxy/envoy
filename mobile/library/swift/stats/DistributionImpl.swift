@@ -16,6 +16,8 @@ final class DistributionImpl: NSObject, Distribution {
   }
 
   /// Record a new int value for the distribution.
+  ///
+  /// - parameter value: The value to record.
   func recordValue(value: Int) {
     // TODO(jingwei99) potentially surface error up if engine is nil.
     self.engine?.recordHistogramValue(
@@ -23,6 +25,9 @@ final class DistributionImpl: NSObject, Distribution {
   }
 
   /// Record a new int value for the distribution with tags.
+  ///
+  /// - parameter tags:  The tags to attach to this distribution.
+  /// - parameter value: The value to record.
   func recordValue(tags: Tags, value: Int) {
     // TODO(jingwei99) potentially surface error up if engine is nil.
     self.engine?.recordHistogramValue(self.series, tags: tags.allTags(), value: numericCast(value))
