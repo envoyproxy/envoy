@@ -2,7 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"                  
+#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -117,10 +117,11 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
   terminate_via_cluster_config_ = true;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  auto* upgrade = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
-  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
-  upgrade->set_name("envoy.filters.connection_pools.http.tcp");
-  upgrade->mutable_typed_config()->PackFrom(tcp_config);
+    auto* upgrade =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
+    envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+    upgrade->set_name("envoy.filters.connection_pools.http.tcp");
+    upgrade->mutable_typed_config()->PackFrom(tcp_config);
   });
 
   initialize();
