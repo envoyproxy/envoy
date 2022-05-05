@@ -93,7 +93,6 @@ def kotlin_dependencies(extra_maven_dependencies = []):
         version_conflict_policy = "pinned",
         repositories = [
             "https://repo1.maven.org/maven2",
-            "https://jcenter.bintray.com/",
             "https://maven.google.com",
         ],
     )
