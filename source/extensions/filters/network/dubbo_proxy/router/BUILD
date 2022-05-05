@@ -42,6 +42,7 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":router_lib",
+        "//envoy/rds:rds_config_interface",
         "//envoy/registry",
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
@@ -67,5 +68,29 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_interface",
+    hdrs = ["rds.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/rds:rds_interface",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_lib",
+    hdrs = [
+        "rds_impl.h",
+    ],
+    deps = [
+        ":rds_interface",
+        ":route_matcher",
+        "//envoy/rds:rds_interface",
+        "//source/common/rds:rds_lib",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )

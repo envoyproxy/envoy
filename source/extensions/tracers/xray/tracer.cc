@@ -101,7 +101,8 @@ void Span::finishSpan() {
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Tracing::TraceContext& trace_context) {
+void Span::injectContext(Tracing::TraceContext& trace_context,
+                         const Upstream::HostDescriptionConstSharedPtr&) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
   trace_context.setByReferenceKey(XRayTraceHeader, xray_header_value);
