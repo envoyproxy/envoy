@@ -395,8 +395,8 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
       return;
     }
 
-    uint8_t element_type = BufferHelper::removeByte(data);
-    std::string key = BufferHelper::removeCString(data);
+    const uint8_t element_type = BufferHelper::removeByte(data);
+    const std::string key = BufferHelper::removeCString(data);
     ENVOY_LOG(trace, "BSON element type: {:#x} key: {}", element_type, key);
     switch (static_cast<Field::Type>(element_type)) {
     case Field::Type::Double: {
@@ -476,21 +476,21 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
     }
 
     case Field::Type::Int32: {
-      int32_t value = BufferHelper::removeInt32(data);
+      const int32_t value = BufferHelper::removeInt32(data);
       ENVOY_LOG(trace, "BSON int32: {}", value);
       addInt32(key, value);
       break;
     }
 
     case Field::Type::Timestamp: {
-      int64_t value = BufferHelper::removeInt64(data);
+      const int64_t value = BufferHelper::removeInt64(data);
       ENVOY_LOG(trace, "BSON timestamp: {}", value);
       addTimestamp(key, value);
       break;
     }
 
     case Field::Type::Int64: {
-      int64_t value = BufferHelper::removeInt64(data);
+      const int64_t value = BufferHelper::removeInt64(data);
       ENVOY_LOG(trace, "BSON int64: {}", value);
       addInt64(key, value);
       break;
