@@ -86,7 +86,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::SkipFilter:
     return Network::FilterStatus::Continue;
-  default:
+  case ReadOrParseState::Done:
     return Network::FilterStatus::Continue;
   }
   return Network::FilterStatus::Continue;
