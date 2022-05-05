@@ -377,13 +377,13 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
   ENVOY_LOG(trace, "BSON document length: {} data length: {}", message_length,
             original_buffer_length);
 
+  const ssize_t bytes_remaining_after_message = original_buffer_length - message_length;
   while (true) {
-    const ssize_t bytes_remaining_after_message = original_buffer_length - message_length;
     const ssize_t document_bytes_remaining =
         static_cast<ssize_t>(data.length()) - bytes_remaining_after_message;
     ENVOY_LOG(trace, "BSON document bytes remaining: {}", document_bytes_remaining);
     // Although mongo_proxy traffic is trusted, do a minimal check.
-    if (document_bytes_remaining < 0) {
+    if (document_bytes_remaining <= 0) {
       throw EnvoyException("invalid document");
     }
     if (document_bytes_remaining == 1) {
