@@ -1,11 +1,33 @@
 #pragma once
 
 #include "envoy/network/connection_balancer.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Network {
+
+class ConnectionBalanceFactory : public Config::TypedFactory {
+public:
+  ~ConnectionBalanceFactory() override = default;
+  std::string category() const override { return "envoy.network.connectionbalance"; }
+};
+
+class ConnectionBalancerBase : public ConnectionBalancer, public ConnectionBalanceFactory {};
+
+/**
+ * Lookup ConnectionBalancer instance by name
+ * @param name Name of the connection balancer to be looked up
+ * @return Pointer to @ref ConnectionBalancer instance that registered using the name of nullptr
+ */
+static inline const ConnectionBalancer* connectionBalancer(std::string name) {
+  auto factory =
+      Envoy::Registry::FactoryRegistry<Envoy::Network::ConnectionBalanceFactory>::getFactory(name);
+  return dynamic_cast<ConnectionBalancer*>(factory);
+}
 
 /**
  * Implementation of connection balancer that does exact balancing. This means that a lock is held
@@ -15,12 +37,16 @@ namespace Network {
  * throughput for accuracy and should be used when there are a small number of connections that
  * rarely cycle (e.g., service mesh gRPC egress).
  */
-class ExactConnectionBalancerImpl : public ConnectionBalancer {
+class ExactConnectionBalancerImpl : public ConnectionBalancerBase {
 public:
   // ConnectionBalancer
   void registerHandler(BalancedConnectionHandler& handler) override;
   void unregisterHandler(BalancedConnectionHandler& handler) override;
   BalancedConnectionHandler& pickTargetHandler(BalancedConnectionHandler& current_handler) override;
+
+  std::string name() const override {
+    return "envoy.config.listener.v3.Listener.ConnectionBalanceConfig.ExactBalance";
+  }
 
 private:
   absl::Mutex lock_;
@@ -31,7 +57,7 @@ private:
  * A NOP connection balancer implementation that always continues execution after incrementing
  * the handler's connection count.
  */
-class NopConnectionBalancerImpl : public ConnectionBalancer {
+class NopConnectionBalancerImpl : public ConnectionBalancerBase {
 public:
   // ConnectionBalancer
   void registerHandler(BalancedConnectionHandler&) override {}
@@ -41,6 +67,10 @@ public:
     // In the NOP case just increment the connection count and return the current handler.
     current_handler.incNumConnections();
     return current_handler;
+  }
+
+  std::string name() const override {
+    return "envoy.config.listener.v3.Listener.ConnectionBalanceConfig.NopBalance";
   }
 };
 

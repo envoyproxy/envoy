@@ -63,6 +63,7 @@ envoy_cc_library(
     hdrs = ["connection_balancer_impl.h"],
     deps = [
         "//envoy/network:connection_balancer_interface",
+        "//envoy/registry",
     ],
 )
 
