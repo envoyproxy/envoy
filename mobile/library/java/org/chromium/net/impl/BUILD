@@ -13,6 +13,7 @@ android_library(
         "AtomicCombinatoryState.java",
         "BidirectionalStreamBuilderImpl.java",
         "CallbackExceptionImpl.java",
+        "CancelProofEnvoyStream.java",
         "CronetEngineBase.java",
         "CronetEngineBuilderImpl.java",
         "CronetExceptionImpl.java",

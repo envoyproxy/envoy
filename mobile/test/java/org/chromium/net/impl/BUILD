@@ -9,6 +9,7 @@ envoy_mobile_android_test(
     name = "cronvoy_test",
     srcs = [
         "AtomicCombinatoryStateTest.java",
+        "CancelProofEnvoyStreamTest.java",
         "CronvoyEngineTest.java",
         "UrlRequestCallbackTester.java",
     ],
