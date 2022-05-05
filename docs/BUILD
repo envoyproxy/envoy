@@ -171,6 +171,22 @@ pkg_files(
     srcs = ["inventories"],
 )
 
+genrule(
+    name = "version_histories",
+    outs = ["version_histories.tar"],
+    cmd = """
+    $(location //tools/docs:generate_version_histories) \
+        $(location //:VERSION.txt) \
+        $@ \
+        $(locations //changelogs)
+    """,
+    tools = [
+        "//:VERSION.txt",
+        "//changelogs",
+        "//tools/docs:generate_version_histories",
+    ],
+)
+
 # TODO(phlax): this appears unused, fix or remove
 pkg_files(
     name = "google_vrp_config",
@@ -197,6 +213,13 @@ pkg_filegroup(
 )
 
 pkg_tar(
+    name = "version_history_rst",
+    extension = "tar",
+    package_dir = "version_history",
+    deps = [":version_histories"],
+)
+
+pkg_tar(
     name = "rst",
     srcs = [":rst_files"],
     extension = "tar",
@@ -205,6 +228,7 @@ pkg_tar(
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
+        ":version_history_rst",
         ":xds_rst",
     ],
 )

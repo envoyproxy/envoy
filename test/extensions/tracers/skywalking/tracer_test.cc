@@ -119,6 +119,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
     EXPECT_EQ("url", span->spanEntity()->tags().at(4).first);
 
+    // When setting peer address tag, the peer will be set.
+    span->setTag(Tracing::Tags::get().PeerAddress, "1.2.3.4:8080");
+    EXPECT_EQ("1.2.3.4:8080", span->spanEntity()->peer());
+
     span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "abc");
     EXPECT_EQ(1, span->spanEntity()->logs().size());
     EXPECT_LT(0, span->spanEntity()->logs().at(0).time());

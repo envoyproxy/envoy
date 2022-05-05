@@ -845,6 +845,7 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq(expected_ip + ":0")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip + ":0")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake cluster")));
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
