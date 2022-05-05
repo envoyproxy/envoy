@@ -12,6 +12,8 @@ namespace HttpFilters {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
 
+  // The filters to exlude in this general fuzzer. For some of them dedicated fuzzer
+  // exists. See #20737 or #21141.
   static const absl::flat_hash_set<absl::string_view> exclusion_list = {
       "envoy.ext_proc", "envoy.filters.http.alternate_protocols_cache",
       "envoy.filters.http.composite", "envoy.filters.http.ext_proc",
@@ -32,7 +34,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         filter_names.reserve(registered_names.size());
         std::for_each(registered_names.begin(), registered_names.end(),
                       [&](const absl::string_view& filter) {
-                        if (exclusion_list.count(filter) == 0) {
+                        if (exclusion_list.contains(filter)) {
                           filter_names.push_back(filter);
                         }
                       });
@@ -63,7 +65,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
     TestUtility::validate(input);
     // Somehow (probably before the mutator was extended by a filter) the fuzzer picked up the
     // extensions it can not fuzz (like the ext_* ones). Therefore reject these here.
-    if (exclusion_list.count(input.config().name()) != 0) {
+    if (exclusion_list.contains(input.config().name())) {
       ENVOY_LOG_MISC(debug, "Filter {} not supported.", input.config().name());
       return;
     }
