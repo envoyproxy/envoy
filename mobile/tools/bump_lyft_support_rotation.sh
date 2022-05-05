@@ -51,7 +51,7 @@ set_maintainer "$next" "$maintainers_file"
 message="Lyft support maintainer changing from <https://github.com/$current|$current> to <https://github.com/$next|$next>"
 echo "$message"
 
-curl -H "Content-type: application/json" \
+curl -H "Content-type: application/json; charset=utf-8" \
   --data "{\"channel\":\"C02F93EEJCE\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"$message\"}}]}" \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
   -X POST \
