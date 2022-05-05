@@ -705,9 +705,9 @@ message RouteAction {
 
     // Only one of *name* and *cluster_header* can be specified.
     // Envoy will determine the cluster to route to by reading the value of the
-    // HTTP header named by cluster_header from the request headers. If the value is not found in headers,
-    // no shadow request will happen. Envoy will not wait for the shadow cluster to respond before returning
-    // the response from the primary cluster
+    // HTTP header named by cluster_header from the request headers. Only the first value in header is used,
+    // and no shadow request will happen if the value is not found in headers. Envoy will not wait for 
+    // the shadow cluster to respond before returning the response from the primary cluster.
     //
     // .. attention::
     //
