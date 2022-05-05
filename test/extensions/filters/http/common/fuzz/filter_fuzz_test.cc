@@ -34,7 +34,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         filter_names.reserve(registered_names.size());
         std::for_each(registered_names.begin(), registered_names.end(),
                       [&](const absl::string_view& filter) {
-                        if (exclusion_list.contains(filter)) {
+                        if (!exclusion_list.contains(filter)) {
                           filter_names.push_back(filter);
                         }
                       });
