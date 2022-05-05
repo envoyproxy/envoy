@@ -37,6 +37,9 @@ minor_behavior_changes:
   change: |
     added &safe option to /stats?filter= to use RE2 regexes when filtering, which are much faster
     than the default Ecmascript regex evaluator.
+- area: skywalking
+  change: |
+    use upstream host address as ``addressUsedAtClient`` in propagation header.
 
 bug_fixes:
 
@@ -70,17 +73,31 @@ new_features:
 - area: dns_resolver
   change: |
     added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
+- area: dubbo_proxy
+  change: |
+    added :ref:`dynamic routes discovery <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` support to the dubbo proxy.
 - area: ext_proc
   change: |
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: thrift
+  change: |
+    introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
 - area: on_demand
   change: |
     :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
+- area: ratelimit
+  change: |
+    added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
 
 deprecated:
+- area: dubbo_proxy
+  change: |
+    deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
+    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
+    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
