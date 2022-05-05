@@ -1,5 +1,7 @@
 #include "source/common/profiler/profiler.h"
 
+#include "source/common/common/logger.h"
+
 #include <chrono>
 #include <string>
 #include <fstream>
@@ -55,7 +57,14 @@ TcmallocHeapProfiler& tcmallocHeapProfiler() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(TcmallocHeapProfiler);
 }
 
-void TcmallocHeapProfiler::startProfiler(absl::string_view path, std::chrono::milliseconds period) {
+bool TcmallocHeapProfiler::startProfiler(absl::string_view path, std::chrono::milliseconds period) {
+  if (heap_profile_started_ || path.empty() || period.count() == 0) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), warn,
+                        "Profile: tcmalloc heap profiler was started or profile file path is empty "
+                        "or output period is zero");
+    return false;
+  }
+
   heap_file_path_ = std::string(path);
   period_ = period;
 
@@ -67,15 +76,21 @@ void TcmallocHeapProfiler::startProfiler(absl::string_view path, std::chrono::mi
     absl::StatusOr<std::string> result = tcmalloc::Marshal(profile);
 
     if (!result.ok()) {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), warn,
+                          "Profile: get nothing from tcmalloc profile");
       return;
     }
     const std::string output_file_path = heap_file_path_ + std::to_string(next_file_id_++);
     std::ofstream output_file(output_file_path, std::ios_base::binary);
 
     if (!output_file.is_open()) {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), warn,
+                          "Profile: cannot open profile file: {}", output_file_path);
       return;
     }
 
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), debug,
+                        "Profile: write heap profile result to: {}", output_file_path);
     output_file << result.value();
     output_file.close();
 
@@ -83,14 +98,30 @@ void TcmallocHeapProfiler::startProfiler(absl::string_view path, std::chrono::mi
   });
 
   flush_timer_->enableTimer(period_);
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), info,
+                      "Profile: tcmalloc heap profiler is started");
+  heap_profile_started_ = true;
+  return true;
 }
 
-void TcmallocHeapProfiler::stopProfiler() {
+bool TcmallocHeapProfiler::stopProfiler() {
+  if (!heap_profile_started_) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), warn,
+                        "Profile: tcmalloc heap profiler was stopped");
+
+    return false;
+  }
+
   heap_file_path_ = "";
   period_ = {};
   flush_timer_->disableTimer();
   flush_timer_.reset();
   heap_profile_started_ = false;
+
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), info,
+                      "Profile: tcmalloc heap profiler is stopped");
+
+  return true;
 }
 
 bool Cpu::profilerEnabled() { return false; }
@@ -100,21 +131,11 @@ void Cpu::stopProfiler() {}
 bool Heap::profilerEnabled() { return true; }
 bool Heap::isProfilerStarted() { return tcmallocHeapProfiler().heapProfilerStarted(); }
 bool Heap::startProfiler(const std::string& path) {
-  if (tcmallocHeapProfiler().heapProfilerStarted()) {
-    return false;
-  }
   // Output heap profile file every minute by default.
   // TODO(wbpcode): make this period configurable.
-  tcmallocHeapProfiler().startProfiler(path, std::chrono::milliseconds(60000));
-  return true;
+  return tcmallocHeapProfiler().startProfiler(path, std::chrono::milliseconds(60000));
 }
-bool Heap::stopProfiler() {
-  if (!tcmallocHeapProfiler().heapProfilerStarted()) {
-    return false;
-  }
-  tcmallocHeapProfiler().stopProfiler();
-  return true;
-}
+bool Heap::stopProfiler() { return tcmallocHeapProfiler().stopProfiler(); }
 
 } // namespace Profiler
 } // namespace Envoy

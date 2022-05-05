@@ -79,8 +79,8 @@ public:
 
   bool heapProfilerStarted() const { return heap_profile_started_; }
 
-  void startProfiler(absl::string_view path, std::chrono::milliseconds period);
-  void stopProfiler();
+  bool startProfiler(absl::string_view path, std::chrono::milliseconds period);
+  bool stopProfiler();
 
 private:
   bool heap_profile_started_{};
