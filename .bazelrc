@@ -208,9 +208,9 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/12.0.1/lib/linux
-build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
-build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
+build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/14.0.0/lib/x86_64-unknown-linux-gnu'
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
 build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
