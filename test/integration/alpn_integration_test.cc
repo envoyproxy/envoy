@@ -48,6 +48,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AlpnIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AlpnIntegrationTest, Http2Old) {
+  FAIL();
   setUpstreamProtocol(Http::CodecType::HTTP2);
   protocols_ = {Http::CodecType::HTTP2, Http::CodecType::HTTP2};
   config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",

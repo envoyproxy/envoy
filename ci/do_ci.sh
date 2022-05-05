@@ -47,7 +47,7 @@ function collect_build_profile() {
 function bazel_with_collection() {
   local failed_logs
   declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
-  bazel "$@" | tee "${BAZEL_OUTPUT}"
+  bazel "$@" 2>&1 | tee "${BAZEL_OUTPUT}"
   declare BAZEL_STATUS="${PIPESTATUS[0]}"
   if [ "${BAZEL_STATUS}" != "0" ]
   then
@@ -57,6 +57,11 @@ function bazel_with_collection() {
       cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
     done <<< "$failed_logs"
     popd
+    URL=$(grep 'Streaming' ${BAZEL_OUTPUT})
+    if [ -z "${URL}" ]
+    then
+      echo "##vso[task.logissue type=error] " "${URL}"
+    fi
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
