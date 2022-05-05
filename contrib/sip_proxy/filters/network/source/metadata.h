@@ -76,15 +76,10 @@ public:
   AffinityEntry(const std::string& header, const std::string& type, const std::string& key,
                 bool query, bool subscribe)
       : header_(header), type_(type), key_(key), query_(query), subscribe_(subscribe) {}
-  AffinityEntry(const std::string& header, const std::string& type, const std::string& key,
-                const std::string& value, bool query, bool subscribe)
-      : header_(header), type_(type), key_(key), value_(value), query_(query),
-        subscribe_(subscribe) {}
 
   std::string& header() { return header_; }
   std::string& type() { return type_; }
   std::string& key() { return key_; }
-  std::string& value() { return value_; }
   bool query() { return query_; }
   bool subscribe() { return subscribe_; }
 
@@ -92,7 +87,6 @@ private:
   std::string header_;
   std::string type_;
   std::string key_;
-  std::string value_;
   bool query_;
   bool subscribe_;
 };

@@ -311,7 +311,8 @@ private:
                                               bool& lb_ret);
 
   QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
-                                       const std::string& key, MessageMetadataSharedPtr metadata);
+                                       const std::string& key,
+                                       MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;

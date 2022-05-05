@@ -137,7 +137,13 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
   std::string host;
 
   if (type == "ep") {
-    host = key;
+    if ((metadata->header(HeaderType::Route).empty() &&
+         metadata->header(HeaderType::TopLine).hasParam("ep"))) {
+      host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
+    } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
+      host = std::string(metadata->header(HeaderType::Route).param("ep"));
+    }
+
     ret = QueryStatus::Continue;
   } else if (type == "text") {
     auto header_type = HeaderTypes::get().str2Header(header);
@@ -203,6 +209,8 @@ FilterStatus Router::handleAffinity() {
 
         if (type == "text") {
           key = metadata->header(header).text();
+        } else if (type == "ep") {
+          key = "ep";
         } else {
           metadata->parseHeader(header);
           if (metadata->header(header).hasParam(type)) {
@@ -220,16 +228,10 @@ FilterStatus Router::handleAffinity() {
                 options->registrationAffinity())) {
       metadata->setStopLoadBalance(false);
 
-      absl::string_view dest = "";
       if ((metadata->header(HeaderType::Route).empty() &&
-           metadata->header(HeaderType::TopLine).hasParam("ep"))) {
-        dest = metadata->header(HeaderType::TopLine).param("ep");
-      } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
-        dest = metadata->header(HeaderType::Route).param("ep");
-      }
-
-      if (!dest.empty()) {
-        metadata->affinity().emplace_back("Route", "ep", "ep", std::string(dest), false, false);
+           metadata->header(HeaderType::TopLine).hasParam("ep")) ||
+          (metadata->header(HeaderType::Route).hasParam("ep"))) {
+        metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
       }
     }
 
@@ -357,9 +359,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     std::string host;
     metadata->resetDestination();
 
-    ENVOY_STREAM_LOG(debug, "handle affinity of {} {} {}", *callbacks_,
+    ENVOY_STREAM_LOG(debug, "handle affinity of header:{} type:{} key:{}", *callbacks_,
                      metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
-                     metadata->affinityIteration()->value());
+                     metadata->affinityIteration()->key());
     auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header(),
                                                metadata->affinityIteration()->type(),
                                                metadata->affinityIteration()->key(), metadata);
@@ -408,10 +410,12 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                      host);
 
     upstream_request_started = false;
-    messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
-    if (upstream_request_started) {
+    auto ret = messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
+    if (upstream_request_started && ret == FilterStatus::StopIteration) {
       // Defer to handle in upstream request onPoolReady or onPoolFailure
       return FilterStatus::StopIteration;
+    } else if (upstream_request_started && ret == FilterStatus::Continue) {
+      return FilterStatus::Continue;
     } else {
       // continue to next affinity
       metadata->setState(State::HandleAffinity);
@@ -607,7 +611,7 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
 // Tcp::ConnectionPool::UpstreamCallbacks
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
-  ENVOY_LOG(debug, "sip proxy received data {} --> {} bytes {}",
+  ENVOY_LOG(debug, "sip proxy received resp {} --> {} bytes {}",
             conn_data_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
             conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
             data.length());
