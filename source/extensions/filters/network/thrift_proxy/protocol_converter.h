@@ -11,7 +11,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 /**
- * ProtocolConverter is an abstract class that implements protocol-related methods on
+ * ProtocolConverter is an class that implements protocol-related methods on
  * DecoderEventHandler in terms of converting the decoded messages into a different protocol.
  */
 class ProtocolConverter : public virtual DecoderEventHandler {
@@ -29,6 +29,10 @@ public:
     buffer_->move(data);
     return FilterStatus::Continue;
   }
+
+  FilterStatus transportBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
+
+  FilterStatus transportEnd() override { return FilterStatus::Continue; }
 
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
@@ -132,6 +136,7 @@ private:
   Buffer::Instance* buffer_{};
 };
 
+using ProtocolConverterSharedPtr = std::shared_ptr<ProtocolConverter>;
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions
