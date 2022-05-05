@@ -12,7 +12,7 @@ namespace HttpFilters {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
 
-  // The filters to exlude in this general fuzzer. For some of them dedicated fuzzer
+  // The filters to exclude in this general fuzzer. For some of them dedicated fuzzer
   // exists. See #20737 or #21141.
   static const absl::flat_hash_set<absl::string_view> exclusion_list = {
       "envoy.ext_proc", "envoy.filters.http.alternate_protocols_cache",
