@@ -46,7 +46,7 @@ CMake Error at cmake/arch.cmake:108 (message):
   A minimum of SSSE3 compiler support is required
 Call Stack (most recent call first):
   CMakeLists.txt:340 (include)
-  
+
 ......
 ```
 Please check the cpu info of your virtual machine (e.g., ssse3):
