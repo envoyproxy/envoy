@@ -16,6 +16,8 @@ final class TimerImpl: NSObject, Timer {
   }
 
   /// Record a new duration value for the distribution.
+  ///
+  /// - parameter durationMs: The duration to record in milliseconds.
   func recordDuration(durationMs: Int) {
     // TODO(jingwei99) potentially surface error up if engine is nil.
     self.engine?.recordHistogramDuration(
@@ -23,6 +25,9 @@ final class TimerImpl: NSObject, Timer {
   }
 
   /// Record a new duration value for the distribution with tags.
+  ///
+  /// - parameter tags:       The tags to attach to this timer.
+  /// - parameter durationMs: The duration to record in milliseconds.
   func recordDuration(tags: Tags, durationMs: Int) {
     self.engine?.recordHistogramDuration(
       self.series, tags: tags.allTags(), durationMs: numericCast(durationMs))

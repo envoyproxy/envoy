@@ -16,32 +16,47 @@ final class GaugeImpl: NSObject, Gauge {
   }
 
   /// Set the gauge with the given value.
+  ///
+  /// - parameter value: The value to set.
   func set(value: Int) {
     // TODO(jingwei99) potentially surface error up if engine is nil.
     self.engine?.recordGaugeSet(self.series, tags: self.tags.allTags(), value: numericCast(value))
   }
 
-    /// Set the gauge with the given value and with tags
+  /// Set the gauge with the given value and with tags.
+  ///
+  /// - parameter tags:  The tags to attach to this Gauge.
+  /// - parameter value: The value to set.
   func set(tags: Tags, value: Int) {
     self.engine?.recordGaugeSet(self.series, tags: tags.allTags(), value: numericCast(value))
   }
 
   /// Add the given amount to the gauge.
+  ///
+  /// - parameter amount: The amount to add to this Gauge.
   func add(amount: Int) {
     self.engine?.recordGaugeAdd(self.series, tags: self.tags.allTags(), amount: numericCast(amount))
   }
 
   /// Add the given amount to the gauge with the given tags.
+  ///
+  /// - parameter tags:   The tags to attach to this Gauge.
+  /// - parameter amount: The amount to add to this Gauge.
   func add(tags: Tags, amount: Int) {
     self.engine?.recordGaugeAdd(self.series, tags: tags.allTags(), amount: numericCast(amount))
   }
 
   /// Subtract the given amount from the gauge.
+  ///
+  /// - parameter amount: The amount to subtract from this Gauge.
   func sub(amount: Int) {
     self.engine?.recordGaugeSub(self.series, tags: self.tags.allTags(), amount: numericCast(amount))
   }
 
   /// Subtract the given amount from the gauge with the given tags.
+  ///
+  /// - parameter tags:   The tags to attach to this Gauge.
+  /// - parameter amount: The amount to subtract from this Gauge.
   func sub(tags: Tags, amount: Int) {
     self.engine?.recordGaugeSub(self.series, tags: tags.allTags(), amount: numericCast(amount))
   }

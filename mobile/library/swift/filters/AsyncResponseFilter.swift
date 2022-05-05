@@ -15,13 +15,15 @@ public protocol AsyncResponseFilter: ResponseFilter {
   /// As with other filter invocations, this will be called on Envoy's main thread, and thus
   /// no additional synchronization is required between this and other invocations.
   ///
-  /// - param headers: Headers, if `stopIteration` was returned from `onResponseHeaders`.
-  /// - param data: Any data that has been buffered where `stopIterationAndBuffer` was returned.
-  /// - param trailers: Trailers, if `stopIteration` was returned from `onReponseTrailers`.
-  /// - param endStream: True, if the stream ended with the previous (and thus, last) invocation.
-  /// - param streamIntel: Internal HTTP stream metrics, context, and other details.
+  /// - parameter headers:     Headers, if `stopIteration` was returned from `onResponseHeaders`.
+  /// - parameter data:        Any data that has been buffered where `stopIterationAndBuffer` was
+  ///                          returned.
+  /// - parameter trailers:    Trailers, if `stopIteration` was returned from `onReponseTrailers`.
+  /// - parameter endStream:   True, if the stream ended with the previous (and thus, last)
+  ///                          invocation.
+  /// - parameter streamIntel: Internal HTTP stream metrics, context, and other details.
   ///
-  /// - return: The resumption status including any HTTP entities that will be forwarded.
+  /// - returns: The resumption status including any HTTP entities that will be forwarded.
   func onResumeResponse(
     headers: ResponseHeaders?,
     data: Data?,

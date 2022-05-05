@@ -136,9 +136,10 @@ private enum GRPCMessageProcessor {
   /// Recursively processes a buffer of data, buffering it into messages based on state.
   /// When a message has been fully buffered, `onMessage` will be called with the message.
   ///
-  /// - parameter buffer:    The buffer of data from which to determine state and messages.
-  /// - parameter state:     The current state of the buffering.
-  /// - parameter onMessage: Closure to call when a new message is available.
+  /// - parameter buffer:      The buffer of data from which to determine state and messages.
+  /// - parameter state:       The current state of the buffering.
+  /// - parameter streamIntel: Internal HTTP stream metrics, context, and other details.
+  /// - parameter onMessage:   Closure to call when a new message is available.
   static func processBuffer(_ buffer: inout Data, state: inout State, streamIntel: StreamIntel,
                             onMessage: (_ message: Data, _ streamIntel: StreamIntel) -> Void)
   {

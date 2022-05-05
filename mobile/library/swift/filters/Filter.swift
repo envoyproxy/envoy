@@ -15,6 +15,8 @@ extension EnvoyHTTPFilterFactory {
 
 extension EnvoyHTTPFilter {
   /// Initialize an EnvoyHTTPFilter using the instance methods of a concrete Filter implementation.
+  ///
+  /// - parameter filter: The contrete `Filter` to wrap.
   convenience init(filter: Filter) {
     self.init()
 

@@ -1,0 +1,17 @@
+include = [
+    "library/swift/**/*.swift",
+]
+column-limit = 110
+ignore-throws = true
+first-letter = "lowercase"
+vertical-align = true
+empty-patterns = true
+needs-separation = [
+    "description",
+    "parameters",
+]
+parameter-style = "separate"
+align-after-colon = [
+    "throws",
+    "returns",
+]

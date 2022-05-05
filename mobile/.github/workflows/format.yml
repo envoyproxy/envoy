@@ -37,13 +37,23 @@ jobs:
   swiftlint:
     name: swift_lint
     runs-on: ubuntu-18.04
-    timeout-minutes: 45
+    timeout-minutes: 5
     container:
-      image: ghcr.io/realm/swiftlint:0.46.5
+      image: ghcr.io/realm/swiftlint:0.47.1
     steps:
       - uses: actions/checkout@v1
       - name: 'Run Swift Lint (SwiftLint)'
         run: swiftlint lint --strict
+  drstring:
+    name: drstring
+    runs-on: macos-12
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Run DrString'
+        run: ./bazelw run @DrString//:drstring check
   kotlinlint:
     name: kotlin_lint
     runs-on: macos-12

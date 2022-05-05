@@ -20,7 +20,7 @@ public class TagsBuilder: NSObject {
 
   /// Replace all values at the provided name with a new set of tag values.
   ///
-  /// - parameter name: The tag name.
+  /// - parameter name:  The tag name.
   /// - parameter value: The value associated to the tag name.
   ///
   /// - returns: This builder.
@@ -43,7 +43,7 @@ public class TagsBuilder: NSObject {
 
   /// Add all tags from dictionary to builder.
   ///
-  /// - parameter name: a dictionary of tags.
+  /// - parameter tags: a dictionary of tags.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -63,7 +63,7 @@ public class TagsBuilder: NSObject {
 
   /// Allows for setting tags that are not publicly mutable (i.e., restricted tags).
   ///
-  /// - parameter name: The tag name.
+  /// - parameter name:  The tag name.
   /// - parameter value: The value associated to the tag name.
   ///
   /// - returns: This builder.
