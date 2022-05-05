@@ -349,8 +349,8 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 10.
+We now require Clang >= 9 due to C++17 support and tcmalloc requirement. GCC >= 9 is also known to work.
+Currently the CI is running with Clang 14.
 
 ## Clang STL debug symbols
 
