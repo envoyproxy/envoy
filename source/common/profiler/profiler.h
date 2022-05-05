@@ -1,12 +1,12 @@
 #pragma once
 
-#include "envoy/event/dispatcher.h"
-
-#include "source/common/runtime/runtime_impl.h"
-
 #include <chrono>
 #include <cstdint>
 #include <string>
+
+#include "envoy/event/dispatcher.h"
+
+#include "source/common/runtime/runtime_impl.h"
 
 // Profiling support is provided in the release tcmalloc of `gperftools`, but not in the library
 // that supplies the debug tcmalloc. So all the profiling code must be ifdef'd
