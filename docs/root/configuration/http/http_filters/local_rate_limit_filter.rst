@@ -34,6 +34,8 @@ Example filter configuration for a globally set rate limiter (e.g.: all vhosts/r
 .. literalinclude:: _include/local-rate-limit-global-configuration.yaml
    :language: yaml
    :lines: 13-37
+   :linenos:
+   :lineno-start: 13
    :caption: :download:`local-rate-limit-global-configuration.yaml <_include/local-rate-limit-global-configuration.yaml>`
 
 
@@ -42,6 +44,8 @@ Example filter configuration for a globally disabled rate limiter but enabled fo
 .. literalinclude:: _include/local-rate-limit-route-specific-configuration.yaml
    :language: yaml
    :lines: 13-17
+   :linenos:
+   :lineno-start: 13
    :caption: :download:`local-rate-limit-route-specific-configuration.yaml <_include/local-rate-limit-route-specific-configuration.yaml>`
 
 
@@ -50,6 +54,8 @@ The route specific configuration:
 .. literalinclude:: _include/local-rate-limit-route-specific-configuration.yaml
    :language: yaml
    :lines: 21-53
+   :linenos:
+   :lineno-start: 21
    :caption: :download:`local-rate-limit-route-specific-configuration.yaml <_include/local-rate-limit-route-specific-configuration.yaml>`
 
 
@@ -76,6 +82,8 @@ Example filter configuration using descriptors:
 .. literalinclude:: _include/local-rate-limit-with-descriptors.yaml
    :language: yaml
    :lines: 21-81
+   :linenos:
+   :lineno-start: 21
    :caption: :download:`local-rate-limit-with-descriptors.yaml <_include/local-rate-limit-with-descriptors.yaml>`
 
 In this example, requests are rate-limited for routes prefixed with "/foo" as
