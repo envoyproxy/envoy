@@ -34,7 +34,7 @@ minor_behavior_changes:
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
     that loads shared object libraries, such as those installed via luarocks.
 - area: admin
-  chnage: |
+  change: |
     added &safe option to /stats?filter= to use RE2 regexes when filtering, which are much faster
     than the default Ecmascript regex evaluator.
 
