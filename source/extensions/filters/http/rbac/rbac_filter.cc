@@ -27,9 +27,9 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
-                                                  validation_visitor_)),
+                                                  action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
-          proto_config, context, validation_visitor, validation_visitor_)) {}
+          proto_config, context, validation_visitor, action_validation_visitor_)) {}
 
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
@@ -52,9 +52,9 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
   // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).
   // Potentially https://lists.llvm.org/pipermail/llvm-bugs/2018-July/066769.html
   engine_ = Filters::Common::RBAC::createEngine(per_route_config.rbac(), context,
-                                                validation_visitor, validation_visitor_);
+                                                validation_visitor, action_validation_visitor_);
   shadow_engine_ = Filters::Common::RBAC::createShadowEngine(
-      per_route_config.rbac(), context, validation_visitor, validation_visitor_);
+      per_route_config.rbac(), context, validation_visitor, action_validation_visitor_);
 }
 
 Http::FilterHeadersStatus

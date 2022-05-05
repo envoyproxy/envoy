@@ -52,9 +52,9 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
-                                                  validation_visitor_)),
+                                                  action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
-          proto_config, context, validation_visitor, validation_visitor_)),
+          proto_config, context, validation_visitor, action_validation_visitor_)),
       enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
