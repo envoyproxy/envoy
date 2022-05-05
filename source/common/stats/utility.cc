@@ -18,14 +18,12 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
     name.remove_prefix(1);
   }
 
-  std::string stats_name = absl::StrReplaceAll(name, {
-                                                         {"://", "_"},
-                                                         {":/", "_"},
-                                                         {":", "_"},
-                                                     });
-  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-
-  return stats_name;
+  return absl::StrReplaceAll(name, {
+                                       {"://", "_"},
+                                       {":/", "_"},
+                                       {":", "_"},
+                                       {absl::string_view("\0", 1), "_"},
+                                   });
 }
 
 absl::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {
