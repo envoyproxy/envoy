@@ -63,9 +63,6 @@ new_features:
 - area: ext_proc
   change: |
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
-- area:  http2
-  change: |
-    added initial implementation for deferring processing of backed up http2 streams by buffering in the receiving codec. This is guarded by ``envoy.reloadable_features.defer_processing_backedup_streams``, but is disabled by default. Trailers and bodies are buffered if a stream is backed up. Body data is processed in chunks up to the size of the receiving codec's buffer high watermark. Fairness is implemented by prioritizing streams that haven't written to the connection recently to process deferred data when we transition from network connection backed up to network connection low watermark. Defer processing applies to both upstream and downstream connections.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.

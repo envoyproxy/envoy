@@ -513,9 +513,14 @@ void ConnectionImpl::StreamImpl::decodeData() {
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
+    // We should decode data in chunks only if we have defer processing enabled
+    // with a non-zero defer_processing_segment_size, and the buffer holds more
+    // data than the defer_processing_segment_size. Otherwise, push the
+    // entire buffer through.
     const bool decode_data_in_chunk =
         defer_processing_backedup_streams_ && stream_manager_.decodeAsChunks() &&
         pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
+
     if (decode_data_in_chunk) {
       Buffer::OwnedImpl chunk_buffer;
       // TODO(kbaichoo): Consider implementing an approximate move for chunking.
@@ -524,6 +529,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
       // With the current implementation this should always be true,
       // though this can change with approximation.
       stream_manager_.body_buffered_ = true;
+      ASSERT(pending_recv_data_->length() > 0);
 
       decoder().decodeData(chunk_buffer, sendEndStream());
       already_drained_data = true;
