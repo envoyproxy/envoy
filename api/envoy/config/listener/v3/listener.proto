@@ -12,6 +12,7 @@ import "envoy/config/listener/v3/listener_components.proto";
 import "envoy/config/listener/v3/udp_listener_config.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
@@ -89,6 +90,8 @@ message Listener {
       ExactBalance exact_balance = 1;
 
       core.v3.TypedExtensionConfig extend_balance = 2;
+
+      google.protobuf.Empty nop_balance = 3;
     }
   }
 

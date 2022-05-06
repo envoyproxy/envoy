@@ -29,8 +29,6 @@ static inline ConnectionBalancerSharedPtr connectionBalancer(std::string name) {
 
 class ConnectionBalancerBase : public ConnectionBalancer, public ConnectionBalanceFactory {};
 
-
-
 /**
  * Implementation of connection balancer that does exact balancing. This means that a lock is held
  * during balancing so that connection counts are nearly exactly balanced between handlers. This
@@ -48,6 +46,10 @@ public:
 
   std::string name() const override {
     return "envoy.config.listener.v3.Listener.ConnectionBalanceConfig.ExactBalance";
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::config::listener::v3::Listener::ConnectionBalanceConfig::ExactBalance>();
   }
 
 private:
@@ -73,6 +75,11 @@ public:
 
   std::string name() const override {
     return "envoy.config.listener.v3.Listener.ConnectionBalanceConfig.NopBalance";
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::config::listener::v3::Listener::ConnectionBalanceConfig::NopBalance>();
   }
 };
 
