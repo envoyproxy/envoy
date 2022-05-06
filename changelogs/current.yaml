@@ -40,6 +40,10 @@ minor_behavior_changes:
 - area: skywalking
   change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.
+- area: dns
+  change: |
+    allow propagating DNS responses with no records back to callers like strict_dns cluster,
+    guarded by ``envoy.reloadable_features.cares_accept_nodata``.
 
 bug_fixes:
 
@@ -88,6 +92,9 @@ new_features:
 - area: on_demand
   change: |
     :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
+- area: proxy_protcol
+  change: |
+    added :ref:`allow_requests_without_proxy_protocol<envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>` to allow requests without proxy protocol on the listener from trusted downstreams as an opt-in flag.
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
