@@ -41,17 +41,26 @@ public:
   TestConfigImpl(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config,
                  Server::Configuration::MockFactoryContext& context,
                  Router::RouteConfigProviderManager& route_config_provider_manager,
-                 ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
+                 ThriftFilters::DecoderFilterSharedPtr decoder_filter,
+                 ThriftFilters::EncoderFilterSharedPtr encoder_filter,
+                 ThriftFilters::BidirectionalFilterSharedPtr bidirectional_filter,
+                 ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context, route_config_provider_manager),
-        decoder_filter_(decoder_filter), stats_(stats) {}
+        decoder_filter_(decoder_filter), encoder_filter_(encoder_filter),
+        bidirectional_filter_(bidirectional_filter), stats_(stats) {}
 
   // ConfigImpl
   ThriftFilterStats& stats() override { return stats_; }
   void createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) override {
-    if (custom_filter_) {
-      callbacks.addDecoderFilter(custom_filter_);
+    if (custom_decoder_filter_) {
+      callbacks.addDecoderFilter(custom_decoder_filter_);
     }
     callbacks.addDecoderFilter(decoder_filter_);
+    if (custom_encoder_filter_) {
+      callbacks.addEncoderFilter(custom_encoder_filter_);
+    }
+    callbacks.addEncoderFilter(encoder_filter_);
+    callbacks.addBidirectionalFilter(bidirectional_filter_);
   }
   TransportPtr createTransport() override {
     if (transport_) {
@@ -66,8 +75,11 @@ public:
     return ConfigImpl::createProtocol();
   }
 
-  ThriftFilters::DecoderFilterSharedPtr custom_filter_;
+  ThriftFilters::DecoderFilterSharedPtr custom_decoder_filter_;
   ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
+  ThriftFilters::EncoderFilterSharedPtr custom_encoder_filter_;
+  ThriftFilters::EncoderFilterSharedPtr encoder_filter_;
+  ThriftFilters::BidirectionalFilterSharedPtr bidirectional_filter_;
   ThriftFilterStats& stats_;
   MockTransport* transport_{};
   MockProtocol* protocol_{};
@@ -83,6 +95,13 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
+  void initializeFilterWithCustomFilters() {
+    auto* decoder_filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
+    custom_decoder_filter_.reset(decoder_filter);
+    auto* encoder_filter = new NiceMock<ThriftFilters::MockEncoderFilter>();
+    custom_encoder_filter_.reset(encoder_filter);
+    initializeFilter();
+  }
   void initializeFilter() { initializeFilter(""); }
 
   void initializeFilter(const std::string& yaml,
@@ -113,17 +132,24 @@ public:
     context_.server_factory_context_.cluster_manager_.initializeClusters(cluster_names, {});
 
     proto_config_ = config;
+    decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
+    encoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockEncoderFilter>>();
+    bidirectional_filter_ = std::make_shared<NiceMock<ThriftFilters::MockBidirectionalFilter>>();
 
-    config_ = std::make_unique<TestConfigImpl>(
-        proto_config_, context_, *route_config_provider_manager_, decoder_filter_, stats_);
+    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_,
+                                               *route_config_provider_manager_, decoder_filter_,
+                                               encoder_filter_, bidirectional_filter_, stats_);
     if (custom_transport_) {
       config_->transport_ = custom_transport_;
     }
     if (custom_protocol_) {
       config_->protocol_ = custom_protocol_;
     }
-    if (custom_filter_) {
-      config_->custom_filter_ = custom_filter_;
+    if (custom_decoder_filter_) {
+      config_->custom_decoder_filter_ = custom_decoder_filter_;
+    }
+    if (custom_encoder_filter_) {
+      config_->custom_encoder_filter_ = custom_encoder_filter_;
     }
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
@@ -337,6 +363,7 @@ public:
 
     proto->writeMessageBegin(msg, metadata);
     proto->writeStructBegin(msg, "");
+    // successful response struct in field id 0, error (IDL exception) in field id greater than 0
     proto->writeFieldBegin(msg, "", FieldType::Struct, 2);
 
     proto->writeStructBegin(msg, "");
@@ -367,6 +394,8 @@ public:
 
     initializeFilter();
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+    checkDecoderEventsCalledToFilters(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
 
     ThriftFilters::DecoderFilterCallbacks* callbacks{};
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -412,8 +441,177 @@ public:
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
   }
 
+  void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
+                                         MessageType resp_msg_type, int32_t resp_seq_id) {
+    bool one = true;
+    uint8_t two = 2;
+    double three = 3.0;
+    int16_t four = 4;
+    int32_t five = 5;
+    int64_t six = 6;
+    int32_t eight = 8;
+    FieldType field_type_i32 = FieldType::I32;
+
+    uint32_t one_32 = 1;
+    EXPECT_CALL(*decoder_filter_, messageBegin(_))
+        .WillOnce(
+            Invoke([req_msg_type, req_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(req_msg_type, metadata->messageType());
+              EXPECT_EQ(req_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*decoder_filter_, messageEnd());
+    // The struct name is not available at runtime.
+    EXPECT_CALL(*decoder_filter_, structBegin("")).Times(2);
+    EXPECT_CALL(*decoder_filter_, structEnd()).Times(2);
+    // The field name is not available at runtime.
+    EXPECT_CALL(*decoder_filter_, fieldBegin("", _, _)).Times(11);
+    EXPECT_CALL(*decoder_filter_, fieldEnd()).Times(11);
+    EXPECT_CALL(*decoder_filter_, boolValue(one));
+    EXPECT_CALL(*decoder_filter_, byteValue(two));
+    EXPECT_CALL(*decoder_filter_, doubleValue(three));
+    EXPECT_CALL(*decoder_filter_, int16Value(four));
+    EXPECT_CALL(*decoder_filter_, int32Value(five));
+    EXPECT_CALL(*decoder_filter_, int64Value(six));
+    EXPECT_CALL(*decoder_filter_, stringValue("seven"));
+    EXPECT_CALL(*decoder_filter_, mapBegin(field_type_i32, field_type_i32, one_32));
+    EXPECT_CALL(*decoder_filter_, int32Value(eight)).Times(4);
+    EXPECT_CALL(*decoder_filter_, mapEnd());
+    EXPECT_CALL(*decoder_filter_, listBegin(field_type_i32, one_32));
+    EXPECT_CALL(*decoder_filter_, listEnd());
+    EXPECT_CALL(*decoder_filter_, setBegin(field_type_i32, one_32));
+    EXPECT_CALL(*decoder_filter_, setEnd());
+
+    EXPECT_CALL(*encoder_filter_, transportBegin(_));
+    EXPECT_CALL(*encoder_filter_, transportEnd());
+    EXPECT_CALL(*encoder_filter_, messageBegin(_))
+        .WillOnce(
+            Invoke([resp_msg_type, resp_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(resp_msg_type, metadata->messageType());
+              EXPECT_EQ(resp_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*encoder_filter_, messageEnd());
+    EXPECT_CALL(*encoder_filter_, structBegin("")).Times(2);
+    EXPECT_CALL(*encoder_filter_, structEnd()).Times(2);
+    EXPECT_CALL(*encoder_filter_, fieldBegin("", _, _)).Times(11);
+    EXPECT_CALL(*encoder_filter_, fieldEnd()).Times(11);
+    EXPECT_CALL(*encoder_filter_, boolValue(one));
+    EXPECT_CALL(*encoder_filter_, byteValue(two));
+    EXPECT_CALL(*encoder_filter_, doubleValue(three));
+    EXPECT_CALL(*encoder_filter_, int16Value(four));
+    EXPECT_CALL(*encoder_filter_, int32Value(five));
+    EXPECT_CALL(*encoder_filter_, int64Value(six));
+    EXPECT_CALL(*encoder_filter_, stringValue("seven"));
+    EXPECT_CALL(*encoder_filter_, mapBegin(field_type_i32, field_type_i32, one_32));
+    EXPECT_CALL(*encoder_filter_, int32Value(eight)).Times(4);
+    EXPECT_CALL(*encoder_filter_, mapEnd());
+    EXPECT_CALL(*encoder_filter_, listBegin(field_type_i32, one_32));
+    EXPECT_CALL(*encoder_filter_, listEnd());
+    EXPECT_CALL(*encoder_filter_, setBegin(field_type_i32, one_32));
+    EXPECT_CALL(*encoder_filter_, setEnd());
+
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageBegin(_))
+        .WillOnce(
+            Invoke([req_msg_type, req_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(req_msg_type, metadata->messageType());
+              EXPECT_EQ(req_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeStructBegin("")).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, decodeStructEnd()).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, decodeFieldBegin("", _, _)).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, decodeFieldEnd()).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, decodeBoolValue(one));
+    EXPECT_CALL(*bidirectional_filter_, decodeByteValue(two));
+    EXPECT_CALL(*bidirectional_filter_, decodeDoubleValue(three));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt16Value(four));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt32Value(five));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt64Value(six));
+    EXPECT_CALL(*bidirectional_filter_, decodeStringValue("seven"));
+    EXPECT_CALL(*bidirectional_filter_, decodeMapBegin(field_type_i32, field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, decodeInt32Value(eight)).Times(4);
+    EXPECT_CALL(*bidirectional_filter_, decodeMapEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeListBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, decodeListEnd());
+    EXPECT_CALL(*bidirectional_filter_, decodeSetBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, decodeSetEnd());
+
+    EXPECT_CALL(*bidirectional_filter_, encodeTransportBegin(_));
+    EXPECT_CALL(*bidirectional_filter_, encodeTransportEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeMessageBegin(_))
+        .WillOnce(
+            Invoke([resp_msg_type, resp_seq_id](MessageMetadataSharedPtr metadata) -> FilterStatus {
+              EXPECT_TRUE(metadata->hasMethodName());
+              EXPECT_TRUE(metadata->hasMessageType());
+              EXPECT_TRUE(metadata->hasSequenceId());
+              EXPECT_EQ("name", metadata->methodName());
+              EXPECT_EQ(resp_msg_type, metadata->messageType());
+              EXPECT_EQ(resp_seq_id, metadata->sequenceId());
+              return FilterStatus::Continue;
+            }));
+    EXPECT_CALL(*bidirectional_filter_, encodeMessageEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeStructBegin("")).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, encodeStructEnd()).Times(2);
+    EXPECT_CALL(*bidirectional_filter_, encodeFieldBegin("", _, _)).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, encodeFieldEnd()).Times(11);
+    EXPECT_CALL(*bidirectional_filter_, encodeBoolValue(one));
+    EXPECT_CALL(*bidirectional_filter_, encodeByteValue(two));
+    EXPECT_CALL(*bidirectional_filter_, encodeDoubleValue(three));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt16Value(four));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt32Value(five));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt64Value(six));
+    EXPECT_CALL(*bidirectional_filter_, encodeStringValue("seven"));
+    EXPECT_CALL(*bidirectional_filter_, encodeMapBegin(field_type_i32, field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, encodeInt32Value(eight)).Times(4);
+    EXPECT_CALL(*bidirectional_filter_, encodeMapEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeListBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, encodeListEnd());
+    EXPECT_CALL(*bidirectional_filter_, encodeSetBegin(field_type_i32, one_32));
+    EXPECT_CALL(*bidirectional_filter_, encodeSetEnd());
+  }
+
+  void passthroughSupportedSetup(bool expected_decode_passthrough_data_called = true,
+                                 bool expected_encode_passthrough_data_called = true) {
+    EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*encoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*bidirectional_filter_, decodePassthroughSupported()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*bidirectional_filter_, encodePassthroughSupported()).WillRepeatedly(Return(true));
+
+    if (expected_decode_passthrough_data_called) {
+      EXPECT_CALL(*decoder_filter_, passthroughData(_));
+      EXPECT_CALL(*bidirectional_filter_, decodePassthroughData(_));
+    } else {
+      EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
+      EXPECT_CALL(*bidirectional_filter_, decodePassthroughData(_)).Times(0);
+    }
+
+    if (expected_encode_passthrough_data_called) {
+      EXPECT_CALL(*encoder_filter_, passthroughData(_));
+      EXPECT_CALL(*bidirectional_filter_, encodePassthroughData(_));
+    } else {
+      EXPECT_CALL(*encoder_filter_, passthroughData(_)).Times(0);
+      EXPECT_CALL(*bidirectional_filter_, encodePassthroughData(_)).Times(0);
+    }
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
+  std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
+  std::shared_ptr<ThriftFilters::MockBidirectionalFilter> bidirectional_filter_;
   Stats::TestUtil::TestStore store_;
   ThriftFilterStats stats_;
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
@@ -429,7 +627,8 @@ public:
   std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
-  ThriftFilters::DecoderFilterSharedPtr custom_filter_;
+  std::shared_ptr<ThriftFilters::MockDecoderFilter> custom_decoder_filter_;
+  std::shared_ptr<ThriftFilters::MockEncoderFilter> custom_encoder_filter_;
 };
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
@@ -1132,7 +1331,7 @@ TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
 
 // Test the base case where there is no limit on the number of requests.
 TEST_F(ThriftConnectionManagerTest, RequestWithNoMaxRequestsLimit) {
-  initializeFilter("");
+  initializeFilter();
   EXPECT_EQ(0, config_->maxRequestsPerConnection());
 
   EXPECT_EQ(50, sendRequests(50));
@@ -1369,41 +1568,75 @@ TEST_F(ThriftConnectionManagerTest, DownstreamProtocolUpgrade) {
 
 // Tests multiple filters are invoked in the correct order.
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCallWithMultipleFilters) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
-  initializeFilter();
+  initializeFilterWithCustomFilters();
 
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
   InSequence s;
-  EXPECT_CALL(*filter, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*filter, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, decodeMessageBegin(_))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*custom_decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
+
+  // Reverse order for encoder filters.
+  EXPECT_CALL(*bidirectional_filter_, encodeMessageBegin(_))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*encoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*custom_encoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*bidirectional_filter_, encodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*encoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*custom_encoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+
+  writeFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x01);
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
 }
 
 // Tests stop iteration/resume with multiple filters.
 TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
+  initializeFilterWithCustomFilters();
 
-  initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
 
-  // First filter stops iteration.
+  ThriftFilters::EncoderFilterCallbacks* encoder_callbacks{};
+  EXPECT_CALL(*custom_encoder_filter_, setEncoderFilterCallbacks(_))
+      .WillOnce(Invoke(
+          [&](ThriftFilters::EncoderFilterCallbacks& cb) -> void { encoder_callbacks = &cb; }));
+
+  // First decoder filter stops iteration.
   {
-    EXPECT_CALL(*filter, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
+    EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
+        .WillOnce(Return(FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(0U, store_.counter("test.request").value());
     EXPECT_EQ(1U, stats_.request_active_.value());
@@ -1413,8 +1646,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
   {
     InSequence s;
     EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::Continue));
-    EXPECT_CALL(*filter, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageBegin(_))
+        .WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*custom_decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(*decoder_filter_, messageEnd()).WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd())
+        .WillOnce(Return(FilterStatus::Continue));
     callbacks->continueDecoding();
   }
 
@@ -1426,14 +1663,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
 // Tests stop iteration/resume with multiple filters when iteration is stopped during
 // transportEnd.
 TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
+  initializeFilterWithCustomFilters();
 
-  initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
@@ -1441,9 +1676,11 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
   // First filter stops iteration.
   {
     InSequence s;
-    EXPECT_CALL(*filter, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(*custom_decoder_filter_, transportBegin(_))
+        .WillOnce(Return(FilterStatus::Continue));
     EXPECT_CALL(*decoder_filter_, transportBegin(_)).WillOnce(Return(FilterStatus::Continue));
-    EXPECT_CALL(*filter, transportEnd()).WillOnce(Return(FilterStatus::StopIteration));
+    EXPECT_CALL(*custom_decoder_filter_, transportEnd())
+        .WillOnce(Return(FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(0U, store_.counter("test.request").value());
     EXPECT_EQ(1U, stats_.request_active_.value());
@@ -1463,14 +1700,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
 
 // Tests multiple filters where one invokes sendLocalReply with a successful reply.
 TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
+  initializeFilterWithCustomFilters();
 
-  initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
@@ -1484,7 +1719,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
       }));
 
   // First filter sends local reply.
-  EXPECT_CALL(*filter, messageBegin(_))
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::StopIteration;
@@ -1507,14 +1742,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
 
 // Tests multiple filters where one invokes sendLocalReply with an error reply.
 TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
+  initializeFilterWithCustomFilters();
 
-  initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
@@ -1528,7 +1761,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
       }));
 
   // First filter sends local reply.
-  EXPECT_CALL(*filter, messageBegin(_))
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::StopIteration;
@@ -1551,14 +1784,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
 
 // sendLocalReply does nothing, when the remote closed the connection.
 TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedConnection) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
+  initializeFilterWithCustomFilters();
 
-  initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
@@ -1567,7 +1798,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_CALL(direct_response, encode(_, _, _)).Times(0);
 
   // First filter sends local reply.
-  EXPECT_CALL(*filter, messageBegin(_))
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::StopIteration;
@@ -1589,21 +1820,19 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
 
 // Tests a decoder filter that modifies data.
 TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
-  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
-  custom_filter_.reset(filter);
+  initializeFilterWithCustomFilters();
 
-  initializeFilter();
-  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
 
   Http::LowerCaseString key{"key"};
 
-  EXPECT_CALL(*filter, transportBegin(_))
+  EXPECT_CALL(*custom_decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
         EXPECT_THAT(*metadata, HasNoHeaders());
         metadata->headers().addCopy(key, "value");
@@ -1616,8 +1845,7 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
       }));
-
-  EXPECT_CALL(*filter, messageBegin(_))
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
         EXPECT_EQ("name", metadata->methodName());
         metadata->setMethodName("alternate");
@@ -1628,11 +1856,86 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
         EXPECT_EQ("alternate", metadata->methodName());
         return FilterStatus::Continue;
       }));
-
+  EXPECT_CALL(*custom_decoder_filter_, boolValue(_))
+      .WillOnce(Invoke([&](bool& value) -> FilterStatus {
+        EXPECT_EQ(true, value);
+        value = false;
+        return FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filter_, boolValue(_)).WillOnce(Invoke([&](bool& value) -> FilterStatus {
+    EXPECT_EQ(false, value);
+    return FilterStatus::Continue;
+  }));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
+}
+
+// Tests a encoder filter that modifies data.
+TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
+  initializeFilterWithCustomFilters();
+
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  Http::LowerCaseString key{"key"};
+
+  EXPECT_CALL(*encoder_filter_, transportBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_THAT(*metadata, HasNoHeaders());
+        metadata->headers().addCopy(key, "value");
+        return FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*custom_encoder_filter_, transportBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        const auto header = metadata->headers().get(key);
+        EXPECT_FALSE(header.empty());
+        EXPECT_EQ("value", header[0]->value().getStringView());
+        return FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_EQ("name", metadata->methodName());
+        metadata->setMethodName("alternate");
+        return FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*custom_encoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        EXPECT_EQ("alternate", metadata->methodName());
+        return FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filter_, boolValue(_)).WillOnce(Invoke([&](bool& value) -> FilterStatus {
+    EXPECT_EQ(true, value);
+    value = false;
+    return FilterStatus::Continue;
+  }));
+  EXPECT_CALL(*custom_encoder_filter_, boolValue(_))
+      .WillOnce(Invoke([&](bool& value) -> FilterStatus {
+        EXPECT_EQ(false, value);
+        return FilterStatus::Continue;
+      }));
+  writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
 }
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
@@ -1674,8 +1977,8 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  // No response since the decoder filter stop the iteration.
+  passthroughSupportedSetup(true, false);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, buffer_.length());
@@ -1698,8 +2001,8 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  // No response for oneway.
+  passthroughSupportedSetup(true, false);
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -1724,8 +2027,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  passthroughSupportedSetup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1767,8 +2069,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  passthroughSupportedSetup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1810,8 +2111,7 @@ payload_passthrough: true
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  passthroughSupportedSetup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1862,8 +2162,8 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+  // No response since the decoder filter stop the iteration.
+  passthroughSupportedSetup(true, false);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1906,8 +2206,8 @@ route_config:
   initializeFilter(yaml, {"cluster"});
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
+  // PassthroughData is not expected to be called.
+  passthroughSupportedSetup(false, false);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))

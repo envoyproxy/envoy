@@ -110,6 +110,30 @@ bool RemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
   }
 
   descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
+
+  return true;
+}
+
+bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                   const std::string&,
+                                                   const Http::RequestHeaderMap&,
+                                                   const StreamInfo::StreamInfo& info) const {
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
+  uint32_t mask_len = v4_prefix_mask_len_;
+  if (remote_address->ip()->version() == Network::Address::IpVersion::v6) {
+    mask_len = v6_prefix_mask_len_;
+  }
+
+  // TODO: increase the efficiency, avoid string transform back and forth
+  Network::Address::CidrRange cidr_entry =
+      Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
+  descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
+
   return true;
 }
 
@@ -228,6 +252,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       break;
     }
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
+      actions_.emplace_back(new MaskedRemoteAddressAction(action.masked_remote_address()));
+      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       throw EnvoyException("invalid config");
     }

@@ -719,28 +719,30 @@ TEST(MultiDubboRouteMatcherTest, Route) {
 stat_prefix: dubbo_incomming_stats
 protocol_type: Dubbo
 serialization_type: Hessian2
-route_config:
-  - name: test1
-    interface: org.apache.dubbo.demo.DemoService
-    routes:
-      - match:
-          method:
-            name:
-              exact: "add"
-            params_match:
-              1:
-                exact_match: "user_id"
-        route:
-            cluster: user_service_dubbo_server
-  - name: test2
-    interface: org.apache.dubbo.demo.FormatService
-    routes:
-      - match:
-          method:
-            name:
-              exact: "format"
-        route:
-            cluster: format_service
+multiple_route_config:
+  name: test_routes
+  route_config:
+    - name: test1
+      interface: org.apache.dubbo.demo.DemoService
+      routes:
+        - match:
+            method:
+              name:
+                exact: "add"
+              params_match:
+                1:
+                  exact_match: "user_id"
+          route:
+              cluster: user_service_dubbo_server
+    - name: test2
+      interface: org.apache.dubbo.demo.FormatService
+      routes:
+        - match:
+            method:
+              name:
+                exact: "format"
+          route:
+              cluster: format_service
 )EOF";
 
   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
@@ -756,12 +758,12 @@ route_config:
   invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id");
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  RouteConfigImpl matcher(config.route_config(), context);
+  RouteConfigImpl matcher(config.multiple_route_config(), context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 
   {
     envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy invalid_config;
-    RouteConfigImpl matcher(invalid_config.route_config(), context);
+    RouteConfigImpl matcher(invalid_config.multiple_route_config(), context);
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
 }
