@@ -7,7 +7,7 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.unified_header_validators.envoy_default.v3";
-option java_outer_classname = "EnvoyDefaultProto";
+option java_outer_classname = "UnifiedHeaderValidatorProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/unified_header_validators/envoy_default/v3;envoy_defaultv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -23,7 +23,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 6. Validation of H/1 requests with both Content-Length and Transfer-Encoding headers
 // 7. Normalization of the URI path.
 //
-// [#next-free-field: 5]
 message UnifiedHeaderValidatorConfig {
   // Determines the action for request that contain %2F, %2f, %5C or %5c sequences in the URI path.
   // This operation occurs before URL normalization and the merge slashes transformations if they were enabled.
