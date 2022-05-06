@@ -44,17 +44,17 @@ HashPolicyImpl::generateHash(const Network::Address::Instance& downstream_addr) 
   return hash_impl_->evaluate(downstream_addr);
 }
 
-HashPolicyImplPtr HashPolicyImplFactory::create(
+HashPolicyImplPtr HashPolicyImpl::create(
     const Protobuf::RepeatedPtrField<
         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>& hash_policies) {
   ASSERT(hash_policies.size() == 1);
   switch (hash_policies[0].policy_specifier_case()) {
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kSourceIp:
-    return std::make_unique<HashPolicyImpl>(std::make_unique<SourceIpHashMethod>());
+    return std::unique_ptr<HashPolicyImpl>(new HashPolicyImpl(std::make_unique<SourceIpHashMethod>()));
     break;
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kKey:
-    return std::make_unique<HashPolicyImpl>(
-        std::make_unique<KeyHashMethod>(hash_policies[0].key()));
+    return std::unique_ptr<HashPolicyImpl>(
+        new HashPolicyImpl(std::make_unique<KeyHashMethod>(hash_policies[0].key())));
     break;
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::POLICY_SPECIFIER_NOT_SET:
     throw EnvoyException("hash policy specifier not set");

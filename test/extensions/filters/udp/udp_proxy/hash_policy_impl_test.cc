@@ -30,7 +30,7 @@ public:
     hash_policy_config_->clear_policy_specifier();
     additionalSetup();
 
-    hash_policy_ = HashPolicyImplFactory::create(config_.hash_policies());
+    hash_policy_ = HashPolicyImpl::create(config_.hash_policies());
   }
 
   virtual void additionalSetup(){
@@ -58,7 +58,7 @@ public:
 
   void additionalSetup() override { hash_policy_config_->set_key(key_); }
 
-  std::string key_;
+  const std::string key_;
 };
 
 // Check if generate correct hash

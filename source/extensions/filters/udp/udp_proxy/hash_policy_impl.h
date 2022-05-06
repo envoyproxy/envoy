@@ -26,27 +26,21 @@ public:
   };
 
   using HashMethodPtr = std::unique_ptr<HashMethod>;
+  using HashPolicyImplPtr = std::unique_ptr<const HashPolicyImpl>;
+  
+  static HashPolicyImplPtr
+  create(const Protobuf::RepeatedPtrField<
+         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>& hash_policies);
 
-  HashPolicyImpl(HashMethodPtr hash_impl) : hash_impl_(std::move(hash_impl)) {}
 
   absl::optional<uint64_t>
   generateHash(const Network::Address::Instance& downstream_addr) const override;
-
 private:
+  HashPolicyImpl(HashMethodPtr hash_impl) : hash_impl_(std::move(hash_impl)) {}
   HashMethodPtr hash_impl_;
 };
 
 using HashPolicyImplPtr = std::unique_ptr<const HashPolicyImpl>;
-
-/**
- * Factory to create hash policy implementations from protobuf hash policies.
- */
-class HashPolicyImplFactory {
-public:
-  static HashPolicyImplPtr
-  create(const Protobuf::RepeatedPtrField<
-         envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig_HashPolicy>& hash_policies);
-};
 
 } // namespace UdpProxy
 } // namespace UdpFilters

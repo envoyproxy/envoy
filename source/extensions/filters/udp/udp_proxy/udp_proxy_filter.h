@@ -96,7 +96,7 @@ public:
     }
 
     if (!config.hash_policies().empty()) {
-      hash_policy_ = HashPolicyImplFactory::create(config.hash_policies());
+      hash_policy_ = HashPolicyImpl::create(config.hash_policies());
     }
   }
 

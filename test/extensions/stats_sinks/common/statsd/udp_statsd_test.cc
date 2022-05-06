@@ -81,7 +81,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(UdpStatsdSinkTest, InvalidTagFormat) {
-  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   Network::Test::UdpSyncPeer server(GetParam());
   TagFormat tf = TagFormat{";", "=", ";", static_cast<TagPosition>(123)};
   NiceMock<ThreadLocal::MockInstance> tls_;

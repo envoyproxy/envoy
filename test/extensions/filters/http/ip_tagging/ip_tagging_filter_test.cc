@@ -291,7 +291,7 @@ TEST_F(IpTaggingFilterTest, InvalidConfig) {
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
   TestUtility::loadFromYaml(internal_request_yaml, config);
   config.set_request_type(
-      static_cast<envoy::extensions::filters::http::ip_tagging::v3::IPTagging_RequestType>(123));
+      static_cast<envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType>(123));
   EXPECT_THROW_WITH_MESSAGE(
       std::make_shared<IpTaggingFilterConfig>(config, "prefix", stats_, runtime_), EnvoyException,
       "Could not create request type: bad proto request type");

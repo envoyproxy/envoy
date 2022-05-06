@@ -198,7 +198,7 @@ public:
 
 private:
   RouteEntryImplBaseConstSharedPtr
-  routeEntryFromConfig(const envoy::extensions::filters::network::thrift_proxy::v3::Route&);
+  routeEntryFromConfig(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route_config);
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
