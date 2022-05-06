@@ -197,8 +197,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
 # compression code
 /*/extensions/filters/http/decompressor @kbaichoo @mattklein123
-/*/extensions/filters/http/gzip @kbaichoo @mattklein123
-/*/extensions/filters/http/common/compressor @kbaichoo @mattklein123
 /*/extensions/filters/http/compressor @kbaichoo @mattklein123
 /*/extensions/compression/brotli @kbaichoo @mattklein123
 /*/extensions/compression/common @kbaichoo @mattklein123
@@ -277,7 +275,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @rgs1 @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
-/contrib/cryptomb/ @ipuustin @ipuustin
+/contrib/cryptomb/ @ipuustin @VillePihlava
 /contrib/vcl/ @florincoras @KfreeZ
-/contrib/hyperscan/ @zhxie @zhxie
+/contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
