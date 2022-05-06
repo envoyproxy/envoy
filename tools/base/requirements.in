@@ -9,7 +9,7 @@ cffi>=1.15.0
 colorama
 coloredlogs
 coverage
-envoy.base.utils>=0.1.0
+envoy.base.utils>=0.1.1
 envoy.code.check
 envoy.dependency.check>=0.1.0
 envoy.dependency.pip_check>=0.1.2
