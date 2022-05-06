@@ -676,8 +676,7 @@ void ListenerImpl::buildSocketOptions() {
         name = config_.connection_balance_config().extend_balance().GetTypeName();
       }
     }
-    connection_balancer_ = Network::ConnectionBalancerSharedPtr(
-        const_cast<Network::ConnectionBalancer*>(Network::connectionBalancer(name)));
+    connection_balancer_ = Network::connectionBalancer(name);
 #endif
   }
 

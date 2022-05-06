@@ -16,18 +16,20 @@ public:
   std::string category() const override { return "envoy.network.connectionbalance"; }
 };
 
-class ConnectionBalancerBase : public ConnectionBalancer, public ConnectionBalanceFactory {};
-
 /**
  * Lookup ConnectionBalancer instance by name
  * @param name Name of the connection balancer to be looked up
  * @return Pointer to @ref ConnectionBalancer instance that registered using the name of nullptr
  */
-static inline const ConnectionBalancer* connectionBalancer(std::string name) {
+static inline ConnectionBalancerSharedPtr connectionBalancer(std::string name) {
   auto factory =
       Envoy::Registry::FactoryRegistry<Envoy::Network::ConnectionBalanceFactory>::getFactory(name);
-  return dynamic_cast<ConnectionBalancer*>(factory);
+  return std::shared_ptr<ConnectionBalancer>(reinterpret_cast<ConnectionBalancer*>(factory));
 }
+
+class ConnectionBalancerBase : public ConnectionBalancer, public ConnectionBalanceFactory {};
+
+
 
 /**
  * Implementation of connection balancer that does exact balancing. This means that a lock is held
