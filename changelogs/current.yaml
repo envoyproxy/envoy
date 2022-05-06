@@ -98,7 +98,7 @@ new_features:
   change: |
     added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
 - area: ratelimit
-  changes: |
+  change: |
     added support for :ref:`HTTP matching input functions <arch_overview_matching_api>` as descriptor producers.
 
 deprecated:
