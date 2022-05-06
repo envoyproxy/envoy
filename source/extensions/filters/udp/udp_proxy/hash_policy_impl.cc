@@ -50,7 +50,8 @@ HashPolicyImplPtr HashPolicyImpl::create(
   ASSERT(hash_policies.size() == 1);
   switch (hash_policies[0].policy_specifier_case()) {
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kSourceIp:
-    return std::unique_ptr<HashPolicyImpl>(new HashPolicyImpl(std::make_unique<SourceIpHashMethod>()));
+    return std::unique_ptr<HashPolicyImpl>(
+        new HashPolicyImpl(std::make_unique<SourceIpHashMethod>()));
     break;
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::kKey:
     return std::unique_ptr<HashPolicyImpl>(
