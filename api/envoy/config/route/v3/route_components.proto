@@ -1955,6 +1955,7 @@ message RateLimit {
 
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
       // [#extension-category: envoy.rate_limit_descriptors]
+      // [#extension-category: envoy.matching.http.input]
       core.v3.TypedExtensionConfig extension = 9;
 
       // Rate limit on masked remote address.
