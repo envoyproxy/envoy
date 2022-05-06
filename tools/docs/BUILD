@@ -1,7 +1,8 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -47,29 +48,15 @@ envoy_entry_point(
 py_binary(
     name = "versions_check",
     srcs = ["versions_check.py"],
-    args = [
-        "$(location //:VERSION.txt)",
-        "$(locations //changelogs)",
-    ],
+    args = [VERSION],
     data = [
-        "//:VERSION.txt",
         "//changelogs",
+        "//changelogs:sections.yaml",
     ],
     deps = [
-        ":project",
         requirement("aio.run.checker"),
-    ],
-)
-
-py_library(
-    name = "project",
-    srcs = [
-        "project.py",
-    ],
-    deps = [
-        requirement("frozendict"),
+        requirement("envoy.base.utils"),
         requirement("packaging"),
-        requirement("pyyaml"),
     ],
 )
 
@@ -79,8 +66,8 @@ py_binary(
         "generate_version_histories.py",
     ],
     deps = [
-        ":project",
         requirement("aio.run.runner"),
+        requirement("envoy.base.utils"),
         requirement("frozendict"),
         requirement("jinja2"),
         requirement("packaging"),
