@@ -27,6 +27,9 @@ envoy_cmake(
         "CMAKE_INSTALL_LIBDIR": "lib",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
+    env = {
+        "CXXFLAGS": "-Wno-error=unused-but-set-variable -Wno-error=bitwise-instead-of-logical",
+    },
     lib_source = "@io_hyperscan//:all",
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
