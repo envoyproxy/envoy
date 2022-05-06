@@ -97,7 +97,7 @@ modify different aspects of the server:
       :ref:`average success rate <envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_average_success_rate>`,
       and :ref:`ejection threshold<envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref/`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
+      :ref:`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
