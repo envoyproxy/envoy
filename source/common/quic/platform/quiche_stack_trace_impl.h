@@ -22,4 +22,6 @@ inline std::string QuicheStackTraceImpl() {
   return os.str();
 }
 
+inline bool QuicheShouldRunStackTraceTestImpl() { return true; }
+
 } // namespace quiche

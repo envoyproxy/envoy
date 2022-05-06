@@ -32,7 +32,6 @@
 #include "quiche/quic/core/quic_epoll_clock.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
-#include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
 #include "quiche/quic/platform/api/quic_flags.h"
@@ -42,7 +41,7 @@
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
-#include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
+#include "quiche/common/platform/api/quiche_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
@@ -585,7 +584,7 @@ protected:
 };
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
-  QuicStreamBufferAllocator allocator;
+  quiche::QuicheStreamBufferAllocator allocator;
   Envoy::Stats::TestUtil::MemoryTest memory_test;
   if (memory_test.mode() == Envoy::Stats::TestUtil::MemoryTest::Mode::Disabled) {
     return;
