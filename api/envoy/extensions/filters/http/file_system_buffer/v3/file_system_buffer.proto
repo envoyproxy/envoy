@@ -102,8 +102,7 @@ message StreamConfig {
   google.protobuf.UInt64Value storage_buffer_queue_high_watermark_bytes = 4;
 }
 
-// FileSystemBufferFilterConfig :ref:`configuration overview <config_http_filters_file_system_buffer>`.
-// Configuration for file system buffer filter.
+// A :ref:`file system buffer <config_http_filters_file_system_buffer>` filter configuration.
 //
 // Route-specific configs override only the fields they explicitly include; unset
 // fields inherit from the vhost or listener-level config, or, if never set,
