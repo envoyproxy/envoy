@@ -35,8 +35,8 @@ minor_behavior_changes:
     that loads shared object libraries, such as those installed via luarocks.
 - area: admin
   change: |
-    added &safe option to /stats?filter= to use RE2 regexes when filtering, which are much faster
-    than the default Ecmascript regex evaluator.
+    changed default regex engine for /stats?filter= from std::regex to RE2, improving filtering speed
+    20x.
 - area: skywalking
   change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.

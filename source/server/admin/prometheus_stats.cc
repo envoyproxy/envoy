@@ -49,9 +49,9 @@ std::string sanitizeValue(const absl::string_view value) {
  */
 template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
-  // Note that this duplicates logic in StatsRequest::populateStatsFromScopes,
-  // but differs in one subtle way: in Prometheus we only use metric.name() for
-  // filtering, not rendering, so we only grab the name if there's a filter.
+  // This duplicates logic in StatsRequest::populateStatsFromScopes, but differs
+  // in one subtle way: in Prometheus we only use metric.name() for filtering,
+  // not rendering, so we only construct the name if there's a filter.
   if (params.used_only_ && !metric.used()) {
     return false;
   }

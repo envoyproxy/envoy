@@ -128,8 +128,15 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     if (params_.used_only_ && !stat->used()) {
       return true;
     }
-    // Capture the name once if we did not early-exit due to used_only -- we'll
-    // use the name for both filtering and for capturing the stat in the map.
+
+    // Capture the name if we did not early-exit due to used_only -- we'll use
+    // the name for both filtering and for capturing the stat in the map.
+    // stat->name() takes a symbol table lock and builds a string, so we only
+    // want to call it once.
+    //
+    // This duplicates logic in shouldShowMetric in prometheus_stats.cc, but
+    // differs in that Prometheus only uses stat->name() for filtering, not
+    // rendering, so it only grab the name if there's a filter.
     std::string name = stat->name();
     if (params_.filter_ != nullptr) {
       if (!std::regex_search(name, *params_.filter_)) {
