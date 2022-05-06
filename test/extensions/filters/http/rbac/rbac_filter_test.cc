@@ -60,87 +60,99 @@ public:
         config, "test", store_, context_, ProtobufMessage::getStrictValidationVisitor()));
   }
 
-  void setupMatcher(envoy::config::rbac::v3::RBAC::Action rbac_action,
-                    envoy::config::rbac::v3::RBAC::Action on_no_match_rbac_action) {
+  void setupMatcher(std::string action, std::string on_no_match_action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
-    envoy::extensions::matching::common_inputs::network::v3::ServerNameInput server_name_input;
-    envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput
-        destination_port_input;
-    envoy::type::matcher::v3::HttpRequestHeaderMatchInput header_input;
-    header_input.set_header_name(":path");
-
-    envoy::config::rbac::v3::Action action;
-    action.set_name("foo");
-    action.set_action(rbac_action);
-    envoy::config::rbac::v3::Action shadow_action;
-    shadow_action.set_name("bar");
-    shadow_action.set_action(rbac_action);
-    envoy::config::rbac::v3::Action on_no_match_action;
-    on_no_match_action.set_name("none");
-    on_no_match_action.set_action(on_no_match_rbac_action);
+    const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      or_matcher:
+        predicate:
+        - single_predicate:
+            input:
+              name: envoy.matching.inputs.server_name
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
+            value_match:
+              safe_regex:
+                google_re2: {}
+                regex: .*cncf.io
+        - single_predicate:
+            input:
+              name: envoy.matching.inputs.destination_port
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+            value_match:
+              exact: "123"
+        - single_predicate:
+            input:
+              name: envoy.matching.inputs.request_headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: ":path"
+            value_match:
+              # TODO(zhxie): it is not equivalent with the URL path rule in setupPolicy(). There
+              # will be a replacement when the URL path custom matcher is ready.
+              prefix: "/suffix"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: foo
+          action: {}
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: none
+      action: {}
+)EOF";
+    const std::string shadow_matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      or_matcher:
+        predicate:
+        - single_predicate:
+            input:
+              name: envoy.matching.inputs.server_name
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
+            value_match:
+              exact: xyz.cncf.io
+        - single_predicate:
+            input:
+              name: envoy.matching.inputs.destination_port
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+            value_match:
+              exact: "456"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: bar
+          action: {}
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: none
+      action: {}
+)EOF";
 
     xds::type::matcher::v3::Matcher matcher;
-    {
-      auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
-      auto matcher_action = matcher_matcher->mutable_on_match()->mutable_action();
-      matcher_action->set_name("action");
-      matcher_action->mutable_typed_config()->PackFrom(action);
-      auto matcher_or_matcher = matcher_matcher->mutable_predicate()->mutable_or_matcher();
-      auto matcher_server_name_predicate =
-          matcher_or_matcher->add_predicate()->mutable_single_predicate();
-      auto matcher_server_name_input = matcher_server_name_predicate->mutable_input();
-      matcher_server_name_input->set_name("envoy.matching.inputs.server_name");
-      matcher_server_name_input->mutable_typed_config()->PackFrom(server_name_input);
-      auto matcher_regex =
-          matcher_server_name_predicate->mutable_value_match()->mutable_safe_regex();
-      matcher_regex->mutable_google_re2();
-      matcher_regex->set_regex(".*cncf.io");
-      auto matcher_destination_port_predicate =
-          matcher_or_matcher->add_predicate()->mutable_single_predicate();
-      auto matcher_destination_port_input = matcher_destination_port_predicate->mutable_input();
-      matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
-      matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
-      matcher_destination_port_predicate->mutable_value_match()->set_exact("123");
-      auto matcher_header_predicate =
-          matcher_or_matcher->add_predicate()->mutable_single_predicate();
-      auto matcher_header_input = matcher_header_predicate->mutable_input();
-      matcher_header_input->set_name("envoy.matching.inputs.request_headers");
-      matcher_header_input->mutable_typed_config()->PackFrom(header_input);
-      // TODO(zhxie): it is not equivalent with the URL path rule in setupPolicy(). There will be a
-      // replacement when the URL path custom matcher is ready.
-      matcher_header_predicate->mutable_value_match()->set_prefix("/suffix");
-
-      auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
-      matcher_on_no_match_action->set_name("action");
-      matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
-    }
+    TestUtility::loadFromYaml(fmt::format(matcher_yaml, "{}", action, on_no_match_action), matcher);
     *config.mutable_matcher() = matcher;
 
     xds::type::matcher::v3::Matcher shadow_matcher;
-    {
-      auto matcher_matcher = shadow_matcher.mutable_matcher_list()->mutable_matchers()->Add();
-      auto matcher_action = matcher_matcher->mutable_on_match()->mutable_action();
-      matcher_action->set_name("action");
-      matcher_action->mutable_typed_config()->PackFrom(shadow_action);
-      auto matcher_or_matcher = matcher_matcher->mutable_predicate()->mutable_or_matcher();
-      auto matcher_server_name_predicate =
-          matcher_or_matcher->add_predicate()->mutable_single_predicate();
-      auto matcher_server_name_input = matcher_server_name_predicate->mutable_input();
-      matcher_server_name_input->set_name("envoy.matching.inputs.server_name");
-      matcher_server_name_input->mutable_typed_config()->PackFrom(server_name_input);
-      matcher_server_name_predicate->mutable_value_match()->set_exact("xyz.cncf.io");
-      auto matcher_destination_port_predicate =
-          matcher_or_matcher->add_predicate()->mutable_single_predicate();
-      auto matcher_destination_port_input = matcher_destination_port_predicate->mutable_input();
-      matcher_destination_port_input->set_name("envoy.matching.inputs.destination_port");
-      matcher_destination_port_input->mutable_typed_config()->PackFrom(destination_port_input);
-      matcher_destination_port_predicate->mutable_value_match()->set_exact("456");
-
-      auto matcher_on_no_match_action = shadow_matcher.mutable_on_no_match()->mutable_action();
-      matcher_on_no_match_action->set_name("action");
-      matcher_on_no_match_action->mutable_typed_config()->PackFrom(on_no_match_action);
-    }
+    TestUtility::loadFromYaml(fmt::format(shadow_matcher_yaml, action, on_no_match_action),
+                              shadow_matcher);
     *config.mutable_shadow_matcher() = shadow_matcher;
     config.set_shadow_rules_stat_prefix("prefix_");
 
@@ -339,7 +351,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherAllowed) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
+  setupMatcher("ALLOW", "DENY");
 
   setDestinationPort(123);
   setMetadata();
@@ -362,7 +374,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherAllowed) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameMatcher) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
+  setupMatcher("ALLOW", "DENY");
 
   setDestinationPort(999);
   setRequestedServerName("www.cncf.io");
@@ -386,7 +398,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameMatcher) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, PathMatcher) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
+  setupMatcher("ALLOW", "DENY");
 
   setDestinationPort(999);
   setMetadata();
@@ -402,7 +414,7 @@ TEST_F(RoleBasedAccessControlFilterTest, PathMatcher) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
+  setupMatcher("ALLOW", "DENY");
 
   setDestinationPort(456);
   setMetadata();
@@ -431,7 +443,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::ALLOW, envoy::config::rbac::v3::RBAC::DENY);
+  setupMatcher("ALLOW", "DENY");
 
   setDestinationPort(456);
   setMetadata();
@@ -505,7 +517,7 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherShouldLog) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::LOG, envoy::config::rbac::v3::RBAC::ALLOW);
+  setupMatcher("LOG", "ALLOW");
 
   setDestinationPort(123);
   setMetadata();
@@ -526,7 +538,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherShouldLog) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherShouldNotLog) {
-  setupMatcher(envoy::config::rbac::v3::RBAC::LOG, envoy::config::rbac::v3::RBAC::ALLOW);
+  setupMatcher("LOG", "ALLOW");
 
   setDestinationPort(456);
   setMetadata();
