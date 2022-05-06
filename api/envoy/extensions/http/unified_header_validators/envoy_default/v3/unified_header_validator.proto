@@ -7,9 +7,9 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.unified_header_validators.envoy_default.v3";
-option java_outer_classname = "UnifiedHeaderValidatorConfig";
+option java_outer_classname = "EnvoyDefaultProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/unified_header_validators/envoy_default/v3;defaultv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/unified_header_validators/envoy_default/v3;envoy_defaultv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Envoy's default Unified Header Validator config]
@@ -23,43 +23,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 6. Validation of H/1 requests with both Content-Length and Transfer-Encoding headers
 // 7. Normalization of the URI path.
 //
-// [#next-free-field: 2]
+// [#next-free-field: 5]
 message UnifiedHeaderValidatorConfig {
-  // [#next-free-field: 2]
-  message Http1ProtocolOptions {
-    // Allows Envoy to process HTTP/1 requests/responses with both `Content-Length` and `Transfer-Encoding`
-    // headers set. By default such messages are rejected, but if option is enabled - Envoy will
-    // remove Content-Length header and process message.
-    // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>`_ for details.
-    //
-    // .. attention::
-    //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
-    //   is proxied via multiple layers of proxies.
-    bool http1_allow_chunked_length = 1;
-  }
-
-  Http1ProtocolOptions http1_protocol_options = 1;
-
-  // Should paths be normalized according to RFC 3986 before any processing of
-  // requests by HTTP filters or routing? This affects the upstream *:path* header
-  // as well. For paths that fail this check, Envoy will respond with 400 to
-  // paths that are malformed. This defaults to false currently but will default
-  // true in the future. When not specified, this value may be overridden by the
-  // runtime variable
-  // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
-  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`_
-  // for details of normalization.
-  // Note that Envoy does not perform
-  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
-  google.protobuf.BoolValue normalize_path = 30;
-
-  // Determines if adjacent slashes in the path are merged into one before any processing of
-  // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
-  // setting this option, incoming requests with path `//dir///file` will not match against route
-  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
-  // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-  bool merge_slashes = 33;
-
   // Determines the action for request that contain %2F, %2f, %5C or %5c sequences in the URI path.
   // This operation occurs before URL normalization and the merge slashes transformations if they were enabled.
   enum PathWithEscapedSlashesAction {
@@ -90,10 +55,44 @@ message UnifiedHeaderValidatorConfig {
     UNESCAPE_AND_FORWARD = 4;
   }
 
+  message Http1ProtocolOptions {
+    // Allows Envoy to process HTTP/1 requests/responses with both `Content-Length` and `Transfer-Encoding`
+    // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+    // remove Content-Length header and process message.
+    // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>`_ for details.
+    //
+    // .. attention::
+    //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
+    //   is proxied via multiple layers of proxies.
+    bool http1_allow_chunked_length = 1;
+  }
+
+  Http1ProtocolOptions http1_protocol_options = 1;
+
+  // Should paths be normalized according to RFC 3986 before any processing of
+  // requests by HTTP filters or routing? This affects the upstream *:path* header
+  // as well. For paths that fail this check, Envoy will respond with 400 to
+  // paths that are malformed. This defaults to false currently but will default
+  // true in the future. When not specified, this value may be overridden by the
+  // runtime variable
+  // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`_
+  // for details of normalization.
+  // Note that Envoy does not perform
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
+  google.protobuf.BoolValue normalize_path = 2;
+
+  // Determines if adjacent slashes in the path are merged into one before any processing of
+  // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
+  // setting this option, incoming requests with path `//dir///file` will not match against route
+  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+  bool merge_slashes = 3;
+
   // Action to take when request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c).
   // The default value can be overridden by the :ref:`http_connection_manager.path_with_escaped_slashes_action<config_http_conn_man_runtime_path_with_escaped_slashes_action>`
   // runtime variable.
   // The :ref:`http_connection_manager.path_with_escaped_slashes_action_sampling<config_http_conn_man_runtime_path_with_escaped_slashes_action_enabled>` runtime
   // variable can be used to apply the action to a portion of all requests.
-  PathWithEscapedSlashesAction path_with_escaped_slashes_action = 45;
+  PathWithEscapedSlashesAction path_with_escaped_slashes_action = 4;
 }

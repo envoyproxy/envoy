@@ -59,7 +59,7 @@ TEST_F(UnifiedHeaderValidatorTest, Http1HeaderNameValidation) {
   std::string key_value("aaa");
   HeaderString key(key_value);
   HeaderString value("valid");
-  for (int c=0; c <= 0xff; ++c) {
+  for (int c = 0; c <= 0xff; ++c) {
     key_value[1] = c;
     setHeaderStringUnvalidated(key, key_value);
     EXPECT_EQ(uhv->validateHeaderEntry(key, value),
