@@ -83,6 +83,11 @@ envoy.config.validators.minimum_clusters:
   - envoy.config.validators
   security_posture: unknown
   status: stable
+envoy.network.connection_balance.exact:
+  categories:
+  - envoy.network.connection_balance
+  security_posture: unknown
+  status: stable
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http

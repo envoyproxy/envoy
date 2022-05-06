@@ -22,7 +22,9 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                         config.ignoreGlobalConnLimit()),
                                     config),
       tcp_conn_handler_(parent) {
+  ENVOY_LOG(warn, "start regitster");
   config.connectionBalancer().registerHandler(*this);
+  ENVOY_LOG(warn, "end regitster");
 }
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,

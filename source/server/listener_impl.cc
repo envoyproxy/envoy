@@ -667,16 +667,17 @@ void ListenerImpl::buildSocketOptions() {
     connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
 #else
     // Not in place listener update.
-    std::string name = "envoy.config.listener.v3.Listener.ConnectionBalanceConfig.NopBalance";
-    if (config_.has_connection_balance_config()) {
-      if (config_.connection_balance_config().has_exact_balance()) {
-        name = config_.connection_balance_config().exact_balance().GetTypeName();
+    std::string name = "envoy.connection_balance.nop";
 
-      } else if (config_.connection_balance_config().has_extend_balance()) {
-        name = config_.connection_balance_config().extend_balance().GetTypeName();
-      }
+    if (config_.has_connection_balance_config() &&
+        !config_.connection_balance_config().balance_name().empty()) {
+      name = config_.connection_balance_config().balance_name();
     }
-    connection_balancer_ = Network::connectionBalancer(name);
+    auto factory =
+        Envoy::Registry::FactoryRegistry<Network::ConnectionBalanceFactory>::getFactory(name);
+
+    connection_balancer_ = factory->createConnectionBalancerFromProto(
+        config_.connection_balance_config(), *listener_factory_context_);
 #endif
   }
 

@@ -30,6 +30,12 @@ EXTENSIONS = {
     "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
 
     #
+    # Connection balancers
+    #
+
+    "envoy.network.connection_balance.exact": "//source/extensions/common/network:config",
+
+    #
     # Config validators
     #
 

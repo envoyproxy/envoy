@@ -72,6 +72,7 @@ message Listener {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Listener.ConnectionBalanceConfig";
 
+    // [#extension: envoy.network.connection_balance.exact]
     // A connection balancer implementation that does exact balancing. This means that a lock is
     // held during balancing so that connection counts are nearly exactly balanced between worker
     // threads. This is "nearly" exact in the sense that a connection might close in parallel thus
@@ -83,6 +84,9 @@ message Listener {
           "envoy.api.v2.Listener.ConnectionBalanceConfig.ExactBalance";
     }
 
+    message NopBalance {
+    }
+
     oneof balance_type {
       option (validate.required) = true;
 
@@ -91,8 +95,10 @@ message Listener {
 
       core.v3.TypedExtensionConfig extend_balance = 2;
 
-      google.protobuf.Empty nop_balance = 3;
+      NopBalance nop_balance = 3;
     }
+
+    string balance_name = 4;
   }
 
   // Configuration for envoy internal listener. All the future internal listener features should be added here.
