@@ -24,7 +24,7 @@ public:
    * @return the number of days in this context until the next certificate will expire, the value is
    * set when not expired.
    */
-  virtual absl::optional<size_t> daysUntilFirstCertExpires() const PURE;
+  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
    * @return certificate details conforming to proto admin.v2alpha.certs.
