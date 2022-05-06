@@ -2,18 +2,18 @@ version: "3.8"
 
 services:
   wasm_compile_update:
-    image: envoyproxy/envoy-build-ubuntu:ac5c9b6e73711ca8686de21cba7bc75c87de0ec8
+    image: envoyproxy/envoy-build-ubuntu:6fff5a6c67db843ddabde4533e24cab6122c7011
     command: |
-      bash -c "git config --global --add safe.directory /source && bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
+      bash -c "bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
     working_dir: /source
     volumes:
     - ../..:/source
     - ./lib:/build
 
   wasm_compile:
-    image: envoyproxy/envoy-build-ubuntu:ac5c9b6e73711ca8686de21cba7bc75c87de0ec8
+    image: envoyproxy/envoy-build-ubuntu:6fff5a6c67db843ddabde4533e24cab6122c7011
     command: |
-      bash -c "git config --global --add safe.directory /source && bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
+      bash -c "bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
     working_dir: /source
     volumes:
     - ../..:/source
