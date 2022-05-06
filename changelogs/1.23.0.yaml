@@ -87,12 +87,12 @@ new_features:
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
-- area: rbac
-  change: |
-    added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
 - area: ratelimit
   change: |
     added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
+- area: rbac
+  change: |
+    added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
 
 deprecated:
 - area: dubbo_proxy
