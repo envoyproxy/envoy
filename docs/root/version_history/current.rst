@@ -1,6 +1,5 @@
-1.21.2 (Pending)
-==========================
-
+1.21.2 (April 27, 2022)
+=======================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -10,6 +9,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* cryptomb: remove RSA PKCS1 v1.5 padding support.
 * perf: ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
 
 Bug Fixes
