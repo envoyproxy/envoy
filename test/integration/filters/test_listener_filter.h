@@ -17,6 +17,10 @@ public:
     alpn_.clear();
     return Network::FilterStatus::Continue;
   }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  }
+  size_t maxReadBytes() const override { return 0; }
 
   static void setAlpn(std::string alpn) {
     absl::MutexLock m(&alpn_lock_);
@@ -26,6 +30,23 @@ public:
 private:
   static absl::Mutex alpn_lock_;
   static std::string alpn_;
+};
+
+/**
+ * Test UDP listener filter.
+ */
+class TestUdpListenerFilter : public Network::UdpListenerReadFilter {
+public:
+  TestUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks)
+      : UdpListenerReadFilter(callbacks) {}
+
+  // Network::UdpListenerReadFilter callbacks
+  Network::FilterStatus onData(Network::UdpRecvData&) override {
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+    return Network::FilterStatus::Continue;
+  }
 };
 
 } // namespace Envoy

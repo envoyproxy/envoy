@@ -23,6 +23,8 @@ public:
   const std::string HttpStatusCode = "http.status_code";
   const std::string HttpUrl = "http.url";
   const std::string MessageBusDestination = "message_bus.destination";
+  // Downstream remote address for the downstream span and upstream remote address for the upstream
+  // span.
   const std::string PeerAddress = "peer.address";
   const std::string PeerHostname = "peer.hostname";
   const std::string PeerIpv4 = "peer.ipv4";

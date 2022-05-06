@@ -16,7 +16,6 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 inline constexpr absl::string_view FilterName = "envoy.filters.http.gcp_authn";
-inline constexpr absl::string_view AudienceKey = "audience_key";
 inline const Envoy::Http::LowerCaseString& authorizationHeaderKey() {
   CONSTRUCT_ON_FIRST_USE(Envoy::Http::LowerCaseString, "Authorization");
 }

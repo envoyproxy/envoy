@@ -284,7 +284,7 @@ void FilterChainManagerImpl::addFilterChains(
       std::vector<std::string> server_names;
       // Reject partial wildcards, we don't match on them.
       for (const auto& server_name : filter_chain_match.server_names()) {
-        if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
+        if (absl::StrContains(server_name, '*') && !isWildcardServerName(server_name)) {
           throw EnvoyException(
               fmt::format("error adding listener '{}': partial wildcards are not supported in "
                           "\"server_names\"",
@@ -706,7 +706,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
   // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
       (!filter_chain_local.first.empty() || !filter_chain_external.first.empty())
-          ? Network::Utility::isSameIpOrLoopback(socket)
+          ? Network::Utility::isSameIpOrLoopback(socket.connectionInfoProvider())
           : false;
 
   if (is_local_connection) {

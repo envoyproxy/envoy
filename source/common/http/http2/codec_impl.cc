@@ -279,6 +279,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 
 Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                        bool end_stream) {
+  parent_.updateActiveStreamsOnEncode(*this);
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
@@ -311,6 +312,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
 
 void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
                                                      bool end_stream) {
+  parent_.updateActiveStreamsOnEncode(*this);
   // The contract is that client codecs must ensure that :status is present.
   ASSERT(headers.Status() != nullptr);
 
@@ -327,6 +329,7 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
+  parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   if (pending_send_data_->length() > 0) {
@@ -349,6 +352,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
+  parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(parent_.allow_metadata_);
   if (parent_.use_new_codec_wrapper_) {
     NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
@@ -449,7 +453,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
-  if (defer_processing_backedup_streams_) {
+  if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
           [this]() { processBufferedData(); });
@@ -745,6 +749,7 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
+  parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   encodeDataHelper(data, end_stream,
                    /*skip_encoding_empty_trailers=*/
@@ -902,7 +907,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       protocol_constraints_(stats, http2_options),
       skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
-      dispatching_(false), raised_goaway_(false), random_(random_generator),
+      dispatching_(false), raised_goaway_(false),
+      delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_delay_keepalive_timeout")),
+      random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   // This library can only be used with the wrapper API enabled.
   ASSERT(!use_oghttp2_library_ || use_new_codec_wrapper_);
@@ -1174,6 +1182,16 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     onKeepaliveResponse();
     return okStatus();
+  }
+
+  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
+  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
+  // timeout for another timeout period. This will still timeout the connection if there is no
+  // activity, but if there is frame activity we assume the connection is still healthy and the
+  // PING ACK may be delayed behind other frames.
+  if (delay_keepalive_timeout_ && keepalive_timeout_timer_ != nullptr &&
+      keepalive_timeout_timer_->enabled()) {
+    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
   }
 
   if (frame->hd.type == NGHTTP2_DATA) {
@@ -1461,6 +1479,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     current_stream_id_.reset();
     // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.
     pending_deferred_reset_streams_.erase(stream->stream_id_);
+
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
@@ -1763,6 +1782,19 @@ void ConnectionImpl::onProtocolConstraintViolation() {
   // Flooded outbound queue implies that peer is not reading and it does not
   // make sense to try to flush pending bytes.
   connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
+}
+
+void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // Notify the streams based on least recently encoding to the connection.
+    for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
+      (*it)->runLowWatermarkCallbacks();
+    }
+  } else {
+    for (auto& stream : active_streams_) {
+      stream->runLowWatermarkCallbacks();
+    }
+  }
 }
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {

@@ -87,9 +87,8 @@ STD_REGEX_ALLOWLIST = (
     "./source/common/formatter/substitution_formatter.cc",
     "./contrib/squash/filters/http/source/squash_filter.h",
     "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
-    "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
-    "./source/server/admin/stats_handler.cc", "./source/server/admin/stats_request.cc",
-    "./source/server/admin/stats_request.h", "./source/server/admin/prometheus_stats.h",
+    "./source/server/admin/utils.cc", "./source/server/admin/stats_params.h",
+    "./source/server/admin/stats_request.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
 
@@ -206,6 +205,7 @@ CODE_CONVENTION_REPLACEMENTS = {
     # Times(1) noise.
     ".Times(1).WillOnce": ".WillOnce",
     ".Times(1).WillRepeatedly": ".WillOnce",
+    "Stats::ScopePtr": "Stats::ScopeSharedPtr",
 }
 
 UNSORTED_FLAGS = {

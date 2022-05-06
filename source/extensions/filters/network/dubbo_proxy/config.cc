@@ -7,6 +7,8 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/rds.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/rds_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -16,12 +18,22 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
+SINGLETON_MANAGER_REGISTRATION(dubbo_route_config_provider_manager);
+
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<Config> filter_config(std::make_shared<ConfigImpl>(proto_config, context));
+  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(dubbo_route_config_provider_manager), [&context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+          });
 
-  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  std::shared_ptr<Config> filter_config(
+      std::make_shared<ConfigImpl>(proto_config, context, *route_config_provider_manager));
+
+  return [route_config_provider_manager, filter_config,
+          &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
         std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
                                             context.mainThreadDispatcher().timeSource()));
@@ -74,37 +86,45 @@ private:
   }
 };
 
-class RouteMatcherTypeMapper {
-public:
-  using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v3::ProtocolType;
-  using RouteMatcherTypeMap = absl::flat_hash_map<ConfigProtocolType, Router::RouteMatcherType>;
-
-  static Router::RouteMatcherType lookupRouteMatcherType(ConfigProtocolType type) {
-    const auto& iter = routeMatcherTypeMap().find(type);
-    ASSERT(iter != routeMatcherTypeMap().end());
-    return iter->second;
-  }
-
-private:
-  static const RouteMatcherTypeMap& routeMatcherTypeMap() {
-    CONSTRUCT_ON_FIRST_USE(RouteMatcherTypeMap,
-                           {
-                               {ConfigProtocolType::Dubbo, Router::RouteMatcherType::Default},
-                           });
-  }
-};
-
 // class ConfigImpl.
 ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
-                       Server::Configuration::FactoryContext& context)
+                       Server::Configuration::FactoryContext& context,
+                       Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("dubbo.{}.", config.stat_prefix())),
       stats_(DubboFilterStats::generateStats(stats_prefix_, context_.scope())),
       serialization_type_(
           SerializationTypeMapper::lookupSerializationType(config.serialization_type())),
       protocol_type_(ProtocolTypeMapper::lookupProtocolType(config.protocol_type())) {
-  auto type = RouteMatcherTypeMapper::lookupRouteMatcherType(config.protocol_type());
-  route_matcher_ = Router::NamedRouteMatcherConfigFactory::getFactory(type).createRouteMatcher(
-      config.route_config(), context);
+
+  if (config.has_drds()) {
+    if (config.route_config_size() > 0) {
+      throw EnvoyException("both drds and route_config is present in DubboProxy");
+    }
+    if (config.drds().config_source().config_source_specifier_case() ==
+        envoy::config::core::v3::ConfigSource::kApiConfigSource) {
+      const auto api_type = config.drds().config_source().api_config_source().api_type();
+      if (api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
+          api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+        throw EnvoyException("drds supports only aggregated api_type in api_config_source");
+      }
+    }
+    route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
+        config.drds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
+  } else if (config.has_multiple_route_config()) {
+    if (config.route_config_size() > 0) {
+      throw EnvoyException("both mutiple_route_config and route_config is present in DubboProxy");
+    }
+    route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
+        config.multiple_route_config(), context_.getServerFactoryContext());
+  } else {
+    envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration
+        multiple_route_config;
+
+    *multiple_route_config.mutable_route_config() = config.route_config();
+    route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
+        multiple_route_config, context_.getServerFactoryContext());
+  }
+
   if (config.dubbo_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
 
@@ -126,7 +146,8 @@ void ConfigImpl::createFilterChain(DubboFilters::FilterChainFactoryCallbacks& ca
 
 Router::RouteConstSharedPtr ConfigImpl::route(const MessageMetadata& metadata,
                                               uint64_t random_value) const {
-  return route_matcher_->route(metadata, random_value);
+  auto config = std::static_pointer_cast<const Router::Config>(route_config_provider_->config());
+  return config->route(metadata, random_value);
 }
 
 ProtocolPtr ConfigImpl::createProtocol() {

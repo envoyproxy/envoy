@@ -31,80 +31,32 @@ Example configuration
 
 Example filter configuration for a globally set rate limiter (e.g.: all vhosts/routes share the same token bucket):
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.local_ratelimit
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
-    stat_prefix: http_local_rate_limiter
-    token_bucket:
-      max_tokens: 10000
-      tokens_per_fill: 1000
-      fill_interval: 1s
-    filter_enabled:
-      runtime_key: local_rate_limit_enabled
-      default_value:
-        numerator: 100
-        denominator: HUNDRED
-    filter_enforced:
-      runtime_key: local_rate_limit_enforced
-      default_value:
-        numerator: 100
-        denominator: HUNDRED
-    response_headers_to_add:
-      - append: false
-        header:
-          key: x-local-rate-limit
-          value: 'true'
-    local_rate_limit_per_downstream_connection: false
+.. literalinclude:: _include/local-rate-limit-global-configuration.yaml
+   :language: yaml
+   :lines: 13-37
+   :linenos:
+   :lineno-start: 13
+   :caption: :download:`local-rate-limit-global-configuration.yaml <_include/local-rate-limit-global-configuration.yaml>`
 
 
 Example filter configuration for a globally disabled rate limiter but enabled for a specific route:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.local_ratelimit
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
-    stat_prefix: http_local_rate_limiter
+.. literalinclude:: _include/local-rate-limit-route-specific-configuration.yaml
+   :language: yaml
+   :lines: 13-17
+   :linenos:
+   :lineno-start: 13
+   :caption: :download:`local-rate-limit-route-specific-configuration.yaml <_include/local-rate-limit-route-specific-configuration.yaml>`
 
 
 The route specific configuration:
 
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      routes:
-      - match: { prefix: "/path/with/rate/limit" }
-        route: { cluster: service_protected_by_rate_limit }
-        typed_per_filter_config:
-          envoy.filters.http.local_ratelimit:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
-            token_bucket:
-              max_tokens: 10000
-              tokens_per_fill: 1000
-              fill_interval: 1s
-            filter_enabled:
-              runtime_key: local_rate_limit_enabled
-              default_value:
-                numerator: 100
-                denominator: HUNDRED
-            filter_enforced:
-              runtime_key: local_rate_limit_enforced
-              default_value:
-                numerator: 100
-                denominator: HUNDRED
-            response_headers_to_add:
-              - append: false
-                header:
-                  key: x-local-rate-limit
-                  value: 'true'
-      - match: { prefix: "/" }
-        route: { cluster: default_service }
+.. literalinclude:: _include/local-rate-limit-route-specific-configuration.yaml
+   :language: yaml
+   :lines: 21-53
+   :linenos:
+   :lineno-start: 21
+   :caption: :download:`local-rate-limit-route-specific-configuration.yaml <_include/local-rate-limit-route-specific-configuration.yaml>`
 
 
 Note that if this filter is configured as globally disabled and there are no virtual host or route level
@@ -129,7 +81,9 @@ Example filter configuration using descriptors:
 
 .. literalinclude:: _include/local-rate-limit-with-descriptors.yaml
    :language: yaml
-   :lines: 15-75
+   :lines: 21-81
+   :linenos:
+   :lineno-start: 21
    :caption: :download:`local-rate-limit-with-descriptors.yaml <_include/local-rate-limit-with-descriptors.yaml>`
 
 In this example, requests are rate-limited for routes prefixed with "/foo" as
