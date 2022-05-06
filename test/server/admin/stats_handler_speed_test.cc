@@ -66,13 +66,13 @@ public:
 } // namespace Envoy
 
 class UseRe2Filters {
- public:
+public:
   UseRe2Filters(bool use_re2) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.admin_stats_filter_use_re2", use_re2 ? "true" : "false"}});
   }
 
- private:
+private:
   Envoy::TestScopedRuntime scoped_runtime_;
 };
 
