@@ -36,6 +36,10 @@ minor_behavior_changes:
 - area: skywalking
   change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.
+- area: dns
+  change: |
+    allow propagating DNS responses with no records back to callers like strict_dns cluster,
+    guarded by ``envoy.reloadable_features.cares_accept_nodata``.
 
 bug_fixes:
 
