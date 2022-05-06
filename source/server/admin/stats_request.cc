@@ -131,12 +131,12 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     // Capture the name once if we did not early-exit due to used_only -- we'll
     // use the name for both filtering and for capturing the stat in the map.
     std::string name = stat->name();
-    if (params_.filter_.has_value()) {
-      if (!std::regex_search(name, params_.filter_.value())) {
+    if (params_.filter_ != nullptr) {
+      if (!std::regex_search(name, *params_.filter_)) {
         return true;
       }
-    } else if (params_.safe_filter_ != nullptr &&
-               !re2::RE2::PartialMatch(name, *params_.safe_filter_)) {
+    } else if (params_.re2_filter_ != nullptr &&
+               !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
       return true;
     }
     stat_map_[name] = stat;

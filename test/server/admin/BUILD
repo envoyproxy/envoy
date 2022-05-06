@@ -20,6 +20,7 @@ envoy_cc_test_library(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -68,6 +69,7 @@ envoy_cc_test(
         "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:real_threads_test_helper_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -77,6 +79,7 @@ envoy_cc_test(
     srcs = ["stats_params_test.cc"],
     deps = [
         "//source/server/admin:stats_params_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

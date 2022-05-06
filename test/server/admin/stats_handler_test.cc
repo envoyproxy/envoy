@@ -11,6 +11,7 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::EndsWith;
@@ -110,6 +111,11 @@ public:
     }
   }
 
+  void setUseRe2Filters(bool re2) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.admin_stats_filter_use_re2", re2 ? "true" : "false"}});
+  }
+
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
   Stats::SymbolTableImpl symbol_table_;
@@ -123,6 +129,7 @@ public:
   Stats::CustomStatNamespacesImpl custom_namespaces_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 class AdminStatsTest : public StatsHandlerTest,
@@ -232,6 +239,7 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
 
   store_->mergeHistograms([]() -> void {});
 
+  setUseRe2Filters(false);
   code_response = handlerStats(url + "&usedonly&filter=h2");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
@@ -239,7 +247,8 @@ TEST_P(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
             "B300000(0,0) B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n",
             code_response.second);
 
-  code_response = handlerStats(url + "&usedonly&filter=h2&safe");
+  setUseRe2Filters(true);
+  code_response = handlerStats(url + "&usedonly&filter=h2");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_EQ("h2: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,0) "
             "B500(1,1) B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) "
@@ -359,6 +368,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
 
   EXPECT_THAT(expected_json_used, JsonStringEq(code_response.second));
 
+  setUseRe2Filters(false);
   code_response = handlerStats(url + "&usedonly&filter=h1");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   const std::string expected_json_used_and_filter = R"EOF({
@@ -380,6 +390,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsCumulative) {
 
   EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
 
+  setUseRe2Filters(true);
   code_response = handlerStats(url + "&usedonly&filter=h1&safe");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
@@ -463,6 +474,7 @@ TEST_P(AdminStatsTest, HandlerStatsJsonHistogramBucketsDisjoint) {
 
   EXPECT_THAT(expected_json_used, JsonStringEq(code_response.second));
 
+  setUseRe2Filters(false);
   code_response = handlerStats(url + "&usedonly&filter=h1");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   const std::string expected_json_used_and_filter = R"EOF({
@@ -842,6 +854,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
+  setUseRe2Filters(false);
   const std::string actual_json = statsAsJsonHandler(false, "&filter=[a-z]1").second;
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
@@ -946,6 +959,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   h3.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
+  setUseRe2Filters(true);
   const std::string actual_json = statsAsJsonHandler(true, "&filter=h[12]&safe").second;
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
@@ -1192,6 +1206,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 TEST_P(AdminInstanceTest, StatsInvalidRegex) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
+  setUseRe2Filters(false);
   EXPECT_LOG_CONTAINS(
       "error", "Invalid regex: ",
       EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test", header_map, data)));
@@ -1207,13 +1222,15 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
 TEST_P(AdminInstanceTest, StatsInvalidSafeRegex) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
-  EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test&safe", header_map, data));
-  EXPECT_EQ("Invalid safe regex", data.toString());
+  setUseRe2Filters(true);
+  EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test", header_map, data));
+  EXPECT_EQ("Invalid re2 regex", data.toString());
 }
 
 TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
+  setUseRe2Filters(false);
   EXPECT_LOG_CONTAINS(
       "error", ": *.ptest",
       EXPECT_EQ(Http::Code::BadRequest,
@@ -1319,6 +1336,7 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 }
 
 TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
+  setUseRe2Filters(false);
   const std::string url = "/stats?format=prometheus&filter=(+invalid)";
 
   createTestStats();

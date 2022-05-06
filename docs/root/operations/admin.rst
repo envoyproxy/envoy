@@ -440,17 +440,15 @@ modify different aspects of the server:
   .. http:get:: /stats?filter=regex
 
   Filters the returned stats to those with names matching the regular
-  expression ``regex`` using Ecmascript syntax. Compatible with
-  ``usedonly``. Performs partial matching by default, so
-  ``/stats?filter=server`` will return all stats containing the word
-  ``server``.  Full-string matching can be specified with begin- and
-  end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
+  expression ``regex``. Compatible with ``usedonly``. Performs partial 
+  matching by default, so ``/stats?filter=server`` will return all stats
+  containing the word ``server``.  Full-string matching can be specified
+  with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
 
-  .. http:get:: /stats?filter=regex&safe
-
-  Works like ``filter=regex`` except that the regex is specified in the
-  `Google RE2 <https://github.com/google/re2>` syntax rather than as Ecmascript,
-  and is substantially faster.
+  By default, the regular expression is evaluated using the
+  `Google RE2 <https://github.com/google/re2>` engine. To switch
+  to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
+  ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
 
   .. http:get:: /stats?histogram_buckets=cumulative
 

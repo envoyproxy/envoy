@@ -1,6 +1,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/server/admin/stats_params.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -23,17 +25,20 @@ TEST(StatsParamsTest, ParseParamsFilter) {
   Buffer::OwnedImpl response;
 
   {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.admin_stats_filter_use_re2", "false"}});
+
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
-    EXPECT_TRUE(params.filter_.has_value());
-    EXPECT_EQ(nullptr, params.safe_filter_);
+    EXPECT_NE(nullptr, params.filter_);
+    EXPECT_EQ(nullptr, params.re2_filter_);
   }
 
   {
     StatsParams params;
-    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo&safe", response));
-    EXPECT_FALSE(params.filter_.has_value());
-    EXPECT_NE(nullptr, params.safe_filter_);
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
+    EXPECT_EQ(nullptr, params.filter_);
+    EXPECT_NE(nullptr, params.re2_filter_);
   }
 }
 
