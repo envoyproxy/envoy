@@ -46,7 +46,6 @@ jobs:
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-macos \
-            --config=remote-ci-local-java8 \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/io/...
   javatestsmac:
@@ -86,7 +85,6 @@ jobs:
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-macos \
-            --config=remote-ci-local-java8 \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
             //test/java/...
@@ -131,6 +129,5 @@ jobs:
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-linux-clang \
-            --config=remote-ci-local-java8 \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/...

@@ -31,6 +31,10 @@ build --copt -Wno-deprecated-declarations
 # Envoy's runtime system. This option prevents them from being compiled out.
 build --copt -DABSL_FLAGS_STRIP_NAMES=0
 
+# The defaults are JDK 11 on newer versions of Bazel
+build --java_runtime_version=remotejdk_11
+build --java_language_version=8
+
 # Override PGV validation with NOP functions
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
@@ -124,11 +128,6 @@ build:remote-ci-common --spawn_strategy=remote,sandboxed,local
 # Avoid hanging if the remote side closes the connection without a TCP RST. Only
 # sends a keepalive if we don't receive any messages (server updates every 60s).
 build:remote-ci-common --grpc_keepalive_time=61s
-#############################################################################
-# remote-ci-local-java8: Use a local Java 8 (JDK)
-#############################################################################
-build:remote-ci-local-java8 --java_runtime_version=local_jdk
-build:remote-ci-local-java8 --java_language_version=8
 #############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
 #############################################################################

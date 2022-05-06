@@ -3,12 +3,13 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
+load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@rules_proto_grpc//protobuf:repositories.bzl", "protobuf_repos")
 load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "java_repos")
 load("@rules_python//python:pip.bzl", "pip_install")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
+load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
 
 def _default_extra_swift_sources_impl(ctx):
     ctx.file("WORKSPACE", "")
@@ -58,6 +59,7 @@ def swift_dependencies():
     swift_rules_dependencies()
 
 def kotlin_dependencies(extra_maven_dependencies = []):
+    rules_java_dependencies()
     maven_install(
         artifacts = [
             "com.google.code.findbugs:jsr305:3.0.2",
