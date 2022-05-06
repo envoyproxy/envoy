@@ -78,8 +78,5 @@ new_features:
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
-- area: http
-  change: |
-    added cluster_header in :ref:`request_mirror_policies <v1.22:envoy_v3_api_field_config.route.v3.RouteConfiguration.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
 
 deprecated:

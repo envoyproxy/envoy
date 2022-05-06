@@ -378,8 +378,8 @@ public:
   bool traceSampled() const override { return trace_sampled_; }
 
 private:
-  std::string cluster_;
-  Http::LowerCaseString cluster_header_;
+  const std::string cluster_;
+  const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
   bool trace_sampled_;

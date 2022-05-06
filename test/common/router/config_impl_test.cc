@@ -3879,9 +3879,9 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only one of cluster or cluster_header in request mirror policy can be specified");
+      "Only one of cluster '.*' or cluster_header '.*' in request mirror policy can be specified");
 }
 
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithNoClusterSpecifier) {
@@ -3905,7 +3905,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "At least one of cluster or cluster_header in request mirror policy need to be specified");
+      "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
 }
 
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithInvalidHttpHeader) {

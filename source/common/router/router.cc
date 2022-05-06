@@ -99,9 +99,7 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
 
 bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
-  if (policy.cluster().empty() && policy.clusterHeader().get().empty()) {
-    return false;
-  }
+  ASSERT(!(policy.cluster().empty() && policy.clusterHeader().get().empty()));
 
   // The policy's default value is set correctly regardless of whether there is a runtime key
   // or not, thus this call is sufficient for all cases (100% if no runtime set, otherwise
@@ -844,19 +842,19 @@ void Filter::cleanup() {
   }
 }
 
-std::string Filter::getShadowCluster(const ShadowPolicy& policy,
-                                     const Http::HeaderMap& headers) const {
+absl::optional<std::string> Filter::getShadowCluster(const ShadowPolicy& policy,
+                                                     const Http::HeaderMap& headers) const {
   if (!policy.cluster().empty()) {
     return policy.cluster();
   } else {
     ASSERT(!policy.clusterHeader().get().empty());
     const auto entry = headers.get(policy.clusterHeader());
-    if (!entry.empty()) {
+    if (!entry.empty() && !entry[0]->value().empty()) {
       return std::string(entry[0]->value().getStringView());
     }
     ENVOY_STREAM_LOG(warn, "There is no cluster name in header: {}", *callbacks_,
                      policy.clusterHeader());
-    return "";
+    return absl::nullopt;
   }
 }
 
@@ -864,10 +862,11 @@ void Filter::maybeDoShadowing() {
   for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
-    const std::string cluster = getShadowCluster(shadow_policy, *downstream_headers_);
+    const absl::optional<std::string> cluster_name =
+        getShadowCluster(shadow_policy, *downstream_headers_);
 
-    // The cluster name in cluster_header is empty
-    if (cluster.empty()) {
+    // The cluster name got from headers is empty.
+    if (!cluster_name.has_value()) {
       continue;
     }
 
@@ -885,7 +884,7 @@ void Filter::maybeDoShadowing() {
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled());
-    config_.shadowWriter().shadow(cluster, std::move(request), options);
+    config_.shadowWriter().shadow(cluster_name.value(), std::move(request), options);
   }
 }
 

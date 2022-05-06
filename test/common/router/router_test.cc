@@ -4457,7 +4457,7 @@ TEST_F(RouterTest, ShadowWithClusterHeader) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
-TEST_F(RouterTest, ShadowNoClusterNameInHeader) {
+TEST_F(RouterTest, ShadowNoClusterHeaderInHeader) {
   ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
@@ -4488,6 +4488,45 @@ TEST_F(RouterTest, ShadowNoClusterNameInHeader) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+
+  EXPECT_CALL(*shadow_writer_, shadow_(_, _, _)).Times(0);
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+TEST_F(RouterTest, ShadowClusterNameEmptyInHeader) {
+  ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+
+  expectResponseTimerCreate();
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addCopy("some_header", "");
+  router_.decodeHeaders(headers, false);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, false));
+
+  Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
+  router_.decodeTrailers(trailers);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*shadow_writer_, shadow_(_, _, _)).Times(0);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -5489,15 +5528,6 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
 
 TEST(RouterFilterUtilityTest, ShouldShadow) {
   {
-    auto policy = makeShadowPolicy();
-    NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(
-        runtime.snapshot_,
-        featureEnabled(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), _))
-        .Times(0);
-    EXPECT_FALSE(FilterUtility::shouldShadow(*policy, runtime, 5));
-  }
-  {
     auto policy = makeShadowPolicy("cluster");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(
@@ -5526,15 +5556,6 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
                        testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)), 5))
         .WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(*policy, runtime, 5));
-  }
-  {
-    auto policy = makeShadowPolicy("", "", "foo");
-    NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(
-        runtime.snapshot_,
-        featureEnabled("foo", testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), _))
-        .Times(0);
-    EXPECT_FALSE(FilterUtility::shouldShadow(*policy, runtime, 5));
   }
   {
     auto policy = makeShadowPolicy("", "cluster_header", "foo");
