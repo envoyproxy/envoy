@@ -567,13 +567,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("test", false));
 
   tcp_client->waitForDisconnect();
-  FakeRawConnectionPtr fake_upstream_connection;
 
   // Guarantee client is done writing to the log.
-  test_server_.reset();
   auto log_result = waitForAccessLog(access_log_path);
 
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
