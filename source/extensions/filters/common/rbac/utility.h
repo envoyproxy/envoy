@@ -44,7 +44,7 @@ createEngine(const ConfigType& config, Server::Configuration::ServerFactoryConte
              ActionValidationVisitor& action_validation_visitor) {
   if (config.has_matcher()) {
     if (config.has_rules()) {
-      ENVOY_LOG_MISC(warn, "RBAC rules are ignored");
+      ENVOY_LOG_MISC(warn, "RBAC rules are ignored when matcher is configured");
     }
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
         config.matcher(), context, action_validation_visitor, EnforcementMode::Enforced);
@@ -64,7 +64,7 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
                    ActionValidationVisitor& action_validation_visitor) {
   if (config.has_shadow_matcher()) {
     if (config.has_shadow_rules()) {
-      ENVOY_LOG_MISC(warn, "RBAC shadow rules are ignored");
+      ENVOY_LOG_MISC(warn, "RBAC shadow rules are ignored when shadow matcher is configured");
     }
     return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
         config.shadow_matcher(), context, action_validation_visitor, EnforcementMode::Shadow);
