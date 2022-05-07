@@ -107,8 +107,6 @@ void StatsRequest::startPhase() {
     StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
     if (variant.index() == absl::variant_npos) {
       variant = ScopeVec();
-    } else {
-      ASSERT(static_cast<StatOrScopesIndex>(variant.index()) == StatOrScopesIndex::Scopes);
     }
     absl::get<ScopeVec>(variant).emplace_back(scope);
   }
