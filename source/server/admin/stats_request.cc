@@ -42,7 +42,7 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
 
   // nextChunk's contract is to add up to chunk_size_ additional bytes. The
   // caller is not required to drain the bytes after each call to nextChunk.
-  uint64_t starting_response_length = response.length();
+  const uint64_t starting_response_length = response.length();
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       switch (phase_) {
