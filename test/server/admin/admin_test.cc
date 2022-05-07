@@ -15,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -173,6 +174,33 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
     EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
     EXPECT_EQ("Text Text Text ", response.toString());
   }
+}
+
+TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Stats::Store& store = server_.stats();
+
+  // Cover the case where multiple chunks are emitted by making a large number
+  // of stats with long names, based on the default chunk size. The actual
+  // chunk size can be changed in the unit test for StatsRequest, but it can't
+  // easily be changed from this test. This covers a bug fix due to
+  // AdminImpl::runRunCallback not draining the buffer after each chunk, which
+  // it is not required to do. This test ensures that StatsRequest::nextChunk
+  // writes up to StatsRequest::DefaultChunkSize *additional* bytes on each
+  // call.
+  const std::string prefix(1000, 'a');
+  uint32_t expected_size = 0;
+  uint32_t n = (StatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
+  for (uint32_t i = 0; i <= n; ++i) {
+    const std::string name = absl::StrCat(prefix, i);
+    store.counterFromString(name);
+    expected_size += name.size() + strlen(": 0\n");
+  }
+  EXPECT_EQ(Http::Code::OK, getCallback("/stats", header_map, response));
+  EXPECT_LT(expected_size, response.length());
+  EXPECT_LT(StatsRequest::DefaultChunkSize, response.length());
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
