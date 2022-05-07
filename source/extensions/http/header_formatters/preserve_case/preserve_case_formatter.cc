@@ -56,9 +56,7 @@ void PreserveCaseHeaderFormatter::setReasonPhrase(absl::string_view reason_phras
   }
 };
 
-absl::string_view PreserveCaseHeaderFormatter::getReasonPhrase() const {
-  return absl::string_view(reason_phrase_);
-};
+absl::string_view PreserveCaseHeaderFormatter::getReasonPhrase() const { return {reason_phrase_}; };
 
 Envoy::Http::HeaderKeyFormatterOptConstRef
 PreserveCaseHeaderFormatter::formatterOnEnvoyHeaders() const {
