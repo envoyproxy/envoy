@@ -336,7 +336,9 @@ message KeepaliveSettings {
   google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
-  // time period, the connection will be aborted.
+  // time period, the connection will be aborted. Note that in order to prevent the influence of
+  // Head-of-line (HOL) blocking the timeout period is extended when *any* frame is received on
+  // the connection, under the assumption that if a frame is received the connection is healthy.
   google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
     required: true
     gte {nanos: 1000000}

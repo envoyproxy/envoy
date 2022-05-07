@@ -39,11 +39,14 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<NullConfigImpl>();
 }
 
-Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message& rc) const {
+Rds::ConfigConstSharedPtr
+ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
+                               Server::Configuration::ServerFactoryContext& factory_context,
+                               bool validate_clusters_default) const {
   ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
   return std::make_shared<ConfigImpl>(
       static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), optional_http_filters_,
-      factory_context_, validator_, validate_clusters_default_);
+      factory_context, validator_, validate_clusters_default);
 }
 
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,

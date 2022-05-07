@@ -27,7 +27,7 @@ with the following statistics:
    global_cx_overflow, Counter, Total connections rejected due to enforcement of the global connection limit
    no_filter_chain_match, Counter, Total connections that didn't match any filter chain
    downstream_listener_filter_remote_close, Counter, Total connections closed by remote when peek data for listener filters
-   downstream_listener_filter_error, Counter, Total numbers of error when peek data for listener filters
+   downstream_listener_filter_error, Counter, Total numbers of read errors when peeking data for listener filters
 
 .. _config_listener_stats_tls:
 

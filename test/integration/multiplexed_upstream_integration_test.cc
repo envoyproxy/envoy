@@ -113,8 +113,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
 void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+)EOF"));
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -353,8 +352,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRando
   }
   config_helper_.prependFilter(R"EOF(
   name: random-pause-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty)EOF");
+)EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
@@ -447,8 +445,7 @@ typed_config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                               "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -715,6 +712,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   fake_upstream_connection_.reset();
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
 
   default_request_headers_.addCopy("second_request", "1");
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

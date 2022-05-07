@@ -342,7 +342,9 @@ public:
 
   /**
    * Return the size of data the filter want to inspect from the connection.
-   * @return the size of data inspect from the connection. 0 means filter needn't any data.
+   * The size can be increased after filter need to inspect more data.
+   * @return maximum number of bytes of the data consumed by the filter. 0 means filter does not
+   * need any data.
    */
   virtual size_t maxReadBytes() const PURE;
 };
@@ -544,6 +546,16 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
+
+  const ConnectionInfoProvider& connectionInfoProvider() const {
+    return socket().connectionInfoProvider();
+  }
+
+  const Address::Instance& localAddress() const { return *connectionInfoProvider().localAddress(); }
+
+  const Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
 };
 
 /**
@@ -555,8 +567,8 @@ public:
 
   virtual ~UdpMatchingData() = default;
 
-  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
-  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+  virtual const Address::Instance& localAddress() const PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
 };
 
 } // namespace Network

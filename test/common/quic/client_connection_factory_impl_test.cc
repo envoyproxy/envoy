@@ -6,7 +6,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/alternate_protocols_cache.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -95,7 +95,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
 TEST_P(QuicNetworkConnectionTest, Srtt) {
   initialize();
 
-  Http::MockAlternateProtocolsCache rtt_cache;
+  Http::MockHttpServerPropertiesCache rtt_cache;
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));

@@ -1,7 +1,8 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_py_binary")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -44,8 +45,32 @@ envoy_entry_point(
     pkg = "envoy.docs.sphinx_runner",
 )
 
-envoy_py_binary(
-    name = "tools.docs.rst_check",
-    data = ["//docs:root/version_history/current.rst"],
-    deps = [requirement("aio.run.checker")],
+py_binary(
+    name = "versions_check",
+    srcs = ["versions_check.py"],
+    args = [VERSION],
+    data = [
+        "//changelogs",
+        "//changelogs:sections.yaml",
+    ],
+    deps = [
+        requirement("aio.run.checker"),
+        requirement("envoy.base.utils"),
+        requirement("packaging"),
+    ],
+)
+
+py_binary(
+    name = "generate_version_histories",
+    srcs = [
+        "generate_version_histories.py",
+    ],
+    deps = [
+        requirement("aio.run.runner"),
+        requirement("envoy.base.utils"),
+        requirement("frozendict"),
+        requirement("jinja2"),
+        requirement("packaging"),
+        requirement("pyyaml"),
+    ],
 )

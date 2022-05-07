@@ -144,7 +144,8 @@ TEST_F(QuicPlatformTest, QuicExportedStats) {
 
 TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("!!"));
-  EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
+  // SNI without dot is valid as per RFC 2396.
+  EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
   EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));
@@ -358,17 +359,17 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
   QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
-                     "CHECK failed:.* Supposed to fail in debug mode.");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "CHECK failed");
+                     "Check failed:.* Supposed to fail in debug mode.");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "Check failed");
 
   EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
-               "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ QUICHE_CHECK(false); }, "CHECK failed");
-  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+               "Check failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH({ QUICHE_CHECK(false); }, "Check failed");
+  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
-                     "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
+                     "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
-                     "CHECK failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
+                     "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
 }
 
 // Test the behaviors of the cross products of
