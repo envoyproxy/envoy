@@ -35,7 +35,7 @@ public:
 
     config_ = std::make_shared<StatefulSessionConfig>(proto_config, context_);
 
-    filter_ = std::make_shared<StatefulSession>(config_.get());
+    filter_ = std::make_shared<StatefulSession>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -204,6 +204,17 @@ TEST_F(StatefulSessionTest, NullSessionState) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+}
+
+TEST(EmpytProtoConfigTest, EmpytProtoConfigTest) {
+  ProtoConfig empty_proto_config;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  StatefulSessionConfig config(empty_proto_config, server_context);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  EXPECT_EQ(nullptr, config.createSessionState(request_headers));
 }
 
 } // namespace

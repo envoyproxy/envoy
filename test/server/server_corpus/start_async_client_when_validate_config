@@ -34,15 +34,25 @@ static_resources {
       seconds: 256
     }
     lb_policy: RING_HASH
-    http2_protocol_options {
-      allow_metadata: true
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http2_protocol_options {
+          allow_metadata: true
+        }
+      }
     }
     dns_lookup_family: V4_ONLY
     outlier_detection {
     }
-    common_http_protocol_options {
-      max_connection_duration {
-        nanos: 55040
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options {
+          max_connection_duration {
+            nanos: 55040
+          }
+        }
       }
     }
     upstream_connection_options {
@@ -157,7 +167,6 @@ static_resources {
 }
 dynamic_resources {
   ads_config {
-    api_type: DELTA_GRPC
     grpc_services {
       envoy_grpc {
         cluster_name: "+"

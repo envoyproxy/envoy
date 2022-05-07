@@ -271,6 +271,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
 }
 
 FilterStatus Router::transportEnd() {
+  upstream_request_->onRequestComplete();
   if (upstream_request_->metadata_->messageType() == MessageType::Oneway) {
     // No response expected
     upstream_request_->onResponseComplete();
@@ -287,7 +288,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
-        true);
+        close_downstream_on_error_);
     return FilterStatus::StopIteration;
   }
 
@@ -298,7 +299,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       prepareUpstreamRequest(cluster_name, metadata, callbacks_->downstreamTransportType(),
                              callbacks_->downstreamProtocolType(), this);
   if (prepare_result.exception.has_value()) {
-    callbacks_->sendLocalReply(prepare_result.exception.value(), true);
+    callbacks_->sendLocalReply(prepare_result.exception.value(), close_downstream_on_error_);
     return FilterStatus::StopIteration;
   }
 
@@ -331,9 +332,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
   }
 
-  upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *upstream_req_info.conn_pool_data, metadata,
-                                        upstream_req_info.transport, upstream_req_info.protocol);
+  upstream_request_ = std::make_unique<UpstreamRequest>(
+      *this, *upstream_req_info.conn_pool_data, metadata, upstream_req_info.transport,
+      upstream_req_info.protocol, close_downstream_on_error_);
   return upstream_request_->start();
 }
 

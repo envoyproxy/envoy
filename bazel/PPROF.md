@@ -337,7 +337,7 @@ Similar results can be achieved with [Perfetto tracing macros](https://github.co
 bazel --define=perf_tracing=enabled ...
 ```
 
-[Pefetto](https://perfetto.dev/) is a production-grade open-source stack for
+[Perfetto](https://perfetto.dev/) is a production-grade open-source stack for
 performance instrumentation and trace analysis. It offers services and libraries
 for recording system-level and app-level traces, a library for analyzing traces
 using SQL and a web-based UI to visualize and explore multi-GB traces.

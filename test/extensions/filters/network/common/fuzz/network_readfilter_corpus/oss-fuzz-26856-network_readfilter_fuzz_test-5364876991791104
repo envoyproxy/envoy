@@ -1,0 +1,12 @@
+config {
+  name: "envoy.filters.network.http_connection_manager"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+    value: "\022\037envoy.filters.thrift.rate_limit\032\004\n\002\032\000R)envoy.config.core.v3.ExtensionConfigSourc\200\001\002\230\001\'\240\001\001\250\001\001\200\002\001\210\002\001\262\002\013\022\t\022\000\"\005\n\003\022\001N\270\002\001"
+  }
+}
+actions {
+  on_data {
+    data: "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }
+}

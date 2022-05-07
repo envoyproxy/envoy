@@ -40,6 +40,7 @@ public:
 
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
   MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsConstSharedPtr),
               (const));
   MOCK_METHOD(void, hashKey,

@@ -35,6 +35,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::ElementsAre;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -64,6 +65,14 @@ public:
   static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
     return connection.slowContainsStreamId(id);
   }
+  static std::vector<uint32_t> getActiveStreamsIds(ConnectionImpl& connection) {
+    std::vector<uint32_t> stream_ids;
+    for (auto& stream : connection.active_streams_) {
+      stream_ids.push_back(stream->stream_id_);
+    }
+    return stream_ids;
+  }
+
   struct ClientCodecError : public std::runtime_error {
     ClientCodecError(Http::Status&& status)
         : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
@@ -1173,6 +1182,85 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   driveClient();
   EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
   timeout_timer->invokeCallback();
+}
+
+// Verify that extending the timeout is performed when a frame is received.
+TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelay) {
+  constexpr uint32_t interval_ms = 100;
+  constexpr uint32_t timeout_ms = 200;
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
+                                                                                     1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  initialize();
+  InSequence s;
+
+  // Initiate a request.
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+
+  // Now send a ping.
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  send_timer->invokeCallback();
+
+  // Send the response and make sure the keepalive timeout is extended. After the response is
+  // received the ACK will come in and reset.
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  driveToCompletion();
+}
+
+// Verify that extending the timeout is not performed when a frame is received and the feature
+// flag is disabled.
+TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelayRuntimeFalse) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http2_delay_keepalive_timeout", "false"}});
+
+  constexpr uint32_t interval_ms = 100;
+  constexpr uint32_t timeout_ms = 200;
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
+                                                                                     1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  initialize();
+  InSequence s;
+
+  // Initiate a request.
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+
+  // Now send a ping.
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  send_timer->invokeCallback();
+
+  // Send the response and make sure the keepalive timeout is not extended. After the response is
+  // received the ACK will come in and reset.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  driveToCompletion();
 }
 
 // Validate that jitter is added as expected based on configuration.
@@ -3645,6 +3733,150 @@ TEST_P(Http2CodecImplTest, CanHandleMultipleBufferedDataProcessingOnAStream) {
       EXPECT_FALSE(process_buffered_data_callback->enabled_);
     }
   }
+}
+
+TEST_P(Http2CodecImplTest,
+       ShouldOnlyScheduledDeferredProcessingCallbackIfHasBufferedBodyOrTrailers) {
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  server_->getStream(1)->readDisable(true);
+
+  // Transitioning to read enabled, since no data pending shouldn't schedule
+  // a processing callback.
+  server_->getStream(1)->readDisable(false);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  // Transitioning to read enable with data pending should lead to scheduling
+  // a processing callback.
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
+
+  // Enable and disable, since no data nothing should be scheduled.
+  server_->getStream(1)->readDisable(true);
+  server_->getStream(1)->readDisable(false);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(true);
+  // Send trailers, when we transition to read enabled we should schedule.
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+  server_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+    process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  }
+}
+
+TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProcessingEnabled) {
+  allow_metadata_ = true;
+
+  // We must initialize before dtor, otherwise we'll touch uninitialized
+  // members in dtor.
+  initialize();
+
+  // Test only makes sense if we have defer processing enabled.
+  if (!defer_processing_backedup_streams_) {
+    return;
+  }
+
+  // Check headers
+  RequestEncoder* request_encoder1 = request_encoder_;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder1->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  // The stream just created should be the only active stream.
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1));
+  EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1));
+  ResponseEncoder* response_encoder1 = response_encoder_;
+
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+  // The newest stream created should come first as on the client
+  // side we most recently encoded on the http2 connection with
+  // that stream.
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1));
+  // On the server side (where no encoding has yet been done), we
+  // just have prepended streams to the list.
+  EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(3, 1));
+
+  // Check body
+  Buffer::OwnedImpl body{"some data"};
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  request_encoder1->encodeData(body, false);
+  driveToCompletion();
+  // The first request should be at the front of the active streams list as it
+  // just encoded above.
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 3));
+
+  // Check metadata
+  MetadataMapVector metadata_map_vector;
+  const MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+  };
+  metadata_map_vector.push_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_));
+  request_encoder2->encodeMetadata(metadata_map_vector);
+  driveToCompletion();
+  // The second request should be at the front of the active streams list as it
+  // just encoded above.
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1));
+
+  // Check trailers
+  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+  request_encoder1->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+  // The first request should be at the front of the active streams list as it
+  // just encoded above.
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 3));
+
+  // Check headers from server side
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder1->encodeHeaders(response_headers, false);
+  driveToCompletion();
+  // The first response should be at the front of the active streams list as it
+  // just encoded above.
+  EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
 TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
