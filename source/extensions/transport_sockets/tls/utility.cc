@@ -255,9 +255,9 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
-absl::optional<int32_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
+absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
-    return absl::make_optional(SIZE_MAX);
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),

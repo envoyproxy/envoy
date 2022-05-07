@@ -91,7 +91,7 @@ absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view ext
  * @param time_source the time source to use for current time calculation.
  * @return the number of days till this certificate is valid, the value is set when not expired.
  */
-absl::optional<int32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
+absl::optional<uint32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
 
 /**
  * Returns the time from when this certificate is valid.
