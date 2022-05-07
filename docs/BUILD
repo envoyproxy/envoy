@@ -4,6 +4,7 @@ load(
 )
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -176,13 +177,12 @@ genrule(
     outs = ["version_histories.tar"],
     cmd = """
     $(location //tools/docs:generate_version_histories) \
-        $(location //:VERSION.txt) \
-        $@ \
-        $(locations //changelogs)
-    """,
+        %s \
+        $@
+    """ % VERSION,
     tools = [
-        "//:VERSION.txt",
         "//changelogs",
+        "//changelogs:sections.yaml",
         "//tools/docs:generate_version_histories",
     ],
 )
