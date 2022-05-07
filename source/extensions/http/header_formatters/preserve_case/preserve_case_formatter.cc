@@ -1,8 +1,5 @@
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
-#include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
-#include "envoy/registry/registry.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -67,9 +64,6 @@ Envoy::Http::HeaderKeyFormatterOptConstRef
 PreserveCaseHeaderFormatter::formatterOnEnvoyHeaders() const {
   return makeOptRefFromPtr(header_key_formatter_on_enovy_headers_.get());
 }
-
-REGISTER_FACTORY(PreserveCaseFormatterFactoryConfig,
-                 Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig);
 
 } // namespace PreserveCase
 } // namespace HeaderFormatters

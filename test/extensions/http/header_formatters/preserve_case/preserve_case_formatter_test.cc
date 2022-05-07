@@ -86,34 +86,6 @@ TEST(PreserveCaseFormatterTest, DefaultFormatterOnEnvoyHeadersEnabled) {
   EXPECT_EQ(false, formatter.formatterOnEnvoyHeaders().has_value());
 }
 
-TEST(PreserveCaseFormatterTest, PreserveCaseFormatterFactoryConfig_PROPER_CASE) {
-  PreserveCaseFormatterFactoryConfig factory_config;
-  auto config = TestUtility::parseYaml<
-      envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig>(
-      "formatter_type_on_envoy_headers: PROPER_CASE");
-  auto formatter_factory = factory_config.createFromProto(config);
-  auto formatter = formatter_factory->create();
-
-  formatter->processKey("Foo");
-  EXPECT_EQ("Foo", formatter->format("foo"));
-  EXPECT_EQ("Foo", formatter->format("Foo"));
-  EXPECT_EQ("Hello-World", formatter->format("hello-world"));
-}
-
-TEST(PreserveCaseFormatterTest, PreserveCaseFormatterFactoryConfig_DEFAULT) {
-  PreserveCaseFormatterFactoryConfig factory_config;
-  auto config = TestUtility::parseYaml<
-      envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig>(
-      "formatter_type_on_envoy_headers: DEFAULT");
-  auto formatter_factory = factory_config.createFromProto(config);
-  auto formatter = formatter_factory->create();
-
-  formatter->processKey("Foo");
-  EXPECT_EQ("Foo", formatter->format("foo"));
-  EXPECT_EQ("Foo", formatter->format("Foo"));
-  EXPECT_EQ("hello-world", formatter->format("hello-world"));
-}
-
 } // namespace PreserveCase
 } // namespace HeaderFormatters
 } // namespace Http
