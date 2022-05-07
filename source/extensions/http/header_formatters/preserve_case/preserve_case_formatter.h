@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 #include "envoy/http/header_formatter.h"
 

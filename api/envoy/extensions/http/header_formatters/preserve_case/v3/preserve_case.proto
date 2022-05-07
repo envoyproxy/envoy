@@ -19,10 +19,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // information.
 message PreserveCaseFormatterConfig {
   enum FormatterTypeOnEnvoyHeaders {
-    // Use LowerCase on unknown headers.
+    // Use LowerCase on Envoy added headers.
     DEFAULT = 0;
 
-    // Use ProperCaseHeaderKeyFormatter on unknown headers that upper cases the first character
+    // Use ProperCaseHeaderKeyFormatter on Envoy added headers that upper cases the first character
     // in each word: The first character as well as any alpha character following a special
     // character is upper cased.
     PROPER_CASE = 1;
@@ -32,8 +32,8 @@ message PreserveCaseFormatterConfig {
   // This is off by default, and a standard reason phrase is used for a corresponding HTTP response code.
   bool forward_reason_phrase = 1;
 
-  // Type of formatter to use on headers which are added by envoy (which are lower case by default).
-  // The default type is DEFAULT, use LowerCase on envoy headers.
+  // Type of formatter to use on headers which are added by Envoy (which are lower case by default).
+  // The default type is DEFAULT, use LowerCase on Envoy headers.
   FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers = 2
       [(validate.rules).enum = {defined_only: true}];
 }

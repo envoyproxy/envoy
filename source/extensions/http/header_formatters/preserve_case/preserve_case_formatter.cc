@@ -23,8 +23,8 @@ PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
         std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>();
     break;
   default:
-    header_key_formatter_on_enovy_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
-    break;
+    throw EnvoyException(fmt::format("Not support FormatterTypeOnEnvoyHeaders: {}.",
+                                     formatter_type_on_envoy_headers_));
   }
 }
 
