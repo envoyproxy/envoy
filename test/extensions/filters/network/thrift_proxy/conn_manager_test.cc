@@ -111,7 +111,22 @@ public:
                         const std::vector<std::string>& cluster_names = {}) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
     if (yaml.empty()) {
-      const std::string default_yaml = R"EOF(
+      const std::vector<std::string> fields = {
+          "%DYNAMIC_METADATA(thrift.proxy:method)%",
+          "%DYNAMIC_METADATA(thrift.proxy:cluster)%",
+          "%DYNAMIC_METADATA(thrift.proxy:request:transport_type)%",
+          "%DYNAMIC_METADATA(thrift.proxy:request:protocol_type)%",
+          "%DYNAMIC_METADATA(thrift.proxy:request:message_type)%",
+          "%DYNAMIC_METADATA(thrift.proxy:response:transport_type)%",
+          "%DYNAMIC_METADATA(thrift.proxy:response:protocol_type)%",
+          "%DYNAMIC_METADATA(thrift.proxy:response:message_type)%",
+          "%DYNAMIC_METADATA(thrift.proxy:response:reply_type)%",
+          "%BYTES_RECEIVED%",
+          "%BYTES_SENT%",
+          "%DURATION%",
+          "%UPSTREAM_HOST%",
+      };
+      const std::string default_yaml = fmt::format(R"EOF(
 stat_prefix: test
 access_log:
   - name: accesslog
@@ -120,8 +135,9 @@ access_log:
       path: /dev/null
       log_format:
         text_format_source:
-          inline_string: "%RESPONSE_FLAGS%\n"
-)EOF";
+          inline_string: "{}\n"
+)EOF",
+                                                   absl::StrJoin(fields, " "));
       TestUtility::loadFromYaml(default_yaml, config);
     } else {
       TestUtility::loadFromYaml(yaml, config);
@@ -169,6 +185,11 @@ access_log:
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    ON_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+        .WillByDefault(Invoke([this](const std::string& key, const ProtobufWkt::Struct& obj) {
+          (*filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata())[key]
+              .MergeFrom(obj);
+        }));
     filter_->onNewConnection();
 
     // NOP currently.
@@ -453,7 +474,8 @@ access_log:
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
 
-    EXPECT_EQ(access_log_data_, "-\n");
+    EXPECT_EQ(access_log_data_,
+              "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
   }
 
   void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
@@ -797,7 +819,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_, "name - framed - call - - - - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -815,7 +837,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_, "- - - - - - - - - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) {
@@ -859,7 +881,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_, "- - - - - - - - - 0 0 - 10.0.0.1:443\n");
 }
 
 // Tests that OnData handles non-thrift input. Regression test for crash on invalid input.
@@ -872,7 +894,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesGarbageRequest) {
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_, "- - - - - - - - - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnEvent) {
@@ -1035,7 +1057,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_,
+            "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
 }
 
 // Tests that the downstream request's sequence number is used for the response.
@@ -1079,7 +1102,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_,
+            "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
@@ -1116,7 +1140,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_,
+            "name - framed - call framed binary exception - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
@@ -1152,7 +1177,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_,
+            "name - framed - call framed binary reply error 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
@@ -1189,7 +1215,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_, "name - framed - call framed binary call - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
@@ -1362,7 +1388,8 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
 
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "-\n");
+  EXPECT_EQ(access_log_data_,
+            "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
