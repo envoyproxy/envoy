@@ -1,9 +1,8 @@
-#include "source/extensions/http/header_formatters/preserve_case/config.h"
-#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-
-#include "envoy/registry/registry.h"
+#include "source/extensions/http/header_formatters/preserve_case/config.h"
+#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 #include "test/test_common/utility.h"
 
@@ -50,8 +49,8 @@ TEST(PreserveCaseFormatterFactoryConfigTest, InvalidfFormatterTypeOnEnvoyHeaders
         formatter_type_on_envoy_headers: INVALID
 )EOF";
   EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYaml(yaml, typed_config);,
-      EnvoyException,
+      TestUtility::loadFromYaml(yaml, typed_config);
+      , EnvoyException,
       "Unable to parse JSON as proto \\(INVALID_ARGUMENT:\\(formatter_type_on_envoy_headers\\):.*");
 }
 

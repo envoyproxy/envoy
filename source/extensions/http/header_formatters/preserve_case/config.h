@@ -1,11 +1,10 @@
 #pragma once
 
-#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
-
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 #include "envoy/http/header_formatter.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 namespace Envoy {
 namespace Extensions {
