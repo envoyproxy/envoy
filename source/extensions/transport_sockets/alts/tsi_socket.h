@@ -135,6 +135,7 @@ public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;

@@ -2171,7 +2171,7 @@ TEST_F(DnsFilterTest, SrvQueryMaxRecords) {
 
     const auto target = srv_rec->targets_.begin();
     const auto target_name = target->first;
-    exact_matches += (target_name.compare(*host++) == 0);
+    exact_matches += (target_name == *host++);
   }
   EXPECT_LT(exact_matches, hosts.size());
 
@@ -2179,7 +2179,7 @@ TEST_F(DnsFilterTest, SrvQueryMaxRecords) {
   exact_matches = 0;
   host = hosts.begin();
   for (const auto& answer : response_ctx_->additional_) {
-    exact_matches += (answer.first.compare(*host++) == 0);
+    exact_matches += (answer.first == *host++);
   }
   EXPECT_LT(exact_matches, hosts.size());
 }

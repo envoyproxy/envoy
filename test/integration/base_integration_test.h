@@ -28,6 +28,22 @@
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
+#if defined(ENVOY_CONFIG_COVERAGE)
+#define DISABLE_UNDER_COVERAGE return
+#else
+#define DISABLE_UNDER_COVERAGE                                                                     \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 
 struct ApiFilesystemConfig {

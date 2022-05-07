@@ -48,11 +48,11 @@ steps:
     REPO_URI: $(Build.Repository.Uri)
     BUILD_URI: $(Build.BuildUri)
     ${{ if parameters.rbe }}:
+      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
