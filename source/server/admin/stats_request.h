@@ -35,7 +35,7 @@ class StatsRequest : public Admin::Request {
   };
 
 public:
-  static constexpr uint32_t DefaultChunkSize = 2 * 1000 * 1000;
+  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
 
   StatsRequest(Stats::Store& stats, const StatsParams& params);
 
