@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -201,6 +202,7 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
   EXPECT_EQ(Http::Code::OK, getCallback("/stats", header_map, response));
   EXPECT_LT(expected_size, response.length());
   EXPECT_LT(StatsRequest::DefaultChunkSize, response.length());
+  EXPECT_THAT(response.toString(), StartsWith(absl::StrCat(prefix, "0: 0\n", prefix)));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
