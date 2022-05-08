@@ -101,20 +101,6 @@ void AdminFilter::nextChunk() {
     ENVOY_LOG_MISC(error, "nextChunk reset");
     request_.reset();
   }
-
-#if 0
-  bool more_data;
-  do {
-    Buffer::OwnedImpl response;
-    more_data = request_->nextChunk(response);
-    bool end_stream = end_stream_on_complete_ && !more_data;
-    ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
-                   response.length(), more_data, end_stream);
-    if (response.length() > 0 || end_stream) {
-      decoder_callbacks_->encodeData(response, end_stream);
-    }
-  } while (more_data);
-#endif
 }
 
 } // namespace Server

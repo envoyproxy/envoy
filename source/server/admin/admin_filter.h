@@ -32,9 +32,13 @@ public:
   public:
     WatermarkCallbacks(AdminFilter& filter) : filter_(filter) {}
     virtual ~WatermarkCallbacks() = default;
-    void onAboveWriteBufferHighWatermark() override { filter_.can_write_ = false; }
+    void onAboveWriteBufferHighWatermark() override {
+      ENVOY_LOG_MISC(error, "Above high-watermark callback");
+      filter_.can_write_ = false;
+    }
     void onBelowWriteBufferLowWatermark() override {
       filter_.can_write_ = true;
+      ENVOY_LOG_MISC(error, "Below high-watermark callback");
       filter_.nextChunk();
     }
 
