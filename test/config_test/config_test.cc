@@ -116,9 +116,9 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::ListenerFilterFactoryCb> {
+                -> Filter::ListenerFilterFactoriesList {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
-                  filters, context);
+                  filters, context, listener_manager_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
