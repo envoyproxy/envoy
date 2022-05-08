@@ -85,43 +85,11 @@ bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter
   return true;
 }
 
-class MissingConfigUdpListenerFilter : public Network::UdpListenerReadFilter {
-public:
-  MissingConfigUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks)
-      : UdpListenerReadFilter(callbacks) {}
-
-  // Network::UdpListenerReadFilter callbacks
-  Network::FilterStatus onData(Network::UdpRecvData&) override {
-    return Network::FilterStatus::StopIteration;
-  }
-  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
-    return Network::FilterStatus::StopIteration;
-  }
-};
-
 void FilterChainUtility::buildUdpFilterChain(
     Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
-    const Filter::UdpListenerFilterFactoriesList& factories) {
-
-  bool added_missing_config_filter = false;
-
-  for (const auto& filter_config_provider : factories) {
-    auto config = filter_config_provider->config();
-    if (config.has_value()) {
-      auto config_value = config.value();
-      config_value(filter_manager, callbacks);
-      continue;
-    }
-    // If a UDP filter config is missing after warming, stop iteration.
-    if (!added_missing_config_filter) {
-      ENVOY_LOG_MISC(trace, "Missing UDP filter config for a provider {}",
-                     filter_config_provider->name());
-      filter_manager.addReadFilter(std::make_unique<MissingConfigUdpListenerFilter>(callbacks));
-      added_missing_config_filter = true;
-    } else {
-      ENVOY_LOG_MISC(trace, "Provider {} missing a UDP filter config",
-                     filter_config_provider->name());
-    }
+    const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
+  for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
+    factory(filter_manager, callbacks);
   }
 }
 

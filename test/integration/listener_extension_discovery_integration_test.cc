@@ -13,10 +13,10 @@
 namespace Envoy {
 namespace {
 
-class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                          public BaseIntegrationTest {
+class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                                  public BaseIntegrationTest {
 public:
-  ExtensionDiscoveryIntegrationTest()
+  ListenerExtensionDiscoveryIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
     - filters:
@@ -72,7 +72,7 @@ public:
     registerTestServerPorts({port_name_});
   }
 
-  ~ExtensionDiscoveryIntegrationTest() override {
+  ~ListenerExtensionDiscoveryIntegrationTest() override {
     if (ecds_connection_ != nullptr) {
       AssertionResult result = ecds_connection_->close();
       RELEASE_ASSERT(result, result.message());
@@ -150,10 +150,10 @@ public:
   FakeStreamPtr ecds_stream_{nullptr};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtensionDiscoveryIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ListenerExtensionDiscoveryIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false);
   initialize();
@@ -173,7 +173,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
   sendDataVerifyResults(3);
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, false);
   initialize();
@@ -199,7 +199,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   });
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, true);
   initialize();
@@ -220,7 +220,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
 }
 
 // This one TBD
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, true);
   initialize();
@@ -236,7 +236,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
 }
 
 // This one TBD
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, false);
   initialize();
@@ -258,7 +258,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   });
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
   initialize();
@@ -272,7 +272,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   sendDataVerifyResults(3);
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
   initialize();
@@ -283,33 +283,20 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
   sendDataVerifyResults(kDefaultDrainBytes);
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameNameWithoutWarming) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
-  // Adding a filter with same name overrides the previous one.
   addDynamicFilter(filter_name_, false);
   initialize();
 
   sendXdsResponse("1", 3);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
-  sendDataVerifyResults(3);
+  // Each filter drain 3 bytes.
+  sendDataVerifyResults(6);
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameNameWithWarming) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter(filter_name_, false);
-  // Adding a filter with same name overrides the previous one.
-  addDynamicFilter(filter_name_, true);
-  initialize();
-
-  sendXdsResponse("1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
-  sendDataVerifyResults(3);
-}
-
-TEST_P(ExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   // If rate limiting is enabled on the config source, gRPC mux drainage updates the requests
   // queue size on destruction. The update calls out to stats scope nested under the extension
   // config subscription stats scope. This test verifies that the stats scope outlasts the gRPC

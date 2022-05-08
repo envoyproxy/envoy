@@ -88,9 +88,10 @@ public:
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
    */
-  static void buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
-                                  Network::UdpReadFilterCallbacks& callbacks,
-                                  const Filter::UdpListenerFilterFactoriesList& factories);
+  static void
+  buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
+                      Network::UdpReadFilterCallbacks& callbacks,
+                      const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
 };
 
 /**

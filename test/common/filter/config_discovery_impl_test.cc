@@ -171,12 +171,14 @@ class HttpFilterConfigDiscoveryImplTest
                                            HttpFilterConfigProviderManagerImpl,
                                            envoy::extensions::filters::http::router::v3::Router> {
 public:
+  HttpFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
+
   const std::string getTypeUrl() const override {
     return "envoy.extensions.filters.http.router.v3.Router";
   }
   const std::string getFilterType() const override { return "http"; }
   const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
-    return nullptr;
+    return matcher_;
   }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_reload";
@@ -184,6 +186,8 @@ public:
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_fail";
   }
+
+  const Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 // TCP listener filter test
@@ -192,10 +196,12 @@ class TcpListenerFilterConfigDiscoveryImplTest
           Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
           TcpListenerFilterConfigProviderManagerImpl, Envoy::ProtobufWkt::Struct> {
 public:
+  TcpListenerFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
+
   const std::string getTypeUrl() const override { return "google.protobuf.Struct"; }
   const std::string getFilterType() const override { return "listener"; }
   const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
-    return nullptr;
+    return matcher_;
   }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_reload";
@@ -203,6 +209,8 @@ public:
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_fail";
   }
+
+  const Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 // UDP listener filter test
@@ -212,12 +220,14 @@ class UdpListenerFilterConfigDiscoveryImplTest
           UdpListenerFilterConfigProviderManagerImpl,
           test::integration::filters::TestUdpListenerFilterConfig> {
 public:
+  UdpListenerFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
+
   const std::string getTypeUrl() const override {
     return "test.integration.filters.TestUdpListenerFilterConfig";
   }
   const std::string getFilterType() const override { return "listener"; }
   const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
-    return nullptr;
+    return matcher_;
   }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_reload";
@@ -225,6 +235,8 @@ public:
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_fail";
   }
+
+  const Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 /***************************************************************************************
@@ -469,7 +481,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
           config_source, "foo", config_discovery_test.factory_context_, "xds.", true,
-          config_discovery_test.getFilterType()),
+          config_discovery_test.getFilterType(), config_discovery_test.getFilterMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "

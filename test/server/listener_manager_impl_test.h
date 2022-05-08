@@ -97,13 +97,13 @@ protected:
                   filters, context, manager_->getTcpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                       filters,
-                   Configuration::ListenerFactoryContext& context)
-                -> Filter::UdpListenerFilterFactoriesList {
-              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
-                  filters, context, manager_->getUdpListenerConfigProviderManager());
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                          filters,
+                      Configuration::ListenerFactoryContext& context)
+                       -> std::vector<Network::UdpListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
+                                                                                       context);
             }));
     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
       return listener_tag_++;

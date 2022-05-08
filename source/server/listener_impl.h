@@ -440,7 +440,7 @@ private:
   std::unique_ptr<Init::Manager> dynamic_init_manager_;
 
   Filter::ListenerFilterFactoriesList listener_filter_factories_;
-  Filter::UdpListenerFilterFactoriesList udp_listener_filter_factories_;
+  std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;

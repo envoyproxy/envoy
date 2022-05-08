@@ -33,7 +33,7 @@ public:
   MOCK_METHOD(Filter::ListenerFilterFactoriesList, createListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD(Filter::UdpListenerFilterFactoriesList, createUdpListenerFilterFactoryList,
+  MOCK_METHOD(std::vector<Network::UdpListenerFilterFactoryCb>, createUdpListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,

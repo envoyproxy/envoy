@@ -99,9 +99,9 @@ public:
    * Creates a list of UDP listener filter factories.
    * @param filters supplies the configuration.
    * @param context supplies the factory creation context.
-   * @return UdpListenerFilterFactoriesList the list of filter factories.
+   * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
    */
-  virtual Filter::UdpListenerFilterFactoriesList createUdpListenerFilterFactoryList(
+  virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
