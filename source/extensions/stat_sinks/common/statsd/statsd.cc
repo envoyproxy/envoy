@@ -127,16 +127,14 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
     constexpr float divisor = Stats::Histogram::PercentScale;
     const float float_value = value;
     const float scaled = float_value / divisor;
-    // message = buildMessage(histogram, scaled, "|h");
-    // absl::optional<const std::string> message = buildMessage(histogram, scaled, "|h");
     auto message_opt = buildMessage(histogram, scaled, "|h");
-    if (!message_opt) {
+    if (!message_opt.has_value()) {
       return;
     }
     message = message_opt.value();
   } else {
     auto message_opt = buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
-    if (!message_opt) {
+    if (!message_opt.has_value()) {
       return;
     }
     message = message_opt.value();
