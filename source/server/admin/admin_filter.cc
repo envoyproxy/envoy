@@ -5,11 +5,12 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(Admin::GenRequestFn admin_handler_fn)
-    : admin_handler_fn_(admin_handler_fn) {}
+AdminFilter::AdminFilter(Admin::GenRequestFn admin_request_fn)
+    : admin_request_fn_(admin_request_fn) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
+  // ENVOY_LOG_MISC(error, "decodeHeaders({})", end_stream);
   request_headers_ = &headers;
   if (end_stream) {
     onComplete();
@@ -62,21 +63,50 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
 }
 
 void AdminFilter::onComplete() {
+  decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks_);
+
   const absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Admin::RequestPtr handler = admin_handler_fn_(path, *this);
-  Http::Code code = handler->start(*header_map);
+  request_ = admin_request_fn_(path, *this);
+  Http::Code code = request_->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
+  nextChunk();
+}
 
+void AdminFilter::nextChunk() {
+  if (!can_write_ || request_ == nullptr) {
+    ENVOY_LOG_MISC(error, "nextChunk exit early");
+    return;
+  }
+
+  Buffer::OwnedImpl response;
+  bool more_data = request_->nextChunk(response);
+  bool end_stream = end_stream_on_complete_ && !more_data;
+  if (response.length() > 0 || end_stream) {
+    // ENVOY_LOG_MISC(error, "nextChunk sent data {}", response.length());
+    decoder_callbacks_->encodeData(response, end_stream);
+  } else {
+    // ENVOY_LOG_MISC(error, "nextChunk no data");
+  }
+
+  if (more_data) {
+    ENVOY_LOG_MISC(error, "nextChunk posting next");
+    decoder_callbacks_->dispatcher().post([this]() { nextChunk(); });
+  } else {
+    ENVOY_LOG_MISC(error, "nextChunk reset");
+    request_.reset();
+  }
+
+#if 0
   bool more_data;
   do {
     Buffer::OwnedImpl response;
-    more_data = handler->nextChunk(response);
+    more_data = request_->nextChunk(response);
     bool end_stream = end_stream_on_complete_ && !more_data;
     ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
                    response.length(), more_data, end_stream);
@@ -84,6 +114,7 @@ void AdminFilter::onComplete() {
       decoder_callbacks_->encodeData(response, end_stream);
     }
   } while (more_data);
+#endif
 }
 
 } // namespace Server
