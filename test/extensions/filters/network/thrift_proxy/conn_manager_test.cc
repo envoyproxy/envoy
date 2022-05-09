@@ -483,7 +483,7 @@ access_log:
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
 
     EXPECT_EQ(access_log_data_,
-              "name cluster framed binary call framed binary reply success 0 0 - 10.0.0.1:443\n");
+              "name cluster framed binary call framed binary reply success 0 0 0 -\n");
   }
 
   void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
@@ -710,7 +710,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary oneway - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
@@ -751,7 +751,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary oneway - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
@@ -827,7 +827,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -845,7 +845,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
 
-  EXPECT_EQ(access_log_data_, "- - - - - - - - - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) {
@@ -889,7 +889,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "- - - - - - - - - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // Tests that OnData handles non-thrift input. Regression test for crash on invalid input.
@@ -902,7 +902,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesGarbageRequest) {
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "- - - - - - - - - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnEvent) {
@@ -1066,7 +1066,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster framed binary call framed binary reply success 0 0 - 10.0.0.1:443\n");
+            "name cluster framed binary call framed binary reply success 0 0 0 -\n");
 }
 
 // Tests that the downstream request's sequence number is used for the response.
@@ -1111,7 +1111,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster framed binary call framed binary reply success 0 0 - 10.0.0.1:443\n");
+            "name cluster framed binary call framed binary reply success 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
@@ -1149,7 +1149,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster framed binary call framed binary exception - 0 0 - 10.0.0.1:443\n");
+            "name cluster framed binary call framed binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
@@ -1186,7 +1186,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster framed binary call framed binary reply error 0 0 - 10.0.0.1:443\n");
+            "name cluster framed binary call framed binary reply error 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
@@ -1223,8 +1223,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster framed binary call framed binary call - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call framed binary call - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
@@ -1269,8 +1268,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  // TODO(rgs1): this be logged too.
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
@@ -1314,8 +1312,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  // TODO(rgs1): this be logged too.
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster header binary call - - - - 0 0 0 -\n");
 }
 
 // Tests that a request is routed and a non-thrift response is handled.
@@ -1352,8 +1349,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // TODO(rgs1): this should be logged too.
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
@@ -1398,7 +1394,7 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   EXPECT_EQ(0U, stats_.request_active_.value());
 
   EXPECT_EQ(access_log_data_,
-            "name cluster framed binary call framed binary reply success 0 0 - 10.0.0.1:443\n");
+            "name cluster framed binary call framed binary reply success 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
@@ -1832,8 +1828,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
 
-  // TODO(rgs1): local replies should be logged too.
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 0 -\n");
 }
 
 // Tests multiple filters where one invokes sendLocalReply with an error reply.
@@ -1877,8 +1872,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
-  // TODO(rgs1): local replies should be logged too.
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 0 -\n");
 }
 
 // sendLocalReply does nothing, when the remote closed the connection.
@@ -1916,8 +1910,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // TODO(rgs1): local replies should be logged too.
-  EXPECT_EQ(access_log_data_, "");
+  EXPECT_EQ(access_log_data_, "name cluster framed binary call - - - - 0 0 0 -\n");
 }
 
 // Tests a decoder filter that modifies data.
@@ -2066,7 +2059,6 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  // TODO(rgs1): this should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -2164,7 +2156,6 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // TODO(rgs1): should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -2209,7 +2200,6 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
-  // TODO(rgs1): should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 
@@ -2254,7 +2244,6 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  // TODO(rgs1): should be logged.
   EXPECT_EQ(access_log_data_, "");
 }
 

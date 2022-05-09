@@ -40,7 +40,6 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
       if (metadata.messageType() == MessageType::Oneway) {
         ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
         half_closed_ = true;
-        emitLogEntry();
         return Network::FilterStatus::StopIteration;
       }
     }
@@ -52,9 +51,9 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManager::emitLogEntry() {
+void ConnectionManager::emitLogEntry(const StreamInfo::StreamInfo& stream_info) {
   for (const auto& access_log : config_.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, read_callbacks_->connection().streamInfo());
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
   }
 }
 
@@ -101,7 +100,6 @@ void ConnectionManager::dispatch() {
     }
   }
 
-  emitLogEntry();
   stats_.request_decoding_error_.inc();
   resetAllRpcs(true);
 }
@@ -298,8 +296,6 @@ void ConnectionManager::ResponseDecoder::finalizeResponse() {
     cm.stats_.response_invalid_type_.inc();
     break;
   }
-
-  cm.emitLogEntry();
 }
 
 FilterStatus ConnectionManager::ResponseDecoder::passthroughData(Buffer::Instance& data) {
@@ -356,7 +352,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   response_fields_map["reply_type"] = ValueUtil::stringValue(
       metadata->hasReplyType() ? ReplyTypeNames::get().fromType(metadata->replyType()) : "-");
 
-  cm.read_callbacks_->connection().streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+  parent_.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
 
   return parent_.applyEncoderFilters(DecoderEvent::MessageBegin, metadata, protocol_converter_);
 }
@@ -822,7 +818,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   request_fields_map["message_type"] = ValueUtil::stringValue(
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
-  connection.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+  streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
 
   return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 }

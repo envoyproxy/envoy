@@ -210,7 +210,10 @@ private:
     }
     ~ActiveRpc() override {
       request_timer_->complete();
+      stream_info_.onRequestComplete();
       parent_.stats_.request_active_.dec();
+
+      parent_.emitLogEntry(streamInfo());
 
       for (auto& filter : base_filters_) {
         filter->onDestroy();
@@ -350,7 +353,7 @@ private:
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
-  void emitLogEntry();
+  void emitLogEntry(const StreamInfo::StreamInfo& stream_info);
 
   Config& config_;
   ThriftFilterStats& stats_;
