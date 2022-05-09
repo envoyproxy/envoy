@@ -27,8 +27,8 @@ inline std::string QuicheGetTestMemoryCachePathImpl() { // NOLINT(readability-id
 namespace quiche {
 namespace test {
 
-using QuicheTestImpl = ::testing::Test;
-using QuicTestImpl = QuicheTestImpl;
+using QuicheTest = ::testing::Test;
+using QuicTestImpl = QuicheTest;
 
 template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
 template <class T> using QuicTestWithParamImpl = QuicheTestWithParamImpl<T>;

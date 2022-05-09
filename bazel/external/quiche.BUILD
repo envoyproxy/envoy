@@ -673,6 +673,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_platform",
     hdrs = [
+        "quiche/http2/platform/api/http2_bug_tracker.h",
         "quiche/http2/platform/api/http2_flag_utils.h",
         "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_logging.h",
@@ -1616,6 +1617,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_containers",
+    hdrs = [
+        "quiche/quic/platform/api/quic_containers.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_containers",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_server_stats",
     hdrs = [
         "quiche/quic/platform/api/quic_server_stats.h",
@@ -1659,6 +1673,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_platform_containers",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
         ":quiche_common_buffer_allocator_lib",
@@ -3235,7 +3250,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_platform_export",
+        ":quic_platform_containers",
     ],
 )
 
