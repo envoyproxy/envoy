@@ -1440,6 +1440,9 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                    .get()
                                                    .upstreamTransportFailureReason();
                                     }
+                                    if (result) {
+                                      std::replace(result->begin(), result->end(), ' ', '_');
+                                    }
                                     return result;
                                   });
                             }}},

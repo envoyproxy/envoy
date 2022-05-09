@@ -406,6 +406,8 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
+  stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
+
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
   onResetStream(reset_reason, transport_failure_reason);
