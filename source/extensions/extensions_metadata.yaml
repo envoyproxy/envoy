@@ -193,6 +193,11 @@ envoy.filters.http.fault:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.http.file_system_buffer:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
 envoy.filters.http.gcp_authn:
   categories:
   - envoy.filters.http
