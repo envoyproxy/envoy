@@ -52,6 +52,8 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 }
 
 void ConnectionManager::emitLogEntry(const StreamInfo::StreamInfo& stream_info) {
+  // TODO(rgs1): pass along the request/response headers, which requires a small
+  // interface change in the metadata class.
   for (const auto& access_log : config_.accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, stream_info);
   }
