@@ -99,7 +99,6 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
 
 bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
-  ASSERT(!(policy.cluster().empty() && policy.clusterHeader().get().empty()));
 
   // The policy's default value is set correctly regardless of whether there is a runtime key
   // or not, thus this call is sufficient for all cases (100% if no runtime set, otherwise

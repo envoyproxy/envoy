@@ -117,7 +117,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
       } else {
         // For shadow policies with `cluster_header_`, we only verify that this field is not
         // empty because the cluster name is not set yet at config time.
-        // Assert here after the validateClusterSpecifier check.
+        // Assert here after the validateMirrorClusterSpecifier check.
         ASSERT(!shadow_policy->clusterHeader().get().empty());
       }
     }
@@ -383,7 +383,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
 }
 
-void validateClusterSpecifier(
+void validateMirrorClusterSpecifier(
     const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {
     throw EnvoyException(fmt::format("Only one of cluster '{}' or cluster_header '{}' "
@@ -397,6 +397,8 @@ void validateClusterSpecifier(
 
 ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config)
     : cluster_(config.cluster()), cluster_header_(config.cluster_header()) {
+  validateMirrorClusterSpecifier(config);
+
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
     default_value_ = config.runtime_fraction().default_value();
@@ -547,7 +549,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-    validateClusterSpecifier(mirror_policy_config);
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
@@ -1550,7 +1551,6 @@ VirtualHostImpl::VirtualHostImpl(
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
-    validateClusterSpecifier(mirror_policy_config);
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
 
@@ -1850,7 +1850,6 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
-      validateClusterSpecifier(mirror_policy_config);
       shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
     }
   }
