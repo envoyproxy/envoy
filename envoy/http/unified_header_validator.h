@@ -70,7 +70,6 @@ using UnifiedHeaderValidatorFactorySharedPtr = std::shared_ptr<UnifiedHeaderVali
  */
 class UnifiedHeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
-  virtual ~UnifiedHeaderValidatorFactoryConfig() = default;
   virtual UnifiedHeaderValidatorFactorySharedPtr
   createFromProto(const Protobuf::Message& config,
                   Server::Configuration::FactoryContext& context) PURE;

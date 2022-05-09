@@ -67,6 +67,21 @@ TEST_F(UnifiedHeaderValidatorTest, Http1HeaderNameValidation) {
   }
 }
 
+TEST_F(UnifiedHeaderValidatorTest, Http1RequestHeaderMapValidation) {
+  auto uhv = create(empty_config, UnifiedHeaderValidatorFactory::Protocol::HTTP1);
+  ::Envoy::Http::TestRequestHeaderMapImpl request_header_map{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  EXPECT_EQ(uhv->validateRequestHeaderMap(request_header_map),
+            ::Envoy::Http::UnifiedHeaderValidator::RequestHeaderMapValidationResult::Accept);
+}
+
+TEST_F(UnifiedHeaderValidatorTest, Http1ResponseHeaderMapValidation) {
+  auto uhv = create(empty_config, UnifiedHeaderValidatorFactory::Protocol::HTTP1);
+  ::Envoy::Http::TestResponseHeaderMapImpl response_header_map{{":status", "200"}};
+  EXPECT_EQ(uhv->validateResponseHeaderMap(response_header_map),
+            ::Envoy::Http::UnifiedHeaderValidator::ResponseHeaderMapValidationResult::Accept);
+}
+
 } // namespace EnvoyDefault
 } // namespace UnifiedHeaderValidators
 } // namespace Http
