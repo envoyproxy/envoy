@@ -43,6 +43,7 @@ envoy_cc_library(
         ":tls_context_match_criteria_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",  # TODO(rodaine): break dependency on server
@@ -337,6 +338,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

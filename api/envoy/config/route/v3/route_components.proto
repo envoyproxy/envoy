@@ -453,6 +453,19 @@ message WeightedCluster {
   }
 }
 
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
+
+  // If is_optional is not set or is set to false and the plugin defined by this message is not a
+  // supported type, the containing resource is NACKed. If is_optional is set to true, the resource
+  // would not be NACKed for this reason. In this case, routes referencing this plugin's name would
+  // not be treated as an illegal configuration, but would result in a failure if the route is
+  // selected.
+  bool is_optional = 2;
+}
+
 // [#next-free-field: 15]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
@@ -920,13 +933,15 @@ message RouteAction {
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
 
-    // [#not-implemented-hide:]
-    // Name of the cluster specifier plugin to use to determine the cluster for
-    // requests on this route. The plugin name must be defined in the associated
-    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
-    // in the
-    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    // Name of the cluster specifier plugin to use to determine the cluster for requests on this route.
+    // The cluster specifier plugin name must be defined in the associated
+    // :ref:`cluster specifier plugins <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins>`
+    // in the :ref:`name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` field.
     string cluster_specifier_plugin = 37;
+
+    // Custom cluster specifier plugin configuration to use to determine the cluster for requests
+    // on this route.
+    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39;
   }
 
   // The HTTP status code to use when configured cluster is not found.
@@ -1716,7 +1731,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1788,6 +1803,28 @@ message RateLimit {
     message RemoteAddress {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
+    }
+
+    // The following descriptor entry is appended to the descriptor and is populated using the
+    // masked address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("masked_remote_address", "<masked address from x-forwarded-for>")
+    message MaskedRemoteAddress {
+      // Length of prefix mask len for IPv4 (e.g. 0, 32).
+      // Defaults to 32 when unset.
+      // For example, trusted address from x-forwarded-for is `192.168.1.1`,
+      // the descriptor entry is ("masked_remote_address", "192.168.1.1/32");
+      // if mask len is 24, the descriptor entry is ("masked_remote_address", "192.168.1.0/24").
+      google.protobuf.UInt32Value v4_prefix_mask_len = 1 [(validate.rules).uint32 = {lte: 32}];
+
+      // Length of prefix mask len for IPv6 (e.g. 0, 128).
+      // Defaults to 128 when unset.
+      // For example, trusted address from x-forwarded-for is `2001:abcd:ef01:2345:6789:abcd:ef01:234`,
+      // the descriptor entry is ("masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128");
+      // if mask len is 64, the descriptor entry is ("masked_remote_address", "2001:abcd:ef01:2345::/64").
+      google.protobuf.UInt32Value v6_prefix_mask_len = 2 [(validate.rules).uint32 = {lte: 128}];
     }
 
     // The following descriptor entry is appended to the descriptor:
@@ -1924,6 +1961,9 @@ message RateLimit {
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
       // [#extension-category: envoy.rate_limit_descriptors]
       core.v3.TypedExtensionConfig extension = 9;
+
+      // Rate limit on masked remote address.
+      MaskedRemoteAddress masked_remote_address = 10;
     }
   }
 

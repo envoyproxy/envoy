@@ -217,7 +217,7 @@ void testIncomingHeaders(
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});
-    span->injectContext(injected_headers);
+    span->injectContext(injected_headers, nullptr);
     span->finishSpan();
 
     // Check contents via public API.

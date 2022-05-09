@@ -4,6 +4,7 @@ load(
 )
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -153,10 +154,13 @@ pkg_files(
     name = "sphinx_base",
     srcs = glob(
         [
-            "conf.py",
             "_ext/*",
         ],
-    ) + [":redirects"],
+    ) + [
+        ":conf.py",
+        ":redirects",
+        ":versions.yaml",
+    ],
     strip_prefix = "/docs",
 )
 
@@ -164,6 +168,26 @@ pkg_files(
     name = "sphinx_root",
     srcs = glob(["root/**/*"]),
     strip_prefix = "/docs/root",
+)
+
+pkg_files(
+    name = "sphinx_inventories",
+    srcs = ["inventories"],
+)
+
+genrule(
+    name = "version_histories",
+    outs = ["version_histories.tar"],
+    cmd = """
+    $(location //tools/docs:generate_version_histories) \
+        %s \
+        $@
+    """ % VERSION,
+    tools = [
+        "//changelogs",
+        "//changelogs:sections.yaml",
+        "//tools/docs:generate_version_histories",
+    ],
 )
 
 # TODO(phlax): this appears unused, fix or remove
@@ -186,8 +210,16 @@ pkg_filegroup(
     srcs = [
         ":examples_rst",
         ":sphinx_base",
+        ":sphinx_inventories",
         ":sphinx_root",
     ],
+)
+
+pkg_tar(
+    name = "version_history_rst",
+    extension = "tar",
+    package_dir = "version_history",
+    deps = [":version_histories"],
 )
 
 pkg_tar(
@@ -199,6 +231,7 @@ pkg_tar(
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
+        ":version_history_rst",
         ":xds_rst",
     ],
 )

@@ -23,10 +23,7 @@ std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  auto* quic_socket_factory =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&transport_socket_factory);
-  ASSERT(quic_socket_factory != nullptr);
-  return quic_socket_factory->clientContextConfig().serverNameIndication();
+  return std::string(transport_socket_factory.defaultServerNameIndication());
 }
 
 } // namespace
@@ -268,7 +265,8 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
         makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
-                                                   options_, transport_socket_options_, state_);
+                                                   options_, transport_socket_options_, state_,
+                                                   origin_, alternate_protocols_);
   }
 
   setupPool(*pool);
@@ -414,8 +412,7 @@ void ConnectivityGrid::onIdleReceived() {
 
 bool ConnectivityGrid::shouldAttemptHttp3() {
   if (host_->address()->type() != Network::Address::Type::Ip) {
-    ENVOY_LOG(error, "Address is not an IP address");
-    ASSERT(false);
+    IS_ENVOY_BUG("Address is not an IP address");
     return false;
   }
   uint32_t port = host_->address()->ip()->port();
