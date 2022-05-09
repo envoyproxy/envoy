@@ -154,10 +154,13 @@ pkg_files(
     name = "sphinx_base",
     srcs = glob(
         [
-            "conf.py",
             "_ext/*",
         ],
-    ) + [":redirects"],
+    ) + [
+        ":conf.py",
+        ":redirects",
+        ":versions.yaml",
+    ],
     strip_prefix = "/docs",
 )
 
