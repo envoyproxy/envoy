@@ -202,6 +202,45 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
 }
 
+// Outlier detection
+TEST_F(ClusterTest, OutlierDetection) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1", "1.2.3.4");
+  makeTestHost("host2", "5.6.7.8");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  EXPECT_CALL(*host_map_["host1"], touch());
+  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  update_callbacks_->onDnsHostAddOrUpdate("host2", host_map_["host2"]);
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("5.6.7.8:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->address()->asString());
+  EXPECT_CALL(*host_map_["host2"], touch());
+  EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
+
+  // Outlier check marked host1 unhealthy
+  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
+  EXPECT_CALL(*host_map_["host2"], touch());
+  EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
+
+  // Outlier check marked host1 as healthy, it should be available again
+  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+      Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*host_map_["host1"], touch());
+  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+}
+
 // Various invalid LB context permutations in case the cluster is used outside of HTTP.
 TEST_F(ClusterTest, InvalidLbContext) {
   initialize(default_yaml_config_, false);
