@@ -64,8 +64,6 @@ public:
   static bool stopProfiler();
 };
 
-#ifdef TCMALLOC
-
 /**
  * Default profiler which will be enabled when tcmalloc (not `gperftools`) is used.
  */
@@ -75,8 +73,6 @@ public:
 
   static absl::StatusOr<std::string> tcmallocHeapProfile();
 };
-
-#endif
 
 } // namespace Profiler
 } // namespace Envoy
