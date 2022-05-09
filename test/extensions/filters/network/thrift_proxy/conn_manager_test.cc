@@ -127,6 +127,14 @@ public:
           "%UPSTREAM_HOST%",
       };
       const std::string default_yaml = fmt::format(R"EOF(
+route_config:
+  name: routes
+  validate_clusters: false
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster: cluster
 stat_prefix: test
 access_log:
   - name: accesslog
@@ -475,7 +483,7 @@ access_log:
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
 
     EXPECT_EQ(access_log_data_,
-              "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
+              "name cluster framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
   }
 
   void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
@@ -819,7 +827,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
 
-  EXPECT_EQ(access_log_data_, "name - framed - call - - - - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_, "name cluster framed - call - - - - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -1058,7 +1066,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
+            "name cluster framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
 }
 
 // Tests that the downstream request's sequence number is used for the response.
@@ -1103,7 +1111,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
+            "name cluster framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
@@ -1141,7 +1149,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name - framed - call framed binary exception - 0 0 - 10.0.0.1:443\n");
+            "name cluster framed - call framed binary exception - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
@@ -1178,7 +1186,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
-            "name - framed - call framed binary reply error 0 0 - 10.0.0.1:443\n");
+            "name cluster framed - call framed binary reply error 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
@@ -1215,7 +1223,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_, "name - framed - call framed binary call - 0 0 - 10.0.0.1:443\n");
+  EXPECT_EQ(access_log_data_,
+            "name cluster framed - call framed binary call - 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
@@ -1389,7 +1398,7 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   EXPECT_EQ(0U, stats_.request_active_.value());
 
   EXPECT_EQ(access_log_data_,
-            "name - framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
+            "name cluster framed - call framed binary reply success 0 0 - 10.0.0.1:443\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
