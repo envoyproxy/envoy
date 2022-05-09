@@ -35,6 +35,8 @@ class StatsRequest : public Admin::Request {
   };
 
 public:
+  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
+
   StatsRequest(Stats::Store& stats, const StatsParams& params);
 
   // Admin::Request
@@ -103,7 +105,7 @@ private:
   absl::btree_map<std::string, StatOrScopes> stat_map_;
   Phase phase_{Phase::TextReadouts};
   Buffer::OwnedImpl response_;
-  uint64_t chunk_size_{2 * 1000 * 1000};
+  uint64_t chunk_size_{DefaultChunkSize};
 };
 
 } // namespace Server

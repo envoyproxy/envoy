@@ -3,7 +3,6 @@ import re
 import sys
 import tarfile
 from functools import cached_property
-from typing import Tuple
 
 from frozendict import frozendict
 import jinja2
@@ -11,7 +10,8 @@ from packaging import version
 
 from aio.run import runner
 
-from project import minor_version_for, Project, VERSION_HISTORY_SECTIONS
+from envoy.base import utils
+from envoy.base.utils import IProject, Project
 
 # TODO(phlax): Move all of this to pytooling
 
@@ -139,10 +139,6 @@ def versionize_filter(text, minor_version, current_minor_version):
 
 class VersionHistories(runner.Runner):
 
-    @property
-    def changelogs(self) -> Tuple[pathlib.Path, ...]:
-        return tuple(pathlib.Path(p) for p in self.args.changelogs)
-
     @cached_property
     def jinja_env(self) -> jinja2.Environment:
         env = jinja2.Environment()
@@ -150,12 +146,12 @@ class VersionHistories(runner.Runner):
         return env
 
     @cached_property
-    def project(self) -> Project:
-        return Project(self.version_path, self.changelogs)
+    def project(self) -> IProject:
+        return Project(self.args.version)
 
     @cached_property
     def sections(self) -> frozendict:
-        return VERSION_HISTORY_SECTIONS
+        return self.project.changelogs.sections
 
     @cached_property
     def tpath(self) -> pathlib.Path:
@@ -173,15 +169,10 @@ class VersionHistories(runner.Runner):
     def version_history_tpl(self):
         return self.jinja_env.from_string(VERSION_HISTORY_TPL)
 
-    @cached_property
-    def version_path(self) -> pathlib.Path:
-        return pathlib.Path(self.args.version_path)
-
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
-        parser.add_argument("version_path")
+        parser.add_argument("version")
         parser.add_argument("output_file")
-        parser.add_argument("changelogs", nargs="+")
 
     def minor_index_path(self, minor_version) -> pathlib.Path:
         return self.tpath.joinpath(f"v{minor_version.base_version}").joinpath(
@@ -203,13 +194,13 @@ class VersionHistories(runner.Runner):
             self.write_version_history(changelog_version)
 
     def write_version_history(self, changelog_version: version.Version) -> None:
-        minor_version = minor_version_for(changelog_version)
+        minor_version = utils.minor_version_for(changelog_version)
         root_path = self.tpath.joinpath(f"v{minor_version.base_version}")
         root_path.mkdir(parents=True, exist_ok=True)
         version_history = self.version_history_tpl.render(
-            current_minor_version=self.project.current_minor_version,
+            current_minor_version=self.project.minor_version,
             minor_version=minor_version,
-            current_version=self.project.current_version,
+            current_version=self.project.version,
             sections=self.sections,
             changelog=self.project.changelogs[changelog_version])
         version_path = root_path.joinpath(f"v{changelog_version}.rst")
