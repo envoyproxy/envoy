@@ -331,9 +331,6 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
 
-  absl::optional<std::string> getShadowCluster(const ShadowPolicy& shadow_policy,
-                                               const Http::HeaderMap& headers) const;
-
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -528,6 +525,8 @@ private:
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
   UpstreamRequestPtr createUpstreamRequest();
+  absl::optional<std::string> getShadowCluster(const ShadowPolicy& shadow_policy,
+                                               const Http::HeaderMap& headers) const;
 
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
