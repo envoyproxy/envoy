@@ -17,10 +17,14 @@ namespace Tls {
 void ValidateResultCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
 
 void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
-                                                        const std::string& /*error_details*/) {
+                                                        const std::string& /*error_details*/,
+                                                        uint8_t out_alert) {
   if (!extended_socket_info_.has_value()) {
     return;
   }
+  extended_socket_info_->setCertificateValidationStatus(
+      succeeded ? Ssl::ClientValidationStatus::Validated : Ssl::ClientValidationStatus::Failed);
+  extended_socket_info_->setTlsAlert(out_alert);
   extended_socket_info_->onCertificateValidationCompleted(succeeded);
 }
 
@@ -40,6 +44,7 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
 }
 
 void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded) {
+  std::cerr << "================ onCertificateValidationCompleted\n";
   cert_validation_result_ =
       succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
   if (cert_validate_result_callback_.has_value()) {
@@ -50,10 +55,13 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded)
   }
 }
 
-Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCallback() {
+Ssl::ValidateResultCallbackPtr
+SslExtendedSocketInfoImpl::createValidateResultCallback(uint8_t* current_tls_alert) {
   auto callback = std::make_unique<ValidateResultCallbackImpl>(
       ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
   cert_validate_result_callback_ = *callback;
+  tls_alert_ = *current_tls_alert;
+  cert_validation_result_ = Ssl::ValidateResult::Pending;
   return callback;
 }
 
@@ -89,6 +97,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_WRITE:
       return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+    case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:

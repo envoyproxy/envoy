@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include <cstdint>
 
 #include "envoy/network/connection.h"
@@ -38,7 +40,8 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertValidationResult(bool succeeded, const std::string& error_details) override;
+  void onCertValidationResult(bool succeeded, const std::string& error_details,
+                              uint8_t out_alert) override;
 
   void onSslHandshakeCancelled();
 
@@ -54,9 +57,14 @@ public:
 
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
-  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override;
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback(uint8_t* current_tls_alert) override;
   void onCertificateValidationCompleted(bool succeeded) override;
-  Ssl::ValidateResult certificateValidationResult() override { return cert_validation_result_; }
+  absl::optional<Ssl::ValidateResult> certificateValidationResult() override {
+    return cert_validation_result_;
+  }
+  uint8_t tlsAlert() const override { return tls_alert_; }
+
+  void setTlsAlert(uint8_t alert) { tls_alert_ = alert; }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
@@ -65,7 +73,8 @@ private:
   // Latch the in-flight async cert validation callback.
   // nullopt if there is none in-flight.
   OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
-  Ssl::ValidateResult cert_validation_result_{Ssl::ValidateResult::Pending};
+  uint8_t tls_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
+  absl::optional<Ssl::ValidateResult> cert_validation_result_;
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

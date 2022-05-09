@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -83,5 +84,16 @@ envoy_cc_test(
     ],
     deps = [
         "//test/integration:http_integration_lib",
+    ],
+)
+
+envoy_cc_extension(
+    name = "timed_cert_validator",
+    srcs = ["timed_cert_validator.cc"],
+    hdrs = [
+        "timed_cert_validator.h",
+    ],
+    deps = [
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
 )

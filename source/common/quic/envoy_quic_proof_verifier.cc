@@ -3,6 +3,7 @@
 #include <openssl/safestack.h>
 #include <openssl/ssl.h>
 
+#include <cstdint>
 #include <memory>
 
 #include "source/common/quic/envoy_quic_utils.h"
@@ -35,7 +36,8 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertValidationResult(bool succeeded, const std::string& error_details) override {
+  void onCertValidationResult(bool succeeded, const std::string& error_details,
+                              uint8_t /*out_alert*/) override {
     std::string error = error_details;
     if (succeeded) {
       if (!verifyLeafCertMatchesHostName(*cert_view_, hostname_, &error)) {

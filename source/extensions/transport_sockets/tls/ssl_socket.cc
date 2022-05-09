@@ -351,7 +351,10 @@ std::string SslSocket::protocol() const { return ssl()->alpn(); }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
-void SslSocket::onAsynchronousCertValidationComplete() { resumeHandshake(); }
+void SslSocket::onAsynchronousCertValidationComplete() {
+  ENVOY_CONN_LOG(debug, "Async cert validation completed", callbacks_->connection());
+  resumeHandshake();
+}
 
 namespace {
 SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {

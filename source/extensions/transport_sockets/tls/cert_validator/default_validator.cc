@@ -3,6 +3,7 @@
 #include <array>
 #include <deque>
 #include <functional>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -251,6 +252,7 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX* ssl_ctx,
     absl::string_view ech_name_override, bool is_server, std::string* error_details,
     uint8_t* out_alert) {
+  std::cerr << "================ DefaultCertValidator::doCustomVerifyCertChain\n";
   if (out_alert != nullptr) {
     *out_alert = SSL_AD_CERTIFICATE_UNKNOWN;
   }
@@ -268,8 +270,10 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
     return Ssl::ValidateResult::Failed;
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
+  ASSERT(leaf_cert);
   if (verify_trusted_ca_) {
     X509_STORE* verify_store = SSL_CTX_get_cert_store(ssl_ctx);
+    ASSERT(verify_store);
     bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
     if (!ctx || !X509_STORE_CTX_init(ctx.get(), verify_store, leaf_cert, &cert_chain) ||
         // We need to inherit the verify parameters. These can be determined by
@@ -296,6 +300,7 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
       ENVOY_LOG(debug, error);
       return Ssl::ValidateResult::Failed;
     }
+    std::cerr << "=========== X509_verify_cert\n";
     int ret = X509_verify_cert(ctx.get());
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(

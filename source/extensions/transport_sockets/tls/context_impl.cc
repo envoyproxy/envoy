@@ -453,10 +453,17 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
 enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* out_alert) {
   auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
-  if (extended_socket_info->certificateValidationResult() != Ssl::ValidateResult::Pending) {
+  if (extended_socket_info->certificateValidationResult().has_value()) {
+    if (extended_socket_info->certificateValidationResult().value() ==
+        Ssl::ValidateResult::Pending) {
+      return ssl_verify_retry;
+    }
     // Already has a binary result, return immediately.
-    return ValidationResultToSslVerifyResult(extended_socket_info->certificateValidationResult());
+    *out_alert = extended_socket_info->tlsAlert();
+    return ValidationResultToSslVerifyResult(
+        extended_socket_info->certificateValidationResult().value());
   }
+  // Hasn't kicked off any validation for this connection yet.
   SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
   ContextImpl* context_impl = static_cast<ContextImpl*>(SSL_CTX_get_app_data(ssl_ctx));
   auto* transport_socket_option =
@@ -487,7 +494,7 @@ ContextImpl::customVerifyCertChain(Ssl::ValidateResultCallbackPtr callback,
   size_t name_len = 0;
   SSL_get0_ech_name_override(ssl, &name, &name_len);
   absl::string_view ech_name_override(name, name_len);
-
+  ASSERT(cert_validator_);
   Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
       *cert_chain, std::move(callback), extended_socket_info, transport_socket_options,
       SSL_get_SSL_CTX(ssl), ech_name_override, SSL_is_server(ssl), error_details, out_alert);

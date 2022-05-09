@@ -1,0 +1,67 @@
+#include <openssl/ssl.h>
+
+#include <chrono>
+#include <memory>
+
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
+class TimedCertValidator : public DefaultCertValidator {
+public:
+  TimedCertValidator(std::chrono::milliseconds validation_time_out_ms,
+                     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+                     TimeSource& time_source)
+      : DefaultCertValidator(config, stats, time_source),
+        validation_time_out_ms_(validation_time_out_ms) {}
+
+  int doVerifyCertChain(
+      X509_STORE_CTX* /*store_ctx*/, Ssl::SslExtendedSocketInfo* /*ssl_extended_info*/,
+      X509& /*leaf_cert*/,
+      const Network::TransportSocketOptions* /*transport_socket_options*/) override {
+    PANIC("unimplemented");
+  }
+
+  Ssl::ValidateResult
+  doCustomVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+                          Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                          const Network::TransportSocketOptions* transport_socket_options,
+                          SSL_CTX* ssl_ctx, absl::string_view ech_name_override, bool is_server,
+                          std::string* /*error_details*/, uint8_t* out_alert) override;
+
+private:
+  Event::TimerPtr validation_timer_;
+  std::chrono::milliseconds validation_time_out_ms_;
+  Ssl::ValidateResultCallbackPtr callback_;
+  std::vector<std::string> cert_chain_in_str_;
+  std::string ech_name_override_;
+};
+
+class TimedCertValidatorFactory : public CertValidatorFactory {
+public:
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats& stats, TimeSource& time_source) override {
+    return std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats,
+                                                time_source);
+  }
+
+  absl::string_view name() override { return "envoy.tls.cert_validator.timed_cert_validator"; }
+
+  void setValidationTimeOutMs(std::chrono::milliseconds validation_time_out_ms) {
+    validation_time_out_ms_ = validation_time_out_ms;
+  }
+
+private:
+  std::chrono::milliseconds validation_time_out_ms_{5};
+};
+
+DECLARE_FACTORY(TimedCertValidatorFactory);
+
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+} // namespace Envoy

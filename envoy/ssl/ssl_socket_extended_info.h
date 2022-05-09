@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,7 +27,8 @@ public:
 
   virtual Event::Dispatcher& dispatcher() PURE;
 
-  virtual void onCertValidationResult(bool succeeded, const std::string& error_details) PURE;
+  virtual void onCertValidationResult(bool succeeded, const std::string& error_details,
+                                      uint8_t out_alert) PURE;
 };
 
 using ValidateResultCallbackPtr = std::unique_ptr<ValidateResultCallback>;
@@ -49,7 +51,7 @@ public:
    * Only called when doing asynchronous cert validation.
    * @return ValidateResultCallbackPtr a callback used to return the validation result.
    */
-  virtual ValidateResultCallbackPtr createValidateResultCallback() PURE;
+  virtual ValidateResultCallbackPtr createValidateResultCallback(uint8_t* current_tls_alert) PURE;
 
   /**
    * Called after the cert validation completes.
@@ -57,10 +59,16 @@ public:
   virtual void onCertificateValidationCompleted(bool succeeded) PURE;
 
   /**
-   * @return ValidateResult either Successful or Failed after the validation
-   * completed. Pending during the validation.
+   * @return absl::optional<ValidateResult> returns nullopt if no validation is going on. Returns
+   * either Successful or Failed after the validation completed, and pending during the validation.
    */
-  virtual ValidateResult certificateValidationResult() PURE;
+  virtual absl::optional<ValidateResult> certificateValidationResult() PURE;
+
+  /**
+   * Called when doing asynchronous cert validation.
+   * @return uint8_t represents the tls alert populated by cert validator.
+   */
+  virtual uint8_t tlsAlert() const PURE;
 };
 
 } // namespace Ssl

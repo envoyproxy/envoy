@@ -21,6 +21,7 @@
 #include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
@@ -6332,6 +6333,82 @@ TEST_P(SslSocketTest, Sni) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedSni("foo.bar.com"));
+}
+
+TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      custom_validator_config:
+        name: "envoy.tls.cert_validator.timed_cert_validator"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      custom_validator_config:
+        name: "envoy.tls.cert_validator.timed_cert_validator"
+)EOF";
+  auto cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
+      "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(0));
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+      custom_validator_config:
+        name: "envoy.tls.cert_validator.timed_cert_validator"
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
+)EOF";
+  auto cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
+      "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(0));
+
+  TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  revoked_test_options.setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose);
+  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
 } // namespace Tls
