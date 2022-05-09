@@ -40,7 +40,6 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/server:watchdog_interface",
         "//envoy/thread:thread_interface",
-        "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

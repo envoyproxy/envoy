@@ -1,10 +1,6 @@
 #include "source/common/profiler/profiler.h"
 
-#include <chrono>
-#include <fstream>
 #include <string>
-
-#include "source/common/common/logger.h"
 
 #ifdef PROFILER_AVAILABLE
 
