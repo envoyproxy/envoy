@@ -334,11 +334,40 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
+  std::string name;
+  if (!config.name().empty()) {
+    name = config.name();
+  } else {
+    name = server_.api().randomGenerator().uuid();
+  }
+
+  // TODO(soulxu): remove this validation to the `PGV` when deprecate the old `address` field.
+  if (config.has_address() && config.addresses_size() > 0) {
+    throw EnvoyException(
+        fmt::format("listener {}: only one of `address` and `addresses` can be set.", name));
+  } else if (!config.has_address() && config.addresses_size() == 0) {
+    throw EnvoyException(
+        fmt::format("listener {}: one of `address` and `addresses` must be set.", name));
+  }
+
+  // There is no use-case for multiple internal addresses yet. This can be supported
+  // when the use-case show up in the future.
+  if (!config.has_address()) {
+    if (config.addresses(0).has_envoy_internal_address() && config.addresses_size() > 1) {
+      throw EnvoyException(
+          fmt::format("listener {}: internal address doesn't support multiple addresses.", name));
+    }
+  }
+
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
     RELEASE_ASSERT(
-        !config.address().has_envoy_internal_address(),
+        !(config.has_address() ? config.address().has_envoy_internal_address()
+                               : config.addresses(0).has_envoy_internal_address()),
         fmt::format("listener {} has envoy internal address {}. This runtime feature is disabled.",
-                    config.name(), config.address().envoy_internal_address().DebugString()));
+                    config.name(),
+                    config.has_address()
+                        ? config.address().envoy_internal_address().DebugString()
+                        : config.addresses(0).envoy_internal_address().DebugString()));
   }
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
@@ -354,13 +383,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
                       "allowed, and it can only be added via bootstrap configuration");
       return false;
     }
-  }
-
-  std::string name;
-  if (!config.name().empty()) {
-    name = config.name();
-  } else {
-    name = server_.api().randomGenerator().uuid();
   }
 
   auto it = error_state_tracker_.find(name);
@@ -446,7 +468,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+      setNewOrDrainingSocketFactory(
+          name, config.has_address() ? config.address() : config.addresses(0), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
     }
@@ -455,7 +478,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+      setNewOrDrainingSocketFactory(
+          name, config.has_address() ? config.address() : config.addresses(0), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
     }
@@ -469,7 +493,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
-    setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+    setNewOrDrainingSocketFactory(
+        name, config.has_address() ? config.address() : config.addresses(0), *new_listener);
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -977,7 +1002,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
        hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
-                    name, listener.address()->asString());
+                    name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
     throw EnvoyException(message);
   }
@@ -1031,9 +1056,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
+    // TODO (soulxu): support multiple addresses.
     return std::make_unique<ListenSocketFactoryImpl>(
-        factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency());
+        factory_, listener.addresses()[0], socket_type, listener.listenSocketOptions(),
+        listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
+        server_.options().concurrency());
   }
   END_TRY
   catch (const EnvoyException& e) {

@@ -1,10 +1,14 @@
 resources:
 - "@type": type.googleapis.com/envoy.config.listener.v3.Listener
   name: ingress_https
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 9901
   filter_chains:
   - filters:
-    - name: envoy.filters.network.http_connection_manager
-      typed_config:
+    - typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         stat_prefix: ingress_http
         use_remote_address: true

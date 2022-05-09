@@ -282,7 +282,9 @@ public:
   bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
   bool blockRemove() { return !added_via_api_; }
 
-  Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
+    return addresses_;
+  }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
   const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factory_; }
   void debugLog(const std::string& message);
@@ -302,7 +304,7 @@ public:
   bool hasCompatibleAddress(const ListenerImpl& other) const;
 
   // Network::ListenerConfig
-  Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
+  Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
   bool bindToPort() override { return bind_to_port_; }
@@ -409,6 +411,8 @@ private:
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
+  void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
+                              const envoy::config::core::v3::Address& proto_address);
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
@@ -416,7 +420,7 @@ private:
   }
 
   ListenerManagerImpl& parent_;
-  Network::Address::InstanceConstSharedPtr address_;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
 
   Network::ListenSocketFactoryPtr socket_factory_;
   const bool bind_to_port_;
@@ -450,7 +454,7 @@ private:
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
-  FilterChainManagerImpl filter_chain_manager_;
+  std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
   const bool reuse_port_;
 
   // Per-listener connection limits are only specified via runtime.

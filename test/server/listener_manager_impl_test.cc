@@ -578,6 +578,108 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, UsingFirstAddressAsStatsPrefixForMultipleAddresses) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  TestStatsConfigFactory filter;
+  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
+
+  const std::string yaml = R"EOF(
+addresses:
+- socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+- socket_address:
+    address: 127.0.0.2
+    port_value: 4567
+bind_to_port: false
+filter_chains:
+- filters:
+  - name: stats_test
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_P(ListenerManagerImplTest, BothAddressAndAddressesAreSpecified) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: "::0"
+        port_value: 13333
+    addresses:
+    - socket_address:
+        address: "::0"
+        port_value: 13334
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "listener foo: only one of `address` and `addresses` can be set.");
+}
+
+TEST_P(ListenerManagerImplTest, NoneOfAddressAndAddressesSpecified) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "listener foo: one of `address` and `addresses` must be set.");
+}
+
+TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    addresses:
+    - socket_address:
+        protocol: TCP
+        address: "::0"
+        port_value: 13333
+    - socket_address:
+        protocol: UDP
+        address: "::0"
+        port_value: 13334
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "listener foo: has different socket type. The listener only "
+                            "support same socket type for all the addresses.");
+}
+
+TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    addresses:
+    - envoy_internal_address:
+        server_listener_name: a_listener_name_1
+    - envoy_internal_address:
+        server_listener_name: a_listener_name_2
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "listener foo: internal address doesn't support multiple addresses.");
+}
+
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
   const std::string yaml = R"EOF(
     name: "foo"
