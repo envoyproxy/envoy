@@ -35,6 +35,9 @@ minor_behavior_changes:
     that loads shared object libraries, such as those installed via luarocks.
 - area: skywalking
   change: |
+    use request path as operation name of ENTRY/EXIT spans.
+- area: skywalking
+  change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.
 - area: dns
   change: |
