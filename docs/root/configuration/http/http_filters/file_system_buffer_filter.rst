@@ -58,18 +58,18 @@ There are several use-cases for this filter.
 
 .. note::
 
-In the current implementation, use-case 2 is implemented imperfectly - when the receiving end
-sends the high watermark event, this also pauses reading from the providing end. An update is in the
-works to make it possible for the filter to intercept that signal.
+  In the current implementation, use-case 2 is implemented imperfectly - when the receiving end
+  sends the high watermark event, this also pauses reading from the providing end. An update is in the
+  works to make it possible for the filter to intercept that signal.
 
 .. note::
 
-Though the filter can theoretically be configured to perform the same behavior symmetrically,
-Envoy currently only provides `onAboveWriteBufferHighWatermark` and `onBelowWriteBufferLowWatermark`
-events on the response stream - this means requests will always flow immediately through the filter
-into the regular filter chain's memory buffer unless using a configuration that requires that the
-entire request be buffered. An update is in the works to make these signals also available on
-request streams.
+  Though the filter can theoretically be configured to perform the same behavior symmetrically,
+  Envoy currently only provides `onAboveWriteBufferHighWatermark` and `onBelowWriteBufferLowWatermark`
+  events on the response stream - this means requests will always flow immediately through the filter
+  into the regular filter chain's memory buffer unless using a configuration that requires that the
+  entire request be buffered. An update is in the works to make these signals also available on
+  request streams.
 
 Under the hood
 --------------
