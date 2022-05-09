@@ -123,7 +123,9 @@ the filter config descriptor list. The local descriptor's token bucket
 settings are then used to decide if the request should be rate limited or not
 depending on whether the local descriptor's entries match the route's rate
 limit actions descriptor entries. If there is no matching descriptor entries,
-the default token bucket is used.
+the default token bucket is used. All the matched local descriptors will try
+to consume tokens, and in most cases if one of them is limited, the remaining
+descriptors will not consume their tokens.
 
 Example filter configuration using descriptors:
 

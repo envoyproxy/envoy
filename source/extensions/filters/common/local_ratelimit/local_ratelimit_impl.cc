@@ -53,16 +53,37 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
     new_descriptor.token_bucket_ = token_bucket;
 
-    auto token_state = std::make_unique<TokenState>();
+    auto token_state = std::make_shared<TokenState>();
     token_state->tokens_ = token_bucket.max_tokens_;
     token_state->fill_time_ = time_source_.monotonicTime();
-    new_descriptor.token_state_ = std::move(token_state);
+    new_descriptor.token_state_ = token_state;
 
-    auto result = descriptors_.emplace(std::move(new_descriptor));
+    auto result = descriptors_.emplace(new_descriptor);
     if (!result.second) {
       throw EnvoyException(absl::StrCat("duplicate descriptor in the local rate descriptor: ",
                                         result.first->toString()));
     }
+    sorted_descriptors_.push_back(new_descriptor);
+  }
+  // If a request is limited by a descriptor, it should not consume tokens from the remaining
+  // matched descriptors, so we sort the descriptors by tokens per second, as a result, in most
+  // cases the strictest descriptor will be consumed first. However, it can not solve the
+  // problem perfectly.
+  if (!sorted_descriptors_.empty()) {
+    std::sort(sorted_descriptors_.begin(), sorted_descriptors_.end(),
+              [](const LocalDescriptorImpl a, const LocalDescriptorImpl b) -> bool {
+                const int a_token_rate_per_second =
+                    a.token_bucket_.tokens_per_fill_ /
+                    (absl::ToInt64Seconds(a.token_bucket_.fill_interval_)
+                         ? absl::ToInt64Seconds(a.token_bucket_.fill_interval_)
+                         : 1);
+                const int b_token_rate_per_second =
+                    b.token_bucket_.tokens_per_fill_ /
+                    (absl::ToInt64Seconds(b.token_bucket_.fill_interval_)
+                         ? absl::ToInt64Seconds(b.token_bucket_.fill_interval_)
+                         : 1);
+                return a_token_rate_per_second < b_token_rate_per_second;
+              });
   }
 }
 
@@ -131,10 +152,6 @@ bool LocalRateLimiterImpl::requestAllowedHelper(const TokenState& tokens) const 
   return true;
 }
 
-bool LocalRateLimiterImpl::hasEnoughTokens(const TokenState& tokens) const {
-  return tokens.tokens_.load(std::memory_order_relaxed) == 0 ? false : true;
-}
-
 OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::descriptorHelper(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (!descriptors_.empty() && !request_descriptors.empty()) {
@@ -154,34 +171,27 @@ bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_local_ratelimit_match_all_descriptors")) {
-    // If a request is limited by a descriptor, it should not consume token from the remaining
-    // matched descriptors, so we first check the remaining tokens of matched descriptors instead of
-    // trying to consuming their tokens. If one of these tokens is 0, it just return false and will
-    // not consume any tokens of matched descriptors. Otherwise, it will try to consume 1 token from
-    // each matched descriptor.
-    bool allow = hasEnoughTokens(tokens_);
-    // Global token is not enough.
+
+    bool allow = requestAllowedHelper(tokens_);
+    // Global token is not enough. Since global token is not sorted, so we suggest it should be
+    // larger than other descriptors.
     if (!allow) {
       return allow;
     }
-    std::vector<TokenState*> token_states;
+
     if (!descriptors_.empty() && !request_descriptors.empty()) {
-      for (const auto& request_descriptor : request_descriptors) {
-        if (auto it = descriptors_.find(request_descriptor); it != descriptors_.end()) {
-          allow &= hasEnoughTokens(*it->token_state_);
-          // Descriptor token is not enough.
-          if (!allow) {
-            return allow;
+      for (const auto& descriptor : sorted_descriptors_) {
+        for (const auto& request_descriptor : request_descriptors) {
+          if (descriptor == request_descriptor) {
+            allow &= requestAllowedHelper(*descriptor.token_state_);
+            // Descriptor token is not enough.
+            if (!allow) {
+              return allow;
+            }
+            break;
           }
-          token_states.push_back(it->token_state_.get());
         }
       }
-    }
-
-    // All tokens are enough.
-    allow &= requestAllowedHelper(tokens_);
-    for (const auto& token_state : token_states) {
-      allow &= requestAllowedHelper(*token_state);
     }
     return allow;
   }
