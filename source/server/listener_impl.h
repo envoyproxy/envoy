@@ -295,7 +295,9 @@ public:
   bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
   bool blockRemove() { return !added_via_api_; }
 
-  Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
+    return addresses_;
+  }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
   const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
   void debugLog(const std::string& message);
@@ -315,7 +317,7 @@ public:
   bool hasCompatibleAddress(const ListenerImpl& other) const;
 
   // Network::ListenerConfig
-  Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
+  Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
@@ -431,6 +433,8 @@ private:
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
+  void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
+                              const envoy::config::core::v3::Address& proto_address);
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
@@ -438,7 +442,7 @@ private:
   }
 
   ListenerManagerImpl& parent_;
-  Network::Address::InstanceConstSharedPtr address_;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
   const Network::Socket::Type socket_type_;
 
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
@@ -475,7 +479,7 @@ private:
   // TODO (soulxu): Add hash support for address, then needn't a string address as key anymore.
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
-  FilterChainManagerImpl filter_chain_manager_;
+  std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
   const bool reuse_port_;
 
   // Per-listener connection limits are only specified via runtime.

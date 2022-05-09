@@ -373,6 +373,24 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
+  std::string name;
+  if (!config.name().empty()) {
+    name = config.name();
+  } else {
+    name = server_.api().randomGenerator().uuid();
+  }
+
+  // TODO (soulxu): Support multiple internal addresses in the future.
+
+  if ((config.address().has_envoy_internal_address() && config.additional_addresses_size() > 0) ||
+      std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
+                  [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
+                    return proto_address.address().has_envoy_internal_address();
+                  })) {
+    throw EnvoyException(
+        fmt::format("listener {}: internal address doesn't support multiple addresses.", name));
+  }
+
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
     RELEASE_ASSERT(
         !config.address().has_envoy_internal_address(),
@@ -393,13 +411,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
                       "allowed, and it can only be added via bootstrap configuration");
       return false;
     }
-  }
-
-  std::string name;
-  if (!config.name().empty()) {
-    name = config.name();
-  } else {
-    name = server_.api().randomGenerator().uuid();
   }
 
   auto it = error_state_tracker_.find(name);
@@ -1016,7 +1027,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
        hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
-                    name, listener.address()->asString());
+                    name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
     throw EnvoyException(message);
   }
@@ -1070,9 +1081,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
+    // TODO (soulxu): support multiple addresses.
     return std::make_unique<ListenSocketFactoryImpl>(
-        factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency());
+        factory_, listener.addresses()[0], socket_type, listener.listenSocketOptions(),
+        listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
+        server_.options().concurrency());
   }
   END_TRY
   catch (const EnvoyException& e) {
