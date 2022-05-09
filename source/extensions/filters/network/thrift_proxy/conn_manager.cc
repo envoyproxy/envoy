@@ -809,6 +809,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       ValueUtil::stringValue(route_ptr ? route_ptr->routeEntry()->clusterName() : "-");
   fields_map["method"] =
       ValueUtil::stringValue(metadata->hasMethodName() ? metadata->methodName() : "-");
+  fields_map["passthrough"] = ValueUtil::stringValue(passthroughSupported() ? "true" : "false");
 
   auto& request_fields_map = *fields_map["request"].mutable_struct_value()->mutable_fields();
   request_fields_map["transport_type"] =

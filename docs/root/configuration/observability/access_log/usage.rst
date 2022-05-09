@@ -665,6 +665,7 @@ The following command operators are supported:
 
     * ``method``: Name of the method.
     * ``cluster_name``: Name of the cluster.
+    * ``passthrough``: Passthrough support for the request and response.
     * ``request:transport_type``: The transport type of the request.
     * ``request:protocol_type``: The protocol type of the request.
     * ``request:message_type``: The message type of the request.
