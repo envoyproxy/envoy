@@ -1242,7 +1242,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
 
   const uint32_t num_requests = 3;
   const uint32_t request_body_size = 1;
-  const uint32_t response_body_size = 20000;
+  const uint32_t response_body_size = 14000;
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
@@ -1282,9 +1282,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
 
   // Data that should be buffered by the upstream codec.
   upstream_requests[0]->encodeData(4000, false);
-  upstream_requests[1]->encodeData(16000, true);
-  upstream_requests[2]->encodeData(16000, true);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 48000);
+  upstream_requests[1]->encodeData(10000, true);
+  upstream_requests[2]->encodeData(10000, true);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 36000);
 
   // Enable writes, check drainage.
   write_matcher_->setResumeWrites();
@@ -1322,8 +1322,8 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   // Send the 1st stream data so that both remaining streams have data to
   // process. We expect that the 3rd stream, which didn't get a turn above will
   // get to go and exit.
-  upstream_requests[0]->encodeData(12000, true);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 60000);
+  upstream_requests[0]->encodeData(6000, true);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 42000);
   write_matcher_->setResumeWrites();
 
   waitForNumTurns(turns, mu, 6);
@@ -1445,15 +1445,21 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
 
   // Enabling again should cause us to chunk this write to third stream.
   write_matcher_->setResumeWrites();
-  EXPECT_TRUE(upstream_requests[2]->waitForData(*dispatcher_, 130000));
+  EXPECT_TRUE(upstream_requests[2]->waitForData(*dispatcher_, 131000));
 
   {
     absl::MutexLock l(&mu);
-    // The 3rd stream should have gone twice since we queued more than
-    // the chunk size of data in the receive buffer.
-    EXPECT_EQ(turns[2].first, turns[3].first);
-    EXPECT_EQ(turns[2].second, 65535);
-    EXPECT_EQ(turns[3].second, 131070);
+    // The 3rd stream should have gone multiple times to drain out the 128KiB of
+    // data. Each chunk drain is 10KB.
+    ASSERT_GE(turns.size(), 3);
+    for (uint32_t i = 2; i < turns.size(); ++i) {
+      EXPECT_EQ(turns[i].first, turns[2].first);
+      if (i != turns.size() - 1) {
+        EXPECT_EQ(turns[i].second, 10000 * (i - 1));
+      } else {
+        EXPECT_EQ(turns[i].second, 131070);
+      }
+    }
   }
 
   // Clean up

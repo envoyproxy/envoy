@@ -218,6 +218,8 @@ public:
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke(
             [&](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); }));
+    // Set to the small read size (reads are suggested to be 16k aligned).
+    ON_CALL(server_connection_, bufferLimit()).WillByDefault(Return(16 * 1024));
   }
 
   void http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
@@ -1845,8 +1847,14 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   driveToCompletion();
 
   if (defer_processing_backedup_streams_) {
-    EXPECT_TRUE(process_buffered_data_callback->enabled_);
-    process_buffered_data_callback->invokeCallback();
+    // Drain queued data for us to process, we should have over a window worth
+    // of data.
+    EXPECT_TRUE(process_buffered_data_callback->enabled());
+    while (process_buffered_data_callback->enabled()) {
+      process_buffered_data_callback->invokeCallback();
+    }
+    // Allow client to send last bit of data that was pending.
+    driveToCompletion();
   }
 
   EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
@@ -3648,7 +3656,8 @@ TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTra
 
   // Force the stream to buffer data at the receiving codec.
   server_->getStream(1)->readDisable(true);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  const uint32_t request_body_size = 1024 * 1024;
+  Buffer::OwnedImpl body(std::string(request_body_size, 'a'));
   request_encoder_->encodeData(body, false);
   driveToCompletion();
 
@@ -3657,11 +3666,11 @@ TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTra
   // from the callback below.
   auto* process_buffered_data_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
-  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled());
 
   server_->getStream(1)->readDisable(false);
 
-  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+  EXPECT_TRUE(process_buffered_data_callback->enabled());
 
   // Trailers should be buffered by the codec since there is unprocessed body.
   // Hence we shouldn't invoke decodeTrailers yet.
@@ -3671,10 +3680,22 @@ TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTra
 
   // Now invoke the deferred processing callback.
   {
+    const int num_iterations_before_trailers_processed =
+        (request_body_size / server_connection_.bufferLimit()) - 1;
+    ASSERT_GT(num_iterations_before_trailers_processed, 0);
     InSequence seq;
+    for (int i = 0; i < num_iterations_before_trailers_processed; ++i) {
+      EXPECT_CALL(request_decoder_, decodeData(_, false));
+      EXPECT_CALL(request_decoder_, decodeTrailers_(_)).Times(0);
+      process_buffered_data_callback->invokeCallback();
+      EXPECT_TRUE(process_buffered_data_callback->enabled());
+    }
+
+    // Now we should process trailers as all data has been decoded.
     EXPECT_CALL(request_decoder_, decodeData(_, false));
     EXPECT_CALL(request_decoder_, decodeTrailers_(_));
     process_buffered_data_callback->invokeCallback();
+    EXPECT_FALSE(process_buffered_data_callback->enabled());
   }
 }
 
@@ -3780,7 +3801,7 @@ TEST_P(Http2CodecImplTest,
 
   // Force the stream to buffer data at the receiving codec.
   server_->getStream(1)->readDisable(true);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  Buffer::OwnedImpl body(std::string(10000, 'a'));
   request_encoder_->encodeData(body, false);
   driveToCompletion();
 
@@ -3872,7 +3893,8 @@ TEST_P(Http2CodecImplTest,
   EXPECT_FALSE(process_buffered_data_callback->enabled_);
 
   server_->getStream(1)->readDisable(true);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  const uint32_t request_body_size = 1024 * 1024;
+  Buffer::OwnedImpl body(std::string(request_body_size, 'a'));
   request_encoder_->encodeData(body, false);
   driveToCompletion();
 
@@ -3882,12 +3904,19 @@ TEST_P(Http2CodecImplTest,
   server_->getStream(1)->readDisable(false);
   EXPECT_TRUE(process_buffered_data_callback->enabled_);
 
-  // Now invoke the deferred processing callback.
+  // Now invoke the deferred processing callback until we drain buffered data.
   {
     InSequence seq;
-    EXPECT_CALL(request_decoder_, decodeData(_, false));
-    process_buffered_data_callback->invokeCallback();
-    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    int num_iterations_to_drain_data = request_body_size / server_connection_.bufferLimit();
+    for (int i = 0; i < num_iterations_to_drain_data; ++i) {
+      EXPECT_CALL(request_decoder_, decodeData(_, false));
+      process_buffered_data_callback->invokeCallback();
+      if (i == num_iterations_to_drain_data - 1) {
+        EXPECT_FALSE(process_buffered_data_callback->enabled());
+      } else {
+        EXPECT_TRUE(process_buffered_data_callback->enabled());
+      }
+    }
   }
 
   // Enable and disable, since no data nothing should be scheduled.
@@ -4010,11 +4039,14 @@ TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   uint32_t initial_stream_window = getStreamReceiveWindowLimit(server_, 1);
   ASSERT_EQ(initial_stream_window, 65535);
   EXPECT_EQ(server_->getStream(1)->bufferLimit(), initial_stream_window);
+  uint32_t chunk_size = server_connection_.bufferLimit();
+  ASSERT_EQ(chunk_size, 16384);
 
   // Fill the receive buffer with over a chunk of data.
   server_->getStream(1)->readDisable(true);
   Buffer::OwnedImpl body(std::string(initial_stream_window, 'a'));
   request_encoder_->encodeData(body, false);
+  double data_to_drain = initial_stream_window;
   driveToCompletion();
 
   // Read enable to grant additional window to the other side.
@@ -4027,6 +4059,7 @@ TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   // allowing us to accumulate more than chunk size in buffer.
   server_->getStream(1)->readDisable(true);
   body.add(std::string(10000, 'a'));
+  data_to_drain += 10000;
   request_encoder_->encodeData(body, true);
   driveToCompletion();
 
@@ -4034,14 +4067,18 @@ TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   server_->getStream(1)->readDisable(false);
   {
     InSequence seq;
-    // Check chunking, should not send the end stream.
-    EXPECT_CALL(request_decoder_, decodeData(_, false))
-        .WillOnce(Invoke([initial_stream_window](Buffer::Instance& buffer, bool) {
-          EXPECT_EQ(buffer.length(), initial_stream_window);
-        }));
-    process_buffered_data_callback->invokeCallback();
-    // Should schedule another call since we still have data to drain.
-    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+    // Drain data
+    int num_iterations_to_drain_data = std::ceil(data_to_drain / server_connection_.bufferLimit());
+    for (int i = 0; i < num_iterations_to_drain_data - 1; ++i) {
+      // Check chunking, should not send the end stream.
+      EXPECT_CALL(request_decoder_, decodeData(_, false))
+          .WillRepeatedly(Invoke([chunk_size](Buffer::Instance& buffer, bool) {
+            EXPECT_EQ(buffer.length(), chunk_size);
+          }));
+      process_buffered_data_callback->invokeCallback();
+      // Should schedule another call since we still have data to drain.
+      EXPECT_TRUE(process_buffered_data_callback->enabled_);
+    }
 
     EXPECT_CALL(request_decoder_, decodeData(_, true));
     process_buffered_data_callback->invokeCallback();
@@ -4071,11 +4108,14 @@ TEST_P(Http2CodecImplTest, ChunkingCanOccurFromFdEvent) {
   uint32_t initial_stream_window = getStreamReceiveWindowLimit(server_, 1);
   ASSERT_EQ(initial_stream_window, 65535);
   EXPECT_EQ(server_->getStream(1)->bufferLimit(), initial_stream_window);
+  uint32_t chunk_size = server_connection_.bufferLimit();
+  ASSERT_EQ(chunk_size, 16384);
 
-  // Fill the receive buffer with over a chunk of data.
+  // Fill the receive buffer with over a stream window worth of data.
   server_->getStream(1)->readDisable(true);
   Buffer::OwnedImpl body(std::string(initial_stream_window, 'a'));
   request_encoder_->encodeData(body, false);
+  double data_to_drain = initial_stream_window;
   driveToCompletion();
 
   // Read enable to grant additional window to the other side.
@@ -4087,17 +4127,28 @@ TEST_P(Http2CodecImplTest, ChunkingCanOccurFromFdEvent) {
   {
     InSequence seq;
     body.add(std::string(10000, 'a'));
+    data_to_drain += 10000;
     // Check chunking, should not send the end stream.
     EXPECT_CALL(request_decoder_, decodeData(_, false))
-        .WillOnce(Invoke([initial_stream_window](Buffer::Instance& buffer, bool) {
-          EXPECT_EQ(buffer.length(), initial_stream_window);
+        .WillRepeatedly(Invoke([chunk_size, &data_to_drain](Buffer::Instance& buffer, bool) {
+          EXPECT_EQ(buffer.length(), chunk_size);
+          data_to_drain -= buffer.length();
         }));
     request_encoder_->encodeData(body, true);
     driveToCompletion();
 
-    EXPECT_CALL(request_decoder_, decodeData(_, true));
-    process_buffered_data_callback->invokeCallback();
-    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    // Drain data
+    int num_iterations_to_drain_data = std::ceil(data_to_drain / server_connection_.bufferLimit());
+    for (int i = 0; i < num_iterations_to_drain_data; ++i) {
+      if (i == num_iterations_to_drain_data - 1) {
+        EXPECT_CALL(request_decoder_, decodeData(_, true));
+        process_buffered_data_callback->invokeCallback();
+        EXPECT_FALSE(process_buffered_data_callback->enabled());
+      } else {
+        process_buffered_data_callback->invokeCallback();
+        EXPECT_TRUE(process_buffered_data_callback->enabled());
+      }
+    }
   }
 }
 
@@ -4123,6 +4174,8 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
   uint32_t initial_stream_window = getStreamReceiveWindowLimit(server_, 1);
   ASSERT_EQ(initial_stream_window, 65535);
   EXPECT_EQ(server_->getStream(1)->bufferLimit(), initial_stream_window);
+  uint32_t chunk_size = server_connection_.bufferLimit();
+  ASSERT_EQ(chunk_size, 16384);
 
   // Fill the receive buffer with over a chunk of data.
   server_->getStream(1)->readDisable(true);
@@ -4150,20 +4203,18 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
     // Check chunking, should not send the end stream.
     EXPECT_CALL(request_decoder_, decodeData(_, false))
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
-          EXPECT_EQ(buffer.length(), initial_stream_window);
+          EXPECT_EQ(buffer.length(), chunk_size);
           server_->getStream(1)->readDisable(true);
         }));
     process_buffered_data_callback->invokeCallback();
 
     // Should not have schedule another call since we read disabled during
     // decoding the other chunk.
-    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    EXPECT_FALSE(process_buffered_data_callback->enabled());
 
     // Read enable to process final chunk.
     server_->getStream(1)->readDisable(false);
-    EXPECT_CALL(request_decoder_, decodeData(_, true));
-    process_buffered_data_callback->invokeCallback();
-    EXPECT_FALSE(process_buffered_data_callback->enabled_);
+    EXPECT_TRUE(process_buffered_data_callback->enabled());
   }
 }
 

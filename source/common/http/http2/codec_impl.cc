@@ -182,8 +182,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
-    stream_manager_.defer_processing_segment_size_ = buffer_limit;
   }
+  stream_manager_.defer_processing_segment_size_ = parent.connection_.bufferLimit();
 }
 
 void ConnectionImpl::StreamImpl::destroy() {
@@ -403,8 +403,8 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     decodeData();
   }
 
-  if (stream_manager_.trailers_buffered_ && continueProcessingBufferedData()) {
-    ASSERT(!stream_manager_.body_buffered_);
+  if (stream_manager_.trailers_buffered_ && !stream_manager_.body_buffered_ &&
+      continueProcessingBufferedData()) {
     decodeTrailers();
     ASSERT(!stream_manager_.trailers_buffered_);
   }
@@ -535,7 +535,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
       already_drained_data = true;
 
       if (!buffersOverrun()) {
-        process_buffered_data_callback_->scheduleCallbackNextIteration();
+        scheduleProcessingOfBufferedData();
       }
     } else {
       // Send the entire buffer through.
