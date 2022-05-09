@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
@@ -232,16 +233,14 @@ public:
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   }
 
-  std::set<std::string> otherTypes() override {
-    auto route_message = createEmptyRouteConfigProto();
-    if (route_message == nullptr) {
-      return {};
+  std::set<std::string> configTypes() override {
+    auto config_types = TypedFactory::configTypes();
+
+    if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
+      config_types.insert(message->GetDescriptor()->full_name());
     }
-    const std::string route_type_url = route_message->GetDescriptor()->full_name();
-    if (route_type_url == configType()) {
-      return {};
-    }
-    return {route_type_url};
+
+    return config_types;
   }
 };
 

@@ -334,11 +334,7 @@ private:
         continue;
       }
 
-      std::set<std::string> config_types = factory->otherTypes();
-      config_types.insert(factory->configType());
-
-      for (const std::string& config_type : config_types) {
-        // Skip untyped factories.
+      for (const auto& config_type : factory->configTypes()) {
         if (config_type.empty()) {
           continue;
         }
@@ -390,10 +386,10 @@ private:
 
       ENVOY_LOG(
           info, "Factory '{}' (type '{}') displaced-by-name with test factory '{}' (type '{}')",
-          prev_by_name->name(), prev_by_name->configType(), factory.name(), factory.configType());
+          prev_by_name->name(), prev_by_name->configTypes(), factory.name(), factory.configTypes());
     } else {
       ENVOY_LOG(info, "Factory '{}' (type '{}') registered for tests", factory.name(),
-                factory.configType());
+                factory.configTypes());
     }
 
     factories().emplace(factory.name(), &factory);
@@ -411,7 +407,7 @@ private:
           ENVOY_LOG(
               info,
               "Deprecated name '{}' (mapped to '{}') displaced with test factory '{}' (type '{}')",
-              it->first, it->second, factory.name(), factory.configType());
+              it->first, it->second, factory.name(), factory.configTypes());
         } else {
           // Name not previously mapped, remember to remove it.
           prev_deprecated_names.emplace_back(std::make_pair(deprecated_name, ""));
@@ -436,14 +432,14 @@ private:
       factories().erase(replacement->name());
 
       ENVOY_LOG(info, "Removed test factory '{}' (type '{}')", replacement->name(),
-                replacement->configType());
+                replacement->configTypes());
 
       if (prev_by_name) {
         // Restore any factory displaced by name, but only register the type if it's non-empty.
         factories().emplace(prev_by_name->name(), prev_by_name);
 
         ENVOY_LOG(info, "Restored factory '{}' (type '{}'), formerly displaced-by-name",
-                  prev_by_name->name(), prev_by_name->configType());
+                  prev_by_name->name(), prev_by_name->configTypes());
       }
 
       for (auto [prev_deprecated_name, mapped_canonical_name] : prev_deprecated_names) {

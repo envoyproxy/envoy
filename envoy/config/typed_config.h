@@ -29,15 +29,10 @@ public:
   virtual std::string category() const PURE;
 
   /**
-   * @return configuration proto full name, or empty for untyped factories.
+   * @return all full names of configuration protos that used by the factory. Empty set
+   * will be returned for untyped factories.
    */
-  virtual std::string configType() { return ""; }
-
-  /**
-   * @return All full names of configuration protos used by the factories except the name
-   * returned by configType().
-   */
-  virtual std::set<std::string> otherTypes() { return {}; }
+  virtual std::set<std::string> configTypes() { return {}; }
 };
 
 /**
@@ -54,10 +49,10 @@ public:
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
-  std::string configType() override {
+  std::set<std::string> configTypes() override {
     auto ptr = createEmptyConfigProto();
     ASSERT(ptr != nullptr);
-    return ptr->GetDescriptor()->full_name();
+    return {ptr->GetDescriptor()->full_name()};
   }
 };
 
