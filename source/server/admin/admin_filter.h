@@ -30,8 +30,8 @@ public:
 
   class WatermarkCallbacks : public Http::DownstreamWatermarkCallbacks {
   public:
-    WatermarkCallbacks(AdminFilter& filter) : filter_(filter) {}
-    virtual ~WatermarkCallbacks() = default;
+    explicit WatermarkCallbacks(AdminFilter& filter) : filter_(filter) {}
+    ~WatermarkCallbacks() override = default;
     void onAboveWriteBufferHighWatermark() override {
       ENVOY_LOG_MISC(error, "Above high-watermark callback");
       filter_.can_write_ = false;
