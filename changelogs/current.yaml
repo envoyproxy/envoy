@@ -107,6 +107,9 @@ new_features:
 - area: build
   change: |
     official released binary is now built with Clang 14.0.0.
+- area: http
+  change: |
+    added :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
 
 deprecated:
 - area: dubbo_proxy
