@@ -56,11 +56,15 @@ There are several use-cases for this filter.
    of these filters in the same chain doesn't make sense, as `buffer_filter` explicitly requires
    that the entire request/response is buffered in memory.
 
-NOTE: in the current implementation, use-case 2 is implemented imperfectly - when the receiving end
+.. note::
+
+In the current implementation, use-case 2 is implemented imperfectly - when the receiving end
 sends the high watermark event, this also pauses reading from the providing end. An update is in the
 works to make it possible for the filter to intercept that signal.
 
-NOTE: though the filter can theoretically be configured to perform the same behavior symmetrically,
+.. note::
+
+Though the filter can theoretically be configured to perform the same behavior symmetrically,
 Envoy currently only provides `onAboveWriteBufferHighWatermark` and `onBelowWriteBufferLowWatermark`
 events on the response stream - this means requests will always flow immediately through the filter
 into the regular filter chain's memory buffer unless using a configuration that requires that the
