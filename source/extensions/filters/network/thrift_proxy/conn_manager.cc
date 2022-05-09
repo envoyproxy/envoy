@@ -264,10 +264,9 @@ void ConnectionManager::ResponseDecoder::finalizeResponse() {
   // Use the factory to get the concrete transport from the decoder transport (as opposed to
   // potentially pre-detection auto transport).
   TransportPtr transport =
-      NamedTransportConfigFactory::getFactory(parent_.parent_.decoder_->transportType())
-          .createTransport();
+      NamedTransportConfigFactory::getFactory(cm.decoder_->transportType()).createTransport();
 
-  metadata_->setProtocol(parent_.parent_.decoder_->protocolType());
+  metadata_->setProtocol(cm.decoder_->protocolType());
   transport->encodeFrame(buffer, *metadata_, parent_.response_buffer_);
   complete_ = true;
 
@@ -818,8 +817,8 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   auto& request_fields_map = *fields_map["request"].mutable_struct_value()->mutable_fields();
   request_fields_map["transport_type"] =
       ValueUtil::stringValue(TransportNames::get().fromType(downstreamTransportType()));
-  request_fields_map["protocol_type"] = ValueUtil::stringValue(
-      metadata->hasProtocol() ? ProtocolNames::get().fromType(metadata->protocol()) : "-");
+  request_fields_map["protocol_type"] =
+      ValueUtil::stringValue(ProtocolNames::get().fromType(parent_.decoder_->protocolType()));
   request_fields_map["message_type"] = ValueUtil::stringValue(
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
