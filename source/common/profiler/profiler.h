@@ -8,6 +8,8 @@
 
 #include "source/common/runtime/runtime_impl.h"
 
+#include "absl/status/statusor.h"
+
 // Profiling support is provided in the release tcmalloc of `gperftools`, but not in the library
 // that supplies the debug tcmalloc. So all the profiling code must be ifdef'd
 // on PROFILER_AVAILABLE which is dependent on those two settings.
@@ -71,23 +73,13 @@ public:
 #ifdef TCMALLOC
 
 /**
- * Default heap profiler which will be enabled when tcmalloc (not `gperftools`) is used.
+ * Default profiler which will be enabled when tcmalloc (not `gperftools`) is used.
  */
-class TcmallocHeapProfiler {
+class TcmallocProfiler {
 public:
-  TcmallocHeapProfiler() = default;
+  TcmallocProfiler() = default;
 
-  bool heapProfilerStarted() const { return heap_profile_started_; }
-
-  bool startProfiler(absl::string_view path, std::chrono::milliseconds period);
-  bool stopProfiler();
-
-private:
-  bool heap_profile_started_{};
-  uint64_t next_file_id_{};
-  std::string heap_file_path_;
-  std::chrono::milliseconds period_;
-  Event::TimerPtr flush_timer_;
+  static absl::StatusOr<std::string> tcmallocHeapProfile();
 };
 
 #endif

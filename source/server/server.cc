@@ -429,9 +429,6 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   tracing_session_->StartBlocking();
 #endif
 
-  // Set main dispatcher singleton.
-  Event::MainDispatcherSingleton::initialize(dispatcher_.get());
-
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
   if (!bootstrap_.header_prefix().empty()) {

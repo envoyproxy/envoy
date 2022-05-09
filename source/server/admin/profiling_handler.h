@@ -27,5 +27,14 @@ private:
   const std::string profile_path_;
 };
 
+class TcmallocProfilingHandler {
+public:
+  TcmallocProfilingHandler() = default;
+
+  Http::Code handlerHeapDump(absl::string_view path_and_query,
+                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                             AdminStream&);
+};
+
 } // namespace Server
 } // namespace Envoy
