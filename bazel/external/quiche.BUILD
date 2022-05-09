@@ -673,7 +673,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_platform",
     hdrs = [
-        "quiche/http2/platform/api/http2_bug_tracker.h",
         "quiche/http2/platform/api/http2_flag_utils.h",
         "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_logging.h",
@@ -1604,19 +1603,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_stream_buffer_allocator",
-    hdrs = [
-        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_stream_buffer_allocator",
-    ],
-)
-
-envoy_cc_library(
     name = "quic_platform_stack_trace",
     hdrs = [
         "quiche/quic/platform/api/quic_stack_trace.h",
@@ -1626,19 +1612,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_stack_trace",
-    ],
-)
-
-envoy_cc_library(
-    name = "quic_platform_containers",
-    hdrs = [
-        "quiche/quic/platform/api/quic_containers.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_containers",
     ],
 )
 
@@ -1686,10 +1659,8 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_platform_containers",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
-        ":quic_platform_stream_buffer_allocator",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
         ":quiche_common_platform_client_stats",
@@ -2737,6 +2708,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_crypto_proof_source_x509_lib",
+    srcs = ["quiche/quic/core/crypto/proof_source_x509.cc"],
+    hdrs = ["quiche/quic/core/crypto/proof_source_x509.h"],
+    copts = quiche_copts,
+    external_deps = [
+        "ssl",
+        "abseil_node_hash_map",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_crypto_certificate_view_lib",
+        ":quic_core_crypto_crypto_handshake_lib",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_crypto_proof_source_lib",
+        ":quic_core_data_lib",
+        ":quic_platform_base",
+        ":quiche_common_endian_lib",
+        "@com_google_absl//absl/base:core_headers",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_crypto_client_proof_source_lib",
     srcs = [
         "quiche/quic/core/crypto/client_proof_source.cc",
@@ -3240,7 +3235,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_platform_containers",
+        ":quic_platform_export",
     ],
 )
 
@@ -3268,6 +3263,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_interval_lib",
         ":quic_platform_base",
+        ":quiche_common_platform_containers",
     ],
 )
 
@@ -4591,6 +4587,7 @@ envoy_cc_test_library(
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_crypto_proof_source_lib",
+        ":quic_core_crypto_proof_source_x509_lib",
         ":quic_core_crypto_random_lib",
         ":quic_core_data_lib",
         ":quic_core_framer_lib",
@@ -4617,6 +4614,7 @@ envoy_cc_test_library(
         ":quic_test_tools_sent_packet_manager_peer_lib",
         ":quic_test_tools_simple_quic_framer_lib",
         ":quic_test_tools_stream_peer_lib",
+        ":quic_test_tools_test_certificates_lib",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_test_tools_test_utils_lib",
         ":spdy_core_framer_lib",

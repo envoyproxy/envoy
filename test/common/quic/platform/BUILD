@@ -57,6 +57,7 @@ envoy_cc_test(
         "@com_github_google_quiche//:quic_platform_test_output",
         "@com_github_google_quiche//:quic_platform_thread",
         "@com_github_google_quiche//:quiche_common_mem_slice_storage",
+        "@com_github_google_quiche//:quiche_common_platform_stream_buffer_allocator",
         "@com_github_google_quiche//:quiche_common_platform_system_event_loop",
     ],
 )

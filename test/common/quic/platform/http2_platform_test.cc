@@ -10,7 +10,6 @@
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
-#include "quiche/http2/platform/api/http2_bug_tracker.h"
 #include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/test_tools/http2_random.h"
@@ -24,12 +23,6 @@
 
 namespace http2 {
 namespace {
-
-TEST(Http2PlatformTest, Http2BugTracker) {
-  EXPECT_DEBUG_DEATH(HTTP2_BUG(bug_1) << "Here is a bug,", " bug");
-  EXPECT_DEBUG_DEATH(HTTP2_BUG_IF(bug_1, true) << "There is a bug,", " bug");
-  EXPECT_LOG_NOT_CONTAINS("error", "", HTTP2_BUG_IF(bug_1, false) << "A feature is not a bug.");
-}
 
 TEST(Http2PlatformTest, Http2Log) {
   // HTTP2_LOG macros are defined to QUIC_LOG macros, which is tested in
