@@ -78,5 +78,16 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
+TEST_P(AdminInstanceTest, AdminHeapDump) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+#ifdef TCMALLOC
+  EXPECT_EQ(Http::Code::OK, postCallback("/heap_dump", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heap_dump", header_map, data));
+#endif
+}
+
 } // namespace Server
 } // namespace Envoy
