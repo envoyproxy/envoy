@@ -69,8 +69,7 @@ public:
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
     if (valid) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      audience.mutable_audience_map()->insert(
-          {std::string(Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey), "test"});
+      audience.set_url("test");
 
       (*metadata_.mutable_typed_filter_metadata())
           [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]

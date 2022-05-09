@@ -31,8 +31,12 @@ protected:
   }
 
   std::unique_ptr<StatsRequest> makeRequest(bool used_only, bool json) {
-    return std::make_unique<StatsRequest>(store_, used_only, json,
-                                          Utility::HistogramBucketsMode::NoBuckets, absl::nullopt);
+    StatsParams params;
+    params.used_only_ = used_only;
+    if (json) {
+      params.format_ = StatsFormat::Json;
+    }
+    return std::make_unique<StatsRequest>(store_, params);
   }
 
   // Executes a request, counting the chunks that were generated.

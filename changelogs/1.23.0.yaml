@@ -1,0 +1,106 @@
+date: Pending
+
+behavior_changes:
+- area: tls-inspector
+  change: |
+    the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
+
+minor_behavior_changes:
+- area: thrift
+  change: |
+    add validate_clusters in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` to override the default behavior of cluster validation.
+- area: tls
+  change: |
+    if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
+- area: tls
+  change: |
+    removed SHA-1 and RSA key transport cipher suites from the server-side defaults.
+- area: http
+  change: |
+    the behavior of the :ref:`timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
+    field has been modified to extend the timeout when *any* frame is received on the owning HTTP/2
+    connection. This negates the effect of head-of-line (HOL) blocking for slow connections. If
+    any frame is received the assumption is that the connection is working. This behavior change
+    can be reverted by setting the ``envoy.reloadable_features.http2_delay_keepalive_timeout`` runtime
+    flag to false.
+- area: http-cache
+  change: |
+    http cache filter ``getCache`` interface changed from returning a reference to
+    returning a shared_ptr - any third-party implementations of this interface will need to be
+    updated accordingly. See changes to ``simple_http_cache.cc`` and ``simple_http_cache.h`` in
+    `PR21114 <https://github.com/envoyproxy/envoy/pull/21114>`_ for example.
+- area: lua
+  change: |
+    export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
+    that loads shared object libraries, such as those installed via luarocks.
+- area: skywalking
+  change: |
+    use upstream host address as ``addressUsedAtClient`` in propagation header.
+- area: dns
+  change: |
+    allow propagating DNS responses with no records back to callers like strict_dns cluster,
+    guarded by ``envoy.reloadable_features.cares_accept_nodata``.
+
+bug_fixes:
+
+removed_config_or_runtime:
+- area: compressor
+  change: |
+    removed ``envoy.reloadable_features.fix_added_trailers`` and legacy code paths.
+- area: dns
+  change: |
+    removed ``envoy.reloadable_features.use_dns_ttl`` and legacy code paths.
+- area: ext_authz
+  change: |
+    removed ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard and legacy code paths.
+- area: http
+  change: |
+    deprecated ``envoy.reloadable_features.correct_scheme_and_xfp`` and legacy code paths.
+- area: http
+  change: |
+    deprecated ``envoy.reloadable_features.validate_connect`` and legacy code paths.
+- area: tcp_proxy
+  change: |
+    removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
+- area: conn pool
+  change: |
+    removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
+
+new_features:
+- area: access_log
+  change: |
+    added new access_log command operators to retrieve upstream connection information change: ``%UPSTREAM_PROTOCOL%``, ``%UPSTREAM_PEER_SUBJECT%``, ``%UPSTREAM_PEER_ISSUER%``, ``%UPSTREAM_TLS_SESSION_ID%``, ``%UPSTREAM_TLS_CIPHER%``, ``%UPSTREAM_TLS_VERSION%``, ``%UPSTREAM_PEER_CERT_V_START%``, ``%UPSTREAM_PEER_CERT_V_END%`` and ``%UPSTREAM_PEER_CERT%``.
+- area: dns_resolver
+  change: |
+    added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
+- area: dubbo_proxy
+  change: |
+    added :ref:`dynamic routes discovery <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` support to the dubbo proxy.
+- area: ext_proc
+  change: |
+    added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
+- area: thrift
+  change: |
+    added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: thrift
+  change: |
+    introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
+- area: on_demand
+  change: |
+    :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
+- area: proxy_protcol
+  change: |
+    added :ref:`allow_requests_without_proxy_protocol<envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>` to allow requests without proxy protocol on the listener from trusted downstreams as an opt-in flag.
+- area: build
+  change: |
+    enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
+- area: ratelimit
+  change: |
+    added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
+
+deprecated:
+- area: dubbo_proxy
+  change: |
+    deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
+    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
+    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.

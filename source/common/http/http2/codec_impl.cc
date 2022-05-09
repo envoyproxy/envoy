@@ -907,7 +907,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       protocol_constraints_(stats, http2_options),
       skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
-      dispatching_(false), raised_goaway_(false), random_(random_generator),
+      dispatching_(false), raised_goaway_(false),
+      delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_delay_keepalive_timeout")),
+      random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   // This library can only be used with the wrapper API enabled.
   ASSERT(!use_oghttp2_library_ || use_new_codec_wrapper_);
@@ -1179,6 +1182,16 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     onKeepaliveResponse();
     return okStatus();
+  }
+
+  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
+  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
+  // timeout for another timeout period. This will still timeout the connection if there is no
+  // activity, but if there is frame activity we assume the connection is still healthy and the
+  // PING ACK may be delayed behind other frames.
+  if (delay_keepalive_timeout_ && keepalive_timeout_timer_ != nullptr &&
+      keepalive_timeout_timer_->enabled()) {
+    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
   }
 
   if (frame->hd.type == NGHTTP2_DATA) {

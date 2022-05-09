@@ -22,8 +22,6 @@ static_resources {
     }
   }
 }
-tracing {
-}
 admin {
   address {
     pipe {
