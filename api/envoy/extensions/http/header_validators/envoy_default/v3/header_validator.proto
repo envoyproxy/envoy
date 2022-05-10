@@ -1,18 +1,18 @@
 syntax = "proto3";
 
-package envoy.extensions.http.unified_header_validators.envoy_default.v3;
+package envoy.extensions.http.header_validators.envoy_default.v3;
 
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.http.unified_header_validators.envoy_default.v3";
-option java_outer_classname = "UnifiedHeaderValidatorProto";
+option java_package = "io.envoyproxy.envoy.extensions.http.header_validators.envoy_default.v3";
+option java_outer_classname = "HeaderValidatorProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/unified_header_validators/envoy_default/v3;envoy_defaultv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/header_validators/envoy_default/v3;envoy_defaultv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Envoy's default Unified Header Validator config]
+// [#protodoc-title: Envoy's default Header Validator config]
 
 // This extension validates that HTTP request and response headers are well formed according to respective RFCs.
 // 1. H/1 header map validity according to `RFC 7230 section 3.2 <https://tools.ietf.org/html/rfc7230#section-3.2>`_
@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 6. Validation of H/1 requests with both Content-Length and Transfer-Encoding headers
 // 7. Normalization of the URI path.
 //
-message UnifiedHeaderValidatorConfig {
+message HeaderValidatorConfig {
   // Determines the action for request that contain %2F, %2f, %5C or %5c sequences in the URI path.
   // This operation occurs before URL normalization and the merge slashes transformations if they were enabled.
   enum PathWithEscapedSlashesAction {

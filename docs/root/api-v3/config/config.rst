@@ -31,7 +31,7 @@ Extensions
   http/header_formatters
   http/original_ip_detection
   http/stateful_session
-  http/unified_header_validators
+  http/header_validators
   stat_sinks/stat_sinks
   quic/quic_extensions
   formatter/formatter

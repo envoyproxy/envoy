@@ -493,9 +493,9 @@ envoy.http.stateful_header_formatters.preserve_case:
   - envoy.http.stateful_header_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.http.unified_header_validators.envoy_default:
+envoy.http.header_validators.envoy_default:
   categories:
-  - envoy.http.unified_header_validators
+  - envoy.http.header_validators
   security_posture: unknown
   status: wip
 envoy.internal_redirect_predicates.allow_listed_routes:

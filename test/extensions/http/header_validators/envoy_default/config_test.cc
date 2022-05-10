@@ -1,7 +1,7 @@
-#include "envoy/extensions/http/unified_header_validators/envoy_default/v3/unified_header_validator.pb.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/http/unified_header_validators/envoy_default/config.h"
+#include "source/extensions/http/header_validators/envoy_default/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
@@ -11,20 +11,19 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace UnifiedHeaderValidators {
+namespace HeaderValidators {
 namespace EnvoyDefault {
 
 TEST(EnvoyDefaultUhvFactoryTest, Basic) {
-  auto* factory =
-      Registry::FactoryRegistry<Envoy::Http::UnifiedHeaderValidatorFactoryConfig>::getFactory(
-          "envoy.http.unified_header_validators.envoy_default");
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
+      "envoy.http.header_validators.envoy_default");
   ASSERT_NE(factory, nullptr);
 
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   const std::string yaml = R"EOF(
-    name: envoy.http.unified_header_validators.envoy_default
+    name: envoy.http.header_validators.envoy_default
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.unified_header_validators.envoy_default.v3.UnifiedHeaderValidatorConfig
+        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
         http1_protocol_options:
           http1_allow_chunked_length: true
 )EOF";
@@ -35,7 +34,7 @@ TEST(EnvoyDefaultUhvFactoryTest, Basic) {
 }
 
 } // namespace EnvoyDefault
-} // namespace UnifiedHeaderValidators
+} // namespace HeaderValidators
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

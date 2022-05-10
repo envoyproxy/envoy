@@ -210,8 +210,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "unified_header_validator_interface",
-    hdrs = ["unified_header_validator.h"],
+    name = "header_validator_interface",
+    hdrs = ["header_validator.h"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",

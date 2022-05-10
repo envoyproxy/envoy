@@ -12,9 +12,9 @@ namespace Http {
  * headers, attached to the header map, and can then be used during encoding for reverse
  * translations if applicable.
  */
-class UnifiedHeaderValidator {
+class HeaderValidator {
 public:
-  virtual ~UnifiedHeaderValidator() = default;
+  virtual ~HeaderValidator() = default;
 
   enum class HeaderEntryValidationResult { Accept, Reject };
 
@@ -46,35 +46,35 @@ public:
   validateResponseHeaderMap(ResponseHeaderMap& header_map) PURE;
 };
 
-using UnifiedHeaderValidatorPtr = std::unique_ptr<UnifiedHeaderValidator>;
+using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 /**
  * Interface for creating unified header validators.
  */
-class UnifiedHeaderValidatorFactory {
+class HeaderValidatorFactory {
 public:
-  virtual ~UnifiedHeaderValidatorFactory() = default;
+  virtual ~HeaderValidatorFactory() = default;
 
   enum class Protocol { HTTP09, HTTP1, HTTP2, HTTP3 };
 
   /**
    * Create a new unified header validator for the specified protocol.
    */
-  virtual UnifiedHeaderValidatorPtr create(Protocol protocol) PURE;
+  virtual HeaderValidatorPtr create(Protocol protocol) PURE;
 };
 
-using UnifiedHeaderValidatorFactorySharedPtr = std::shared_ptr<UnifiedHeaderValidatorFactory>;
+using HeaderValidatorFactorySharedPtr = std::shared_ptr<HeaderValidatorFactory>;
 
 /**
  * Extension configuration for unified header validators.
  */
-class UnifiedHeaderValidatorFactoryConfig : public Config::TypedFactory {
+class HeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
-  virtual UnifiedHeaderValidatorFactorySharedPtr
+  virtual HeaderValidatorFactorySharedPtr
   createFromProto(const Protobuf::Message& config,
                   Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.http.unified_header_validators"; }
+  std::string category() const override { return "envoy.http.header_validators"; }
 };
 
 } // namespace Http

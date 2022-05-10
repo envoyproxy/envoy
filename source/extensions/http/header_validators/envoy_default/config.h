@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/http/unified_header_validator.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -8,29 +8,28 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace UnifiedHeaderValidators {
+namespace HeaderValidators {
 namespace EnvoyDefault {
 
 /**
  * Config registration for the custom header IP detection extension.
  * @see OriginalIPDetectionFactory.
  */
-class UnifiedHeaderValidatorFactoryConfig
-    : public ::Envoy::Http::UnifiedHeaderValidatorFactoryConfig {
+class HeaderValidatorFactoryConfig : public ::Envoy::Http::HeaderValidatorFactoryConfig {
 public:
-  ::Envoy::Http::UnifiedHeaderValidatorFactorySharedPtr
+  ::Envoy::Http::HeaderValidatorFactorySharedPtr
   createFromProto(const Protobuf::Message& config,
                   Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() const override { return "envoy.http.unified_header_validators.envoy_default"; }
+  std::string name() const override { return "envoy.http.header_validators.envoy_default"; }
 };
 
-DECLARE_FACTORY(UnifiedHeaderValidatorFactoryConfig);
+DECLARE_FACTORY(HeaderValidatorFactoryConfig);
 
 } // namespace EnvoyDefault
-} // namespace UnifiedHeaderValidators
+} // namespace HeaderValidators
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

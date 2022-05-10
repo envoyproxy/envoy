@@ -344,7 +344,7 @@ EXTENSIONS = {
     # Unified Header Validators
     #
 
-    "envoy.http.unified_header_validators.envoy_default":        "//source/extensions/http/unified_header_validators/envoy_default:config",
+    "envoy.http.header_validators.envoy_default":        "//source/extensions/http/header_validators/envoy_default:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

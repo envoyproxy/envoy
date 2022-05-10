@@ -257,7 +257,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
 # Unified Header Validators
-/*/extensions/http/unified_header_validators/envoy_default @yanavlasov @alyssawilk
+/*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
