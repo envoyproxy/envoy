@@ -43,6 +43,10 @@ minor_behavior_changes:
 
 bug_fixes:
 
+- area: tcp_proxy
+  change: |
+    Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
+
 removed_config_or_runtime:
 - area: compressor
   change: |
@@ -79,6 +83,9 @@ new_features:
 - area: ext_proc
   change: |
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
+- area: http
+  change: |
+    added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
 - area: http
   change: |
     preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
