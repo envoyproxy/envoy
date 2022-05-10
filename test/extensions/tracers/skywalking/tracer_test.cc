@@ -150,9 +150,6 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // child span (EXIT span).
     EXPECT_EQ(span->spanEntity()->operationName(), first_child_span->spanEntity()->operationName());
 
-    first_child_span->finishSpan();
-    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
-
     Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"},
                                                        {":path", "/upstream/path"}};
     Upstream::HostDescriptionConstSharedPtr host{
@@ -168,6 +165,9 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
     EXPECT_EQ("/downstream/path", sp->endpoint());
     EXPECT_EQ("10.0.0.1:443", sp->targetAddress());
+
+    first_child_span->finishSpan();
+    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
   }
 
   {
@@ -187,9 +187,6 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ(span->spanEntity()->operationName(),
               second_child_span->spanEntity()->operationName());
 
-    second_child_span->finishSpan();
-    EXPECT_NE(0, second_child_span->spanEntity()->endTime());
-
     Http::TestRequestHeaderMapImpl second_child_headers{{":authority", "test.com"}};
 
     second_child_span->injectContext(second_child_headers, nullptr);
@@ -198,6 +195,9 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
     EXPECT_EQ("/downstream/path", sp->endpoint());
     EXPECT_EQ("test.com", sp->targetAddress());
+
+    second_child_span->finishSpan();
+    EXPECT_NE(0, second_child_span->spanEntity()->endTime());
   }
 
   segment_context->setSkipAnalysis();
