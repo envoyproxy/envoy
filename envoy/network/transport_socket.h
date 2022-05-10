@@ -264,6 +264,13 @@ public:
   virtual bool supportsAlpn() const { return false; }
 
   /**
+   * Returns the default SNI for transport sockets created by this factory.
+   * This will return an empty string view if the transport sockets created are
+   * not client-side TLS sockets.
+   */
+  virtual absl::string_view defaultServerNameIndication() const PURE;
+
+  /**
    * @param key supplies a vector of bytes to which the option should append hash key data that will
    *        be used to separate connections based on the option. Any data already in the key vector
    *        must not be modified.

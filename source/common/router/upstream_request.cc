@@ -406,6 +406,8 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
+  stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
+
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
   onResetStream(reset_reason, transport_failure_reason);
@@ -465,6 +467,9 @@ void UpstreamRequest::onPoolReady(
   stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
   StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
                                                               stream_info_);
+  if (protocol) {
+    upstream_info.setUpstreamProtocol(protocol.value());
+  }
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();
@@ -485,12 +490,12 @@ void UpstreamRequest::onPoolReady(
   }
 
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders());
+    span_->injectContext(*parent_.downstreamHeaders(), host);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders());
+    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());

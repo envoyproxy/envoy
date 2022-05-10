@@ -119,6 +119,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
     EXPECT_EQ("url", span->spanEntity()->tags().at(4).first);
 
+    // When setting peer address tag, the peer will be set.
+    span->setTag(Tracing::Tags::get().PeerAddress, "1.2.3.4:8080");
+    EXPECT_EQ("1.2.3.4:8080", span->spanEntity()->peer());
+
     span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "abc");
     EXPECT_EQ(1, span->spanEntity()->logs().size());
     EXPECT_LT(0, span->spanEntity()->logs().at(0).time());
@@ -148,8 +152,37 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_NE(0, first_child_span->spanEntity()->endTime());
 
     Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+    Upstream::HostDescriptionConstSharedPtr host{
+        new testing::NiceMock<Upstream::MockHostDescription>()};
 
-    first_child_span->injectContext(first_child_headers);
+    first_child_span->injectContext(first_child_headers, host);
+    auto sp = createSpanContext(first_child_headers.get_("sw8"));
+    EXPECT_EQ("CURR#SERVICE", sp->service());
+    EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
+    EXPECT_EQ("TEST_OP", sp->endpoint());
+    EXPECT_EQ("10.0.0.1:443", sp->targetAddress());
+  }
+
+  {
+    Envoy::Tracing::SpanPtr org_first_child_span =
+        org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
+
+    Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
+
+    EXPECT_TRUE(first_child_span->spanEntity()->spanType() == skywalking::v3::SpanType::Exit);
+
+    EXPECT_FALSE(first_child_span->spanEntity()->skipAnalysis());
+    EXPECT_EQ(2, first_child_span->spanEntity()->spanId());
+    EXPECT_EQ(0, first_child_span->spanEntity()->parentSpanId());
+
+    EXPECT_EQ("TestChild", first_child_span->spanEntity()->operationName());
+
+    first_child_span->finishSpan();
+    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
+
+    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+
+    first_child_span->injectContext(first_child_headers, nullptr);
     auto sp = createSpanContext(first_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
@@ -166,7 +199,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     // SkipAnalysis is true by default with calling setSkipAnalysis() on segment_context.
     EXPECT_TRUE(second_child_span->spanEntity()->skipAnalysis());
-    EXPECT_EQ(2, second_child_span->spanEntity()->spanId());
+    EXPECT_EQ(3, second_child_span->spanEntity()->spanId());
     EXPECT_EQ(0, second_child_span->spanEntity()->parentSpanId());
 
     second_child_span->finishSpan();
