@@ -1,7 +1,5 @@
 #include "source/common/network/connection_balancer_impl.h"
 
-#include <memory>
-
 namespace Envoy {
 namespace Network {
 
@@ -34,12 +32,6 @@ ExactConnectionBalancerImpl::pickTargetHandler(BalancedConnectionHandler&) {
   }
 
   return *min_connection_handler;
-}
-
-ConnectionBalancerSharedPtr ExactConnectionBalancerImpl::createConnectionBalancerFromProto(
-    const Protobuf::Message&, Server::Configuration::FactoryContext&) {
-  std::shared_ptr<ConnectionBalancer> ptr(new ExactConnectionBalancerImpl());
-  return ptr;
 }
 
 } // namespace Network
