@@ -34,7 +34,7 @@ jobs:
               --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
               //:android_dist_ci
       - name: 'Tar artifacts'
-        run: tar -czvf envoy_android_aar_sources.tar.gz dist/envoy.aar dist/envoy-pom.xml dist/envoy-javadoc.jar dist/envoy-sources.jar
+        run: tar -czvf envoy_android_aar_sources.tar.gz bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
       - uses: actions/upload-artifact@v2
         with:
           name: envoy_android_aar_sources
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: envoy_android_aar_sources
-          path: dist/
+          path: .
       - run: tar -xvf dist/envoy_android_aar_sources.tar.gz
       - name: 'Configure envoy-bot git user'
         run: |
@@ -75,10 +75,10 @@ jobs:
           gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
           shred signing-key
 
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab dist/envoy.aar
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab dist/envoy-pom.xml
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab dist/envoy-javadoc.jar
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab dist/envoy-sources.jar
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar -o aar.asc
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml -o xml.asc
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar -o javadoc.asc
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar -o sources.asc
       - name: 'Release to sonatype repository'
         env:
           READWRITE_USER: ${{ secrets.sonatype_user }}
@@ -86,19 +86,19 @@ jobs:
           ENVOY_PROXY_PROFILE_ID: ${{ secrets.envoy_proxy_profile_id }}
         run: |
           current_release_tag=$(git describe --tags --abbrev=0 --exact-match)
-          python dist/sonatype_nexus_upload.py \
+          python ci/sonatype_nexus_upload.py \
             --profile_id=$ENVOY_PROXY_PROFILE_ID \
             --version="${current_release_tag:1}" \
             --files \
-                dist/envoy.aar \
-                dist/envoy-pom.xml \
-                dist/envoy-sources.jar \
-                dist/envoy-javadoc.jar \
+                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar \
+                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml \
+                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar \
+                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar \
           --signed_files \
-                dist/envoy-sources.jar.asc \
-                dist/envoy.aar.asc \
-                dist/envoy-pom.xml.asc \
-                dist/envoy-javadoc.jar.asc
+                sources.asc \
+                aar.asc \
+                xml.asc \
+                javadoc.asc
 
   ios_release_artifacts_framework:
     name: ios_release_artifacts_framework
@@ -119,15 +119,11 @@ jobs:
             --ios_multi_cpus=i386,x86_64,armv7,arm64 \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            //:ios_dist
-      - name: 'Create temporary directory for artifact to produce properly named zip'
-        run: mkdir -p dist/ios_artifact/Envoy.framework
-      - name: 'Move artifact to directory for zipping'
-        run: mv dist/Envoy.framework/* dist/ios_artifact/Envoy.framework
+            //library/swift:ios_framework
       - uses: actions/upload-artifact@v2
         with:
           name: envoy_ios_framework
-          path: dist/ios_artifact
+          path: bazel-bin/library/swift/ios_framework.zip
 
   ios_release_artifacts_cocoapods:
     name: ios_release_artifacts_cocoapods

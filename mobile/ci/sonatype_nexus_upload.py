@@ -133,7 +133,7 @@ def _upload_files(staging_id, version, files, ascs, sha256):
     # aggregate all the files for uploading
     all_files = files + ascs + sha256
     for file in all_files:
-        # This will output "dist/envoy", ".aar" for "dist/envoy.aar
+        # This will output "envoy", ".aar" for "envoy.aar
         print("Uploading file {}".format(file))
         suffix, file_extension = _resolve_name(file)
         basename = "{name}-{version}{suffix}.{extension}".format(
@@ -281,10 +281,10 @@ def _build_parser():
                         Files to upload
 
                         The checklist for Envoy Mobile files are:
-                            dist/envoy.aar
-                            dist/envoy-pom.xml
-                            dist/envoy-sources.jar
-                            dist/envoy-javadoc.jar
+                            envoy.aar
+                            envoy-pom.xml
+                            envoy-sources.jar
+                            envoy-javadoc.jar
                         """)
     parser.add_argument("--signed_files", nargs="+", required=False,
                         help="""
@@ -292,10 +292,10 @@ def _build_parser():
                         Sonatype requires uploaded artifacts to be gpg signed
 
                         GPG signed:
-                            dist/envoy.aar.asc
-                            dist/envoy-pom.xml.asc
-                            dist/envoy-sources.jar.asc
-                            dist/envoy-javadoc.jar.asc
+                            envoy.aar.asc
+                            envoy-pom.xml.asc
+                            envoy-sources.jar.asc
+                            envoy-javadoc.jar.asc
                         """)
     return parser
 
