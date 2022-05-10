@@ -67,6 +67,17 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
   return h1_settings;
 }
 
+// Convert from test proto Http1ClientSettings to Http1Settings.
+Http1Settings fromHttp1Settings(const test::common::http::Http1ClientSettings& settings) {
+  Http1Settings h1_settings;
+
+  h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
+  h1_settings.accept_http_10_ = settings.accept_http_10();
+  h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
+
+  return h1_settings;
+}
+
 envoy::config::core::v3::Http2ProtocolOptions
 fromHttp2Settings(const test::common::http::Http2Settings& settings) {
   envoy::config::core::v3::Http2ProtocolOptions options(
@@ -162,9 +173,9 @@ public:
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
              bool end_stream, StreamResetCallbackFn stream_reset_callback,
-             ConnectionContext& context, const bool http1_enable_trailers)
+             ConnectionContext& context, const bool http1_allow_trailers)
       : http_protocol_(client.protocol()), stream_reset_callback_(stream_reset_callback),
-        context_(context), http1_enable_trailers_(http1_enable_trailers) {
+        context_(context), http1_allow_trailers_(http1_allow_trailers) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
 
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
@@ -294,7 +305,7 @@ public:
     }
     case test::common::http::DirectionalAction::kTrailers: {
       // Allow trailers for http >= 2 or for http1x only, when they are configured.
-      if ((http_protocol_ > Protocol::Http11 || http1_enable_trailers_) && state.isLocalOpen() &&
+      if ((http_protocol_ > Protocol::Http11 || http1_allow_trailers_) && state.isLocalOpen() &&
           state.stream_state_ == StreamState::PendingDataOrTrailers) {
         if (response) {
           state.response_encoder_->encodeTrailers(
@@ -445,7 +456,7 @@ public:
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  bool http1_enable_trailers_{false};
+  bool http1_allow_trailers_{false};
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -526,9 +537,6 @@ enum class HttpVersion { Http1, Http2Nghttp2, Http2WrappedNghttp2, Http2Oghttp2 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
-  const envoy::config::core::v3::Http2ProtocolOptions client_http2_options{
-      fromHttp2Settings(input.h2_settings().client())};
-  const Http1Settings client_http1settings{fromHttp1Settings(input.h1_settings().server())};
   NiceMock<MockConnectionCallbacks> client_callbacks;
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
@@ -571,11 +579,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   }
 
   if (http2) {
+    const envoy::config::core::v3::Http2ProtocolOptions client_http2_options{
+        fromHttp2Settings(input.h2_settings().client())};
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
         random, client_http2_options, max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
+    const Http1Settings client_http1settings{fromHttp1Settings(input.h1_settings().client())};
     client = std::make_unique<Http1::ClientConnectionImpl>(
         client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), client_callbacks,
         client_http1settings, max_response_headers_count);
@@ -675,6 +686,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
           continue;
         }
       }
+
+      const auto allow_h1_trailers = input.h1_settings().server().enable_trailers();
       HttpStreamPtr stream = std::make_unique<HttpStream>(
           *client,
           fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
@@ -685,7 +698,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
               should_close_connection = true;
             }
           },
-          connection_context, input.h1_settings().server().enable_trailers());
+          connection_context, allow_h1_trailers);
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }
