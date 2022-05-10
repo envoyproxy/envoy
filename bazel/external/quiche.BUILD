@@ -5091,15 +5091,11 @@ envoy_quiche_platform_impl_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_export",
-    hdrs = [
-        "quiche/common/platform/api/quiche_export.h",
-    ],
+    hdrs = ["quiche/common/platform/api/quiche_export.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
-    ],
+    deps = ["@envoy//source/common/quic/platform:quiche_export_impl_lib"],
 )
 
 envoy_cc_test_library(
