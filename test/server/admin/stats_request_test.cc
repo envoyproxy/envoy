@@ -40,7 +40,7 @@ protected:
   }
 
   // Executes a request, counting the chunks that were generated.
-  uint32_t iterateChunks(StatsRequest& request) {
+  uint32_t iterateChunks(StatsRequest& request, bool drain = true) {
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request.start(response_headers);
     EXPECT_EQ(Http::Code::OK, code);
@@ -52,7 +52,9 @@ protected:
       uint64_t size = data.length();
       if (size > 0) {
         ++num_chunks;
-        data.drain(size);
+        if (drain) {
+          data.drain(size);
+        }
       }
     } while (more);
     return num_chunks;
@@ -115,6 +117,15 @@ TEST_F(StatsRequestTest, ManyStatsSmallChunkSize) {
   std::unique_ptr<StatsRequest> request = makeRequest(false, false);
   request->setChunkSize(100);
   EXPECT_EQ(9, iterateChunks(*request));
+}
+
+TEST_F(StatsRequestTest, ManyStatsSmallChunkSizeNoDrain) {
+  for (uint32_t i = 0; i < 100; ++i) {
+    store_.counterFromStatName(makeStatName(absl::StrCat("foo", i)));
+  }
+  std::unique_ptr<StatsRequest> request = makeRequest(false, false);
+  request->setChunkSize(100);
+  EXPECT_EQ(9, iterateChunks(*request, false));
 }
 
 TEST_F(StatsRequestTest, OneStatUsedOnly) {
