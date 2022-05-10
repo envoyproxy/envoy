@@ -7,6 +7,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
+std::vector<std::string> methodStr{"INVITE", "REGISTER", "UPDATE", "REFER", "SUBSCRIBE", "NOTIFY",
+                                   "ACK",    "BYE",      "CANCEL", "OK",    "FAILURE",   "NULL"};
+
 void SipHeader::parseHeader() {
   if (!params_.empty()) {
     // Already parsed

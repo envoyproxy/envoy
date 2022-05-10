@@ -33,7 +33,7 @@ enum HeaderType {
 
 enum class MsgType { Request, Response, ErrorMsg };
 
-enum class MethodType {
+enum MethodType {
   Invite,
   Register,
   Update,
@@ -106,6 +106,7 @@ private:
 };
 
 using HeaderTypes = ConstSingleton<HeaderTypeMap>;
+extern std::vector<std::string> methodStr;
 
 } // namespace SipProxy
 } // namespace NetworkFilters

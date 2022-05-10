@@ -327,7 +327,6 @@ private:
   std::shared_ptr<TransactionInfos> transaction_infos_{};
   std::shared_ptr<SipSettings> settings_;
   Server::Configuration::FactoryContext& context_;
-  // bool continue_handling_;
 };
 
 class ResponseDecoder : public DecoderCallbacks,
@@ -349,10 +348,7 @@ public:
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
 
   // DecoderCallbacks
-  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-    return *this;
-  }
+  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -394,6 +390,7 @@ public:
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  SipFilters::DecoderFilterCallbacks& decoderFilterCallbacks() { return *callbacks_; }
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }

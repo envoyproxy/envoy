@@ -83,7 +83,7 @@ private:
   virtual TrafficRoutingAssistant::ClientPtr& traClient() { return tra_client_; }
 
   ConnectionManager& parent_;
-  std::shared_ptr<TrafficRoutingAssistantMap> traffic_routing_assistant_map_;
+  CacheManager<std::string, std::string, std::string> cache_manager_;
   TrafficRoutingAssistant::ClientPtr tra_client_;
   StreamInfo::StreamInfoImpl stream_info_;
   std::map<std::string, bool> is_subscribe_map_;
@@ -185,6 +185,7 @@ private:
     std::string transactionId() const override { return parent_.transactionId(); }
     const Network::Connection* connection() const override { return parent_.connection(); }
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
+    SipFilterStats& stats() override { return parent_.stats(); }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
       parent_.sendLocalReply(response, end_stream);
     }
@@ -246,14 +247,13 @@ private:
           transaction_id_(metadata->transactionId().value()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          metadata_(metadata), local_response_sent_(false) {
-      parent_.stats_.request_active_.inc();
-    }
+          metadata_(metadata), local_response_sent_(false) {}
     ~ActiveTrans() override {
       request_timer_->complete();
       ENVOY_LOG(trace, "destruct activetrans {}", transaction_id_);
       parent_.stats_.request_active_.dec();
 
+      eraseActiveTransFromPendingList(transaction_id_);
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
       }
@@ -286,6 +286,7 @@ private:
     std::string transactionId() const override { return transaction_id_; }
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override;
+    SipFilterStats& stats() override { return parent_.stats_; }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse() override;
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override;
@@ -332,6 +333,7 @@ private:
     std::list<ActiveTransDecoderFilterPtr> decoder_filters_;
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
+
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
 
     absl::any filter_context_;

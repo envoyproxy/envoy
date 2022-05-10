@@ -11,6 +11,7 @@
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
+#include "contrib/sip_proxy/filters/network/source/stats.h"
 #include "contrib/sip_proxy/filters/network/source/tra/tra.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
 
@@ -53,6 +54,8 @@ public:
    * @return RouteConstSharedPtr the route for the current request.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  virtual SipFilterStats& stats() PURE;
 
   /**
    * Create a locally generated response using the provided response object.

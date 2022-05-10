@@ -32,6 +32,8 @@ void PendingList::eraseActiveTransFromPendingList(std::string& transaction_id) {
   for (auto& item : pending_list_) {
     for (auto it = item.second.begin(); it != item.second.end();) {
       if ((*it).get().transactionId() == transaction_id) {
+        // TODO timeout handle this transaction, need send 408 timeout
+        //
         it = item.second.erase(it);
       } else {
         ++it;

@@ -450,6 +450,9 @@ FilterStatus Router::messageEnd() {
   ENVOY_STREAM_LOG(trace, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
                    transport_buffer.toString());
 
+  callbacks_->stats()
+      .counterFromElements(methodStr[metadata_->methodType()], "request_proxied")
+      .inc();
   upstream_request_->write(transport_buffer, false);
   return FilterStatus::Continue;
 }
@@ -692,6 +695,14 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
   }
 
   return FilterStatus::Continue;
+}
+
+DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
+  parent_.decoderFilterCallbacks()
+      .stats()
+      .counterFromElements(methodStr[metadata->methodType()], "response_received")
+      .inc();
+  return *this;
 }
 
 std::shared_ptr<SipSettings> ResponseDecoder::settings() const { return parent_.settings(); }

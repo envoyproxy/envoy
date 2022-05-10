@@ -19,7 +19,6 @@ namespace SipProxy {
 
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
-  FUNCTION(WaitForData)                                                                            \
   FUNCTION(TransportBegin)                                                                         \
   FUNCTION(MessageBegin)                                                                           \
   FUNCTION(MessageEnd)                                                                             \
