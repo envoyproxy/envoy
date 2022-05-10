@@ -83,9 +83,15 @@ new_features:
 - area: ext_proc
   change: |
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
+- area: http
+  change: |
+    added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: thrift
+  change: |
+    added support for access logging.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
