@@ -413,8 +413,9 @@ protected:
              !stream_manager_.body_buffered_;
     }
 
-    // Schedules a callback to process buffered data.
-    void scheduleProcessingOfBufferedData();
+    // Schedules a callback either in the current or next iteration to process
+    // buffered data.
+    void scheduleProcessingOfBufferedData(bool schedule_next_iteration);
 
     // Marks data consumed by the stream, granting the peer additional stream
     // window.

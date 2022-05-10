@@ -1849,6 +1849,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   if (defer_processing_backedup_streams_) {
     // Drain queued data for us to process, we should have over a window worth
     // of data.
+    ASSERT(process_buffered_data_callback != nullptr);
     EXPECT_TRUE(process_buffered_data_callback->enabled());
     while (process_buffered_data_callback->enabled()) {
       process_buffered_data_callback->invokeCallback();
@@ -4119,6 +4120,7 @@ TEST_P(Http2CodecImplTest, ChunkingCanOccurFromFdEvent) {
   driveToCompletion();
 
   // Read enable to grant additional window to the other side.
+  // The allocated callback will be owned by the stream when read enabled.
   auto* process_buffered_data_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
   server_->getStream(1)->readDisable(false);
@@ -4150,7 +4152,7 @@ TEST_P(Http2CodecImplTest, ChunkingCanOccurFromFdEvent) {
       }
     }
   }
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
   server_settings_.emplace(smallWindowHttp2Settings());

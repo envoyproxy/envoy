@@ -447,7 +447,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffersOverrun()) {
-      scheduleProcessingOfBufferedData();
+      scheduleProcessingOfBufferedData(false);
       if (shouldAllowPeerAdditionalStreamWindow()) {
         grantPeerAdditionalStreamWindow();
       }
@@ -455,7 +455,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   }
 }
 
-void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
+void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_next_iteration) {
   if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
@@ -464,7 +464,11 @@ void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
 
     // We schedule processing to occur in another callback to avoid
     // reentrant and deep call stacks.
-    process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+    if (schedule_next_iteration) {
+      process_buffered_data_callback_->scheduleCallbackNextIteration();
+    } else {
+      process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+    }
   }
 }
 
@@ -535,7 +539,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
       already_drained_data = true;
 
       if (!buffersOverrun()) {
-        scheduleProcessingOfBufferedData();
+        scheduleProcessingOfBufferedData(true);
       }
     } else {
       // Send the entire buffer through.
