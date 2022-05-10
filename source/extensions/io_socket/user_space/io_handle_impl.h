@@ -182,7 +182,7 @@ private:
   PassthroughStateSharedPtr passthrough_state_{nullptr};
 };
 
-class PassthroughStateImpl : public PassthroughState {
+class PassthroughStateImpl : public PassthroughState, public Logger::Loggable<Logger::Id::io> {
 public:
   void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
                   std::unique_ptr<FilterStateObjects> filter_state_objects) override;

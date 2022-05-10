@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "envoy/common/hashable.h"
+#include "envoy/common/optref.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.validate.h"
 #include "envoy/registry/registry.h"
 
@@ -77,27 +78,23 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
   }
   auto metadata = std::make_unique<envoy::config::core::v3::Metadata>();
   for (const auto& source : metadata_sources_) {
+    OptRef<const envoy::config::core::v3::Metadata> source_metadata;
     switch (source.kind_) {
-    case MetadataKind::Host: {
-      if (host->metadata()->filter_metadata().contains(source.name_)) {
-        (*metadata->mutable_filter_metadata())[source.name_] =
-            host->metadata()->filter_metadata().at(source.name_);
-      } else {
-        stats_.no_metadata_.inc();
-      }
+    case MetadataKind::Host:
+      source_metadata = makeOptRef(*host->metadata());
       break;
-    }
-    case MetadataKind::Cluster: {
-      if (host->cluster().metadata().filter_metadata().contains(source.name_)) {
-        (*metadata->mutable_filter_metadata())[source.name_] =
-            host->cluster().metadata().filter_metadata().at(source.name_);
-      } else {
-        stats_.no_metadata_.inc();
-      }
+    case MetadataKind::Cluster:
+      source_metadata = makeOptRef(host->cluster().metadata());
       break;
-    }
     default:
       PANIC("not reached");
+    }
+    if (source_metadata->filter_metadata().contains(source.name_)) {
+      (*metadata->mutable_filter_metadata())[source.name_] =
+          source_metadata->filter_metadata().at(source.name_);
+    } else {
+      ENVOY_LOG(trace, "Internal upstream missing metadata: {}", source.name_);
+      stats_.no_metadata_.inc();
     }
   }
   return metadata;
@@ -113,11 +110,13 @@ Config::extractFilterState(const StreamInfo::FilterStateSharedPtr& filter_state)
     try {
       auto object = filter_state->getDataSharedMutableGeneric(name);
       if (object == nullptr) {
+        ENVOY_LOG(trace, "Internal upstream missing filter state: {}", name);
         stats_.no_filter_state_.inc();
         continue;
       }
       filter_state_objects->emplace_back(name, object);
     } catch (const EnvoyException& e) {
+      ENVOY_LOG(trace, "Internal upstream filter state error: {}. Error: {}", name, e.what());
       stats_.filter_state_error_.inc();
     }
   }
@@ -164,7 +163,7 @@ void InternalSocketFactory::hashKey(std::vector<uint8_t>& key,
                                     Network::TransportSocketOptionsConstSharedPtr options) const {
   PassthroughFactory::hashKey(key, options);
   // Filter state should be included in the hash since it can originate from
-  // the downstream request but is only applied once per upstream connection to
+  // the downstream request, but it is only applied once per upstream connection in
   // the internal listener.
   if (options && options->filterState()) {
     config_.hashKey(key, options->filterState());

@@ -393,8 +393,12 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   }
   if (filter_state_objects_) {
     for (const auto& [name, object] : *filter_state_objects_) {
-      filter_state.setData(name, object, StreamInfo::FilterState::StateType::Mutable,
-                           StreamInfo::FilterState::LifeSpan::Connection);
+      try {
+        filter_state.setData(name, object, StreamInfo::FilterState::StateType::Mutable,
+                             StreamInfo::FilterState::LifeSpan::Connection);
+      } catch (const EnvoyException& e) {
+        ENVOY_LOG(trace, "Failed to set data for '{}': {}", name, e.what());
+      }
     }
   }
   metadata_ = nullptr;

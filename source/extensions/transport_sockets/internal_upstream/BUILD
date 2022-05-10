@@ -30,6 +30,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/common:logger_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/io_socket/user_space:io_handle_lib",

@@ -4,6 +4,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
@@ -24,7 +25,7 @@ struct InternalUpstreamStats {
   ALL_INTERNAL_UPSTREAM_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class Config {
+class Config : public Logger::Loggable<Logger::Id::upstream> {
 public:
   Config(
       const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
