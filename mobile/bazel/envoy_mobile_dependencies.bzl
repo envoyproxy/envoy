@@ -65,9 +65,9 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "com.google.code.findbugs:jsr305:3.0.2",
             "com.google.flatbuffers:flatbuffers-java:2.0.3",
             # Kotlin
-            "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.11",
-            "org.jetbrains.kotlin:kotlin-stdlib-common:1.3.11",
-            "org.jetbrains.kotlin:kotlin-stdlib:1.3.11",
+            "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.6.21",
+            "org.jetbrains.kotlin:kotlin-stdlib-common:1.6.21",
+            "org.jetbrains.kotlin:kotlin-stdlib:1.6.21",
             "androidx.recyclerview:recyclerview:1.1.0",
             "androidx.core:core:1.3.2",
             # Dokka
