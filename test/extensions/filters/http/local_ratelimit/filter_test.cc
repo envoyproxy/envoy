@@ -411,7 +411,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
   // Request  should not be rate  limited as it should match first descriptor with 10 req/min
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_local_ratelimit_match_all_descriptors", "false"}});
+      {{"envoy.reloadable_features.local_ratelimit_match_all_descriptors", "false"}});
   setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,

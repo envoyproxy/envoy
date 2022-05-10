@@ -170,7 +170,7 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_local_ratelimit_match_all_descriptors")) {
+          "envoy.reloadable_features.local_ratelimit_match_all_descriptors")) {
 
     bool allow = requestAllowedHelper(tokens_);
     // Global token is not enough. Since global token is not sorted, so we suggest it should be
