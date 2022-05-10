@@ -6,6 +6,12 @@ load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 licenses(["notice"])  # Apache 2
 
 alias(
+    name = "ios_xcframework",
+    actual = "//library/swift:Envoy",
+    visibility = ["//visibility:public"],
+)
+
+alias(
     name = "ios_dist",
     actual = "//library/swift:ios_framework",
 )

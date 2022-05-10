@@ -10,7 +10,8 @@ Breaking changes:
 
 Bugfixes:
 
-- None
+- iOS: change release artifacts to use xcframeworks (:issue:`#2216 <2216>`)
+- iOS: fix CocoaPods releases (:issue:`#2215 <2215>`)
 
 Features:
 
