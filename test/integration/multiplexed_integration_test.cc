@@ -1784,7 +1784,10 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
   const Http2Frame settings_frame = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
-  ASSERT_TRUE(fake_upstream_connection1->write(std::string(settings_frame)));
+  std::string settings_data(settings_frame);
+  ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 settings_data.size());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
 
@@ -1801,10 +1804,10 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
   const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
-  std::string settings_data(settings_frame2);
-  ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
+  std::string settings_data2(settings_frame2);
+  ASSERT_TRUE(fake_upstream_connection1->write(settings_data2));
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                 bytes_read + settings_data.size());
+                                 bytes_read + settings_data2.size());
   // Now create another request.
   sendFrame(Http2Frame::makePostRequest(5, "host", "/path/to/long/url"));
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);

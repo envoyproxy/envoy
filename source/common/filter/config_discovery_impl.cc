@@ -16,8 +16,6 @@
 namespace Envoy {
 namespace Filter {
 
-constexpr absl::string_view HttpStatPrefix = "http_filter.";
-
 namespace {
 void validateTypeUrlHelper(const std::string& type_url,
                            const absl::flat_hash_set<std::string> require_type_urls) {
@@ -232,41 +230,19 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   }
 }
 
-std::tuple<ProtobufTypes::MessagePtr, std::string> HttpFilterConfigProviderManagerImpl::getMessage(
-    const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-    Server::Configuration::ServerFactoryContext& factory_context) const {
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          filter_config);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      filter_config.typed_config(),
-      factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
-  return {std::move(message), factory.name()};
-}
-
-absl::string_view HttpFilterConfigProviderManagerImpl::statPrefix() const { return HttpStatPrefix; }
-
-ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
-    const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-    Server::Configuration::FactoryContext& factory_context, bool last_filter_in_filter_chain,
-    const std::string& filter_chain_type,
-    const absl::flat_hash_set<std::string>& require_type_urls) const {
-  auto* default_factory =
-      Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
-  if (default_factory == nullptr) {
+void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
+    const bool null_default_factory, const std::string& filter_config_name,
+    const std::string& type_url) const {
+  if (null_default_factory) {
     throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
                                      "configuration with type URL {}.",
-                                     filter_config_name, proto_config.type_url()));
+                                     filter_config_name, type_url));
   }
-  validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      proto_config, factory_context.messageValidationVisitor(), *default_factory);
-  Config::Utility::validateTerminalFilters(
-      filter_config_name, default_factory->name(), filter_chain_type,
-      default_factory->isTerminalFilterByProto(*message, factory_context),
-      last_filter_in_filter_chain);
-  return message;
+}
+
+void FilterConfigProviderManagerImplBase::validateProtoConfigTypeUrl(
+    const std::string& type_url, const absl::flat_hash_set<std::string>& require_type_urls) const {
+  validateTypeUrlHelper(type_url, require_type_urls);
 }
 
 } // namespace Filter

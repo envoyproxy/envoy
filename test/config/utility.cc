@@ -31,7 +31,7 @@
 
 namespace Envoy {
 
-std::string ConfigHelper::baseConfig() {
+std::string ConfigHelper::baseConfigNoListeners() {
   return fmt::format(R"EOF(
 admin:
   access_log:
@@ -69,14 +69,19 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+                     Platform::null_device_path, Platform::null_device_path);
+}
+
+std::string ConfigHelper::baseConfig() {
+  return absl::StrCat(baseConfigNoListeners(), R"EOF(
   listeners:
   - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-)EOF",
-                     Platform::null_device_path, Platform::null_device_path);
+)EOF");
 }
 
 std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {

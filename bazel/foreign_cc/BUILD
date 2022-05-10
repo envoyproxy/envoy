@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 
@@ -494,7 +493,7 @@ envoy_cmake(
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.
         "CFLAGS": "-UDEBUG",
-        "CXXFLAGS": "-UDEBUG",
+        "CXXFLAGS": "-UDEBUG -Wno-error=unused-but-set-variable",
         "ASMFLAGS": "-UDEBUG",
     },
     lib_source = "@com_github_wavm_wavm//:all",

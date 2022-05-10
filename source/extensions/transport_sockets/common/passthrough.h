@@ -21,6 +21,9 @@ public:
     return transport_socket_factory_->implementsSecureTransport();
   }
   bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
+  absl::string_view defaultServerNameIndication() const override {
+    return transport_socket_factory_->defaultServerNameIndication();
+  }
 
 protected:
   // The wrapped factory.
