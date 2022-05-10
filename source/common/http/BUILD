@@ -128,10 +128,10 @@ envoy_cc_library(
     hdrs = ["conn_pool_base.h"],
     deps = [
         ":codec_client_lib",
+        ":http_server_properties_cache",
         "//envoy/http:conn_pool_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
-        ":http_server_properties_cache",
         "//source/common/conn_pool:conn_pool_base_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",

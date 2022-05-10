@@ -88,8 +88,12 @@ public:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
+  virtual absl::optional<HttpServerPropertiesCache::Origin> origin() { return {}; }
+  virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
+
 protected:
   friend class ActiveClient;
+
   Random::RandomGenerator& random_generator_;
 };
 
@@ -136,7 +140,6 @@ public:
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
-  HttpConnPoolImplBase& fixed_parent() { return *static_cast<FixedHttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
 };
@@ -160,8 +163,8 @@ public:
       Http::HttpServerPropertiesCacheSharedPtr cache = nullptr)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
-        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]),
-        origin_(origin), cache_(cache) {
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]), origin_(origin),
+        cache_(cache) {
     ASSERT(protocols.size() == 1);
   }
 
@@ -177,10 +180,14 @@ public:
     return Utility::getProtocolString(protocol_);
   }
 
+  absl::optional<HttpServerPropertiesCache::Origin> origin() override { return origin_; }
+  Http::HttpServerPropertiesCacheSharedPtr cache() override { return cache_; }
+
 protected:
   const CreateCodecFn codec_fn_;
   const CreateClientFn client_fn_;
   const Http::Protocol protocol_;
+
   absl::optional<HttpServerPropertiesCache::Origin> origin_;
   Http::HttpServerPropertiesCacheSharedPtr cache_;
 };

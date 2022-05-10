@@ -17,6 +17,11 @@ namespace Http2 {
  */
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
+  static uint32_t
+  calculateInitialStreams(Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
+                          absl::optional<HttpServerPropertiesCache::Origin>& origin,
+                          Upstream::HostDescriptionConstSharedPtr host);
+
   ActiveClient(HttpConnPoolImplBase& parent);
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);

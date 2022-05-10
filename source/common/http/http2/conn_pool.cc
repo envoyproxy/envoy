@@ -12,6 +12,35 @@ namespace Envoy {
 namespace Http {
 
 namespace Http2 {
+
+// TODO(alyssar) use for normal HTTP/2 streams not just the mixed pool.
+uint32_t ActiveClient::calculateInitialStreams(
+    Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
+    absl::optional<HttpServerPropertiesCache::Origin>& origin,
+    Upstream::HostDescriptionConstSharedPtr host) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+    return host->cluster().http2Options().max_concurrent_streams().value();
+  }
+  uint32_t initial_streams = host->cluster().http2Options().max_concurrent_streams().value();
+  if (http_server_properties_cache && origin.has_value()) {
+    uint32_t cached_concurrency =
+        http_server_properties_cache->getConcurrentStreams(origin.value());
+    if (cached_concurrency != 0 && cached_concurrency < initial_streams) {
+      // Only use the cached concurrency if lowers the streams below the
+      // configured max_concurrent_streams as Envoy should never send more
+      // than max_concurrent_streams at once.
+      initial_streams = cached_concurrency;
+    }
+  }
+  auto max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
+      host->cluster().maxRequestsPerConnection());
+  if (max_requests < initial_streams) {
+    initial_streams = max_requests;
+  }
+  return initial_streams;
+}
+
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
     : MultiplexedActiveClientBase(
           parent, parent.host()->cluster().http2Options().max_concurrent_streams().value(),

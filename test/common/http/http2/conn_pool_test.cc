@@ -11,6 +11,7 @@
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -23,6 +24,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
@@ -1795,6 +1797,48 @@ TEST_F(Http2ConnPoolImplTest, TestStateWithMultiplexing) {
   pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+}
+
+TEST_F(Http2ConnPoolImplTest, InitialStreams) {
+  TestScopedRuntime scoped_runtime;
+  absl::optional<HttpServerPropertiesCache::Origin> origin;
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host->cluster_.http2_options_.mutable_max_concurrent_streams()->set_value(2000);
+  EXPECT_CALL(host->cluster_, maxRequestsPerConnection)
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(4000));
+  EXPECT_CALL(host->cluster_, maxRequestsPerConnection()).WillRepeatedly(Return(8000));
+
+  // By default, return max concurrent streams.
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(nullptr, origin, host));
+
+  // Adding a cache is a no-op if there's no cached settings.
+  auto cache = std::make_shared<NiceMock<MockHttpServerPropertiesCache>>();
+  origin = {"https", "hostname.com", 443};
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(cache, origin, host));
+
+  // Zero is ignored.
+  EXPECT_CALL(*cache, getConcurrentStreams(_)).WillOnce(Return(0));
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(cache, origin, host));
+
+  // Cached settings are respected if lower than configured streams.
+  EXPECT_CALL(*cache, getConcurrentStreams(_)).WillOnce(Return(500));
+  EXPECT_EQ(500, ActiveClient::calculateInitialStreams(cache, origin, host));
+
+  // Max requests per connection is an upper bound.
+  EXPECT_CALL(*cache, getConcurrentStreams(_)).WillOnce(Return(500));
+  EXPECT_CALL(host->cluster_, maxRequestsPerConnection)
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(100));
+  EXPECT_EQ(100, ActiveClient::calculateInitialStreams(cache, origin, host));
+
+  // All these bounds are ignored with the reloadable feature off.
+  EXPECT_CALL(*cache, getConcurrentStreams(_)).Times(0);
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(nullptr, origin, host));
 }
 
 } // namespace Http2

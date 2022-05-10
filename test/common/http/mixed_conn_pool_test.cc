@@ -112,16 +112,6 @@ TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshake) {
 }
 
 TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimit) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
-
-  expected_capacity_ = 5;
-  EXPECT_CALL(mock_cache_, getConcurrentStreams(_)).WillOnce(Return(5));
-  testAlpnHandshake({});
-}
-
-TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) { testAlpnHandshake(Protocol::Http11); }
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
 
