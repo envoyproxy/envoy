@@ -597,8 +597,7 @@ CacheLookupStatus CacheFilter::cacheLookupStatus() const {
           case FilterState::NotServingFromCache:
             return CacheLookupStatus::StaleHitWithFailedValidation;
           default:
-            ENVOY_BUG(
-                false,
+            IS_ENVOY_BUG(
                 absl::StrCat(
                     "Unexpected filter state in requestCacheStatus: cache "
                     "lookup response required validation, but filter state is ",
@@ -623,8 +622,7 @@ CacheLookupStatus CacheFilter::cacheLookupStatus() const {
     case FilterState::NotServingFromCache:
       return CacheLookupStatus::RequestNotCacheable;
     default:
-      ENVOY_BUG(false,
-                absl::StrCat("Unexpected filter state in requestCacheStatus: "
+      IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
                              "lookup_result_ is empty but filter state is ",
                              filter_state_));
       return CacheLookupStatus::Unknown;
