@@ -40,6 +40,11 @@ minor_behavior_changes:
   change: |
     allow propagating DNS responses with no records back to callers like strict_dns cluster,
     guarded by ``envoy.reloadable_features.cares_accept_nodata``.
+- area: router
+  change: |
+    get route config factories by the configuration proto full names by default. This behavior change
+    can be reverted by setting the ``envoy.reloadable_features.get_route_config_factory_by_type``
+    runtime flag to false.
 
 bug_fixes:
 
