@@ -197,8 +197,7 @@ class VersionHistories(runner.Runner):
         root_path.mkdir(parents=True, exist_ok=True)
         map_version = (
             minor_version < self.project.minor_version
-            and (minor_version
-                 in self.project.inventories.versions))
+            and (minor_version in self.project.inventories.versions))
         version_history = self.version_history_tpl.render(
             mapped_version=(minor_version if map_version else None),
             sections=self.sections,
