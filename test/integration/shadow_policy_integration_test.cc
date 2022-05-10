@@ -21,7 +21,7 @@ public:
 
     // Set the mirror policy with cluster header or cluster name.
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
           auto* mirror_policy = hcm.mutable_route_config()
                                     ->mutable_virtual_hosts(0)
@@ -81,18 +81,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilt
   sendRequestAndValidateResponse();
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
-}
-
-// Test request mirroring / shadowing with the cluster header, but the value is not set in header.
-TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithoutClusterHeader) {
-  intitialConfigSetup("", "cluster_header_1");
-
-  initialize();
-  sendRequestAndValidateResponse();
-
-  // The cluster header is not set in headers.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
