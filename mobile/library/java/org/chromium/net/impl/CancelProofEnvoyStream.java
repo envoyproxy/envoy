@@ -76,6 +76,7 @@ final class CancelProofEnvoyStream {
     if (buffer.position() == 0) {
       mStream.sendData(buffer, buffer.remaining(), finalChunk);
     } else {
+      // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2247): avoid ByteBuffer copies
       ByteBuffer resizedBuffer = ByteBuffer.allocateDirect(buffer.remaining());
       buffer.mark();
       resizedBuffer.put(buffer);

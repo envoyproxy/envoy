@@ -508,7 +508,6 @@ public class BidirectionalStreamTest {
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
   public void testSimpleGetWithFlush() throws Exception {
-    // TODO(xunjieli): Use ParameterizedTest instead of the loop.
     for (int i = 0; i < 2; i++) {
       String url = Http2TestServer.getEchoStreamUrl();
       TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback() {
@@ -562,7 +561,6 @@ public class BidirectionalStreamTest {
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
   public void testSimplePostWithFlushAfterOneWrite() throws Exception {
-    // TODO(xunjieli): Use ParameterizedTest instead of the loop.
     for (int i = 0; i < 2; i++) {
       String url = Http2TestServer.getEchoStreamUrl();
       TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -591,7 +589,6 @@ public class BidirectionalStreamTest {
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
   public void testSimplePostWithFlushTwice() throws Exception {
-    // TODO(xunjieli): Use ParameterizedTest instead of the loop.
     for (int i = 0; i < 2; i++) {
       String url = Http2TestServer.getEchoStreamUrl();
       TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
@@ -1216,7 +1213,7 @@ public class BidirectionalStreamTest {
     // The expected received bytes count is lower than it would be for the first request on the
     // connection, because the server includes an HPACK dynamic table size update only in the
     // first response HEADERS frame.
-    // TODO: fix expected ReceivedByteCount - quite unpredictable
+    // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2265): fix expected ReceivedByteCount
     // runSimpleGetWithExpectedReceivedByteCount(27);
   }
 
@@ -1300,8 +1297,9 @@ public class BidirectionalStreamTest {
         failureStep == ResponseStep.ON_READ_COMPLETED || failureStep == ResponseStep.ON_TRAILERS) {
       // For steps after response headers are received, there will be
       // connect timing metrics.
-      // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2192) uncomment this line
-      // MetricsTestUtil.checkTimingMetrics(metrics, startTime, endTime);
+      // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2192): flaky.
+      MetricsTestUtil.checkTimingMetrics(metrics, startTime, endTime);
+      // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2192): flaky.
       MetricsTestUtil.checkHasConnectTiming(metrics, startTime, endTime, true);
       assertTrue(metrics.getSentByteCount() > 0);
       assertTrue(metrics.getReceivedByteCount() > 0);
@@ -1334,12 +1332,13 @@ public class BidirectionalStreamTest {
   @OnlyRunNativeCronet
   @Ignore("Flaky: crashes EM")
   public void testFailures() throws Exception {
-    // TODO: start time and end time are not set.
+    // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2192): start/end time are not set.
     //  throwOrCancel(FailureType.CANCEL_SYNC, ResponseStep.ON_STREAM_READY, false);
     //  throwOrCancel(FailureType.CANCEL_ASYNC, ResponseStep.ON_STREAM_READY, false);
     //  throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_STREAM_READY, false);
     //  throwOrCancel(FailureType.THROW_SYNC, ResponseStep.ON_STREAM_READY, true);
 
+    // TODO(https://github.com/envoyproxy/envoy-mobile/issues/2192): start/end time are flaky.
     throwOrCancel(FailureType.CANCEL_SYNC, ResponseStep.ON_RESPONSE_STARTED, false);
     throwOrCancel(FailureType.CANCEL_ASYNC, ResponseStep.ON_RESPONSE_STARTED, false);
     throwOrCancel(FailureType.CANCEL_ASYNC_WITHOUT_PAUSE, ResponseStep.ON_RESPONSE_STARTED, false);
@@ -1541,7 +1540,7 @@ public class BidirectionalStreamTest {
   @Feature({"Cronet"})
   @Test
   @OnlyRunNativeCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1550")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1594")
   public void testErrorCodes() throws Exception {
     // Non-BidirectionalStream specific error codes.
     checkSpecificErrorCode(NetError.ERR_NAME_NOT_RESOLVED,
@@ -1561,7 +1560,7 @@ public class BidirectionalStreamTest {
     checkSpecificErrorCode(NetError.ERR_TIMED_OUT, NetworkException.ERROR_TIMED_OUT, true);
     checkSpecificErrorCode(NetError.ERR_ADDRESS_UNREACHABLE,
                            NetworkException.ERROR_ADDRESS_UNREACHABLE, false);
-    // TODO("enable")
+    // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1594) Missing error - code this.
     // BidirectionalStream specific retryable error codes.
     // checkSpecificErrorCode(NetError.ERR_HTTP2_PING_FAILED, NetworkException.ERROR_OTHER, true);
     // checkSpecificErrorCode(
