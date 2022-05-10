@@ -5012,12 +5012,13 @@ envoy_cc_library(
     ],
 )
 
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
-    hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
-    ],
-)
+# Use the QUICHE default implmentation once the WIN32 compiler error is resolved.
+# envoy_quiche_platform_impl_cc_library(
+#    name = "quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
+#    hdrs = [
+#        "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
+#    ],
+#)
 
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_flag_utils_impl_lib",
@@ -5075,7 +5076,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_export_impl_lib",
     ],
 )
 
