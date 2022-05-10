@@ -45,20 +45,16 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    cb_ = &cb;
     ENVOY_LOG(warn, "Listener filter: new connection accepted while missing configuration. "
                     "Close socket and stop the iteration onAccept.");
-    cb_->socket().ioHandle().close();
+    cb.socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   }
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
     // The socket is already closed onAccept. Just return StopIteration here.
     return Network::FilterStatus::StopIteration;
   }
-  size_t maxReadBytes() const override { return 1024; }
-
-private:
-  Network::ListenerFilterCallbacks* cb_{};
+  size_t maxReadBytes() const override { return 0; }
 };
 
 bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,

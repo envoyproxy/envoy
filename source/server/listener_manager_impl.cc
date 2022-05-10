@@ -113,6 +113,8 @@ Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListener
     Configuration::ListenerFactoryContext& context,
     Filter::TcpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
   Filter::ListenerFilterFactoriesList ret;
+
+  ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -123,8 +125,8 @@ Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListener
     // dynamic listener filter configuration
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
-      auto& config_discovery = proto_config.config_discovery();
-      auto& name = proto_config.name();
+      const auto& config_discovery = proto_config.config_discovery();
+      const auto& name = proto_config.name();
       ENVOY_LOG(debug, "   Listener filter:   dynamic filter name: {}", name);
       if (config_discovery.apply_default_config_without_warming() &&
           !config_discovery.has_default_config()) {
@@ -133,8 +135,8 @@ Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListener
             name));
       }
       for (const auto& type_url : config_discovery.type_urls()) {
-        auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
-        auto* factory =
+        const auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        const auto* factory =
             Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
                 getFactoryByType(factory_type_url);
         if (factory == nullptr) {
@@ -151,7 +153,7 @@ Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListener
       auto& factory =
           Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
               proto_config);
-      auto message = Config::Utility::translateToFactoryConfig(
+      const auto message = Config::Utility::translateToFactoryConfig(
           proto_config, context.messageValidationVisitor(), factory);
 
       Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
@@ -282,14 +284,13 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
           [this](const Matchers::StringMatcher& name_matcher) {
             return dumpListenerConfigs(name_matcher);
           })),
-      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names),
+      tcp_listener_config_provider_manager_(
+          std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
   }
-  // Create TCP listener filter config provider manager instance.
-  tcp_listener_config_provider_manager_ =
-      std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>();
 }
 
 ProtobufTypes::MessagePtr
