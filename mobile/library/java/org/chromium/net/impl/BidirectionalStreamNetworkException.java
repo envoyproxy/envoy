@@ -5,7 +5,7 @@ import org.chromium.net.impl.Annotations.NetError;
 /**
  * Used in {@link CronetBidirectionalStream}. Implements {@link NetworkExceptionImpl}.
  */
-final class BidirectionalStreamNetworkException extends NetworkExceptionImpl {
+public final class BidirectionalStreamNetworkException extends NetworkExceptionImpl {
   public BidirectionalStreamNetworkException(String message, int errorCode,
                                              int cronetInternalErrorCode) {
     super(message, errorCode, cronetInternalErrorCode);

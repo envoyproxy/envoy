@@ -94,11 +94,10 @@ public final class CronetUrlRequest extends UrlRequestBase {
   }
 
   private static final String X_ENVOY = "x-envoy";
-  private static final String X_ENVOY_SELECTED_TRANSPORT = "x-android-selected-transport";
+  private static final String X_ENVOY_UPSTREAM_ALPN = "x-envoy-upstream-alpn";
   private static final String TAG = CronetUrlRequest.class.getSimpleName();
   private static final String USER_AGENT = "User-Agent";
   private static final String CONTENT_TYPE = "Content-Type";
-  private static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocateDirect(0);
   private static final Executor DIRECT_EXECUTOR = new DirectExecutor();
 
   private final String mUserAgent;
@@ -142,8 +141,6 @@ public final class CronetUrlRequest extends UrlRequestBase {
   private final AtomicCombinatoryState mReportState =
       new AtomicCombinatoryState(ReportState.REPORT_READY);
 
-  private final AtomicBoolean mUploadProviderClosed = new AtomicBoolean(false);
-
   private final boolean mAllowDirectExecutor;
 
   /* These don't change with redirects */
@@ -183,10 +180,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
 
   /**
    * @param executor The executor for orchestrating tasks between envoy-mobile callbacks
-   * @param userExecutor The executor used to dispatch to Cronet {@code callback}
    */
-  CronetUrlRequest(CronetUrlRequestContext cronvoyEngine, Callback callback, Executor executor,
-                   String url, String userAgent, boolean allowDirectExecutor,
+  CronetUrlRequest(CronetUrlRequestContext cronvoyEngine, String url, Callback callback,
+                   Executor executor, String userAgent, boolean allowDirectExecutor,
                    Collection<Object> connectionAnnotations, boolean trafficStatsTagSet,
                    int trafficStatsTag, boolean trafficStatsUidSet, int trafficStatsUid,
                    RequestFinishedInfo.Listener requestFinishedListener) {
@@ -1051,7 +1047,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
         if (headerEntry.getValue().get(0) == null) {
           continue;
         }
-        if (X_ENVOY_SELECTED_TRANSPORT.equals(headerKey)) {
+        if (X_ENVOY_UPSTREAM_ALPN.equals(headerKey)) {
           selectedTransport = headerEntry.getValue().get(0);
         }
         if (!headerKey.startsWith(X_ENVOY) && !headerKey.equals("date") &&
@@ -1064,9 +1060,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       // Important to copy the list here, because although we never concurrently modify
       // the list ourselves, user code might iterate over it while we're redirecting, and
       // that would throw ConcurrentModificationException.
-      // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1426) set receivedByteCount
       // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1622) support proxy
-      // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1546) negotiated protocol
       // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1578) http caching
       mUrlResponseInfo.setResponseValues(
           new ArrayList<>(mUrlChain), responseCode, HttpReason.getReason(responseCode),

@@ -17,5 +17,13 @@ public final class CronetTestUtil {
     return (NativeCronetEngineBuilderImpl)builder.getBuilderDelegate();
   }
 
+  public static boolean nativeCanGetTaggedBytes() {
+    return false; // TODO(carloseltuerto) implement
+  }
+
+  public static long nativeGetTaggedBytes(int tag) {
+    return 0; // TODO(carloseltuerto) implement
+  }
+
   private CronetTestUtil() {}
 }

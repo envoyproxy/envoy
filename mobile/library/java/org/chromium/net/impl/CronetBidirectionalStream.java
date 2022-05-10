@@ -1,22 +1,10 @@
 package org.chromium.net.impl;
 
 import android.util.Log;
-import androidx.annotation.GuardedBy;
-import androidx.annotation.IntDef;
+
+import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
-import io.envoyproxy.envoymobile.engine.EnvoyEngine;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.nio.ByteBuffer;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
+
 import org.chromium.net.BidirectionalStream;
 import org.chromium.net.CallbackException;
 import org.chromium.net.CronetException;
@@ -25,134 +13,94 @@ import org.chromium.net.NetworkException;
 import org.chromium.net.RequestFinishedInfo;
 import org.chromium.net.UrlResponseInfo;
 import org.chromium.net.impl.Annotations.RequestPriority;
+import org.chromium.net.impl.CronetBidirectionalState.Event;
+import org.chromium.net.impl.CronetBidirectionalState.NextAction;
+import org.chromium.net.impl.UrlResponseInfoImpl.HeaderBlockImpl;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel;
 
 /**
  * {@link BidirectionalStream} implementation using Envoy-Mobile stack.
- * All @CalledByNative methods are called on the native network thread
- * and post tasks with callback calls onto Executor. Upon returning from callback, the native
- * stream is called on Executor thread and posts native tasks to the native network thread.
  */
-final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
-  /**
-   * States of BidirectionalStream are tracked in mReadState and mWriteState.
-   * The write state is separated out as it changes independently of the read state.
-   * There is one initial state: State.NOT_STARTED. There is one normal final state:
-   * State.SUCCESS, reached after State.READING_DONE and State.WRITING_DONE. There are two
-   * exceptional final states: State.CANCELED and State.ERROR, which can be reached from
-   * any other non-final state.
-   */
-  @IntDef({State.NOT_STARTED, State.STARTED, State.WAITING_FOR_READ, State.READING,
-           State.READING_DONE, State.CANCELED, State.ERROR, State.SUCCESS, State.WAITING_FOR_FLUSH,
-           State.WRITING, State.WRITING_DONE})
-  @Retention(RetentionPolicy.SOURCE)
-  private @interface State {
-    /* Initial state, stream not started. */
-    int NOT_STARTED = 0;
-    /*
-     * Stream started, request headers are being sent if mDelayRequestHeadersUntilNextFlush
-     * is not set to true.
-     */
-    int STARTED = 1;
-    /* Waiting for {@code read()} to be called. */
-    int WAITING_FOR_READ = 2;
-    /* Reading from the remote, {@code onReadCompleted()} callback will be called when done. */
-    int READING = 3;
-    /* There is no more data to read and stream is half-closed by the remote side. */
-    int READING_DONE = 4;
-    /* Stream is canceled. */
-    int CANCELED = 5;
-    /* Error has occurred, stream is closed. */
-    int ERROR = 6;
-    /* Reading and writing are done, and the stream is closed successfully. */
-    int SUCCESS = 7;
-    /* Waiting for {@code CronetBidirectionalStreamJni.get().sendRequestHeaders()} or {@code
-       CronetBidirectionalStreamJni.get().writevData()} to be called. */
-    int WAITING_FOR_FLUSH = 8;
-    /* Writing to the remote, {@code onWritevCompleted()} callback will be called when done. */
-    int WRITING = 9;
-    /* There is no more data to write and stream is half-closed by the local side. */
-    int WRITING_DONE = 10;
-  }
+public final class CronetBidirectionalStream
+    extends ExperimentalBidirectionalStream implements EnvoyHTTPCallbacks {
+
+  private static final String X_ENVOY = "x-envoy";
+  private static final String X_ENVOY_SELECTED_TRANSPORT = "x-envoy-upstream-alpn";
+  private static final String USER_AGENT = "User-Agent";
+  private static final Executor DIRECT_EXECUTOR = new DirectExecutor();
 
   private final CronetUrlRequestContext mRequestContext;
   private final Executor mExecutor;
   private final VersionSafeCallbacks.BidirectionalStreamCallback mCallback;
   private final String mInitialUrl;
   private final int mInitialPriority;
-  private final String mInitialMethod;
-  private final String[] mRequestHeaders;
+  private final String mMethod;
+  private final boolean mReadOnly; // if mInitialMethod is GET or HEAD, then this is true.
+  private final List<Map.Entry<String, String>> mRequestHeaders;
   private final boolean mDelayRequestHeadersUntilFirstFlush;
   private final Collection<Object> mRequestAnnotations;
   private final boolean mTrafficStatsTagSet;
   private final int mTrafficStatsTag;
   private final boolean mTrafficStatsUidSet;
   private final int mTrafficStatsUid;
-  private CronetException mException;
+  private final String mUserAgent;
+  private final CancelProofEnvoyStream mStream = new CancelProofEnvoyStream();
+  private final CronetBidirectionalState mState = new CronetBidirectionalState();
+  private final AtomicInteger mUserflushConcurrentInvocationCount = new AtomicInteger();
+  private final AtomicInteger mFlushConcurrentInvocationCount = new AtomicInteger();
+  private final AtomicReference<CronetException> mException = new AtomicReference<>();
 
-  /*
-   * Synchronizes access to mNativeStream, mReadState and mWriteState.
-   */
-  private final Object mNativeStreamLock = new Object();
+  // Set by start() upon success.
+  private Map<String, List<String>> mEnvoyRequestHeaders;
 
-  @GuardedBy("mNativeStreamLock")
   // Pending write data.
-  private LinkedList<ByteBuffer> mPendingData;
+  private final ConcurrentLinkedDeque<WriteBuffer> mPendingData;
 
-  @GuardedBy("mNativeStreamLock")
   // Flush data queue that should be pushed to the native stack when the previous
-  // CronetBidirectionalStreamJni.get().writevData completes.
-  private LinkedList<ByteBuffer> mFlushData;
+  // writevData completes.
+  private final ConcurrentLinkedDeque<WriteBuffer> mFlushData;
 
-  @GuardedBy("mNativeStreamLock")
-  // Whether an end-of-stream flag is passed in through write().
-  private boolean mEndOfStreamWritten;
+  /* Final metrics recorded the the Envoy Mobile Engine. May be null */
+  private EnvoyFinalStreamIntel mEnvoyFinalStreamIntel;
 
-  @GuardedBy("mNativeStreamLock")
-  // Whether request headers have been sent.
-  private boolean mRequestHeadersSent;
-
-  @GuardedBy("mNativeStreamLock")
-  // Metrics information. Obtained when request succeeds, fails or is canceled.
-  private RequestFinishedInfo.Metrics mMetrics;
-
-  /* Native BidirectionalStream object, owned by CronetBidirectionalStream. */
-  @GuardedBy("mNativeStreamLock") private long mNativeStream;
-
-  /**
-   * Read state is tracking reading flow.
-   *                         / <--- READING <--- \
-   *                         |                   |
-   *                         \                   /
-   * NOT_STARTED -> STARTED --> WAITING_FOR_READ -> READING_DONE -> SUCCESS
-   */
-  @GuardedBy("mNativeStreamLock") private @State int mReadState = State.NOT_STARTED;
-
-  /**
-   * Write state is tracking writing flow.
-   *                         / <---  WRITING  <--- \
-   *                         |                     |
-   *                         \                     /
-   * NOT_STARTED -> STARTED --> WAITING_FOR_FLUSH -> WRITING_DONE -> SUCCESS
-   */
-  @GuardedBy("mNativeStreamLock") private @State int mWriteState = State.NOT_STARTED;
+  private volatile WriteBuffer mLastWriteBufferSent;
+  private final AtomicReference<ReadBuffer> mLatestBufferRead = new AtomicReference<>();
 
   // Only modified on the network thread.
-  private UrlResponseInfoImpl mResponseInfo;
-
-  /*
-   * OnReadCompleted callback is repeatedly invoked when each read is completed, so it
-   * is cached as a member variable.
-   */
-  // Only modified on the network thread.
-  private OnReadCompletedRunnable mOnReadCompletedTask;
+  private volatile UrlResponseInfoImpl mResponseInfo;
 
   private Runnable mOnDestroyedCallbackForTesting;
 
   private final class OnReadCompletedRunnable implements Runnable {
     // Buffer passed back from current invocation of onReadCompleted.
-    ByteBuffer mByteBuffer;
+    private ByteBuffer mByteBuffer;
     // End of stream flag from current invocation of onReadCompleted.
-    boolean mEndOfStream;
+    private final boolean mEndOfStream;
+
+    OnReadCompletedRunnable(ByteBuffer mByteBuffer, boolean mEndOfStream) {
+      this.mByteBuffer = mByteBuffer;
+      this.mEndOfStream = mEndOfStream;
+    }
 
     @Override
     public void run() {
@@ -160,22 +108,33 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
         // Null out mByteBuffer, to pass buffer ownership to callback or release if done.
         ByteBuffer buffer = mByteBuffer;
         mByteBuffer = null;
-        boolean maybeOnSucceeded = false;
-        synchronized (mNativeStreamLock) {
-          if (isDoneLocked()) {
-            return;
-          }
-          if (mEndOfStream) {
-            mReadState = State.READING_DONE;
-            maybeOnSucceeded = (mWriteState == State.WRITING_DONE);
-          } else {
-            mReadState = State.WAITING_FOR_READ;
-          }
+        switch (
+            mState.nextAction(mEndOfStream ? Event.LAST_READ_COMPLETED : Event.READ_COMPLETED)) {
+        case NextAction.NOTIFY_USER_READ_COMPLETED:
+          mCallback.onReadCompleted(CronetBidirectionalStream.this, mResponseInfo, buffer,
+                                    mEndOfStream);
+          break;
+        case NextAction.TAKE_NO_MORE_ACTIONS:
+          // An EM onError callback occurred, or there was a USER_CANCEL event since this task was
+          // scheduled.
+          return;
+        default:
+          assert false;
         }
-        mCallback.onReadCompleted(CronetBidirectionalStream.this, mResponseInfo, buffer,
-                                  mEndOfStream);
-        if (maybeOnSucceeded) {
-          maybeOnSucceededOnExecutor();
+        if (mEndOfStream) {
+          switch (mState.nextAction(Event.READY_TO_FINISH)) {
+          case NextAction.NOTIFY_USER_SUCCEEDED:
+            onSucceededOnExecutor();
+            break;
+          case NextAction.CARRY_ON:
+            break; // Not yet ready to conclude the Stream.
+          case NextAction.TAKE_NO_MORE_ACTIONS:
+            // Very unlikely: just before this switch statement and after the previous one, an EM
+            // onError callback occurred, or there was a USER_CANCEL event.
+            return;
+          default:
+            assert false;
+          }
         }
       } catch (Exception e) {
         onCallbackException(e);
@@ -200,20 +159,32 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
         // Null out mByteBuffer, to pass buffer ownership to callback or release if done.
         ByteBuffer buffer = mByteBuffer;
         mByteBuffer = null;
-        boolean maybeOnSucceeded = false;
-        synchronized (mNativeStreamLock) {
-          if (isDoneLocked()) {
+
+        switch (
+            mState.nextAction(mEndOfStream ? Event.LAST_WRITE_COMPLETED : Event.WRITE_COMPLETED)) {
+        case NextAction.NOTIFY_USER_WRITE_COMPLETED:
+          mCallback.onWriteCompleted(CronetBidirectionalStream.this, mResponseInfo, buffer,
+                                     mEndOfStream);
+          break;
+        case NextAction.TAKE_NO_MORE_ACTIONS:
+          // An EM onError callback occurred, or there was a USER_CANCEL event since this task was
+          // scheduled.
+          return;
+        default:
+          assert false;
+        }
+        if (mEndOfStream) {
+          switch (mState.nextAction(Event.READY_TO_FINISH)) {
+          case NextAction.NOTIFY_USER_SUCCEEDED:
+            onSucceededOnExecutor();
+            break;
+          case NextAction.CARRY_ON:
+            break; // Not yet ready to conclude the Stream.
+          case NextAction.TAKE_NO_MORE_ACTIONS:
+            // Very unlikely: just before this switch statement and after the previous one, an EM
+            // onError callback occurred, or there was a USER_CANCEL event.
             return;
           }
-          if (mEndOfStream) {
-            mWriteState = State.WRITING_DONE;
-            maybeOnSucceeded = (mReadState == State.READING_DONE);
-          }
-        }
-        mCallback.onWriteCompleted(CronetBidirectionalStream.this, mResponseInfo, buffer,
-                                   mEndOfStream);
-        if (maybeOnSucceeded) {
-          maybeOnSucceededOnExecutor();
         }
       } catch (Exception e) {
         onCallbackException(e);
@@ -223,7 +194,7 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
 
   CronetBidirectionalStream(CronetUrlRequestContext requestContext, String url,
                             @CronetEngineBase.StreamPriority int priority, Callback callback,
-                            Executor executor, String httpMethod,
+                            Executor executor, String userAgent, String httpMethod,
                             List<Map.Entry<String, String>> requestHeaders,
                             boolean delayRequestHeadersUntilNextFlush,
                             Collection<Object> requestAnnotations, boolean trafficStatsTagSet,
@@ -233,164 +204,204 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     mInitialPriority = convertStreamPriority(priority);
     mCallback = new VersionSafeCallbacks.BidirectionalStreamCallback(callback);
     mExecutor = executor;
-    mInitialMethod = httpMethod;
-    mRequestHeaders = stringsFromHeaderList(requestHeaders);
+    mUserAgent = userAgent;
+    mMethod = httpMethod;
+    mRequestHeaders = requestHeaders;
     mDelayRequestHeadersUntilFirstFlush = delayRequestHeadersUntilNextFlush;
-    mPendingData = new LinkedList<>();
-    mFlushData = new LinkedList<>();
+    mPendingData = new ConcurrentLinkedDeque<>();
+    mFlushData = new ConcurrentLinkedDeque<>();
     mRequestAnnotations = requestAnnotations;
     mTrafficStatsTagSet = trafficStatsTagSet;
     mTrafficStatsTag = trafficStatsTag;
     mTrafficStatsUidSet = trafficStatsUidSet;
     mTrafficStatsUid = trafficStatsUid;
+    mReadOnly = !doesMethodAllowWriteData(mMethod);
   }
 
   @Override
   public void start() {
-    synchronized (mNativeStreamLock) {
-      if (mReadState != State.NOT_STARTED) {
-        throw new IllegalStateException("Stream is already started.");
-      }
-      try {
-        mNativeStream = CronetBidirectionalStreamJni.get().createBidirectionalStream(
-            CronetBidirectionalStream.this, mRequestContext.getEnvoyEngine(),
-            !mDelayRequestHeadersUntilFirstFlush, mRequestContext.hasRequestFinishedListener(),
-            mTrafficStatsTagSet, mTrafficStatsTag, mTrafficStatsUidSet, mTrafficStatsUid);
-        mRequestContext.onRequestStarted();
-        // Non-zero startResult means an argument error.
-        int startResult = CronetBidirectionalStreamJni.get().start(
-            mNativeStream, CronetBidirectionalStream.this, mInitialUrl, mInitialPriority,
-            mInitialMethod, mRequestHeaders, !doesMethodAllowWriteData(mInitialMethod));
-        if (startResult == -1) {
-          throw new IllegalArgumentException("Invalid http method " + mInitialMethod);
-        }
-        if (startResult > 0) {
-          int headerPos = startResult - 1;
-          throw new IllegalArgumentException("Invalid header " + mRequestHeaders[headerPos] + "=" +
-                                             mRequestHeaders[headerPos + 1]);
-        }
-        mReadState = mWriteState = State.STARTED;
-      } catch (RuntimeException e) {
-        // If there's an exception, clean up and then throw the
-        // exception to the caller.
-        destroyNativeStreamLocked(false);
-        throw e;
-      }
+    validateHttpMethod(mMethod);
+    for (Map.Entry<String, String> requestHeader : mRequestHeaders) {
+      validateHeader(requestHeader.getKey(), requestHeader.getValue());
     }
+    mEnvoyRequestHeaders =
+        buildEnvoyRequestHeaders(mMethod, mRequestHeaders, mUserAgent, mInitialUrl);
+    // Cronet C++ layer exposes reported errors here with an onError callback. EM does not.
+    @Nullable CronetException startUpException = engineSimulatedError(mEnvoyRequestHeaders);
+    @Event
+    int startingEvent =
+        startUpException != null ? Event.ERROR
+        : mDelayRequestHeadersUntilFirstFlush
+            ? (mReadOnly ? Event.USER_START_READ_ONLY : Event.USER_START)
+            : (mReadOnly ? Event.USER_START_WITH_HEADERS_READ_ONLY : Event.USER_START_WITH_HEADERS);
+    mRequestContext.onRequestStarted();
+
+    switch (mState.nextAction(startingEvent)) {
+    case NextAction.NOTIFY_USER_FAILED:
+      mException.set(startUpException);
+      failWithException();
+      break;
+    case NextAction.NOTIFY_USER_STREAM_READY:
+      Runnable startTask = new Runnable() {
+        @Override
+        public void run() {
+          try {
+            mStream.setStream(mRequestContext.getEnvoyEngine().startStream(
+                CronetBidirectionalStream.this, /* explicitFlowCrontrol= */ true));
+            if (!mDelayRequestHeadersUntilFirstFlush) {
+              mStream.sendHeaders(mEnvoyRequestHeaders, mReadOnly);
+            }
+            onStreamReady();
+          } catch (RuntimeException e) {
+            // Will be reported when "onCancel" gets invoked.
+            reportException(new CronetExceptionImpl("Startup failure", e));
+          }
+        }
+      };
+      // Starting a new stream can only occur once the engine initialization has completed. The
+      // first time a Stream is created this will take more or less 100ms. Keep in mind that Cronet
+      // API methods can't be blocking.
+      mRequestContext.setTaskToExecuteWhenInitializationIsCompleted(new Runnable() {
+        @Override
+        public void run() {
+          // For the first stream, this task is executed by the Network Thread once the engine
+          // initialization is completed. For the subsequent streams, there is no waiting: this line
+          // of code is executed by the Thread that invoked this start() method.
+          postTaskToExecutor(startTask);
+        }
+      });
+      break;
+    default:
+      assert false;
+    }
+  }
+
+  /**
+   * Returns, potentially, an exception to be reported through the User's {@link Callback#onFailed},
+   * even though no stream has been created yet. This awkward error reporting solely exists to mimic
+   * Cronet.
+   */
+  @Nullable
+  private static CronetException engineSimulatedError(Map<String, List<String>> requestHeaders) {
+    if (requestHeaders.get(":scheme").get(0).equals("http")) {
+      return new BidirectionalStreamNetworkException("Exception in BidirectionalStream: "
+                                                         + "net::ERR_DISALLOWED_URL_SCHEME",
+                                                     11, -301);
+    }
+    return null;
   }
 
   @Override
   public void read(ByteBuffer buffer) {
-    synchronized (mNativeStreamLock) {
-      Preconditions.checkHasRemaining(buffer);
-      Preconditions.checkDirect(buffer);
-      if (mReadState != State.WAITING_FOR_READ) {
-        throw new IllegalStateException("Unexpected read attempt.");
-      }
-      if (isDoneLocked()) {
-        return;
-      }
-      if (mOnReadCompletedTask == null) {
-        mOnReadCompletedTask = new OnReadCompletedRunnable();
-      }
-      mReadState = State.READING;
-      if (!CronetBidirectionalStreamJni.get().readData(mNativeStream,
-                                                       CronetBidirectionalStream.this, buffer,
-                                                       buffer.position(), buffer.limit())) {
-        // Still waiting on read. This is just to have consistent
-        // behavior with the other error cases.
-        mReadState = State.WAITING_FOR_READ;
-        throw new IllegalArgumentException("Unable to call native read");
-      }
+    Preconditions.checkHasRemaining(buffer);
+    Preconditions.checkDirect(buffer);
+    mLatestBufferRead.compareAndSet(null, new ReadBuffer(buffer));
+    attemptToRead(Event.USER_READ); // Read might not occur right now. If so, it is postponed.
+  }
+
+  private void attemptToRead(@Event int readEvent) {
+    switch (mState.nextAction(readEvent)) {
+    case NextAction.READ: // EM receiving Stream is opened: it accepts "readData" invocations.
+      mStream.readData(mLatestBufferRead.get().mByteBuffer.remaining());
+      break;
+    case NextAction.INVOKE_ON_READ_COMPLETED: // EM receiving Stream is closed.
+      // The final read buffer has already been received, or there was no response body.
+      ReadBuffer readBuffer = mLatestBufferRead.getAndSet(null);
+      onReadCompleted(readBuffer, 0); // Fake the reception of an empty ByteBuffer.
+      break;
+    case NextAction.POSTPONE_READ: // Response Headers have not yet been received.
+    case NextAction.CARRY_ON:      // There was no postponed "read".
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
     }
   }
 
   @Override
   public void write(ByteBuffer buffer, boolean endOfStream) {
-    synchronized (mNativeStreamLock) {
-      Preconditions.checkDirect(buffer);
-      if (!buffer.hasRemaining() && !endOfStream) {
-        throw new IllegalArgumentException("Empty buffer before end of stream.");
-      }
-      if (mEndOfStreamWritten) {
-        throw new IllegalArgumentException("Write after writing end of stream.");
-      }
-      if (isDoneLocked()) {
-        return;
-      }
-      mPendingData.add(buffer);
-      if (endOfStream) {
-        mEndOfStreamWritten = true;
-      }
+    Preconditions.checkDirect(buffer);
+    if (!buffer.hasRemaining() && !endOfStream) {
+      throw new IllegalArgumentException("Empty buffer before end of stream.");
+    }
+    switch (mState.nextAction(endOfStream ? Event.USER_LAST_WRITE : Event.USER_WRITE)) {
+    case NextAction.WRITE:
+      mPendingData.add(new WriteBuffer(buffer, endOfStream));
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
     }
   }
 
   @Override
   public void flush() {
-    synchronized (mNativeStreamLock) {
-      if (isDoneLocked() ||
-          (mWriteState != State.WAITING_FOR_FLUSH && mWriteState != State.WRITING)) {
-        return;
-      }
-      if (mPendingData.isEmpty() && mFlushData.isEmpty()) {
-        // If there is no pending write when flush() is called, see if
-        // request headers need to be flushed.
-        if (!mRequestHeadersSent) {
-          mRequestHeadersSent = true;
-          CronetBidirectionalStreamJni.get().sendRequestHeaders(mNativeStream,
-                                                                CronetBidirectionalStream.this);
-          if (!doesMethodAllowWriteData(mInitialMethod)) {
-            mWriteState = State.WRITING_DONE;
-          }
-        }
-        return;
-      }
-
-      assert !mPendingData.isEmpty() || !mFlushData.isEmpty();
-
-      // Move buffers from mPendingData to the flushing queue.
-      if (!mPendingData.isEmpty()) {
-        mFlushData.addAll(mPendingData);
-        mPendingData.clear();
-      }
-
-      if (mWriteState == State.WRITING) {
-        // If there is a write already pending, wait until onWritevCompleted is
-        // called before pushing data to the native stack.
-        return;
-      }
-      sendFlushDataLocked();
+    switch (mState.nextAction(Event.USER_FLUSH)) {
+    case NextAction.FLUSH_HEADERS:
+      mStream.sendHeaders(mEnvoyRequestHeaders, /* endStream= */ mReadOnly);
+      break;
+    case NextAction.CARRY_ON:
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
     }
+    if (mUserflushConcurrentInvocationCount.getAndIncrement() > 0) {
+      // Another Thread is already copying pending buffers - can't be done concurrently.
+      // However, the thread which started with a zero count will loop until this count goes back
+      // to zero. For all intent and purposes, this has a similar outcome as using synchronized {}
+      return;
+    }
+    do {
+      WriteBuffer pendingBuffer;
+      // A write operation can occur while this "flush" method is being executed. This might look
+      // like a breach of contract with the Cronet implementation given that this is not possible
+      // with Cronet - equivalent code is under a synchronized block. However, for all intents and
+      // purposes, this does not affect the general contract: the race condition remains
+      // conceptually identical. With Cronet, a distinct Thread invoking a "write" can be lucky or
+      // unlucky, depending if that "write" occurred just before the "flush" or not. With Cronvoy,
+      // the same "luck" factor is present: it depends if the "write" sent by the other Thread
+      // happens before the end of this loop, or not. In short, there is not any strong ordering
+      // guarantees between the flush and write when executed by different Threads.
+      while ((pendingBuffer = mPendingData.poll()) != null) {
+        mFlushData.add(pendingBuffer);
+      }
+      sendFlushedDataIfAny();
+    } while (mUserflushConcurrentInvocationCount.decrementAndGet() > 0);
   }
 
-  // Helper method to send buffers in mFlushData. Caller needs to acquire
-  // mNativeStreamLock and make sure mWriteState is WAITING_FOR_FLUSH and
-  // mFlushData queue isn't empty.
-  @SuppressWarnings("GuardedByChecker")
-  private void sendFlushDataLocked() {
-    assert mWriteState == State.WAITING_FOR_FLUSH;
-    int size = mFlushData.size();
-    ByteBuffer[] buffers = new ByteBuffer[size];
-    int[] positions = new int[size];
-    int[] limits = new int[size];
-    for (int i = 0; i < size; i++) {
-      ByteBuffer buffer = mFlushData.poll();
-      buffers[i] = buffer;
-      positions[i] = buffer.position();
-      limits[i] = buffer.limit();
+  private void sendFlushedDataIfAny() {
+    if (mFlushConcurrentInvocationCount.getAndIncrement() > 0) {
+      // Another Thread is already flushing - can't be done concurrently. However, the thread which
+      // started with a zero count will loop until this count goes back to zero. For all intent and
+      // purposes, this has a similar outcome as using synchronized {}
+      return;
     }
-    assert mFlushData.isEmpty();
-    assert buffers.length >= 1;
-    mWriteState = State.WRITING;
-    mRequestHeadersSent = true;
-    if (!CronetBidirectionalStreamJni.get().writevData(
-            mNativeStream, CronetBidirectionalStream.this, buffers, positions, limits,
-            mEndOfStreamWritten && mPendingData.isEmpty())) {
-      // Still waiting on flush. This is just to have consistent
-      // behavior with the other error cases.
-      mWriteState = State.WAITING_FOR_FLUSH;
-      throw new IllegalArgumentException("Unable to call native writev.");
-    }
+    do {
+      if (!mFlushData.isEmpty()) {
+        WriteBuffer writeBuffer = mFlushData.getFirst();
+        switch (mState.nextAction(writeBuffer.mEndStream ? Event.READY_TO_FLUSH_LAST
+                                                         : Event.READY_TO_FLUSH)) {
+        case NextAction.SEND_DATA:
+          mLastWriteBufferSent = mFlushData.pollFirst();
+          mStream.sendData(writeBuffer.mByteBuffer, writeBuffer.mEndStream);
+          if (writeBuffer.mEndStream) {
+            // There is no EM final callback - last write is therefore acknowledged immediately.
+            onWriteCompleted(writeBuffer);
+          }
+          break;
+        case NextAction.CARRY_ON:
+          break; // Was not waiting for a "flush" at the moment.
+        case NextAction.TAKE_NO_MORE_ACTIONS:
+          return;
+        default:
+          assert false;
+        }
+      }
+    } while (mFlushConcurrentInvocationCount.decrementAndGet() > 0);
   }
 
   /**
@@ -398,66 +409,66 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
    */
   @VisibleForTesting
   public List<ByteBuffer> getPendingDataForTesting() {
-    synchronized (mNativeStreamLock) {
-      List<ByteBuffer> pendingData = new LinkedList<ByteBuffer>();
-      for (ByteBuffer buffer : mPendingData) {
-        pendingData.add(buffer.asReadOnlyBuffer());
-      }
-      return pendingData;
+    List<ByteBuffer> pendingData = new LinkedList<>();
+    for (WriteBuffer writeBuffer : mPendingData) {
+      pendingData.add(writeBuffer.mByteBuffer.asReadOnlyBuffer());
     }
+    return pendingData;
   }
 
   /**
    * Returns a read-only copy of {@code mFlushData} for testing.
+   *
+   * <p>Warning: this does not behave like Cronet. Cronet flushes all buffers in one shot. EM does
+   * it one by one.
    */
   @VisibleForTesting
   public List<ByteBuffer> getFlushDataForTesting() {
-    synchronized (mNativeStreamLock) {
-      List<ByteBuffer> flushData = new LinkedList<ByteBuffer>();
-      for (ByteBuffer buffer : mFlushData) {
-        flushData.add(buffer.asReadOnlyBuffer());
-      }
-      return flushData;
+    List<ByteBuffer> flushData = new LinkedList<>();
+    for (WriteBuffer writeBuffer : mFlushData) {
+      flushData.add(writeBuffer.mByteBuffer.asReadOnlyBuffer());
     }
+    return flushData;
   }
 
   @Override
   public void cancel() {
-    synchronized (mNativeStreamLock) {
-      if (isDoneLocked() || mReadState == State.NOT_STARTED) {
-        return;
-      }
-      mReadState = mWriteState = State.CANCELED;
-      destroyNativeStreamLocked(true);
+    switch (mState.nextAction(Event.USER_CANCEL)) {
+    case NextAction.CANCEL:
+      mStream.cancel();
+      break;
+    case NextAction.NOTIFY_USER_CANCELED:
+      onCanceledReceived();
+      break;
+    case NextAction.CARRY_ON:
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      // Has already been cancelled, an error condition already registered, or just too late.
+      break;
+    default:
+      assert false;
     }
   }
 
   @Override
   public boolean isDone() {
-    synchronized (mNativeStreamLock) { return isDoneLocked(); }
+    return mState.isDone();
   }
 
-  @GuardedBy("mNativeStreamLock")
-  private boolean isDoneLocked() {
-    return mReadState != State.NOT_STARTED && mNativeStream == 0;
+  private void onSucceeded() {
+    postTaskToExecutor(new Runnable() {
+      @Override
+      public void run() {
+        onSucceededOnExecutor();
+      }
+    });
   }
 
-  /*
-   * Runs an onSucceeded callback if both Read and Write sides are closed.
+  /**
+   * Runs User's {@link Callback#onSucceeded} if both Read and Write sides are closed, and the EM
+   * callback {@link #onComplete} was called too.
    */
-  private void maybeOnSucceededOnExecutor() {
-    synchronized (mNativeStreamLock) {
-      if (isDoneLocked()) {
-        return;
-      }
-      if (!(mWriteState == State.WRITING_DONE && mReadState == State.READING_DONE)) {
-        return;
-      }
-      mReadState = mWriteState = State.SUCCESS;
-      // Destroy native stream first, so UrlRequestContext could be shut
-      // down from the listener.
-      destroyNativeStreamLocked(false);
-    }
+  private void onSucceededOnExecutor() {
+    cleanup();
     try {
       mCallback.onSucceeded(CronetBidirectionalStream.this, mResponseInfo);
     } catch (Exception e) {
@@ -465,27 +476,30 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     }
   }
 
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onStreamReady(final boolean requestHeadersSent) {
+  private void onStreamReady() {
     postTaskToExecutor(new Runnable() {
       @Override
       public void run() {
-        synchronized (mNativeStreamLock) {
-          if (isDoneLocked()) {
+        try {
+          if (mState.isTerminating()) {
             return;
           }
-          mRequestHeadersSent = requestHeadersSent;
-          mReadState = State.WAITING_FOR_READ;
-          if (!doesMethodAllowWriteData(mInitialMethod) && mRequestHeadersSent) {
-            mWriteState = State.WRITING_DONE;
-          } else {
-            mWriteState = State.WAITING_FOR_FLUSH;
-          }
-        }
-
-        try {
           mCallback.onStreamReady(CronetBidirectionalStream.this);
+          // Under duress, or due to user long logic, the response headers might have been received
+          // already. In that case mCallback.onResponseHeadersReceived was purposely not called, and
+          // therefore this is done here. This guarantees correct ordering: mCallback.onStreamReady
+          // must finish before invoking mCallback.onResponseHeadersReceived.
+          switch (mState.nextAction(Event.STREAM_READY_CALLBACK_DONE)) {
+          case NextAction.NOTIFY_USER_HEADERS_RECEIVED:
+            mCallback.onResponseHeadersReceived(CronetBidirectionalStream.this, mResponseInfo);
+            break;
+          case NextAction.CARRY_ON:
+            break; // Response headers have not been received yet - most common outcome.
+          case NextAction.TAKE_NO_MORE_ACTIONS:
+            return;
+          default:
+            assert false;
+          }
         } catch (Exception e) {
           onCallbackException(e);
         }
@@ -494,31 +508,20 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
   }
 
   /**
-   * Called when the final set of headers, after all redirects,
-   * is received. Can only be called once for each stream.
+   * Called when the response headers are received.
+   *
+   * <p>Note: If the User's {@link Callback#onStreamReady} method has not yet finished, then this
+   * method won't be invoked - User's {@link Callback#onResponseHeadersReceived} method will instead
+   * be invoked just after {@link Callback#onStreamReady} completion. See method above.
    */
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onResponseHeadersReceived(int httpStatusCode, String negotiatedProtocol,
-                                         String[] headers, long receivedByteCount) {
-    try {
-      mResponseInfo = prepareResponseInfoOnNetworkThread(httpStatusCode, negotiatedProtocol,
-                                                         headers, receivedByteCount);
-    } catch (Exception e) {
-      failWithException(new CronetExceptionImpl("Cannot prepare ResponseInfo", null));
-      return;
-    }
+  private void onResponseHeadersReceived() {
     postTaskToExecutor(new Runnable() {
       @Override
       public void run() {
-        synchronized (mNativeStreamLock) {
-          if (isDoneLocked()) {
+        try {
+          if (mState.isTerminating()) {
             return;
           }
-          mReadState = State.WAITING_FOR_READ;
-        }
-
-        try {
           mCallback.onResponseHeadersReceived(CronetBidirectionalStream.this, mResponseInfo);
         } catch (Exception e) {
           onCallbackException(e);
@@ -527,72 +530,43 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     });
   }
 
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onReadCompleted(final ByteBuffer byteBuffer, int bytesRead, int initialPosition,
-                               int initialLimit, long receivedByteCount) {
-    mResponseInfo.setReceivedByteCount(receivedByteCount);
+  private void onReadCompleted(ReadBuffer readBuffer, int bytesRead) {
+    ByteBuffer byteBuffer = readBuffer.mByteBuffer;
+    int initialPosition = readBuffer.mInitialPosition;
+    int initialLimit = readBuffer.mInitialLimit;
     if (byteBuffer.position() != initialPosition || byteBuffer.limit() != initialLimit) {
-      failWithException(
-          new CronetExceptionImpl("ByteBuffer modified externally during read", null));
+      reportException(new CronetExceptionImpl("ByteBuffer modified externally during read", null));
       return;
     }
     if (bytesRead < 0 || initialPosition + bytesRead > initialLimit) {
-      failWithException(new CronetExceptionImpl("Invalid number of bytes read", null));
+      reportException(new CronetExceptionImpl("Invalid number of bytes read", null));
       return;
     }
     byteBuffer.position(initialPosition + bytesRead);
-    assert mOnReadCompletedTask.mByteBuffer == null;
-    mOnReadCompletedTask.mByteBuffer = byteBuffer;
-    mOnReadCompletedTask.mEndOfStream = (bytesRead == 0);
-    postTaskToExecutor(mOnReadCompletedTask);
+    postTaskToExecutor(new OnReadCompletedRunnable(byteBuffer, bytesRead == 0));
   }
 
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onWritevCompleted(final ByteBuffer[] byteBuffers, int[] initialPositions,
-                                 int[] initialLimits, boolean endOfStream) {
-    assert byteBuffers.length == initialPositions.length;
-    assert byteBuffers.length == initialLimits.length;
-    synchronized (mNativeStreamLock) {
-      if (isDoneLocked())
-        return;
-      mWriteState = State.WAITING_FOR_FLUSH;
-      // Flush if there is anything in the flush queue mFlushData.
-      if (!mFlushData.isEmpty()) {
-        sendFlushDataLocked();
-      }
+  private void onWriteCompleted(WriteBuffer writeBuffer) {
+    ByteBuffer buffer = writeBuffer.mByteBuffer;
+    if (buffer.position() != writeBuffer.mInitialPosition ||
+        buffer.limit() != writeBuffer.mInitialLimit) {
+      reportException(new CronetExceptionImpl("ByteBuffer modified externally during write", null));
+      return;
     }
-    for (int i = 0; i < byteBuffers.length; i++) {
-      ByteBuffer buffer = byteBuffers[i];
-      if (buffer.position() != initialPositions[i] || buffer.limit() != initialLimits[i]) {
-        failWithException(
-            new CronetExceptionImpl("ByteBuffer modified externally during write", null));
-        return;
-      }
-      // Current implementation always writes the complete buffer.
-      buffer.position(buffer.limit());
-      postTaskToExecutor(new OnWriteCompletedRunnable(
-          buffer,
-          // Only set endOfStream flag if this buffer is the last in byteBuffers.
-          endOfStream && i == byteBuffers.length - 1));
-    }
+    // Current implementation always writes the complete buffer.
+    buffer.position(buffer.limit());
+    postTaskToExecutor(new OnWriteCompletedRunnable(buffer, writeBuffer.mEndStream));
   }
 
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onResponseTrailersReceived(String[] trailers) {
-    final UrlResponseInfo.HeaderBlock trailersBlock =
-        new UrlResponseInfoImpl.HeaderBlockImpl(headersListFromStrings(trailers));
+  private void onResponseTrailersReceived(List<Map.Entry<String, String>> trailers) {
+    final UrlResponseInfo.HeaderBlock trailersBlock = new HeaderBlockImpl(trailers);
     postTaskToExecutor(new Runnable() {
       @Override
       public void run() {
-        synchronized (mNativeStreamLock) {
-          if (isDoneLocked()) {
+        try {
+          if (mState.isTerminating()) {
             return;
           }
-        }
-        try {
           mCallback.onResponseTrailersReceived(CronetBidirectionalStream.this, mResponseInfo,
                                                trailersBlock);
         } catch (Exception e) {
@@ -602,29 +576,29 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     });
   }
 
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onError(int errorCode, int nativeError, int nativeQuicError, String errorString,
-                       long receivedByteCount) {
+  private void onErrorReceived(int errorCode, int nativeError, int nativeQuicError,
+                               String errorString, long receivedByteCount) {
     if (mResponseInfo != null) {
       mResponseInfo.setReceivedByteCount(receivedByteCount);
     }
+    CronetException exception;
     if (errorCode == NetworkException.ERROR_QUIC_PROTOCOL_FAILED ||
         errorCode == NetworkException.ERROR_NETWORK_CHANGED) {
-      failWithException(new QuicExceptionImpl("Exception in BidirectionalStream: " + errorString,
-                                              errorCode, nativeError, nativeQuicError));
+      exception = new QuicExceptionImpl("Exception in BidirectionalStream: " + errorString,
+                                        errorCode, nativeError, nativeQuicError);
     } else {
-      failWithException(new BidirectionalStreamNetworkException(
-          "Exception in BidirectionalStream: " + errorString, errorCode, nativeError));
+      exception = new BidirectionalStreamNetworkException(
+          "Exception in BidirectionalStream: " + errorString, errorCode, nativeError);
     }
+    mException.set(exception);
+    failWithException();
   }
 
   /**
    * Called when request is canceled, no callbacks will be called afterwards.
    */
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
-  private void onCanceled() {
+  private void onCanceledReceived() {
+    cleanup();
     postTaskToExecutor(new Runnable() {
       @Override
       public void run() {
@@ -638,39 +612,23 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
   }
 
   /**
-   * Called by the native code to report metrics just before the native adapter is destroyed.
+   * Report metrics to listeners.
    */
-  @SuppressWarnings("unused")
-  // TODO(carloseltuerto) Hook up Envoy-Mobile to call back this method.
   private void onMetricsCollected(long requestStartMs, long dnsStartMs, long dnsEndMs,
                                   long connectStartMs, long connectEndMs, long sslStartMs,
                                   long sslEndMs, long sendingStartMs, long sendingEndMs,
                                   long pushStartMs, long pushEndMs, long responseStartMs,
                                   long requestEndMs, boolean socketReused, long sentByteCount,
                                   long receivedByteCount) {
-    synchronized (mNativeStreamLock) {
-      if (mMetrics != null) {
-        throw new IllegalStateException("Metrics collection should only happen once.");
-      }
-      mMetrics = new CronetMetrics(requestStartMs, dnsStartMs, dnsEndMs, connectStartMs,
-                                   connectEndMs, sslStartMs, sslEndMs, sendingStartMs, sendingEndMs,
-                                   pushStartMs, pushEndMs, responseStartMs, requestEndMs,
-                                   socketReused, sentByteCount, receivedByteCount);
-      assert mReadState == mWriteState;
-      assert (mReadState == State.SUCCESS) || (mReadState == State.ERROR) ||
-          (mReadState == State.CANCELED);
-      int finishedReason;
-      if (mReadState == State.SUCCESS) {
-        finishedReason = RequestFinishedInfo.SUCCEEDED;
-      } else if (mReadState == State.CANCELED) {
-        finishedReason = RequestFinishedInfo.CANCELED;
-      } else {
-        finishedReason = RequestFinishedInfo.FAILED;
-      }
-      final RequestFinishedInfo requestFinishedInfo = new RequestFinishedInfoImpl(
-          mInitialUrl, mRequestAnnotations, mMetrics, finishedReason, mResponseInfo, mException);
-      mRequestContext.reportRequestFinished(requestFinishedInfo);
-    }
+    // Metrics information. Obtained when request succeeds, fails or is canceled.
+    RequestFinishedInfo.Metrics mMetrics = new CronetMetrics(
+        requestStartMs, dnsStartMs, dnsEndMs, connectStartMs, connectEndMs, sslStartMs, sslEndMs,
+        sendingStartMs, sendingEndMs, pushStartMs, pushEndMs, responseStartMs, requestEndMs,
+        socketReused, sentByteCount, receivedByteCount);
+    final RequestFinishedInfo requestFinishedInfo =
+        new RequestFinishedInfoImpl(mInitialUrl, mRequestAnnotations, mMetrics,
+                                    mState.getFinishedReason(), mResponseInfo, mException.get());
+    mRequestContext.reportRequestFinished(requestFinishedInfo);
   }
 
   @VisibleForTesting
@@ -680,24 +638,6 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
 
   private static boolean doesMethodAllowWriteData(String methodName) {
     return !methodName.equals("GET") && !methodName.equals("HEAD");
-  }
-
-  private static ArrayList<Map.Entry<String, String>> headersListFromStrings(String[] headers) {
-    ArrayList<Map.Entry<String, String>> headersList = new ArrayList<>(headers.length / 2);
-    for (int i = 0; i < headers.length; i += 2) {
-      headersList.add(new AbstractMap.SimpleImmutableEntry<>(headers[i], headers[i + 1]));
-    }
-    return headersList;
-  }
-
-  private static String[] stringsFromHeaderList(List<Map.Entry<String, String>> headersList) {
-    String headersArray[] = new String[headersList.size() * 2];
-    int i = 0;
-    for (Map.Entry<String, String> requestHeader : headersList) {
-      headersArray[i++] = requestHeader.getKey();
-      headersArray[i++] = requestHeader.getValue();
-    }
-    return headersArray;
   }
 
   private static int convertStreamPriority(@CronetEngineBase.StreamPriority int priority) {
@@ -726,107 +666,381 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
       mExecutor.execute(task);
     } catch (RejectedExecutionException failException) {
       Log.e(CronetUrlRequestContext.LOG_TAG, "Exception posting task to executor", failException);
-      // If posting a task throws an exception, then there is no choice
-      // but to destroy the stream without invoking the callback.
-      synchronized (mNativeStreamLock) {
-        mReadState = mWriteState = State.ERROR;
-        destroyNativeStreamLocked(false);
-      }
+      // If already in a failed state this invocation is a no-op.
+      reportException(new CronetExceptionImpl("Exception posting task to executor", failException));
     }
   }
 
-  private UrlResponseInfoImpl prepareResponseInfoOnNetworkThread(int httpStatusCode,
-                                                                 String negotiatedProtocol,
-                                                                 String[] headers,
-                                                                 long receivedByteCount) {
-    UrlResponseInfoImpl responseInfo = new UrlResponseInfoImpl(
-        Arrays.asList(mInitialUrl), httpStatusCode, "", headersListFromStrings(headers), false,
-        negotiatedProtocol, null, receivedByteCount);
+  private UrlResponseInfoImpl
+  prepareResponseInfoOnNetworkThread(int httpStatusCode, String negotiatedProtocol,
+                                     Map<String, List<String>> responseHeaders,
+                                     long receivedByteCount) {
+    List<Map.Entry<String, String>> headers = new ArrayList<>();
+    for (Map.Entry<String, List<String>> headerEntry : responseHeaders.entrySet()) {
+      String headerKey = headerEntry.getKey();
+      if (headerEntry.getValue().get(0) == null) {
+        continue;
+      }
+      if (!headerKey.startsWith(X_ENVOY) && !headerKey.equals("date")) {
+        for (String value : headerEntry.getValue()) {
+          headers.add(new AbstractMap.SimpleEntry<>(headerKey, value));
+        }
+      }
+    }
+    // proxy and caching are not supported.
+    UrlResponseInfoImpl responseInfo =
+        new UrlResponseInfoImpl(Arrays.asList(mInitialUrl), httpStatusCode, "", headers, false,
+                                negotiatedProtocol, null, receivedByteCount);
     return responseInfo;
   }
 
-  @GuardedBy("mNativeStreamLock")
-  private void destroyNativeStreamLocked(boolean sendOnCanceled) {
-    Log.i(CronetUrlRequestContext.LOG_TAG, "destroyNativeStreamLocked " + this.toString());
-    if (mNativeStream == 0) {
-      return;
+  private void cleanup() {
+    if (mEnvoyFinalStreamIntel != null) {
+      recordFinalIntel(mEnvoyFinalStreamIntel);
     }
-    CronetBidirectionalStreamJni.get().destroy(mNativeStream, CronetBidirectionalStream.this,
-                                               sendOnCanceled);
     mRequestContext.onRequestDestroyed();
-    mNativeStream = 0;
     if (mOnDestroyedCallbackForTesting != null) {
       mOnDestroyedCallbackForTesting.run();
     }
   }
 
   /**
-   * Fails the stream with an exception. Only called on the Executor.
+   * Fails the stream with an exception.
    */
-  private void failWithExceptionOnExecutor(CronetException e) {
-    mException = e;
-    // Do not call into mCallback if request is complete.
-    synchronized (mNativeStreamLock) {
-      if (isDoneLocked()) {
-        return;
+  private void failWithException() {
+    assert mException.get() != null;
+    cleanup();
+    mExecutor.execute(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          mCallback.onFailed(CronetBidirectionalStream.this, mResponseInfo, mException.get());
+        } catch (Exception failException) {
+          Log.e(CronetUrlRequestContext.LOG_TAG, "Exception notifying of failed request",
+                failException);
+        }
       }
-      mReadState = mWriteState = State.ERROR;
-      destroyNativeStreamLocked(false);
-    }
-    try {
-      mCallback.onFailed(this, mResponseInfo, e);
-    } catch (Exception failException) {
-      Log.e(CronetUrlRequestContext.LOG_TAG, "Exception notifying of failed request",
-            failException);
-    }
+    });
   }
 
   /**
-   * If callback method throws an exception, stream gets canceled
-   * and exception is reported via onFailed callback.
-   * Only called on the Executor.
+   * If callback method throws an exception, stream gets canceled and exception is reported via
+   * User's {@link Callback#onFailed}.
    */
   private void onCallbackException(Exception e) {
     CallbackException streamError =
         new CallbackExceptionImpl("CalledByNative method has thrown an exception", e);
     Log.e(CronetUrlRequestContext.LOG_TAG, "Exception in CalledByNative method", e);
-    failWithExceptionOnExecutor(streamError);
+    reportException(streamError);
   }
 
   /**
-   * Fails the stream with an exception. Can be called on any thread.
+   * Reports an exception. Can be called on any thread. Only the first call is recorded. The
+   * User's {@link Callback#onFailed} will be scheduled not before any of the final EM callback has
+   * been invoked ({@link #onCancel}, {@link #onComplete}, or {@link #onError}).
    */
-  private void failWithException(final CronetException exception) {
-    postTaskToExecutor(new Runnable() {
-      @Override
-      public void run() {
-        failWithExceptionOnExecutor(exception);
-      }
-    });
+  private void reportException(CronetException exception) {
+    mException.compareAndSet(null, exception);
+    switch (mState.nextAction(Event.ERROR)) {
+    case NextAction.CANCEL:
+      mStream.cancel();
+      break;
+    case NextAction.NOTIFY_USER_FAILED:
+      failWithException();
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      Log.e(CronetUrlRequestContext.LOG_TAG,
+            "An exception has already been previously recorded. This one is ignored.", exception);
+      return;
+    default:
+      assert false;
+    }
   }
 
-  interface CronetBidirectionalStreamJni {
-    long createBidirectionalStream(CronetBidirectionalStream caller, EnvoyEngine envoyEngine,
-                                   boolean sendRequestHeadersAutomatically,
-                                   boolean enableMetricsCollection, boolean trafficStatsTagSet,
-                                   int trafficStatsTag, boolean trafficStatsUidSet,
-                                   int trafficStatsUid);
+  private void recordFinalIntel(EnvoyFinalStreamIntel intel) {
+    if (mRequestContext.hasRequestFinishedListener()) {
+      onMetricsCollected(intel.getStreamStartMs(), intel.getDnsStartMs(), intel.getDnsEndMs(),
+                         intel.getConnectStartMs(), intel.getConnectEndMs(), intel.getSslStartMs(),
+                         intel.getSslEndMs(), intel.getSendingStartMs(), intel.getSendingEndMs(),
+                         /* pushStartMs= */ -1, /* pushEndMs= */ -1, intel.getResponseStartMs(),
+                         intel.getStreamEndMs(), intel.getSocketReused(), intel.getSentByteCount(),
+                         intel.getReceivedByteCount());
+    }
+  }
 
-    int start(long nativePtr, CronetBidirectionalStream caller, String url, int priority,
-              String method, String[] headers, boolean endOfStream);
+  private static void validateHttpMethod(String method) {
+    if (method == null) {
+      throw new NullPointerException("Method is required.");
+    }
+    if ("OPTIONS".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method) ||
+        "HEAD".equalsIgnoreCase(method) || "POST".equalsIgnoreCase(method) ||
+        "PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method) ||
+        "TRACE".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method)) {
+      return;
+    }
+    throw new IllegalArgumentException("Invalid http method " + method);
+  }
 
-    void sendRequestHeaders(long nativePtr, CronetBidirectionalStream caller);
+  private static void validateHeader(String header, String value) {
+    if (header == null) {
+      throw new NullPointerException("Invalid header name.");
+    }
+    if (value == null) {
+      throw new NullPointerException("Invalid header value.");
+    }
+    if (!isValidHeaderName(header) || value.contains("\r\n")) {
+      throw new IllegalArgumentException("Invalid header " + header + "=" + value);
+    }
+  }
 
-    boolean readData(long nativePtr, CronetBidirectionalStream caller, ByteBuffer byteBuffer,
-                     int position, int limit);
+  private static boolean isValidHeaderName(String header) {
+    for (int i = 0; i < header.length(); i++) {
+      char c = header.charAt(i);
+      switch (c) {
+      case '(':
+      case ')':
+      case '<':
+      case '>':
+      case '@':
+      case ',':
+      case ';':
+      case ':':
+      case '\\':
+      case '\'':
+      case '/':
+      case '[':
+      case ']':
+      case '?':
+      case '=':
+      case '{':
+      case '}':
+        return false;
+      default: {
+        if (Character.isISOControl(c) || Character.isWhitespace(c)) {
+          return false;
+        }
+      }
+      }
+    }
+    return true;
+  }
 
-    boolean writevData(long nativePtr, CronetBidirectionalStream caller, ByteBuffer[] buffers,
-                       int[] positions, int[] limits, boolean endOfStream);
+  private static Map<String, List<String>>
+  buildEnvoyRequestHeaders(String initialMethod, List<Map.Entry<String, String>> headerList,
+                           String userAgent, String currentUrl) {
+    Map<String, List<String>> headers = new LinkedHashMap<>();
+    final URL url;
+    try {
+      url = new URL(currentUrl);
+    } catch (MalformedURLException e) {
+      throw new IllegalArgumentException("Invalid URL", e);
+    }
+    // TODO: with an empty string it does not always work. Why?
+    String path = url.getFile().isEmpty() ? "/" : url.getFile();
+    headers.computeIfAbsent(":authority", unused -> new ArrayList<>()).add(url.getAuthority());
+    headers.computeIfAbsent(":method", unused -> new ArrayList<>()).add(initialMethod);
+    headers.computeIfAbsent(":path", unused -> new ArrayList<>()).add(path);
+    headers.computeIfAbsent(":scheme", unused -> new ArrayList<>()).add(url.getProtocol());
+    boolean hasUserAgent = false;
+    for (Map.Entry<String, String> header : headerList) {
+      if (header.getKey().isEmpty()) {
+        throw new IllegalArgumentException("Invalid header =");
+      }
+      hasUserAgent = hasUserAgent ||
+                     (header.getKey().equalsIgnoreCase(USER_AGENT) && !header.getValue().isEmpty());
+      headers.computeIfAbsent(header.getKey(), unused -> new ArrayList<>()).add(header.getValue());
+    }
+    if (!hasUserAgent) {
+      headers.computeIfAbsent(USER_AGENT, unused -> new ArrayList<>()).add(userAgent);
+    }
+    // TODO: support H3
+    headers.computeIfAbsent("x-envoy-mobile-upstream-protocol", unused -> new ArrayList<>())
+        .add("http2");
+    return headers;
+  }
 
-    void destroy(long nativePtr, CronetBidirectionalStream caller, boolean sendOnCanceled);
+  @Override
+  public Executor getExecutor() {
+    return DIRECT_EXECUTOR;
+  }
 
-    static CronetBidirectionalStreamJni get() {
-      return null; // TODO(carloseltuerto) Implement!
+  @Override
+  public void onSendWindowAvailable(EnvoyStreamIntel streamIntel) {
+    switch (mState.nextAction(Event.ON_SEND_WINDOW_AVAILABLE)) {
+    case NextAction.CHAIN_NEXT_WRITE:
+      onWriteCompleted(mLastWriteBufferSent);
+      sendFlushedDataIfAny(); // Flush if there is anything in the flush queue mFlushData.
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
+    }
+  }
+
+  @Override
+  public void onHeaders(Map<String, List<String>> headers, boolean endStream,
+                        EnvoyStreamIntel streamIntel) {
+    List<String> statuses = headers.get(":status");
+    int httpStatusCode =
+        statuses != null && !statuses.isEmpty() ? Integer.parseInt(statuses.get(0)) : -1;
+    List<String> transportValues = headers.get(X_ENVOY_SELECTED_TRANSPORT);
+    String negotiatedProtocol =
+        transportValues != null && !transportValues.isEmpty() ? transportValues.get(0) : "unknown";
+    try {
+      mResponseInfo = prepareResponseInfoOnNetworkThread(
+          httpStatusCode, negotiatedProtocol, headers, streamIntel.getConsumedBytesFromResponse());
+    } catch (Exception e) {
+      reportException(new CronetExceptionImpl("Cannot prepare ResponseInfo", null));
+      return;
+    }
+
+    switch (mState.nextAction(endStream ? Event.ON_HEADERS_END_STREAM : Event.ON_HEADERS)) {
+    case NextAction.NOTIFY_USER_HEADERS_RECEIVED:
+      onResponseHeadersReceived();
+      break;
+    case NextAction.CARRY_ON:
+      break; // User has not finished executing the "streamReady" callback - must wait.
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
+    }
+
+    attemptToRead(Event.READY_TO_START_POSTPONED_READ_IF_ANY);
+  }
+
+  @Override
+  public void onData(ByteBuffer data, boolean endStream, EnvoyStreamIntel streamIntel) {
+    mResponseInfo.setReceivedByteCount(streamIntel.getConsumedBytesFromResponse());
+    switch (mState.nextAction(endStream ? Event.ON_DATA_END_STREAM : Event.ON_DATA)) {
+    case NextAction.INVOKE_ON_READ_COMPLETED:
+      ReadBuffer readBuffer = mLatestBufferRead.getAndSet(null);
+      ByteBuffer userBuffer = readBuffer.mByteBuffer;
+      // TODO: copy buffer on network Thread - consider doing on the user Thread.
+      userBuffer.mark();
+      userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
+      userBuffer.reset();
+      onReadCompleted(readBuffer, data.capacity());
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
+    }
+  }
+
+  @Override
+  public void onTrailers(Map<String, List<String>> trailers, EnvoyStreamIntel streamIntel) {
+    List<Map.Entry<String, String>> headers = new ArrayList<>();
+    switch (mState.nextAction(Event.ON_TRAILERS)) {
+    case NextAction.NOTIFY_USER_TRAILERS_RECEIVED:
+      for (Map.Entry<String, List<String>> headerEntry : trailers.entrySet()) {
+        String headerKey = headerEntry.getKey();
+        if (headerEntry.getValue().get(0) == null) {
+          continue;
+        }
+        // TODO: make sure which headers should be posted.
+        if (!headerKey.startsWith(X_ENVOY) && !headerKey.equals("date") &&
+            !headerKey.startsWith(":")) {
+          for (String value : headerEntry.getValue()) {
+            headers.add(new AbstractMap.SimpleEntry<>(headerKey, value));
+          }
+        }
+      }
+      onResponseTrailersReceived(headers);
+      break;
+    case NextAction.TAKE_NO_MORE_ACTIONS:
+      return;
+    default:
+      assert false;
+    }
+  }
+
+  @Override
+  public void onError(int errorCode, String message, int attemptCount, EnvoyStreamIntel streamIntel,
+                      EnvoyFinalStreamIntel finalStreamIntel) {
+    mEnvoyFinalStreamIntel = finalStreamIntel;
+    switch (mState.nextAction(Event.ON_ERROR)) {
+    case NextAction.NOTIFY_USER_NETWORK_ERROR:
+      // TODO: fix error scheme.
+      onErrorReceived(errorCode, /* nativeError= */ -1,
+                      /* nativeQuicError */ 0, message, finalStreamIntel.getReceivedByteCount());
+      break;
+    case NextAction.NOTIFY_USER_FAILED:
+      // There was already an error in-progress - the network error came too late and is ignored.
+      failWithException();
+      break;
+    default:
+      assert false;
+    }
+  }
+
+  @Override
+  public void onCancel(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel) {
+    mEnvoyFinalStreamIntel = finalStreamIntel;
+    switch (mState.nextAction(Event.ON_CANCEL)) {
+    case NextAction.NOTIFY_USER_CANCELED:
+      onCanceledReceived(); // The cancel was user initiated.
+      break;
+    case NextAction.NOTIFY_USER_FAILED:
+      failWithException(); // The cancel was not user initiated, but a mean to report the error.
+      break;
+    default:
+      assert false;
+    }
+  }
+
+  @Override
+  public void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel) {
+    mEnvoyFinalStreamIntel = finalStreamIntel;
+    switch (mState.nextAction(Event.ON_COMPLETE)) {
+    case NextAction.NOTIFY_USER_FAILED:
+      failWithException();
+      break;
+    case NextAction.NOTIFY_USER_CANCELED:
+      onCanceledReceived();
+      break;
+    case NextAction.NOTIFY_USER_SUCCEEDED:
+      onSucceeded();
+      break;
+    case NextAction.CARRY_ON:
+      break;
+    default:
+      assert false;
+    }
+  }
+
+  private static class WriteBuffer {
+    final ByteBuffer mByteBuffer;
+    final boolean mEndStream;
+    final int mInitialPosition;
+    final int mInitialLimit;
+
+    WriteBuffer(ByteBuffer mByteBuffer, boolean mEndStream) {
+      this.mByteBuffer = mByteBuffer;
+      this.mEndStream = mEndStream;
+      this.mInitialPosition = mByteBuffer.position();
+      this.mInitialLimit = mByteBuffer.limit();
+    }
+  }
+
+  private static class ReadBuffer {
+    final ByteBuffer mByteBuffer;
+    final int mInitialPosition;
+    final int mInitialLimit;
+
+    ReadBuffer(ByteBuffer mByteBuffer) {
+      this.mByteBuffer = mByteBuffer;
+      this.mInitialPosition = mByteBuffer.position();
+      this.mInitialLimit = mByteBuffer.limit();
+    }
+  }
+
+  private static class DirectExecutor implements Executor {
+    @Override
+    public void execute(Runnable runnable) {
+      runnable.run();
     }
   }
 }
