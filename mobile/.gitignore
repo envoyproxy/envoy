@@ -5,15 +5,7 @@
 .vscode
 /bazel-*
 /build_*
-/dist/*pom.xml
-/dist/*.aar
-/dist/*.jar
-/dist/*.objdump
-/dist/*.objdump.gz
-/dist/envoy_aar_sources.zip
-/dist/Envoy.framework
-/dist/*.asc
-/dist/*.sha256
+/dist/
 /generated
 /test/coverage/BUILD
 /tmp

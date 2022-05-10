@@ -19,6 +19,7 @@ build --ios_simulator_version=15.2
 build --verbose_failures
 build --workspace_status_command=envoy/bazel/get_workspace_status
 build --xcode_version=13.2.1
+build --use_top_level_targets_for_symlinks
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true

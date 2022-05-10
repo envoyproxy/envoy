@@ -1,25 +1,33 @@
+load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
+load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
+load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
 
 alias(
-    name = "ios_framework",
+    name = "ios_dist",
     actual = "//library/swift:ios_framework",
-    visibility = ["//visibility:public"],
 )
 
-genrule(
-    name = "ios_dist",
-    srcs = [":ios_framework"],
-    outs = ["ios_out"],
-    cmd = """
-unzip -o $< -d dist/
-touch $@
-""",
-    stamp = True,
-    # This action writes to a non-hermetic output location, so it needs to run
-    # locally.
-    tags = ["local"],
+framework_imports_extractor(
+    name = "framework_imports",
+    framework = "//library/swift:ios_framework",
+)
+
+apple_static_framework_import(
+    name = "envoy_mobile_ios",
+    framework_imports = [":framework_imports"],
+    sdk_dylibs = [
+        "resolv.9",
+        "c++",
+    ],
+    sdk_frameworks = [
+        "Network",
+        "SystemConfiguration",
+        "UIKit",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 alias(
@@ -28,53 +36,24 @@ alias(
     visibility = ["//visibility:public"],
 )
 
-genrule(
-    name = "android_dist_ci",
-    srcs = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
-    ],
-    outs = ["envoy_mobile.zip"],
-    cmd = """
-    for artifact in $(SRCS); do
-        chmod 755 $$artifact
-        cp $$artifact dist/
-    done
-    touch $@
-    """,
-    local = True,
-    stamp = True,
-    tools = ["//bazel:zipper"],
+aar_import(
+    name = "envoy_mobile_android",
+    aar = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar",
     visibility = ["//visibility:public"],
 )
 
-genrule(
+alias(
+    name = "android_dist_ci",
+    actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
+)
+
+filegroup(
     name = "android_dist",
     srcs = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_pom_xml",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_objdump_collector",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_pom_xml",
     ],
-    outs = ["output_in_dist_directory"],
-    cmd = """
-    set -- $(SRCS)
-    chmod 755 $$1
-    chmod 755 $$2
-    cp $$1 dist/envoy.aar
-    cp $$2 dist/envoy-pom.xml
-    shift 2
-
-    mkdir -p dist/symbols
-    if [[ -n "$$@" ]]; then
-        chmod 755 $$@
-        cp $$@ dist/symbols
-        tar -cvf dist/symbols.tar dist/symbols
-    fi
-    touch $@
-    """,
-    stamp = True,
-    # This action writes to a non-hermetic output location, so it needs to run
-    # locally.
-    tags = ["local"],
 )
 
 define_kt_toolchain(

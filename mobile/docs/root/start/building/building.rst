@@ -71,12 +71,12 @@ This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and 
 
 ``./bazelw build android_dist --config=android --fat_apk_cpu=<arch1,arch2>``
 
-Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`dist/envoy.aar <dist>`.
+Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar`.
 
 Alternatively, you can use the **prebuilt artifact** from Envoy Mobile's releases_
 or from :ref:`Maven <maven>`.
 
-The ``envoy_mobile_android`` Bazel rule defined in the :repo:`dist BUILD file <dist/BUILD>` provides
+The ``envoy_mobile_android`` Bazel rule defined in the :repo:`root BUILD file <BUILD>` provides
 an example of how this artifact may be used.
 
 **When building the artifact for release** (usage outside of development), be sure to include the
@@ -97,14 +97,10 @@ This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and 
 
 ``./bazelw build ios_dist --config=ios``
 
-Upon completion of the build, you'll see a ``Envoy.framework`` directory at
-:repo:`dist/Envoy.framework <dist>`.
+Upon completion of the build, you'll see a ``ios_framework.zip`` file at output in a path bazel picks.
 
 Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_ (envoy_android_aar_sources.zip)
 or from :ref:`CocoaPods <cocoapods>`.
-
-The ``envoy_mobile_ios`` Bazel rule defined in the :repo:`dist BUILD file <dist/BUILD>` provides an
-example of how this artifact may be used.
 
 **When building the artifact for release** (usage outside of development), be sure to include the
 ``--config=release-ios`` option, along with the architectures for which the artifact is being built:
@@ -176,7 +172,7 @@ To deploy Envoy Mobile's aar to your local maven repository, run the following c
     ./bazelw build android_dist --config=android --fat_apk_cpu=x86
 
     # To publish to local maven.
-    dist/sonatype_nexus_upload.py --files dist/envoy.aar dist/envoy-pom.xml --local
+    ci/sonatype_nexus_upload.py --local --files bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml
 
 
 The version deployed will be ``LOCAL-SNAPSHOT``. These artifacts can be found in your local maven directory (``~/.m2/repository/io/envoyproxy/envoymobile/envoy/LOCAL-SNAPSHOT/``)

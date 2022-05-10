@@ -1,3 +1,4 @@
+load("@build_bazel_rules_android//android:rules.bzl", "android_library", "android_local_test")
 load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_test")
 load("//bazel:kotlin_lib.bzl", "native_lib_name")
 
@@ -67,7 +68,7 @@ def envoy_mobile_kt_test(name, srcs, deps = [], repository = "", exec_properties
 # A basic macro to run android based (robolectric) tests with native dependencies
 def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repository = "", library_path = "library/common/jni", exec_properties = {}):
     lib_name = native_lib_name(native_deps[0])[3:]
-    native.android_library(
+    android_library(
         name = name + "_test_lib",
         custom_package = "io.envoyproxy.envoymobile.test",
         manifest = repository + "//bazel:test_manifest.xml",
@@ -76,8 +77,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
         exports = deps,
         testonly = True,
     )
-
-    native.android_local_test(
+    android_local_test(
         name = name,
         srcs = srcs,
         data = native_deps,
