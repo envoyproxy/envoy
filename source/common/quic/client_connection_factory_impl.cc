@@ -58,6 +58,9 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope) {
+  // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
+  // and call maybeSetInterfaceName based on that upon acquiring a local socket.
+  // Similar to what is done in ClientConnectionImpl::onConnected().
   ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   auto config = info_impl->cryptoConfig();
