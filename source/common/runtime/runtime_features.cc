@@ -91,6 +91,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
 // Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+// TODO(#21245): Finish BalsaParser implementation, then enable by default.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 
