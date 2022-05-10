@@ -1,4 +1,5 @@
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
+load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_xcframework")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("//bazel:swift_header_collector.bzl", "swift_header_collector")
@@ -66,6 +67,29 @@ ios_static_framework(
     hdrs = ["ios_lib_headers"],
     bundle_name = "Envoy",
     minimum_os_version = MINIMUM_IOS_VERSION,
+    # Currently the framework is over 2GB, and is not worth caching
+    tags = [
+        "no-cache",
+        "no-remote",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["ios_lib"],
+)
+
+apple_static_xcframework(
+    name = "Envoy",
+    ios = {
+        "simulator": [
+            "arm64",
+            "x86_64",
+        ],
+        "device": [
+            "arm64",
+        ],
+    },
+    minimum_os_versions = {
+        "ios": MINIMUM_IOS_VERSION,
+    },
     # Currently the framework is over 2GB, and is not worth caching
     tags = [
         "no-cache",

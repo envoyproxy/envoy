@@ -2,8 +2,11 @@ name: release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - v*
+  pull_request:
 
 jobs:
   android_release_artifacts:
@@ -42,6 +45,7 @@ jobs:
 
   android_release_deploy:
     name: android_release_deploy
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: android_release_artifacts
     runs-on: ubuntu-18.04
     timeout-minutes: 240
@@ -100,8 +104,8 @@ jobs:
                 xml.asc \
                 javadoc.asc
 
-  ios_release_artifacts_framework:
-    name: ios_release_artifacts_framework
+  ios_release_artifacts:
+    name: ios_release_artifacts
     runs-on: macos-12
     timeout-minutes: 120
     steps:
@@ -110,78 +114,61 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
-      - name: 'Build Envoy.framework distributable'
+      - name: 'Build Envoy.xcframework'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./bazelw build \
             --config=release-ios \
-            --ios_multi_cpus=i386,x86_64,armv7,arm64 \
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            //library/swift:ios_framework
+            //:ios_xcframework
+      - name: 'Move Envoy.xcframework.zip'
+        run: mv bazel-bin/library/swift/Envoy.xcframework.zip .
       - uses: actions/upload-artifact@v2
         with:
-          name: envoy_ios_framework
-          path: bazel-bin/library/swift/ios_framework.zip
-
-  ios_release_artifacts_cocoapods:
-    name: ios_release_artifacts_cocoapods
-    runs-on: macos-12
-    timeout-minutes: 45
-    needs: [ios_release_artifacts_framework]
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
-      - uses: actions/download-artifact@v3
-        with:
-          name: envoy_ios_framework
-          path: dist/envoy_ios_cocoapods
-      - name: 'Copy license for CocoaPods'
-        run: cp LICENSE dist/envoy_ios_cocoapods
-      - name: 'Create empty Swift sources directory'
-        run: mkdir -p dist/envoy_ios_cocoapods/Envoy.framework/Swift
-      - name: 'Create empty Swift file to force Swift libraries to link properly'
-        run: touch dist/envoy_ios_cocoapods/Envoy.framework/Swift/Empty.swift
+          name: ios_framework
+          path: ./Envoy.xcframework.zip
+      - name: 'Create temporary directory for artifact to produce properly named zip'
+        run: mkdir ios_framework_cocoapods
+      - name: 'Unzip framework to archive directory'
+        run: unzip Envoy.xcframework.zip -d ios_framework_cocoapods
+      - name: 'Copy LICENSE to archive directory'
+        run: cp LICENSE ios_framework_cocoapods
+      - name: 'Zip archive directory'
+        run: zip -r ios_framework_cocoapods.zip ios_framework_cocoapods
       - uses: actions/upload-artifact@v2
         with:
-          name: envoy_ios_cocoapods
-          path: dist/envoy_ios_cocoapods
+          name: ios_framework_cocoapods
+          path: ./ios_framework_cocoapods.zip
 
   create_github_release:
     name: create_github_release
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [android_release_artifacts, ios_release_artifacts_framework, ios_release_artifacts_cocoapods]
+    needs: [android_release_artifacts, ios_release_artifacts]
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
       - uses: actions/download-artifact@v3
         with:
           name: envoy_android_aar_sources
-          path: ./envoy_android_aar_sources.tar.gz
       - uses: actions/download-artifact@v3
         with:
-          name: envoy_ios_framework
-          path: ./envoy_ios_framework.zip
+          name: ios_framework
       - uses: actions/download-artifact@v3
         with:
-          name: envoy_ios_cocoapods
-          path: ./envoy_ios_cocoapods.zip
+          name: ios_framework_cocoapods
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             envoy_android_aar_sources.tar.gz
-            envoy_ios_framework.zip
-            envoy_ios_cocoapods.zip
+            Envoy.xcframework.zip
+            ios_framework_cocoapods.zip
 
   publish_to_cocoapods:
     name: publish_to_cocoapods
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-12
     timeout-minutes: 45
     needs: create_github_release
