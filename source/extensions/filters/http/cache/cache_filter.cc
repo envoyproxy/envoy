@@ -302,7 +302,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     decoder_callbacks_->continueDecoding();
     return;
   default:
-    ENVOY_LOG(error, "Unhandled CacheLookupStatus in CacheFilter::onHeaders: {}",
+    ENVOY_LOG(error, "Unhandled CacheEntryStatus in CacheFilter::onHeaders: {}",
               cacheEntryStatusString(lookup_result_->cache_entry_status_));
     // Treat unhandled status as a cache miss.
     decoder_callbacks_->continueDecoding();
@@ -609,8 +609,9 @@ CacheLookupStatus CacheFilter::cacheLookupStatus() const {
     case CacheEntryStatus::LookupError:
       return CacheLookupStatus::LookupError;
     }
-    PANIC("Unhandled CacheLookupStatus encountered when retrieving request cache status: " +
-          std::to_string(static_cast<int>(filter_state_)));
+    IS_ENVOY_BUG(absl::StrCat("Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+                              std::to_string(static_cast<int>(filter_state_))));
+    return CacheLookupStatus::Unknown;
   }
 
   // Either decodeHeaders decided not to do a cache lookup (because the
