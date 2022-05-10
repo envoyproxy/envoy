@@ -18,11 +18,12 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
 
+  auto cache = http_cache_factory->getCache(config, context);
+
   return [config, stats_prefix, &context,
-          http_cache_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(
-        std::make_shared<CacheFilter>(config, stats_prefix, context.scope(), context.timeSource(),
-                                      http_cache_factory->getCache(config, context)));
+          cache](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config, stats_prefix, context.scope(),
+                                                            context.timeSource(), *cache));
   };
 }
 

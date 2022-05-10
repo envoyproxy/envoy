@@ -2,8 +2,13 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.on_demand.v3;
 
+import "envoy/config/core/v3/config_source.proto";
+
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.on_demand.v3";
 option java_outer_classname = "OnDemandProto";
@@ -11,11 +16,44 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/on_demand/v3;on_demandv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: OnDemand]
-// IP tagging :ref:`configuration overview <config_http_filters_on_demand>`.
+// [#protodoc-title: On Demand Discovery]
+// On Demand Discovery :ref:`configuration overview <config_http_filters_on_demand>`.
 // [#extension: envoy.filters.http.on_demand]
 
+// Configuration of on-demand CDS.
+message OnDemandCds {
+  // A configuration source for the service that will be used for
+  // on-demand cluster discovery.
+  config.core.v3.ConfigSource source = 1 [(validate.rules).message = {required: true}];
+
+  // xdstp:// resource locator for on-demand cluster collection.
+  string resources_locator = 2;
+
+  // The timeout for on demand cluster lookup. If not set, defaults to 5 seconds.
+  google.protobuf.Duration timeout = 3;
+}
+
+// On Demand Discovery filter config.
 message OnDemand {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.on_demand.v2.OnDemand";
+
+  // An optional configuration for on-demand cluster discovery
+  // service. If not specified, the on-demand cluster discovery will
+  // be disabled. When it's specified, the filter will pause the
+  // request to an unknown cluster and will begin a cluster discovery
+  // process. When the discovery is finished (successfully or not), the
+  // request will be resumed for further processing.
+  OnDemandCds odcds = 1;
+}
+
+// Per-route configuration for On Demand Discovery.
+message PerRouteConfig {
+  // An optional configuration for on-demand cluster discovery
+  // service. If not specified, the on-demand cluster discovery will
+  // be disabled. When it's specified, the filter will pause the
+  // request to an unknown cluster and will begin a cluster discovery
+  // process. When the discovery is finished (successfully or not), the
+  // request will be resumed for further processing.
+  OnDemandCds odcds = 1;
 }

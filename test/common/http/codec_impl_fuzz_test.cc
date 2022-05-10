@@ -179,7 +179,9 @@ public:
           // that the internal book keeping resetStream() below is consistent with the state of the
           // client codec state, which is necessary to prevent multiple simultaneous streams for the
           // HTTP/1 codec.
-          request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          if (response_.stream_state_ != StreamState::Closed) {
+            request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          }
           resetStream();
           stream_reset_callback_();
         }));

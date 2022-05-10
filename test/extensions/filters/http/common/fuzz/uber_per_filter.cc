@@ -138,6 +138,13 @@ void UberFilterFuzzer::perFilterSetup() {
       .WillByDefault(testing::ReturnRef(listener_metadata_));
   ON_CALL(factory_context_.api_, customStatNamespaces())
       .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
+
+  // Prepare expectations for AWSRequestSigning filter
+  ON_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillByDefault([this](Buffer::Instance& data, bool) { decoding_buffer_ = &data; });
+  ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() -> const Buffer::Instance* {
+    return decoding_buffer_;
+  });
 }
 
 } // namespace HttpFilters

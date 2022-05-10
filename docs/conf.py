@@ -315,23 +315,4 @@ htmlhelp_basename = 'envoydoc'
 #    to be injected dynamically, somehow
 rediraffe_redirects = "envoy-redirects.txt"
 
-intersphinx_mapping = {
-    'v1.5': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', "inventories/v1.5/objects.inv"),
-    'v1.6': ('https://www.envoyproxy.io/docs/envoy/v1.6.0', "inventories/v1.6/objects.inv"),
-    'v1.7': ('https://www.envoyproxy.io/docs/envoy/v1.7.1', "inventories/v1.7/objects.inv"),
-    'v1.8': ('https://www.envoyproxy.io/docs/envoy/v1.8.0', "inventories/v1.8/objects.inv"),
-    'v1.9': ('https://www.envoyproxy.io/docs/envoy/v1.9.1', "inventories/v1.9/objects.inv"),
-    'v1.10': ('https://www.envoyproxy.io/docs/envoy/v1.10.0', "inventories/v1.10/objects.inv"),
-    'v1.11': ('https://www.envoyproxy.io/docs/envoy/v1.11.2', "inventories/v1.11/objects.inv"),
-    'v1.12': ('https://www.envoyproxy.io/docs/envoy/v1.12.6', "inventories/v1.12/objects.inv"),
-    'v1.13': ('https://www.envoyproxy.io/docs/envoy/v1.13.3', "inventories/v1.13/objects.inv"),
-    'v1.14': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', "inventories/v1.14/objects.inv"),
-    'v1.15': ('https://www.envoyproxy.io/docs/envoy/v1.15.5', "inventories/v1.15/objects.inv"),
-    'v1.16': ('https://www.envoyproxy.io/docs/envoy/v1.16.5', "inventories/v1.16/objects.inv"),
-    'v1.17': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', "inventories/v1.17/objects.inv"),
-    'v1.18': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', "inventories/v1.18/objects.inv"),
-    'v1.19': ('https://www.envoyproxy.io/docs/envoy/v1.19.4', "inventories/v1.19/objects.inv"),
-    'v1.20': ('https://www.envoyproxy.io/docs/envoy/v1.20.3', "inventories/v1.20/objects.inv"),
-    'v1.21': ('https://www.envoyproxy.io/docs/envoy/v1.21.1', "inventories/v1.21/objects.inv"),
-    'v1.22': ('https://www.envoyproxy.io/docs/envoy/v1.22.0', "inventories/v1.22/objects.inv"),
-}
+intersphinx_mapping = _config("intersphinx_mapping")

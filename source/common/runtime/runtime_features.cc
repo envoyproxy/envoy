@@ -33,6 +33,8 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_repli
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
+RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
+RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
 RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
@@ -61,6 +63,7 @@ RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
+RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
@@ -82,6 +85,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
 // Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+// Used to track if runtime is initialized.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
@@ -172,6 +177,14 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   }
   IS_ENVOY_BUG(absl::StrCat("requested an unsupported integer ", feature));
   return default_value;
+}
+
+void markRuntimeInitialized() {
+  maybeSetRuntimeGuard("envoy.reloadable_features.runtime_initialized", true);
+}
+
+bool isRuntimeInitialized() {
+  return runtimeFeatureEnabled("envoy.reloadable_features.runtime_initialized");
 }
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {
