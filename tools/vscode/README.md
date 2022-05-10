@@ -18,7 +18,7 @@ correctly.
 Note that it is recommended to disable VSCode Microsoft C/C++ extension and use `vscode-clangd` instead for
 C/C++ code completion.
 
-For Chinese developers, you need to set `http_proxy`, `https_proxy`, `all_proxy` in advance.
+For developers in China, you might need to set `http_proxy`, `https_proxy`, `all_proxy` in advance.
 
 ### Tips for proxmox users
 
