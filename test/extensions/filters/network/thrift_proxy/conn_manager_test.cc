@@ -662,6 +662,7 @@ stat_prefix: test
     }
   }
 
+  StringViewSaver access_log_data_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
@@ -683,7 +684,6 @@ stat_prefix: test
   MockProtocol* custom_protocol_{};
   std::shared_ptr<ThriftFilters::MockDecoderFilter> custom_decoder_filter_;
   std::shared_ptr<ThriftFilters::MockEncoderFilter> custom_encoder_filter_;
-  StringViewSaver access_log_data_;
 };
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
