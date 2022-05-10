@@ -25,6 +25,7 @@ android_library(
         "PathUtils.java",
         "ReportingCollector.java",
         "StrictModeContext.java",
+        "TestBidirectionalStreamCallback.java",
         "TestFilesInstaller.java",
         "TestUploadDataProvider.java",
         "TestUrlRequestCallback.java",

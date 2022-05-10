@@ -10,6 +10,7 @@ envoy_mobile_android_test(
     srcs = [
         "AtomicCombinatoryStateTest.java",
         "CancelProofEnvoyStreamTest.java",
+        "CronetBidirectionalStateTest.java",
         "CronvoyEngineTest.java",
         "UrlRequestCallbackTester.java",
     ],
