@@ -91,6 +91,9 @@ new_features:
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
 - area: thrift
   change: |
+    added support for access logging.
+- area: thrift
+  change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
 - area: on_demand
   change: |
