@@ -55,25 +55,14 @@ fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& header
                                                      {":authority", ":method", ":path"});
 }
 
-// Convert from test proto Http1ServerSettings to Http1Settings.
-Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
+// Convert from test proto Http1Settings to Http1Settings.
+Http1Settings fromHttp1Settings(const test::common::http::Http1Settings& settings) {
   Http1Settings h1_settings;
 
   h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
   h1_settings.accept_http_10_ = settings.accept_http_10();
   h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
   h1_settings.enable_trailers_ = settings.enable_trailers();
-
-  return h1_settings;
-}
-
-// Convert from test proto Http1ClientSettings to Http1Settings.
-Http1Settings fromHttp1Settings(const test::common::http::Http1ClientSettings& settings) {
-  Http1Settings h1_settings;
-
-  h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
-  h1_settings.accept_http_10_ = settings.accept_http_10();
-  h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
 
   return h1_settings;
 }

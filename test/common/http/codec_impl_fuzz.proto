@@ -87,13 +87,7 @@ message Action {
   }
 }
 
-message Http1ClientSettings {
-  bool allow_absolute_url = 1;
-  bool accept_http_10 = 2;
-  string default_host_for_http_10 = 3;
-}
-
-message Http1ServerSettings {
+message Http1Settings {
   bool allow_absolute_url = 1;
   bool accept_http_10 = 2;
   string default_host_for_http_10 = 3;
@@ -101,8 +95,8 @@ message Http1ServerSettings {
 }
 
 message Http1ClientServerSettings {
-  Http1ClientSettings client = 1;
-  Http1ServerSettings server = 2;
+  Http1Settings client = 1;
+  Http1Settings server = 2;
 }
 
 // Setting X below is interpreted as min_valid_setting + X % (1 +
