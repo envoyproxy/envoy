@@ -239,8 +239,13 @@ public:
 
   // RequestOwner
   Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override {
-    StreamInfo::UpstreamInfo& upstream_info = *callbacks_->streamInfo().upstreamInfo();
-    upstream_info.setUpstreamHost(upstream_request_->upstream_host_);
+    ASSERT(callbacks_ != nullptr);
+    ASSERT(upstream_request_ != nullptr);
+
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    upstream_info->setUpstreamHost(upstream_request_->upstream_host_);
+    callbacks_->streamInfo().setUpstreamInfo(std::move(upstream_info));
+
     return *this;
   }
   Buffer::OwnedImpl& buffer() override { return upstream_request_buffer_; }
