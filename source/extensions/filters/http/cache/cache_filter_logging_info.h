@@ -1,13 +1,13 @@
 #pragma once
 
 #include "envoy/stream_info/filter_state.h"
+
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-
 
 enum class CacheLookupStatus {
   // The CacheFilter couldn't determine the status of the request, probably
@@ -40,8 +40,7 @@ enum class CacheLookupStatus {
 
 absl::string_view CacheLookupStatusToString(CacheLookupStatus status);
 
-std::ostream& operator<<(std::ostream& os,
-                         const CacheLookupStatus& request_cache_status);
+std::ostream& operator<<(std::ostream& os, const CacheLookupStatus& request_cache_status);
 
 enum class CacheInsertStatus {
   // The CacheFilter attempted to insert a cache entry, and succeeded as far as
@@ -90,29 +89,23 @@ enum class CacheInsertStatus {
 
 absl::string_view CacheInsertStatusToString(CacheInsertStatus status);
 
-std::ostream& operator<<(std::ostream& os,
-                         const CacheInsertStatus& cache_insert_status);
+std::ostream& operator<<(std::ostream& os, const CacheInsertStatus& cache_insert_status);
 
 // Cache-related information about a request, to be used for logging and stats.
 class CacheFilterLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
- public:
+public:
   static constexpr absl::string_view Key =
       "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo";
 
   CacheFilterLoggingInfo(CacheLookupStatus cache_lookup_status,
                          CacheInsertStatus cache_insert_status)
-      : cache_lookup_status_(cache_lookup_status),
-        cache_insert_status_(cache_insert_status) {}
+      : cache_lookup_status_(cache_lookup_status), cache_insert_status_(cache_insert_status) {}
 
-  CacheLookupStatus cache_lookup_status() const {
-    return cache_lookup_status_;
-  }
+  CacheLookupStatus cache_lookup_status() const { return cache_lookup_status_; }
 
-  CacheInsertStatus cache_insert_status() const {
-    return cache_insert_status_;
-  }
+  CacheInsertStatus cache_insert_status() const { return cache_insert_status_; }
 
- private:
+private:
   const CacheLookupStatus cache_lookup_status_;
   const CacheInsertStatus cache_insert_status_;
 };

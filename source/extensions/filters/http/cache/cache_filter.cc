@@ -5,9 +5,9 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
+#include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "absl/memory/memory.h"
@@ -296,11 +296,11 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
   case CacheEntryStatus::Unusable:
     decoder_callbacks_->continueDecoding();
     return;
-    case CacheEntryStatus::LookupError:
-      filter_state_ = FilterState::NotServingFromCache;
-      insert_status_ = CacheInsertStatus::NoInsertLookupError;
-      decoder_callbacks_->continueDecoding();
-      return;
+  case CacheEntryStatus::LookupError:
+    filter_state_ = FilterState::NotServingFromCache;
+    insert_status_ = CacheInsertStatus::NoInsertLookupError;
+    decoder_callbacks_->continueDecoding();
+    return;
   default:
     ENVOY_LOG(error, "Unhandled CacheLookupStatus in CacheFilter::onHeaders: {}",
               cacheEntryStatusString(lookup_result_->cache_entry_status_));
@@ -578,62 +578,60 @@ CacheLookupStatus CacheFilter::cacheLookupStatus() const {
 
   if (lookup_result_ != nullptr) {
     switch (lookup_result_->cache_entry_status_) {
-      case CacheEntryStatus::Ok:
-        return CacheLookupStatus::CacheHit;
-      case CacheEntryStatus::Unusable:
-        return CacheLookupStatus::CacheMiss;
-      case CacheEntryStatus::RequiresValidation:
-        // The CacheFilter sent the response upstream for validation; check the
-        // filter state to see whether and how the upstream responded. The
-        // filter currently won't send the stale entry if it can't reach the
-        // upstream or if the upstream responds with a 5xx, so don't include
-        // special handling for those cases.
-        switch (filter_state_) {
-          case FilterState::ValidatingCachedResponse:
-            return CacheLookupStatus::RequestIncomplete;
-          case FilterState::EncodeServingFromCache:
-          case FilterState::ResponseServedFromCache:
-            return CacheLookupStatus::StaleHitWithSuccessfulValidation;
-          case FilterState::NotServingFromCache:
-            return CacheLookupStatus::StaleHitWithFailedValidation;
-          default:
-            IS_ENVOY_BUG(
-                absl::StrCat(
-                    "Unexpected filter state in requestCacheStatus: cache "
-                    "lookup response required validation, but filter state is ",
-                    filter_state_));
-            return CacheLookupStatus::Unknown;
-        }
-      case CacheEntryStatus::FoundNotModified:
-        // TODO(capoferro): Report this as a FoundNotModified when we handle
-        // those.
-        return CacheLookupStatus::CacheHit;
-      case CacheEntryStatus::LookupError:
-        return CacheLookupStatus::LookupError;
+    case CacheEntryStatus::Ok:
+      return CacheLookupStatus::CacheHit;
+    case CacheEntryStatus::Unusable:
+      return CacheLookupStatus::CacheMiss;
+    case CacheEntryStatus::RequiresValidation:
+      // The CacheFilter sent the response upstream for validation; check the
+      // filter state to see whether and how the upstream responded. The
+      // filter currently won't send the stale entry if it can't reach the
+      // upstream or if the upstream responds with a 5xx, so don't include
+      // special handling for those cases.
+      switch (filter_state_) {
+      case FilterState::ValidatingCachedResponse:
+        return CacheLookupStatus::RequestIncomplete;
+      case FilterState::EncodeServingFromCache:
+      case FilterState::ResponseServedFromCache:
+        return CacheLookupStatus::StaleHitWithSuccessfulValidation;
+      case FilterState::NotServingFromCache:
+        return CacheLookupStatus::StaleHitWithFailedValidation;
+      default:
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache "
+                                  "lookup response required validation, but filter state is ",
+                                  filter_state_));
+        return CacheLookupStatus::Unknown;
+      }
+    case CacheEntryStatus::FoundNotModified:
+      // TODO(capoferro): Report this as a FoundNotModified when we handle
+      // those.
+      return CacheLookupStatus::CacheHit;
+    case CacheEntryStatus::LookupError:
+      return CacheLookupStatus::LookupError;
     }
-    PANIC("Unhandled CacheLookupStatus encountered when retrieving request cache status: " + std::to_string(static_cast<int>(filter_state_)));
+    PANIC("Unhandled CacheLookupStatus encountered when retrieving request cache status: " +
+          std::to_string(static_cast<int>(filter_state_)));
   }
 
   // Either decodeHeaders decided not to do a cache lookup (because the
   // request isn't cacheable), or decodeHeaders hasn't been called yet.
   switch (filter_state_) {
-    case FilterState::Initial:
-      return CacheLookupStatus::RequestIncomplete;
-    case FilterState::NotServingFromCache:
-      return CacheLookupStatus::RequestNotCacheable;
-    default:
-      IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
-                             "lookup_result_ is empty but filter state is ",
-                             filter_state_));
-      return CacheLookupStatus::Unknown;
+  case FilterState::Initial:
+    return CacheLookupStatus::RequestIncomplete;
+  case FilterState::NotServingFromCache:
+    return CacheLookupStatus::RequestNotCacheable;
+  default:
+    IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
+                              "lookup_result_ is empty but filter state is ",
+                              filter_state_));
+    return CacheLookupStatus::Unknown;
   }
 }
 
 CacheInsertStatus CacheFilter::cacheInsertStatus() const {
-  return insert_status_.value_or(
-      (insert_ == nullptr)
-          ? CacheInsertStatus::NoInsertRequestIncomplete
-          : CacheInsertStatus::InsertAbortedResponseIncomplete);
+  return insert_status_.value_or((insert_ == nullptr)
+                                     ? CacheInsertStatus::NoInsertRequestIncomplete
+                                     : CacheInsertStatus::InsertAbortedResponseIncomplete);
 }
 
 } // namespace Cache

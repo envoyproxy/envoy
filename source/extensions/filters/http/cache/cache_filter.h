@@ -8,8 +8,8 @@
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -151,7 +151,7 @@ private:
   bool is_head_request_ = false;
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
-  std::optional<CacheInsertStatus> insert_status_ = std::nullopt;
+  absl::optional<CacheInsertStatus> insert_status_ = absl::nullopt;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
