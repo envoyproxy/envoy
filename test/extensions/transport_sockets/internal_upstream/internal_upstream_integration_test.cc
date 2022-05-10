@@ -85,7 +85,8 @@ filter_chains:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
           path: {}
-          format: "%DYNAMIC_METADATA(host_metadata:value)%,%DYNAMIC_METADATA(cluster_metadata:value)%\n"
+          log_format:
+            text_format: "%DYNAMIC_METADATA(host_metadata:value)%,%DYNAMIC_METADATA(cluster_metadata:value)%\n"
     )EOF",
                                             access_log_name_),
                                 *listener);
