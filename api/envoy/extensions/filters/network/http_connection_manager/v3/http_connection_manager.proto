@@ -766,7 +766,7 @@ message HttpConnectionManager {
   // populated. By default, it is not.
   ProxyStatusConfig proxy_status_config = 49;
 
-  // Configuration options for Unified Header Validation (UHV).
+  // Configuration options for Header Validation (UHV).
   // UHV is an extensible mechanism for checking validity of HTTP requests as well as providing
   // normalization for request attributes, such as URI path.
   // The default UHV checks the following:
@@ -778,8 +778,8 @@ message HttpConnectionManager {
   // 6. Validation of H/1 requests with both Content-Length and Transfer-Encoding headers
   // 7. Normalization of the URI path
   // [#not-implemented-hide:]
-  // [#extension-category: envoy.http.unified_header_validators]
-  config.core.v3.TypedExtensionConfig typed_unified_header_validation_config = 50;
+  // [#extension-category: envoy.http.header_validators]
+  config.core.v3.TypedExtensionConfig typed_header_validation_config = 50;
 }
 
 // The configuration to customize local reply returned by Envoy.

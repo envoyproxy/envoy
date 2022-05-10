@@ -341,7 +341,7 @@ EXTENSIONS = {
     "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
 
     #
-    # Unified Header Validators
+    # Header Validators
     #
 
     "envoy.http.header_validators.envoy_default":        "//source/extensions/http/header_validators/envoy_default:config",

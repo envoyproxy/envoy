@@ -49,7 +49,7 @@ public:
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 /**
- * Interface for creating unified header validators.
+ * Interface for creating header validators.
  */
 class HeaderValidatorFactory {
 public:
@@ -58,7 +58,7 @@ public:
   enum class Protocol { HTTP09, HTTP1, HTTP2, HTTP3 };
 
   /**
-   * Create a new unified header validator for the specified protocol.
+   * Create a new header validator for the specified protocol.
    */
   virtual HeaderValidatorPtr create(Protocol protocol) PURE;
 };
@@ -66,7 +66,7 @@ public:
 using HeaderValidatorFactorySharedPtr = std::shared_ptr<HeaderValidatorFactory>;
 
 /**
- * Extension configuration for unified header validators.
+ * Extension configuration for header validators.
  */
 class HeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
