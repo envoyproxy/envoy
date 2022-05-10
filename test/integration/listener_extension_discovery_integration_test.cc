@@ -25,7 +25,8 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF") {}
+)EOF"),
+        default_drain_bytes_(2), filter_name_("foo"), data_("HelloWorld"), port_name_("http") {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false) {
@@ -39,7 +40,7 @@ public:
           "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig");
       if (set_default_config) {
         auto default_configuration = test::integration::filters::TestTcpListenerFilterConfig();
-        default_configuration.set_drain_bytes(kDefaultDrainBytes);
+        default_configuration.set_drain_bytes(default_drain_bytes_);
         discovery->mutable_default_config()->PackFrom(default_configuration);
       }
 
@@ -138,10 +139,10 @@ public:
     tcp_client->close();
   }
 
-  const uint32_t kDefaultDrainBytes = 2;
-  const std::string filter_name_ = "foo";
-  const std::string data_ = "HelloWorld";
-  const std::string port_name_ = "http";
+  const uint32_t default_drain_bytes_;
+  const std::string filter_name_;
+  const std::string data_;
+  const std::string port_name_;
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
 
@@ -216,7 +217,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
   // Start a TCP connection. The default filter drain 2 bytes.
-  sendDataVerifyResults(kDefaultDrainBytes);
+  sendDataVerifyResults(default_drain_bytes_);
 }
 
 // This one TBD
@@ -232,7 +233,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
   // The default filter will be installed. Start a TCP connection. The default filter drain 2 bytes.
-  sendDataVerifyResults(kDefaultDrainBytes);
+  sendDataVerifyResults(default_drain_bytes_);
 }
 
 // This one TBD
@@ -264,7 +265,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   initialize();
 
   // Send data without send config update.
-  sendDataVerifyResults(kDefaultDrainBytes);
+  sendDataVerifyResults(default_drain_bytes_);
   // Send update should cause a different response.
   sendXdsResponse("1", 3);
   test_server_->waitForCounterGe(
@@ -280,7 +281,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
   sendXdsResponse("1", 1);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
-  sendDataVerifyResults(kDefaultDrainBytes);
+  sendDataVerifyResults(default_drain_bytes_);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
