@@ -41,7 +41,7 @@ EXTENSION_SECURITY_POSTURES = (
 # Extension categories as defined by factories
 EXTENSION_CATEGORIES = (
     "envoy.access_loggers", "envoy.bootstrap", "envoy.clusters", "envoy.compression.compressor",
-    "envoy.compression.decompressor", "envoy.config.validators", "envoy.filters.http",
+    "envoy.compression.decompressor", "envoy.config.validators", "envoy.network.connection_balance", "envoy.filters.http",
     "envoy.filters.http.cache", "envoy.filters.listener", "envoy.filters.network",
     "envoy.filters.udp_listener", "envoy.formatter", "envoy.grpc_credentials",
     "envoy.guarddog_actions", "envoy.health_checkers", "envoy.http.stateful_header_formatters",
