@@ -213,7 +213,7 @@ private:
       stream_info_.onRequestComplete();
       parent_.stats_.request_active_.dec();
 
-      parent_.emitLogEntry(streamInfo());
+      parent_.emitLogEntry(stream_info_);
 
       for (auto& filter : base_filters_) {
         filter->onDestroy();
