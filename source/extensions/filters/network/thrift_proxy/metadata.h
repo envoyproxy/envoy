@@ -14,6 +14,7 @@
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 #include "source/extensions/filters/network/thrift_proxy/tracing.h"
 
+#include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
