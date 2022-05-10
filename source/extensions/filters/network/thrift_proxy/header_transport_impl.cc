@@ -150,14 +150,12 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter = metadata.headers().formatter();
     while (num_headers-- > 0) {
       std::string key_string = drainVarString(buffer, header_size, "header key");
+      if (formatter) {
+        formatter->processKey(key_string);
+      }
       // LowerCaseString doesn't allow '\0', '\n', and '\r'.
       key_string =
           absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
-
-      if (formatter) {
-        // TODO(rgs1): do we also want to preserve the removed characters from above?
-        formatter->processKey(key_string);
-      }
 
       const Http::LowerCaseString key = Http::LowerCaseString(key_string);
       const std::string value = drainVarString(buffer, header_size, "header value");

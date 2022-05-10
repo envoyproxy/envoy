@@ -22,11 +22,10 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-// TODO(rgs1): this is copied from the PreserveCaseHeaderFormatter extension, so move it to a common
-// path.
-class PreserveCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
+// See: https://github.com/apache/thrift/commit/e165fa3c85d00cb984f4d9635ed60909a1266ce1
+class ThriftCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
 public:
-  PreserveCaseHeaderFormatter() = default;
+  ThriftCaseHeaderFormatter() = default;
 
   // Envoy::Http::StatefulHeaderKeyFormatter
   std::string format(absl::string_view key) const override {
@@ -34,12 +33,16 @@ public:
     return remembered_key_itr != original_header_keys_.end() ? *remembered_key_itr
                                                              : std::string(key);
   }
-  void processKey(absl::string_view key) override { original_header_keys_.emplace(key); }
+  void processKey(absl::string_view key) override {
+    std::string s = absl::StrReplaceAll(key, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    original_header_keys_.try_emplace(std::move(s), std::string(key));
+  }
   void setReasonPhrase(absl::string_view) override {}
   absl::string_view getReasonPhrase() const override { return ""; }
 
 private:
-  StringUtil::CaseUnorderedSet original_header_keys_;
+  absl::flat_hash_map<std::string, std::string> original_header_keys_;
 };
 
 } // namespace
@@ -55,7 +58,7 @@ public:
   MessageMetadata(bool case_sensitive = false) {
     auto headers = Http::RequestHeaderMapImpl::create();
     if (case_sensitive) {
-      headers->setFormatter(std::make_unique<PreserveCaseHeaderFormatter>());
+      headers->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
     }
     headers_ = std::move(headers);
   }
