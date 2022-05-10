@@ -111,6 +111,24 @@ public:
     return &lb_context_;
   }
 
+  void setOutlierFailed(const std::string& host) {
+    for (auto& h : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+      if (h->hostname() == host) {
+        h->healthFlagSet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
+        break;
+      }
+    }
+  }
+
+  void clearOutlierFailed(const std::string& host) {
+    for (auto& h : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+      if (h->hostname() == host) {
+        h->healthFlagClear(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
+        break;
+      }
+    }
+  }
+
   MOCK_METHOD(void, onMemberUpdateCb,
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
@@ -211,32 +229,23 @@ TEST_F(ClusterTest, OutlierDetection) {
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ("1.2.3.4:0",
-            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host2", host_map_["host2"]);
-  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ("5.6.7.8:0",
-            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->address()->asString());
   EXPECT_CALL(*host_map_["host2"], touch());
   EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
 
-  // Outlier check marked host1 unhealthy
-  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
-      Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  // Fail outlier check for host1
+  setOutlierFailed("host1");
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
+  // "host2" should not be affected
   EXPECT_CALL(*host_map_["host2"], touch());
   EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
 
-  // Outlier check marked host1 as healthy, it should be available again
-  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
-      Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  // Clear outlier check failure for host1, it should be available again
+  clearOutlierFailed("host1");
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 }
