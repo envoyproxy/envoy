@@ -38,6 +38,7 @@ public:
   MOCK_METHOD(void, drain, (Event::Dispatcher & event_dispatcher));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(envoy_status_t, post_, (std::function<void()> callback));
+  MOCK_METHOD(Event::SchedulableCallbackPtr, createSchedulableCallback, (std::function<void()> cb));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
   MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
   MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
