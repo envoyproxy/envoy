@@ -147,7 +147,10 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // TODO(toddmgreer): Wait for the cache if necessary.
     insert_->insertBody(
         data, [](bool) {}, end_stream);
-    insert_status_ = CacheInsertStatus::InsertSucceeded;
+    if (end_stream) {
+      // TODO: test end_stream
+      insert_status_ = CacheInsertStatus::InsertSucceeded;
+    }
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -167,6 +170,8 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
     insert_->insertTrailers(trailers);
   }
+  insert_status_ = CacheInsertStatus::InsertSucceeded;
+
   return Http::FilterTrailersStatus::Continue;
 }
 
