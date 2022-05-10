@@ -30,7 +30,7 @@ public:
   // Envoy::Http::StatefulHeaderKeyFormatter
   std::string format(absl::string_view key) const override {
     const auto remembered_key_itr = original_header_keys_.find(key);
-    return remembered_key_itr != original_header_keys_.end() ? *remembered_key_itr
+    return remembered_key_itr != original_header_keys_.end() ? remembered_key_itr->second
                                                              : std::string(key);
   }
   void processKey(absl::string_view key) override {
