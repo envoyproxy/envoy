@@ -274,6 +274,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       auto* factory = Envoy::Config::Utility::getFactory<RateLimit::DescriptorProducerFactory>(
           action.extension());
       if (!factory) {
+        // If no descriptor extension is found, fallback to using HTTP matcher
+        // input functions. Note that if the same extension name or type was
+        // dual registered as an extension descriptor and an HTTP matcher input
+        // function, the descriptor extension takes priority.
         RateLimitDescriptorValidationVisitor validation_visitor;
         Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(validator,
                                                                          validation_visitor);
