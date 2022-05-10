@@ -336,6 +336,7 @@ FilterStatus Router::messageEnd() {
   const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
   addSize(encode_size);
   stats().recordUpstreamRequestSize(*cluster_, request_size_);
+  callbacks_->streamInfo().addBytesReceived(request_size_);
 
   // Dispatch shadow requests, if any.
   // Note: if connections aren't ready, the write will happen when appropriate.

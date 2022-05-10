@@ -43,6 +43,10 @@ minor_behavior_changes:
 
 bug_fixes:
 
+- area: tcp_proxy
+  change: |
+    Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
+
 removed_config_or_runtime:
 - area: compressor
   change: |
@@ -79,9 +83,15 @@ new_features:
 - area: ext_proc
   change: |
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
+- area: http
+  change: |
+    added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: thrift
+  change: |
+    added support for access logging.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
@@ -100,6 +110,9 @@ new_features:
 - area: ratelimit
   change: |
     added support for :ref:`HTTP matching input functions <arch_overview_matching_api>` as descriptor producers.
+- area: build
+  change: |
+    official released binary is now built with Clang 14.0.0.
 
 deprecated:
 - area: dubbo_proxy
