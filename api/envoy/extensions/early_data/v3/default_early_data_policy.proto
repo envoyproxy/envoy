@@ -13,8 +13,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: HTTP request early data policy]
 
 // [#extension: envoy.route.early_data_policy.default]
-// The default rule to allow/disallow a request to be sent as early data.
+// The default rule to allow/disallow a request to be sent as early data. It's an empty config now. Configuring it will disallow any request to be sent over early data.
 message DefaultEarlyDataPolicy {
-  // If true, allow `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data. Otherwise, do not use early data.
-  bool early_data_allows_safe_requests = 1;
 }
