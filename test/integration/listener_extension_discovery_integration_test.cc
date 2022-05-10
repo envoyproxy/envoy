@@ -302,7 +302,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   // config subscription stats scope. This test verifies that the stats scope outlasts the gRPC
   // subscription.
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter("foo", false, true);
+  addDynamicFilter(filter_name_, false, true);
   initialize();
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   test_server_.reset();

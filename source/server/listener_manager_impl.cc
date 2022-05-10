@@ -286,7 +286,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
           })),
       enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names),
       tcp_listener_config_provider_manager_(
-          std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
+          std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));

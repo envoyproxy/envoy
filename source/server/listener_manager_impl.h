@@ -259,7 +259,7 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
-  std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
       tcp_listener_config_provider_manager_;
 };
 
