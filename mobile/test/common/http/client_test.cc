@@ -335,6 +335,20 @@ TEST_P(ClientTest, BasicStreamTrailers) {
 }
 
 TEST_P(ClientTest, MultipleDataStream) {
+  Event::MockDispatcher dispatcher;
+  ON_CALL(dispatcher_, drain).WillByDefault([&](Event::Dispatcher& event_dispatcher) {
+    dispatcher_.Event::ProvisionalDispatcher::drain(event_dispatcher);
+  });
+  dispatcher_.drain(dispatcher);
+  Event::MockSchedulableCallback* process_buffered_data_callback = nullptr;
+  if (explicit_flow_control_) {
+    process_buffered_data_callback = new Event::MockSchedulableCallback(&dispatcher);
+    EXPECT_CALL(*process_buffered_data_callback, scheduleCallbackNextIteration());
+    ON_CALL(dispatcher_, createSchedulableCallback).WillByDefault([&](std::function<void()> cb) {
+      return dispatcher_.Event::ProvisionalDispatcher::createSchedulableCallback(cb);
+    });
+  }
+
   cc_.end_stream_with_headers_ = false;
 
   envoy_headers c_headers = defaultRequestHeaders();
@@ -361,8 +375,13 @@ TEST_P(ClientTest, MultipleDataStream) {
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), false));
   http_client_.sendData(stream_, c_data, false);
-  // The buffer is not full: expect an on_send_window_available call in explicit_flow_control mode.
-  EXPECT_EQ(cc_.on_send_window_available_calls, explicit_flow_control_ ? 1 : 0);
+  EXPECT_EQ(cc_.on_send_window_available_calls, 0);
+  if (explicit_flow_control_) {
+    EXPECT_TRUE(process_buffered_data_callback->enabled_);
+    process_buffered_data_callback->invokeCallback();
+    // The buffer is not full: expect an on_send_window_available call.
+    EXPECT_EQ(cc_.on_send_window_available_calls, 1);
+  }
 
   // Send second request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));

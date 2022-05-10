@@ -42,6 +42,15 @@ public:
   virtual envoy_status_t post(Event::PostCb callback);
 
   /**
+   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
+   * callback.
+   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
+   * event loop.
+   * Must be called from context where ProvisionalDispatcher::isThreadSafe() is true.
+   */
+  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb);
+
+  /**
    * @return false before the Event::Dispatcher is running, otherwise the result of the
    * underlying call to Event::Dispatcher::isThreadSafe().
    */

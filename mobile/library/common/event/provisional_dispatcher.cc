@@ -44,6 +44,14 @@ envoy_status_t ProvisionalDispatcher::post(Event::PostCb callback) {
   return ENVOY_SUCCESS;
 }
 
+Event::SchedulableCallbackPtr
+ProvisionalDispatcher::createSchedulableCallback(std::function<void()> cb) {
+  RELEASE_ASSERT(
+      isThreadSafe(),
+      "ProvisionalDispatcher::createSchedulableCallback must be called from a threadsafe context");
+  return event_dispatcher_->createSchedulableCallback(cb);
+}
+
 bool ProvisionalDispatcher::isThreadSafe() const {
   // Doesn't require locking because if a thread has a stale view of drained_, then by definition
   // this wasn't a threadsafe call.

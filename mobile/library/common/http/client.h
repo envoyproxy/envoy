@@ -321,6 +321,7 @@ private:
 
   ApiListener& api_listener_;
   Event::ProvisionalDispatcher& dispatcher_;
+  Event::SchedulableCallbackPtr scheduled_callback_;
   HttpClientStats stats_;
   // The set of open streams, which can safely have request data sent on them
   // or response data received.
