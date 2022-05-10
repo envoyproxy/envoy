@@ -1185,8 +1185,7 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, RequestMatchInput) {
-  const std::string yaml = R"EOF(
+const std::string RequestHeaderMatchInputDescriptor = R"EOF(
 actions:
 - extension:
     name: my_header_name
@@ -1195,8 +1194,8 @@ actions:
       header_name: x-header-name
   )EOF";
 
-  setupTest(yaml);
-
+TEST_F(RateLimitPolicyEntryTest, RequestMatchInput) {
+  setupTest(RequestHeaderMatchInputDescriptor);
   Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
@@ -1209,17 +1208,19 @@ actions:
       testing::ContainerEq(local_descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, RequestMatchInputSkip) {
-  const std::string yaml = R"EOF(
-actions:
-- extension:
-    name: my_header_name
-    typed_config:
-      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-      header_name: x-header-name
-  )EOF";
+TEST_F(RateLimitPolicyEntryTest, RequestMatchInputEmpty) {
+  setupTest(RequestHeaderMatchInputDescriptor);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", ""}};
 
-  setupTest(yaml);
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "service_cluster", header,
+                                              stream_info_);
+  EXPECT_FALSE(descriptors_.empty());
+  EXPECT_FALSE(local_descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, RequestMatchInputSkip) {
+  setupTest(RequestHeaderMatchInputDescriptor);
 
   rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "service_cluster", header_,

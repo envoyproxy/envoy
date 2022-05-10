@@ -149,8 +149,11 @@ Rate limit descriptors are extensible with custom descriptors. For example, :ref
                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                 header_name: x-header-name
 
-The above example produces an entry with the key ``custom`` and the value of the request header ``x-header-name``.
-If the header is absent, then the descriptor entry is not produced, and no descriptor is generated.
+The above example produces an entry with the key ``custom`` and the value of
+the request header ``x-header-name``. If the header is absent, then the
+descriptor entry is not produced, and no descriptor is generated. If the header
+value is present but is an empty string, then the descriptor is generated but
+no entry is added.
 
 Statistics
 ----------

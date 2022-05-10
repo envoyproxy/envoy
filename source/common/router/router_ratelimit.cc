@@ -62,7 +62,9 @@ public:
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
     if (result.data_) {
-      descriptor_entry = {descriptor_key_, result.data_.value()};
+      if (!result.data_.value().empty()) {
+        descriptor_entry = {descriptor_key_, result.data_.value()};
+      }
       return true;
     }
     return false;
