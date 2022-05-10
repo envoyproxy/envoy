@@ -14,6 +14,7 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filter_utils.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
@@ -72,50 +73,68 @@ public:
 private:
   struct ActiveRpc;
 
-  struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
+  struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          complete_(false), passthrough_{false} {
-      initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
+          protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
+          passthrough_{false}, pending_transport_end_{false} {
+      ;
+      protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
+                                                 parent_.response_buffer_);
     }
 
     bool onData(Buffer::Instance& data);
 
-    // ProtocolConverter
+    // DecoderEventHandler
+    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus transportEnd() override;
     FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
-      UNREFERENCED_PARAMETER(metadata);
-      return FilterStatus::Continue;
-    }
-    FilterStatus transportEnd() override;
+    FilterStatus messageEnd() override;
+    FilterStatus structBegin(absl::string_view name) override;
+    FilterStatus structEnd() override;
+    FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                            int16_t& field_id) override;
+    FilterStatus fieldEnd() override;
+    FilterStatus boolValue(bool& value) override;
+    FilterStatus byteValue(uint8_t& value) override;
+    FilterStatus int16Value(int16_t& value) override;
+    FilterStatus int32Value(int32_t& value) override;
+    FilterStatus int64Value(int64_t& value) override;
+    FilterStatus doubleValue(double& value) override;
+    FilterStatus stringValue(absl::string_view value) override;
+    FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) override;
+    FilterStatus mapEnd() override;
+    FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
+    FilterStatus listEnd() override;
+    FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
+    FilterStatus setEnd() override;
 
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
 
+    void finalizeResponse();
+
     ActiveRpc& parent_;
     DecoderPtr decoder_;
     Buffer::OwnedImpl upstream_buffer_;
     MessageMetadataSharedPtr metadata_;
+    ProtocolConverterSharedPtr protocol_converter_;
     absl::optional<bool> success_;
     bool complete_ : 1;
     bool passthrough_ : 1;
+    bool pending_transport_end_ : 1;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
-  // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
-  // chain continuation.
-  struct ActiveRpcDecoderFilter : public ThriftFilters::DecoderFilterCallbacks,
-                                  LinkedObject<ActiveRpcDecoderFilter> {
-    ActiveRpcDecoderFilter(ActiveRpc& parent, ThriftFilters::DecoderFilterSharedPtr filter)
-        : parent_(parent), handle_(filter) {}
+  struct ActiveRpcFilterBase : public virtual ThriftFilters::FilterCallbacks {
+    ActiveRpcFilterBase(ActiveRpc& parent) : parent_(parent) {}
 
-    // ThriftFilters::DecoderFilterCallbacks
+    // ThriftFilters::FilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
     const Network::Connection* connection() const override { return parent_.connection(); }
     Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
-    void continueDecoding() override;
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     TransportType downstreamTransportType() const override {
       return parent_.downstreamTransportType();
@@ -123,6 +142,25 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.downstreamProtocolType();
     }
+
+    void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
+    StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
+    MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
+    bool responseSuccess() override { return parent_.responseSuccess(); }
+    void onReset() override { parent_.onReset(); }
+
+    ActiveRpc& parent_;
+  };
+
+  // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
+  // chain continuation.
+  struct ActiveRpcDecoderFilter : public ActiveRpcFilterBase,
+                                  public virtual ThriftFilters::DecoderFilterCallbacks,
+                                  LinkedObject<ActiveRpcDecoderFilter> {
+    ActiveRpcDecoderFilter(ActiveRpc& parent, ThriftFilters::DecoderFilterSharedPtr filter)
+        : ActiveRpcFilterBase(parent), decoder_handle_(filter) {}
+
+    // ThriftFilters::DecoderFilterCallbacks
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
       parent_.sendLocalReply(response, end_stream);
     }
@@ -132,22 +170,33 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
       return parent_.upstreamData(buffer);
     }
-    void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
-    StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
-    MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
-    bool responseSuccess() override { return parent_.responseSuccess(); }
-    void onReset() override { parent_.onReset(); }
-
-    ActiveRpc& parent_;
-    ThriftFilters::DecoderFilterSharedPtr handle_;
+    void continueDecoding() override;
+    DecoderEventHandler* decodeEventHandler() { return decoder_handle_.get(); }
+    ThriftFilters::DecoderFilterSharedPtr decoder_handle_;
   };
   using ActiveRpcDecoderFilterPtr = std::unique_ptr<ActiveRpcDecoderFilter>;
+
+  // Wraps a EncoderFilter and acts as the EncoderFilterCallbacks for the filter, enabling filter
+  // chain continuation.
+  struct ActiveRpcEncoderFilter : public ActiveRpcFilterBase,
+                                  public virtual ThriftFilters::EncoderFilterCallbacks,
+                                  LinkedObject<ActiveRpcEncoderFilter> {
+    ActiveRpcEncoderFilter(ActiveRpc& parent, ThriftFilters::EncoderFilterSharedPtr filter)
+        : ActiveRpcFilterBase(parent), encoder_handle_(filter) {}
+
+    // ThriftFilters::EncoderFilterCallbacks
+    void continueEncoding() override;
+    DecoderEventHandler* decodeEventHandler() { return encoder_handle_.get(); }
+    ThriftFilters::EncoderFilterSharedPtr encoder_handle_;
+  };
+  using ActiveRpcEncoderFilterPtr = std::unique_ptr<ActiveRpcEncoderFilter>;
 
   // ActiveRpc tracks request/response pairs.
   struct ActiveRpc : LinkedObject<ActiveRpc>,
                      public Event::DeferredDeletable,
                      public DecoderEventHandler,
                      public ThriftFilters::DecoderFilterCallbacks,
+                     public ThriftFilters::EncoderFilterCallbacks,
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
         : parent_(parent), request_timer_(new Stats::HistogramCompletableTimespanImpl(
@@ -162,8 +211,8 @@ private:
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
 
-      for (auto& filter : decoder_filters_) {
-        filter->handle_->onDestroy();
+      for (auto& filter : base_filters_) {
+        filter->onDestroy();
       }
     }
 
@@ -199,6 +248,7 @@ private:
       return parent_.read_callbacks_->connection().dispatcher();
     }
     void continueDecoding() override { parent_.continueDecoding(); }
+    void continueEncoding() override {}
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
       return parent_.decoder_->transportType();
@@ -220,10 +270,52 @@ private:
       ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
       filter->setDecoderFilterCallbacks(*wrapper);
       LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+      base_filters_.emplace_back(filter);
+    }
+
+    void addEncoderFilter(ThriftFilters::EncoderFilterSharedPtr filter) override {
+      ActiveRpcEncoderFilterPtr wrapper = std::make_unique<ActiveRpcEncoderFilter>(*this, filter);
+      filter->setEncoderFilterCallbacks(*wrapper);
+      LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
+      base_filters_.emplace_back(filter);
+    }
+
+    void addBidirectionalFilter(ThriftFilters::BidirectionalFilterSharedPtr filter) override {
+      ThriftFilters::BidirectionalFilterWrapperSharedPtr wrapper =
+          std::make_unique<ThriftFilters::BidirectionalFilterWrapper>(filter);
+
+      ActiveRpcDecoderFilterPtr decoder_wrapper =
+          std::make_unique<ActiveRpcDecoderFilter>(*this, wrapper->decoder_filter_);
+      filter->setDecoderFilterCallbacks(*decoder_wrapper);
+      LinkedList::moveIntoListBack(std::move(decoder_wrapper), decoder_filters_);
+
+      ActiveRpcEncoderFilterPtr encoder_wrapper =
+          std::make_unique<ActiveRpcEncoderFilter>(*this, wrapper->encoder_filter_);
+      filter->setEncoderFilterCallbacks(*encoder_wrapper);
+      LinkedList::moveIntoList(std::move(encoder_wrapper), encoder_filters_);
+
+      base_filters_.emplace_back(wrapper);
     }
 
     bool passthroughSupported() const;
-    FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
+
+    // Apply filters to the decoder_event.
+    // @param filter    the last filter which is already applied to the decoder_event.
+    //                  nullptr indicates none is applied and the decoder_event is applied from the
+    //                  first filter.
+    FilterStatus applyDecoderFilters(DecoderEvent state, absl::any data,
+                                     ActiveRpcDecoderFilter* filter = nullptr);
+    FilterStatus applyEncoderFilters(DecoderEvent state, absl::any data,
+                                     ProtocolConverterSharedPtr protocol_converter,
+                                     ActiveRpcEncoderFilter* filter = nullptr);
+    template <typename FilterType>
+    FilterStatus applyFilters(FilterType* filter,
+                              std::list<std::unique_ptr<FilterType>>& filter_list,
+                              ProtocolConverterSharedPtr protocol_converter = nullptr);
+
+    // Helper to setup filter_action_ and filter_context_
+    void prepareFilterAction(DecoderEvent event, absl::any data);
+
     void finalizeRequest();
 
     void createFilterChain();
@@ -235,6 +327,8 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
     std::list<ActiveRpcDecoderFilterPtr> decoder_filters_;
+    std::list<ActiveRpcEncoderFilterPtr> encoder_filters_;
+    std::list<ThriftFilters::FilterBaseSharedPtr> base_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;

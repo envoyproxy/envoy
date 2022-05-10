@@ -268,7 +268,7 @@ public:
   //
   // Pass factory context to allow HttpCache to use async client, stats scope
   // etc.
-  virtual HttpCache&
+  virtual std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
            Server::Configuration::FactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;

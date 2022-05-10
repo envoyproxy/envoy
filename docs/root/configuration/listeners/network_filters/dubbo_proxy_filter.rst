@@ -64,16 +64,17 @@ the second step is to add your configuration, configuration method refer to the 
         stat_prefix: dubbo_incomming_stats
         protocol_type: Dubbo
         serialization_type: Hessian2
-        route_config:
+        multiple_route_config:
           name: local_route
-          interface: org.apache.dubbo.demo.DemoService
-          routes:
-          - match:
-              method:
-                name:
-                  exact: sayHello
-            route:
-              cluster: user_service_dubbo_server
+          route_config:
+          - interface: org.apache.dubbo.demo.DemoService
+            routes:
+            - match:
+                method:
+                  name:
+                    exact: sayHello
+              route:
+                cluster: user_service_dubbo_server
         dubbo_filters:
         - name: envoy.filters.dubbo.testFilter
           typed_config:
