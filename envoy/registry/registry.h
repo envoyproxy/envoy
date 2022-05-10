@@ -20,6 +20,8 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
+#include "fmt/ranges.h"
+
 namespace Envoy {
 namespace Registry {
 

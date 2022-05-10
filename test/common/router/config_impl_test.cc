@@ -8442,17 +8442,18 @@ public:
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_most_specific_config,
-                 absl::InlinedVector<uint32_t, 3>& expected_traveled_config) {
+                 absl::InlinedVector<uint32_t, 3>& expected_traveled_config,
+                 const std::string& route_config_name) {
     const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
 
     check(dynamic_cast<const DerivedFilterConfig*>(
-              route->mostSpecificPerFilterConfig(factory_.name())),
+              route->mostSpecificPerFilterConfig(route_config_name)),
           expected_most_specific_config, "most specific config");
     route->traversePerFilterConfig(
-        factory_.name(), [&](const Router::RouteSpecificFilterConfig& cfg) {
+        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
           auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
           traveled_cfg.push_back(typed_cfg->config_.seconds());
         });
@@ -8466,7 +8467,7 @@ public:
   }
 
   void
-  checkNoPerFilterConfig(const std::string& yaml,
+  checkNoPerFilterConfig(const std::string& yaml, const std::string& route_config_name,
                          const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters()) {
     const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 optional_http_filters);
@@ -8474,9 +8475,9 @@ public:
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
 
-    EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig(factory_.name()));
+    EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig(route_config_name));
     route->traversePerFilterConfig(
-        factory_.name(), [&](const Router::RouteSpecificFilterConfig& cfg) {
+        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
           auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
           traveled_cfg.push_back(typed_cfg->config_.seconds());
         });
@@ -8547,7 +8548,7 @@ virtual_hosts:
 
   OptionalHttpFilters optional_http_filters = {"test.default.filter"};
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml, optional_http_filters);
+  checkNoPerFilterConfig(yaml, "test.default.filter", optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerRoute) {
@@ -8588,7 +8589,7 @@ virtual_hosts:
 
   OptionalHttpFilters optional_http_filters = {"test.default.filter"};
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml, optional_http_filters);
+  checkNoPerFilterConfig(yaml, "test.default.filter", optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithUnknownFilter) {
@@ -8626,7 +8627,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
-  checkNoPerFilterConfig(yaml, optional_http_filters);
+  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithUnknownFilter) {
@@ -8664,7 +8665,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   OptionalHttpFilters optional_http_filters;
   optional_http_filters.insert("filter.unknown");
-  checkNoPerFilterConfig(yaml, optional_http_filters);
+  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
@@ -8689,7 +8690,7 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
-  checkEach(yaml, 123, expected_traveled_config);
+  checkEach(yaml, 123, expected_traveled_config, "test.filter");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfigWithDirectResponse) {
@@ -8715,7 +8716,7 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
-  checkEach(yaml, 123, expected_traveled_config);
+  checkEach(yaml, 123, expected_traveled_config, "test.filter");
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
@@ -8744,7 +8745,7 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({1011, 789});
-  checkEach(yaml, 789, expected_traveled_config);
+  checkEach(yaml, 789, expected_traveled_config, "test.filter");
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
@@ -8773,7 +8774,64 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213});
-  checkEach(yaml, 1213, expected_traveled_config);
+  checkEach(yaml, 1213, expected_traveled_config, "test.filter");
+}
+
+TEST_F(PerFilterConfigsTest, RouteTypedConfigWithErrorFilterName) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 123
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 456
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
+  // Factories is obtained by type here by default, so route config can be loaded correctly.
+  checkEach(yaml, 123, expected_traveled_config, "filter.unknown");
+}
+
+TEST_F(PerFilterConfigsTest, RouteTypedConfigWithErrorFilterNameButDisableGetByType) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.get_route_config_factory_by_type", "false"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 123
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 456
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+  // No route config factory can be obtained by the filter name 'filter.unknown'.
+  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
