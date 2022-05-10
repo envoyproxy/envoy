@@ -62,6 +62,7 @@ envoy_cc_test(
     srcs = ["stats_handler_test.cc"],
     deps = [
         ":admin_instance_lib",
+        "//source/common/common:regex_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/server/admin:stats_handler_lib",

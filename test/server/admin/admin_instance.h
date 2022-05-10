@@ -7,7 +7,6 @@
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_runtime.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
@@ -30,11 +29,6 @@ public:
   Http::Code postCallback(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
-  void setUseRe2Filters(bool re2) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.admin_stats_filter_use_re2", re2 ? "true" : "false"}});
-  }
-
   std::string address_out_path_;
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
@@ -43,7 +37,6 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   Server::AdminFilter admin_filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 } // namespace Server
