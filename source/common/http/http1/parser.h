@@ -159,9 +159,6 @@ public:
 
   // Returns whether the Transfer-Encoding header is present.
   virtual int hasTransferEncoding() const PURE;
-
-  // Converts a ParserStatus code to the parsers' integer return code value.
-  virtual int statusToInt(const ParserStatus code) const PURE;
 };
 
 using ParserPtr = std::unique_ptr<Parser>;

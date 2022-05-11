@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 namespace {
+
 ParserStatus intToStatus(int rc) {
   // See
   // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
@@ -29,6 +30,26 @@ ParserStatus intToStatus(int rc) {
     return ParserStatus::Unknown;
   }
 }
+
+int statusToInt(const ParserStatus code) {
+  // See
+  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
+  switch (code) {
+  case ParserStatus::Error:
+    return -1;
+  case ParserStatus::Success:
+    return 0;
+  case ParserStatus::NoBody:
+    return 1;
+  case ParserStatus::NoBodyData:
+    return 2;
+  case ParserStatus::Paused:
+    return 31;
+  default:
+    PANIC("not implemented");
+  }
+}
+
 } // namespace
 
 class LegacyHttpParserImpl::Impl {
@@ -184,25 +205,6 @@ absl::string_view LegacyHttpParserImpl::errnoName(ParserStatus rc) const {
 }
 
 int LegacyHttpParserImpl::hasTransferEncoding() const { return impl_->hasTransferEncoding(); }
-
-int LegacyHttpParserImpl::statusToInt(const ParserStatus code) const {
-  // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
-  switch (code) {
-  case ParserStatus::Error:
-    return -1;
-  case ParserStatus::Success:
-    return 0;
-  case ParserStatus::NoBody:
-    return 1;
-  case ParserStatus::NoBodyData:
-    return 2;
-  case ParserStatus::Paused:
-    return 31;
-  default:
-    PANIC("not implemented");
-  }
-}
 
 } // namespace Http1
 } // namespace Http
