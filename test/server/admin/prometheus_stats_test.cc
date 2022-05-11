@@ -812,20 +812,32 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   addHistogram(histogram1);
 
-  Buffer::OwnedImpl response;
-  StatsParams params;
-  params.filter_ = std::regex("cluster.test_1.upstream_cx_total");
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
-  EXPECT_EQ(1UL, size);
-
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
 envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
 
 )EOF";
+  {
+    Buffer::OwnedImpl response;
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK,
+              params.parse("/stats?filter=cluster.test_1.upstream_cx_total", response));
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    EXPECT_EQ(1UL, size);
+    EXPECT_EQ(expected_output, response.toString());
+  }
 
-  EXPECT_EQ(expected_output, response.toString());
+  {
+    Buffer::OwnedImpl response;
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK,
+              params.parse("/stats?filter=cluster.test_1.upstream_cx_total&safe", response));
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    EXPECT_EQ(1UL, size);
+    EXPECT_EQ(expected_output, response.toString());
+  }
 }
 
 } // namespace Server
