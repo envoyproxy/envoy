@@ -81,6 +81,19 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
     return Admin::makeStaticTextRequest(response, code);
   }
 
+  if (params.format_ == StatsFormat::Prometheus) {
+    // TODO(#16139): modify streaming algorithm to cover Prometheus.
+    //
+    // This may be easiest to accomplish by populating the set
+    // with tagExtractedName(), and allowing for vectors of
+    // stats as multiples will have the same tag-extracted names.
+    // Ideally we'd find a way to do this without slowing down
+    // the non-Prometheus implementations.
+    Buffer::OwnedImpl response;
+    prometheusFlushAndRender(params, response);
+    return Admin::makeStaticTextRequest(response, code);
+  }
+
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
@@ -112,7 +125,11 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
                                             StatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+  return makeRequest(server_.stats(), params);
+}
+
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params) {
+  return std::make_unique<StatsRequest>(stats, params);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
@@ -133,14 +150,26 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
     server_.flushStats();
   }
 
-  Stats::Store& stats = server_.stats();
+  prometheusFlushAndRender(params, response);
+  return Http::Code::OK;
+}
+
+void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+}
+
+void StatsHandler::prometheusRender(Stats::Store& stats,
+                                    const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params.used_only_,
-                                              params.filter_, server_.api().customStatNamespaces());
-  return Http::Code::OK;
+                                              text_readouts_vec, response, params,
+                                              custom_namespaces);
 }
 
 Http::Code StatsHandler::handlerContention(absl::string_view,

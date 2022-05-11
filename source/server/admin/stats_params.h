@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <regex>
 #include <string>
 
@@ -18,6 +19,13 @@ constexpr absl::string_view Gauges = "Gauges";
 constexpr absl::string_view Histograms = "Histograms";
 constexpr absl::string_view TextReadouts = "TextReadouts";
 } // namespace Labels
+
+enum class StatsFormat {
+=======
+#include "re2/re2.h"
+
+namespace Envoy {
+namespace Server {
 
 enum class StatsFormat {
   Html,
@@ -49,15 +57,15 @@ struct StatsParams {
    */
   static absl::string_view typeToString(StatsType type);
 
+  StatsType type_{StatsType::All};
+  StatsType start_type_{StatsType::TextReadouts};
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
-  // If no `format=` param we use Text, but the `UI` defaults to HTML.
   StatsFormat format_{StatsFormat::Text};
-  StatsType type_{StatsType::All};
-  StatsType start_type_{StatsType::TextReadouts};
   std::string filter_string_;
-  absl::optional<std::regex> filter_;
+  std::shared_ptr<std::regex> filter_;
+  std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;
 };

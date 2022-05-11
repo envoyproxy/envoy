@@ -169,8 +169,6 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
 }
 
 void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::CancelReason reason) {
-  // TODO(mattklein123): If cancel reason is timeout, do something more aggressive about destroying
-  // and recreating the DNS system to maximize the chance of success in following queries.
   ENVOY_LOG_EVENT(debug, "apple_dns_resolution_cancelled",
                   "dns resolution cancelled for {} with reason={}", dns_name_,
                   static_cast<int>(reason));

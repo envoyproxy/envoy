@@ -941,11 +941,14 @@ TEST_F(ConnectivityGridTest, RealGrid) {
                         Upstream::ResourcePriority::Default, socket_options_,
                         transport_socket_options_, state_, simTime(), alternate_protocols_,
                         options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  EXPECT_EQ("connection grid", grid.protocolDescription());
+  EXPECT_FALSE(grid.hasActiveConnections());
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_TRUE(optional_it1.has_value());
   EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+  EXPECT_FALSE(grid.hasActiveConnections());
 
   // Create the mixed pool.
   auto optional_it2 = ConnectivityGridForTest::forceCreateNextPool(grid);

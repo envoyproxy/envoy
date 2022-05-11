@@ -281,6 +281,7 @@ protected:
   const Http1Settings codec_settings_;
   std::unique_ptr<Parser> parser_;
   Buffer::Instance* current_dispatching_buffer_{};
+  Buffer::Instance* output_buffer_ = nullptr; // Not owned
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
@@ -417,9 +418,6 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
-  // Buffer used to encode the HTTP message before moving it to the network connection's output
-  // buffer. This buffer is always allocated, never nullptr.
-  Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -530,6 +528,9 @@ private:
   std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr owned_output_buffer_;
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
@@ -613,6 +614,10 @@ private:
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
+
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr owned_output_buffer_;
 
   absl::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before

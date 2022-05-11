@@ -15,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -26,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -175,6 +177,36 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
   }
 }
 
+TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Stats::Store& store = server_.stats();
+
+  // Cover the case where multiple chunks are emitted by making a large number
+  // of stats with long names, based on the default chunk size. The actual
+  // chunk size can be changed in the unit test for StatsRequest, but it can't
+  // easily be changed from this test. This covers a bug fix due to
+  // AdminImpl::runRunCallback not draining the buffer after each chunk, which
+  // it is not required to do. This test ensures that StatsRequest::nextChunk
+  // writes up to StatsRequest::DefaultChunkSize *additional* bytes on each
+  // call.
+  const std::string prefix(1000, 'a');
+  uint32_t expected_size = 0;
+
+  // Declare enough counters so that we are sure to exceed the chunk size.
+  const uint32_t n = (StatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
+  for (uint32_t i = 0; i <= n; ++i) {
+    const std::string name = absl::StrCat(prefix, i);
+    store.counterFromString(name);
+    expected_size += name.size() + strlen(": 0\n");
+  }
+  EXPECT_EQ(Http::Code::OK, getCallback("/stats", header_map, response));
+  EXPECT_LT(expected_size, response.length());
+  EXPECT_LT(StatsRequest::DefaultChunkSize, response.length());
+  EXPECT_THAT(response.toString(), StartsWith(absl::StrCat(prefix, "0: 0\n", prefix)));
+}
+
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
@@ -206,7 +238,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const Http::HeaderString& content_type = header_map.ContentType()->value();
-  EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
+  EXPECT_THAT(std::string(content_type.getStringView()), HasSubstr("text/html"));
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0, 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
   EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0, 0));

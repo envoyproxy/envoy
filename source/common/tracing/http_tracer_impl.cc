@@ -234,8 +234,12 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
       Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
   if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UpstreamAddress,
-                stream_info.upstreamInfo()->upstreamHost()->address()->asStringView());
+    auto upstream_address = stream_info.upstreamInfo()->upstreamHost()->address();
+    // TODO(wbpcode): separated `upstream_address` may be meaningful to the downstream span.
+    // But for the upstream span, `peer.address` should be used.
+    span.setTag(Tracing::Tags::get().UpstreamAddress, upstream_address->asStringView());
+    // TODO(wbpcode): may be set this tag in the setCommonTags.
+    span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
   }
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);

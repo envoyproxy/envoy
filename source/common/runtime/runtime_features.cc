@@ -29,30 +29,27 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
 RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_replies);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
+RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
-RUNTIME_GUARD(envoy_reloadable_features_correct_scheme_and_xfp);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
 RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
-RUNTIME_GUARD(envoy_reloadable_features_disable_tls_inspector_injection);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
-RUNTIME_GUARD(envoy_reloadable_features_fix_added_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_allow_capacity_increase_by_settings);
+RUNTIME_GUARD(envoy_reloadable_features_http2_delay_keepalive_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http_100_continue_case_insensitive);
-RUNTIME_GUARD(envoy_reloadable_features_http_ext_authz_do_not_skip_direct_response_and_redirect);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_internal_address);
-RUNTIME_GUARD(envoy_reloadable_features_listener_reuse_port_default_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_new_tcp_connection_pool);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
@@ -67,7 +64,6 @@ RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
-RUNTIME_GUARD(envoy_reloadable_features_use_dns_ttl);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_no_runtime_singleton);
@@ -90,6 +86,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
 // Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+// Used to track if runtime is initialized.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
@@ -180,6 +178,14 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   }
   IS_ENVOY_BUG(absl::StrCat("requested an unsupported integer ", feature));
   return default_value;
+}
+
+void markRuntimeInitialized() {
+  maybeSetRuntimeGuard("envoy.reloadable_features.runtime_initialized", true);
+}
+
+bool isRuntimeInitialized() {
+  return runtimeFeatureEnabled("envoy.reloadable_features.runtime_initialized");
 }
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value) {

@@ -32,39 +32,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 
-std::vector<TcpProxyIntegrationTestParams> newPoolTestParams() {
-  std::vector<TcpProxyIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::vector<TcpProxyIntegrationTestParams> getProtocolTestParams() {
-  std::vector<TcpProxyIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, true});
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::string
-protocolTestParamsToString(const ::testing::TestParamInfo<TcpProxyIntegrationTestParams>& params) {
-  return absl::StrCat(
-      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
-}
-
 void TcpProxyIntegrationTest::initialize() {
-  if (GetParam().test_original_version) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "false");
-  } else {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "true");
-  }
-
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
@@ -76,8 +44,9 @@ void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
                        "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
 }
 
-INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -525,6 +494,55 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                        "\r?.*",
                                        ip_port_regex, ip_regex)));
+}
+
+// Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
+// message when there is an upstream transport failure.
+TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  useListenerAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  // Ensure we don't get an upstream connection.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+
+  config_helper_.skipPortUsageValidation();
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  tcp_client->waitForDisconnect();
+
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+
+  EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
 // Make sure no bytes are logged when no data is sent.
@@ -986,7 +1004,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute(
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyMetadataMatchIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test subset load balancing for a regular cluster when endpoint selector is defined at the top
 // level.
@@ -1214,7 +1233,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyDynamicMetadataMatchIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
@@ -1258,7 +1278,8 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
@@ -1545,6 +1566,6 @@ TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
-                         testing::ValuesIn(newPoolTestParams()), protocolTestParamsToString);
-
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 } // namespace Envoy

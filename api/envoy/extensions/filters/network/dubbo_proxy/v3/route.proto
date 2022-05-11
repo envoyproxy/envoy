@@ -128,3 +128,11 @@ message MethodMatch {
   // The value is the parameter matching type.
   map<uint32, ParameterMatchSpecifier> params_match = 2;
 }
+
+message MultipleRouteConfiguration {
+  // The name of the named route configurations. This name is used in asynchronous route discovery.
+  string name = 1;
+
+  // The route table of the dubbo connection manager.
+  repeated RouteConfiguration route_config = 4;
+}

@@ -17,7 +17,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
     throw EnvoyException(regex_.error());
   }
 
-  if (do_program_size_check) {
+  if (do_program_size_check && Runtime::isRuntimeInitialized()) {
     const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
     const uint32_t max_program_size_error_level =
         Runtime::getInteger("re2.max_program_size.error_level", 100);
