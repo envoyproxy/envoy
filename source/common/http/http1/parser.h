@@ -112,6 +112,8 @@ public:
 
 class Parser {
 public:
+  virtual ~Parser() = default;
+
   // Executes the parser.
   // @return the number of parsed bytes.
   virtual size_t execute(const char* slice, int len) PURE;
