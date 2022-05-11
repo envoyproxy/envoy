@@ -614,8 +614,9 @@ CacheLookupStatus CacheFilter::cacheLookupStatus() const {
     case CacheEntryStatus::LookupError:
       return CacheLookupStatus::LookupError;
     }
-    IS_ENVOY_BUG(absl::StrCat("Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                              std::to_string(static_cast<int>(filter_state_))));
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state_))));
     return CacheLookupStatus::Unknown;
   }
 
