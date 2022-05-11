@@ -248,6 +248,7 @@ public:
     return FilterStatus::Continue;
   }
   bool passthroughEnabled() const override { return false; }
+  bool fromClient() const override { return false; }
 
   // ThriftObject
   bool onData(Buffer::Instance& buffer) override;

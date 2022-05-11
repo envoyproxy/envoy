@@ -61,7 +61,8 @@ public:
     EXPECT_FALSE(metadata_->hasFrameSize());
     EXPECT_FALSE(metadata_->hasProtocol());
     EXPECT_FALSE(metadata_->hasAppException());
-    EXPECT_EQ(metadata_->headers().size(), 0);
+    EXPECT_EQ(metadata_->requestHeaders().size(), 0);
+    EXPECT_EQ(metadata_->responseHeaders().size(), 0);
   }
 
   void addMessageStart(Buffer::Instance& buffer, const std::string& name = "the_name",
@@ -83,7 +84,7 @@ public:
     TestTwitterProtocolImpl proto;
     metadata_->setTraceId(trace_id);
     metadata_->setSpanId(span_id);
-    metadata_->headers().addCopy(Http::LowerCaseString(":client-id"), client_id);
+    metadata_->requestHeaders().addCopy(Http::LowerCaseString(":client-id"), client_id);
 
     proto.writeRequestHeaderForTest(buffer, *metadata_);
     addMessageStart(buffer, name, msg_type, seq_id);
@@ -100,7 +101,7 @@ public:
 
     metadata_->mutableSpans().emplace_back(trace_id, "", span_id, absl::optional<int64_t>(),
                                            AnnotationList(), BinaryAnnotationList(), false);
-    metadata_->headers().addCopy(Http::LowerCaseString("test-header"), "test-header-value");
+    metadata_->responseHeaders().addCopy(Http::LowerCaseString("test-header"), "test-header-value");
 
     proto.writeResponseHeaderForTest(buffer, *metadata_);
     addMessageStart(buffer, name, msg_type, seq_id);
@@ -486,7 +487,7 @@ TEST_F(TwitterProtocolTest, ParseRequestHeader) {
   EXPECT_TRUE(metadata_->flags());
   EXPECT_EQ(5, *metadata_->flags());
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ(6, test_headers.size());
 
   EXPECT_EQ("thrift-client-id", test_headers.get_(":client-id"));
@@ -522,7 +523,7 @@ TEST_F(TwitterProtocolTest, ParseEmptyRequestHeader) {
   EXPECT_FALSE(metadata_->flags());
   EXPECT_TRUE(metadata_->spans().empty());
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ(0, test_headers.size());
 }
 
@@ -534,7 +535,7 @@ TEST_F(TwitterProtocolTest, WriteRequestHeader) {
   metadata_->setParentSpanId(10);
   metadata_->setSampled(true);
   metadata_->setFlags(5);
-  Http::HeaderMap& headers = metadata_->headers();
+  Http::HeaderMap& headers = metadata_->requestHeaders();
   headers.addCopy(Http::LowerCaseString(":client-id"), "thrift-client-id");
   headers.addCopy(Http::LowerCaseString(":dest"), "dest");
   headers.addCopy(Http::LowerCaseString(":d:s1"), "d1");
@@ -555,7 +556,7 @@ TEST_F(TwitterProtocolTest, WriteRequestHeader) {
   EXPECT_TRUE(*metadata_->sampled());
   EXPECT_EQ(5, *metadata_->flags());
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ(4, test_headers.size());
   EXPECT_EQ("thrift-client-id", test_headers.get_(":client-id"));
   EXPECT_EQ("dest", test_headers.get_(":dest"));
@@ -580,7 +581,7 @@ TEST_F(TwitterProtocolTest, WriteMostlyEmptyRequestHeader) {
   EXPECT_FALSE(metadata_->sampled());
   EXPECT_FALSE(metadata_->flags());
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ(0, test_headers.size());
 }
 
@@ -695,7 +696,7 @@ TEST_F(TwitterProtocolTest, ParseResponseHeader) {
     EXPECT_FALSE(span.debug_);
   }
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ(2, test_headers.size());
   EXPECT_EQ("v1", test_headers.get_("k1"));
   EXPECT_EQ("v2", test_headers.get_("k2"));
@@ -713,13 +714,13 @@ TEST_F(TwitterProtocolTest, ParseEmptyResponseHeader) {
 
   EXPECT_TRUE(metadata_->spans().empty());
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->responseHeaders());
   EXPECT_EQ(0, test_headers.size());
 }
 
 // Test writing a ResponseHeader
 TEST_F(TwitterProtocolTest, WriteResponseHeader) {
-  Http::HeaderMap& headers = metadata_->headers();
+  Http::ResponseHeaderMap& headers = metadata_->responseHeaders();
   headers.addCopy(Http::LowerCaseString("key1"), "value1");
   headers.addCopy(Http::LowerCaseString("key2"), "value2");
 
@@ -797,7 +798,7 @@ TEST_F(TwitterProtocolTest, WriteResponseHeader) {
   EXPECT_TRUE(span2.binary_annotations_.empty());
   EXPECT_FALSE(span2.debug_);
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ("value1", test_headers.get_("key1"));
   EXPECT_EQ("value2", test_headers.get_("key2"));
 }
@@ -821,7 +822,7 @@ TEST_F(TwitterProtocolTest, WriteEmptyResponseHeader) {
 
   EXPECT_TRUE(metadata_->spans().empty());
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ(0, test_headers.size());
 }
 
@@ -839,7 +840,7 @@ TEST_F(TwitterProtocolTest, TestUpgradedRequestMessageBegin) {
   EXPECT_EQ(101, metadata_->sequenceId());
   EXPECT_EQ(1, *metadata_->traceId());
   EXPECT_EQ(2, *metadata_->spanId());
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
   EXPECT_EQ("test_client", test_headers.get_(":client-id"));
 }
 
@@ -864,7 +865,7 @@ TEST_F(TwitterProtocolTest, TestUpgradedRequestMessageContinuation) {
     EXPECT_EQ(101, metadata_->sequenceId());
     EXPECT_EQ(1, *metadata_->traceId());
     EXPECT_EQ(2, *metadata_->spanId());
-    Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+    Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
     EXPECT_EQ("test_client", test_headers.get_(":client-id"));
   }
 }
@@ -884,7 +885,7 @@ TEST_F(TwitterProtocolTest, TestUpgradedReplyMessageBegin) {
   EXPECT_EQ(1, metadata_->spans().size());
   EXPECT_EQ(1, metadata_->spans().front().trace_id_);
   EXPECT_EQ(2, metadata_->spans().front().span_id_);
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+  Http::TestResponseHeaderMapImpl test_headers(metadata_->responseHeaders());
   EXPECT_EQ("test-header-value", test_headers.get_("test-header"));
 }
 
@@ -911,7 +912,7 @@ TEST_F(TwitterProtocolTest, TestUpgradedReplyMessageContinuation) {
     EXPECT_EQ(1, metadata_->spans().size());
     EXPECT_EQ(1, metadata_->spans().front().trace_id_);
     EXPECT_EQ(2, metadata_->spans().front().span_id_);
-    Http::TestRequestHeaderMapImpl test_headers(metadata_->headers());
+    Http::TestResponseHeaderMapImpl test_headers(metadata_->responseHeaders());
     EXPECT_EQ("test-header-value", test_headers.get_("test-header"));
   }
 }

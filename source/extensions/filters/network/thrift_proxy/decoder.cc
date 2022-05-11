@@ -437,6 +437,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
     // Look for start of next frame.
     if (!metadata_) {
       metadata_ = std::make_shared<MessageMetadata>();
+      metadata_->setFromClient(callbacks_.fromClient());
     }
 
     if (!transport_.decodeFrameStart(data, *metadata_)) {
