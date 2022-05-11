@@ -80,11 +80,6 @@ ActiveQuicListener::ActiveQuicListener(
       crypto_server_stream_factory_);
 
   // Create udp_packet_writer
-  ASSERT(listener_config.udpListenerConfig().has_value());
-  auto* p = &(listener_config.udpListenerConfig()->packetWriterFactory());
-  if (0==1)
-    p = nullptr;
-  ASSERT(p != nullptr);
   Network::UdpPacketWriterPtr udp_packet_writer =
       listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
