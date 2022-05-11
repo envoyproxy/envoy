@@ -33,6 +33,10 @@ minor_behavior_changes:
   change: |
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
     that loads shared object libraries, such as those installed via luarocks.
+- area: admin
+  change: |
+    changed default regex engine for /stats?filter= from std::regex to RE2, improving filtering speed
+    20x.
 - area: skywalking
   change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.
@@ -86,9 +90,15 @@ new_features:
 - area: http
   change: |
     added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
+- area: http
+  change: |
+    preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: thrift
+  change: |
+    added support for access logging.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
