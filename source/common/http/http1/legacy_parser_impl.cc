@@ -178,8 +178,8 @@ bool LegacyHttpParserImpl::isChunked() const { return impl_->isChunked(); }
 
 absl::string_view LegacyHttpParserImpl::methodName() const { return impl_->methodName(); }
 
-absl::string_view LegacyHttpParserImpl::errnoName(int rc) const {
-  return http_errno_name(static_cast<http_errno>(rc));
+absl::string_view LegacyHttpParserImpl::errnoName(ParserStatus rc) const {
+  return http_errno_name(static_cast<http_errno>(statusToInt(rc)));
 }
 
 int LegacyHttpParserImpl::hasTransferEncoding() const { return impl_->hasTransferEncoding(); }

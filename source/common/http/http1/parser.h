@@ -154,8 +154,8 @@ public:
   // Returns a textual representation of the method. For requests only.
   virtual absl::string_view methodName() const PURE;
 
-  // Returns a textual representation of the given return code.
-  virtual absl::string_view errnoName(int rc) const PURE;
+  // Returns a textual representation of the given parser status.
+  virtual absl::string_view errnoName(ParserStatus rc) const PURE;
 
   // Returns whether the Transfer-Encoding header is present.
   virtual int hasTransferEncoding() const PURE;
