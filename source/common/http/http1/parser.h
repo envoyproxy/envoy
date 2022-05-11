@@ -117,7 +117,7 @@ public:
     // Number of parsed bytes.
     size_t nread;
     // Integer error from parser indicating return code.
-    int rc;
+    ParserStatus rc;
   };
   virtual ~Parser() = default;
 

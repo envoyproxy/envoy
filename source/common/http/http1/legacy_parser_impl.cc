@@ -94,7 +94,8 @@ public:
   }
 
   RcVal execute(const char* slice, int len) {
-    return {http_parser_execute(&parser_, &settings_, slice, len), HTTP_PARSER_ERRNO(&parser_)};
+    return {http_parser_execute(&parser_, &settings_, slice, len),
+            intToStatus(HTTP_PARSER_ERRNO(&parser_))};
   }
 
   void resume() { http_parser_pause(&parser_, 0); }

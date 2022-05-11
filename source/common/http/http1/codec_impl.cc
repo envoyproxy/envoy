@@ -635,8 +635,7 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
     return codec_status_;
   }
 
-  if (rc != parser_->statusToInt(ParserStatus::Success) &&
-      rc != parser_->statusToInt(ParserStatus::Paused)) {
+  if (rc != ParserStatus::Success && rc != ParserStatus::Paused) {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
