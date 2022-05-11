@@ -1841,6 +1841,142 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 4567
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.2
+    port_value: 4567
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+per_connection_buffer_limit_bytes: 999
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1234
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1234
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+per_connection_buffer_limit_bytes: 999
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
