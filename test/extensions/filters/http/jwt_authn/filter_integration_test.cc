@@ -20,44 +20,6 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-const char HeaderToFilterStateFilterName[] = "envoy.filters.http.header_to_filter_state_for_test";
-// This filter extracts a string header from "header" and
-// save it into FilterState as name "state" as read-only Router::StringAccessor.
-class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
-public:
-  HeaderToFilterStateFilter(const std::string& header, const std::string& state)
-      : header_(header), state_(state) {}
-
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    const auto entry = headers.get(header_);
-    if (!entry.empty()) {
-      decoder_callbacks_->streamInfo().filterState()->setData(
-          state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::FilterChain);
-    }
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-private:
-  Http::LowerCaseString header_;
-  std::string state_;
-};
-
-class HeaderToFilterStateFilterConfig : public Common::EmptyHttpFilterConfig {
-public:
-  HeaderToFilterStateFilterConfig()
-      : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
-
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
-    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(
-          std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
-    };
-  }
-};
-
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
