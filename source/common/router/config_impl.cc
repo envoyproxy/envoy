@@ -114,11 +114,6 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
           throw EnvoyException(
               fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
-      } else {
-        // For shadow policies with `cluster_header_`, we only verify that this field is not
-        // empty because the cluster name is not set yet at config time.
-        // Assert here after the validateMirrorClusterSpecifier check.
-        ASSERT(!shadow_policy->clusterHeader().get().empty());
       }
     }
   }
@@ -390,6 +385,8 @@ void validateMirrorClusterSpecifier(
                                      "in request mirror policy can be specified",
                                      config.cluster(), config.cluster_header()));
   } else if (config.cluster().empty() && config.cluster_header().empty()) {
+    // For shadow policies with `cluster_header_`, we only verify that this field is not
+    // empty because the cluster name is not set yet at config time.
     throw EnvoyException(
         "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
   }

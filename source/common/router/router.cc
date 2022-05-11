@@ -841,17 +841,17 @@ void Filter::cleanup() {
   }
 }
 
-absl::optional<std::string> Filter::getShadowCluster(const ShadowPolicy& policy,
-                                                     const Http::HeaderMap& headers) const {
+absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& policy,
+                                                           const Http::HeaderMap& headers) const {
   if (!policy.cluster().empty()) {
     return policy.cluster();
   } else {
     ASSERT(!policy.clusterHeader().get().empty());
     const auto entry = headers.get(policy.clusterHeader());
     if (!entry.empty() && !entry[0]->value().empty()) {
-      return std::string(entry[0]->value().getStringView());
+      return entry[0]->value().getStringView();
     }
-    ENVOY_STREAM_LOG(warn, "There is no cluster name in header: {}", *callbacks_,
+    ENVOY_STREAM_LOG(debug, "There is no cluster name in header: {}", *callbacks_,
                      policy.clusterHeader());
     return absl::nullopt;
   }
@@ -861,7 +861,7 @@ void Filter::maybeDoShadowing() {
   for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
-    const absl::optional<std::string> cluster_name =
+    const absl::optional<absl::string_view> cluster_name =
         getShadowCluster(shadow_policy, *downstream_headers_);
 
     // The cluster name got from headers is empty.
@@ -883,7 +883,7 @@ void Filter::maybeDoShadowing() {
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled());
-    config_.shadowWriter().shadow(cluster_name.value(), std::move(request), options);
+    config_.shadowWriter().shadow(std::string(cluster_name.value()), std::move(request), options);
   }
 }
 
