@@ -297,7 +297,7 @@ public:
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return socket_factories_;
     }
-    bool bindToPort() override { return bind_to_port_; }
+    bool bindToPort() const override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }

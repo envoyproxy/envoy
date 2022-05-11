@@ -542,10 +542,10 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithCompatibleAddress(const ListenerList& list,
+bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
                                                            const ListenerImpl& listener) {
   for (const auto& existing_listener : list) {
-    if (existing_listener->hasCompatibleAddress(listener)) {
+    if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
   }
@@ -1018,13 +1018,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     const std::string& name, const envoy::config::core::v3::Address& proto_address,
     ListenerImpl& listener) {
-  // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
-  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
-  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
-  // different listeners receiving connections destined for the same port.
-  if ((!listener.bindToPort() || listener.config().address().socket_address().port_value() != 0) &&
-      (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
-       hasListenerWithCompatibleAddress(active_listeners_, listener))) {
+  if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
+      hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));

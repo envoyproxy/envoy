@@ -162,7 +162,7 @@ public:
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
    */
-  virtual bool bindToPort() PURE;
+  virtual bool bindToPort() const PURE;
 
   /**
    * @return bool if a connection should be handed off to another Listener after the original

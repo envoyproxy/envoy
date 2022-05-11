@@ -251,6 +251,154 @@ filter_chains:
       "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, DuplicateNonIPAddressNotAllowed) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  pipe:
+    path: /path
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  pipe:
+    path: /path
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+      "error adding listener: 'bar' has duplicate address '/path' as existing listener");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleAddressesDuplicatePortNotAllowed) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                            "error adding listener: 'bar' has duplicate address "
+                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       MultipleAddressesDuplicatePortNotAllowedWithZeroPortAndNonBind) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 0
+bind_to_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 0
+bind_to_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                            "error adding listener: 'bar' has duplicate address "
+                            "'127.0.0.1:0,127.0.0.3:0' as existing listener");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, AllowCreateListenerWithMutipleZeroPorts) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 0
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 0
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:
