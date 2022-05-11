@@ -5,6 +5,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
@@ -112,9 +113,11 @@ public:
    */
   virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                    Stats::Scope& scope) PURE;
+  std::string category() const override { return "envoy.udp"; }
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
+using UdpPacketWriterFactoryOptRef = OptRef<UdpPacketWriterFactory>;
 
 } // namespace Network
 } // namespace Envoy

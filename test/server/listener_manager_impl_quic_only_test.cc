@@ -214,6 +214,14 @@ udp_listener_config:
       "@type": type.googleapis.com/envoy.extensions.quic.udp_packet_writer.v3.UdpDefaultWriterFactory
   )EOF",
                                                        Network::Address::IpVersion::v4);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 0);
+  }
+#endif
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
 

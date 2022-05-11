@@ -13,6 +13,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: UDP packet writer config]
 // [#extension: envoy.quic.udp_packet_writer.server.quiche]
 
-// Configuration for the default UDP packet writer factory.
+// Configuration for the default UDP packet writer factory which simply
+// uses the kernel's sendmsg() to send UDP packets.
 message UdpDefaultWriterFactory {
 }

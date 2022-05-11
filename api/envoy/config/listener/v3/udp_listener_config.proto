@@ -37,6 +37,8 @@ message UdpListenerConfig {
   // to the default object to enable QUIC without modifying any additional options.
   QuicProtocolOptions quic_options = 7;
 
+  // Configuration for the UDP packet writer. If empty, the writer will use GSO if available
+  // or the default kernel sendmsg if not.
   core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
 }
 
