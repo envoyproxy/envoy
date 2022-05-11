@@ -14,7 +14,7 @@ namespace Http {
 namespace Http2 {
 
 // TODO(alyssar) use for normal HTTP/2 streams not just the mixed pool.
-uint32_t ActiveClient::calculateInitialStreams(
+uint32_t ActiveClient::calculateInitialStreamsLimit(
     Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
     absl::optional<HttpServerPropertiesCache::Origin>& origin,
     Upstream::HostDescriptionConstSharedPtr host) {

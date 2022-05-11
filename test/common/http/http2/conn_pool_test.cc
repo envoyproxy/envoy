@@ -1799,7 +1799,7 @@ TEST_F(Http2ConnPoolImplTest, TestStateWithMultiplexing) {
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 }
 
-class InitialStreamsTest : public Http2ConnPoolImplTest {
+class InitialStreamsLimitTest : public Http2ConnPoolImplTest {
 protected:
   void SetUp() override {
     mock_host_->cluster_.http2_options_.mutable_max_concurrent_streams()->set_value(2000);
@@ -1818,38 +1818,38 @@ protected:
       std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()};
 };
 
-TEST_F(InitialStreamsTest, InitialStreamsDefaultsNoCache) {
+TEST_F(InitialStreamsLimitTest, InitialStreamsLimitDefaultsNoCache) {
   // By default, return max concurrent streams from SetUp.
   cache_ = nullptr;
-  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(nullptr, origin_, mock_host_));
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
 }
 
-TEST_F(InitialStreamsTest, InitialStreamsDefaultsWithCache) {
+TEST_F(InitialStreamsLimitTest, InitialStreamsLimitDefaultsWithCache) {
   // Adding a cache is a no-op if there's no cached settings.
-  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(cache_, origin_, mock_host_));
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
 }
 
-TEST_F(InitialStreamsTest, InitialStreamsZeroCached) {
+TEST_F(InitialStreamsLimitTest, InitialStreamsLimitZeroCached) {
   // Zero is ignored.
   EXPECT_CALL(*cache_, getConcurrentStreams(_)).WillOnce(Return(0));
-  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(cache_, origin_, mock_host_));
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
 }
 
-TEST_F(InitialStreamsTest, InitialStreamsRespectCache) {
+TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectCache) {
   // Cached settings are respected if lower than configured streams.
   EXPECT_CALL(*cache_, getConcurrentStreams(_)).WillOnce(Return(500));
-  EXPECT_EQ(500, ActiveClient::calculateInitialStreams(cache_, origin_, mock_host_));
+  EXPECT_EQ(500, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
 }
 
-TEST_F(InitialStreamsTest, InitialStreamsRespectMaxRequests) {
+TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
   // Max requests per connection is an upper bound.
   EXPECT_CALL(*cache_, getConcurrentStreams(_)).WillOnce(Return(500));
   EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
       .Times(AnyNumber())
       .WillRepeatedly(Return(100));
-  EXPECT_EQ(100, ActiveClient::calculateInitialStreams(cache_, origin_, mock_host_));
+  EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
 }
-TEST_F(InitialStreamsTest, InitialStreamsOld) {
+TEST_F(InitialStreamsLimitTest, InitialStreamsLimitOld) {
   // All these bounds are ignored with the reloadable feature off.
   EXPECT_CALL(*cache_, getConcurrentStreams(_)).Times(0);
   EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
@@ -1857,7 +1857,7 @@ TEST_F(InitialStreamsTest, InitialStreamsOld) {
       .WillRepeatedly(Return(100));
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
-  EXPECT_EQ(2000, ActiveClient::calculateInitialStreams(nullptr, origin_, mock_host_));
+  EXPECT_EQ(2000, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
 }
 
 } // namespace Http2

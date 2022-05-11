@@ -19,10 +19,10 @@ class ActiveClient : public MultiplexedActiveClientBase {
 public:
   // Calculate the expected streams allowed for this host, based on both
   // configuration and cached SETTINGS.
-  static uint32_t
-  calculateInitialStreams(Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
-                          absl::optional<HttpServerPropertiesCache::Origin>& origin,
-                          Upstream::HostDescriptionConstSharedPtr host);
+  static uint32_t calculateInitialStreamsLimit(
+      Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
+      absl::optional<HttpServerPropertiesCache::Origin>& origin,
+      Upstream::HostDescriptionConstSharedPtr host);
 
   ActiveClient(HttpConnPoolImplBase& parent);
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
