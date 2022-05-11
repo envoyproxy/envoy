@@ -87,6 +87,7 @@ public:
   }
 
   bool earlyDataEnabled() const { return enable_early_data_; }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 
 protected:
   void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
@@ -103,6 +104,9 @@ public:
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   void initialize() override {}
+  absl::string_view defaultServerNameIndication() const override {
+    return clientContextConfig().serverNameIndication();
+  }
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.

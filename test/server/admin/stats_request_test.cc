@@ -31,12 +31,16 @@ protected:
   }
 
   std::unique_ptr<StatsRequest> makeRequest(bool used_only, bool json) {
-    return std::make_unique<StatsRequest>(store_, used_only, json,
-                                          Utility::HistogramBucketsMode::NoBuckets, absl::nullopt);
+    StatsParams params;
+    params.used_only_ = used_only;
+    if (json) {
+      params.format_ = StatsFormat::Json;
+    }
+    return std::make_unique<StatsRequest>(store_, params);
   }
 
   // Executes a request, counting the chunks that were generated.
-  uint32_t iterateChunks(StatsRequest& request) {
+  uint32_t iterateChunks(StatsRequest& request, bool drain = true) {
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request.start(response_headers);
     EXPECT_EQ(Http::Code::OK, code);
@@ -48,7 +52,9 @@ protected:
       uint64_t size = data.length();
       if (size > 0) {
         ++num_chunks;
-        data.drain(size);
+        if (drain) {
+          data.drain(size);
+        }
       }
     } while (more);
     return num_chunks;
@@ -79,9 +85,29 @@ protected:
 
 TEST_F(StatsRequestTest, Empty) { EXPECT_EQ(0, iterateChunks(*makeRequest(false, false))); }
 
-TEST_F(StatsRequestTest, OneStat) {
+TEST_F(StatsRequestTest, OneCounter) {
   store_.counterFromStatName(makeStatName("foo"));
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneGauge) {
+  store_.gaugeFromStatName(makeStatName("foo"), Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneHistogram) {
+  store_.histogramFromStatName(makeStatName("foo"), Stats::Histogram::Unit::Milliseconds);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneTextReadout) {
+  store_.textReadoutFromStatName(makeStatName("foo"));
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneScope) {
+  Stats::ScopeSharedPtr scope = store_.createScope("foo");
+  EXPECT_EQ(0, iterateChunks(*makeRequest(false, false)));
 }
 
 TEST_F(StatsRequestTest, ManyStatsSmallChunkSize) {
@@ -91,6 +117,15 @@ TEST_F(StatsRequestTest, ManyStatsSmallChunkSize) {
   std::unique_ptr<StatsRequest> request = makeRequest(false, false);
   request->setChunkSize(100);
   EXPECT_EQ(9, iterateChunks(*request));
+}
+
+TEST_F(StatsRequestTest, ManyStatsSmallChunkSizeNoDrain) {
+  for (uint32_t i = 0; i < 100; ++i) {
+    store_.counterFromStatName(makeStatName(absl::StrCat("foo", i)));
+  }
+  std::unique_ptr<StatsRequest> request = makeRequest(false, false);
+  request->setChunkSize(100);
+  EXPECT_EQ(9, iterateChunks(*request, false));
 }
 
 TEST_F(StatsRequestTest, OneStatUsedOnly) {

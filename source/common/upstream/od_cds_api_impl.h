@@ -87,7 +87,7 @@ private:
   CdsApiHelper helper_;
   ClusterManager& cm_;
   MissingClusterNotifier& notifier_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   StartStatus status_;
   absl::flat_hash_set<std::string> awaiting_names_;
   Config::SubscriptionPtr subscription_;

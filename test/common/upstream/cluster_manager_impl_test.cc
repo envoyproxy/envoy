@@ -5176,6 +5176,52 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   expectSetsockoptSoKeepalive(7, 4, 1);
 }
 
+// Make sure the drainConnections() with a predicate can correctly exclude a host.
+TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Set up the HostSet.
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81", time_system_);
+
+  HostVector hosts{host1, host2};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // Sending non-mergeable updates.
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  // Using RR LB get a pool for each host.
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
+  Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_NE(cp1, cp2);
+
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, drainConnections(_)).Times(0);
+  cluster_manager_->drainConnections("cluster_1", [](const Upstream::Host& host) {
+    return host.address()->asString() == "127.0.0.1:80";
+  });
+}
+
 TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -5390,7 +5436,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
 TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.conn_pool_delete_when_idle", "true"}});
 
   const std::string yaml = R"EOF(
   static_resources:

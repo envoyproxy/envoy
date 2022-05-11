@@ -118,6 +118,9 @@ def envoy_copts(repository, test = False):
                # APPLE_USE_RFC_3542 is needed to support IPV6_PKTINFO in MAC OS.
                repository + "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
                "//conditions:default": [],
+           }) + select({
+               repository + "//bazel:uhv_enabled": ["-DENVOY_ENABLE_UHV"],
+               "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_enable_http3(["-DENVOY_ENABLE_QUIC"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \

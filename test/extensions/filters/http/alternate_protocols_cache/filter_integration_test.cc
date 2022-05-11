@@ -5,7 +5,7 @@
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -211,7 +211,7 @@ protected:
     size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
                          timeSystem().monotonicTime().time_since_epoch())
                          .count();
-    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0");
+    std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0|0");
     TestEnvironment::writeStringToFileForTest(
         "alt_svc_cache.txt", absl::StrCat(key.length(), "\n", key, value.length(), "\n", value));
   }
@@ -237,8 +237,8 @@ protected:
 };
 
 int getSrtt(std::string alt_svc, TimeSource& time_source) {
-  auto data = Http::AlternateProtocolsCacheImpl::originDataFromString(alt_svc, time_source,
-                                                                      /*from_cache=*/false);
+  auto data = Http::HttpServerPropertiesCacheImpl::originDataFromString(alt_svc, time_source,
+                                                                        /*from_cache=*/false);
   return data.has_value() ? data.value().srtt.count() : 0;
 }
 

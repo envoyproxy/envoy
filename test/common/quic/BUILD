@@ -72,7 +72,6 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_filter_manager_connection_lib",
-        "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
@@ -110,7 +109,6 @@ envoy_cc_test(
     srcs = ["envoy_quic_server_stream_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
         "//source/common/http:headers_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
@@ -133,7 +131,6 @@ envoy_cc_test(
     srcs = ["envoy_quic_client_stream_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
         "//source/common/http:headers_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
@@ -154,7 +151,6 @@ envoy_cc_test(
     srcs = ["envoy_quic_server_session_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
@@ -183,7 +179,6 @@ envoy_cc_test(
     srcs = ["envoy_quic_client_session_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
         "//source/common/quic:codec_lib",
@@ -207,7 +202,7 @@ envoy_cc_test(
     srcs = ["active_quic_listener_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
+        ":test_proof_source_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
@@ -232,7 +227,6 @@ envoy_cc_test(
     srcs = ["envoy_quic_dispatcher_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
@@ -273,17 +267,6 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "quic_test_utils_for_envoy_lib",
-    srcs = ["crypto_test_utils_for_envoy.cc"],
-    tags = ["nofips"],
-    deps = [
-        ":test_proof_source_lib",
-        ":test_proof_verifier_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
-    ],
-)
-
 envoy_cc_test(
     name = "client_connection_factory_impl_test",
     srcs = ["client_connection_factory_impl_test.cc"],
@@ -297,8 +280,8 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/http:alternate_protocols_cache_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
@@ -326,10 +309,10 @@ envoy_cc_test(
     srcs = ["envoy_quic_utils_test.cc"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stream_info/stream_info.h"
@@ -36,6 +37,7 @@ class ExternalProcessorClient {
 public:
   virtual ~ExternalProcessorClient() = default;
   virtual ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
+                                           const envoy::config::core::v3::GrpcService& grpc_service,
                                            const StreamInfo::StreamInfo& stream_info) PURE;
 };
 

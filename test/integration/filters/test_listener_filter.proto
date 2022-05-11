@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+// Configuration for UDP listener filter test
+message TestUdpListenerFilterConfig {
+}

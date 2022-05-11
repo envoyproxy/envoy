@@ -943,6 +943,7 @@ TEST_P(Http2FloodMitigationTest, RstStreamOnStreamIdleTimeoutAfterResponseHeader
 // timer. The test verifies protocol constraint violation handling in the
 // Http2::ConnectionImpl::sendKeepalive() method.
 TEST_P(Http2FloodMitigationTest, KeepAliveTimeeTriggersFloodProtection) {
+  DISABLE_UNDER_COVERAGE; // https://github.com/envoyproxy/envoy/issues/21019
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {

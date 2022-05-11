@@ -252,6 +252,7 @@ envoy_cc_test(
     srcs = [
         "drain_close_integration_test.cc",
     ],
+    shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:utility_lib",
@@ -551,7 +552,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 16,
+    shard_count = 32,
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -683,7 +684,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 4,
+    shard_count = 6,
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -1013,7 +1014,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1345,8 +1346,10 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/upstreams/http/tcp:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
     ],
 )
 
@@ -1668,6 +1671,7 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/filters:address_restore_listener_filter_lib",
+        "//test/integration/filters:inspect_data_listener_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:network_utility_lib",
@@ -1709,6 +1713,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
+    shard_count = 2,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1770,7 +1775,7 @@ envoy_cc_test(
         "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
     ],
     data = ["//test/config/integration/certs"],
-    shard_count = 8,
+    shard_count = 12,
     tags = [
         "nofips",
     ],
@@ -1812,7 +1817,6 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:quic_factory_lib",
-        "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/test_common:test_runtime_lib",

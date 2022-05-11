@@ -23,6 +23,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 
@@ -178,7 +179,9 @@ public:
           // that the internal book keeping resetStream() below is consistent with the state of the
           // client codec state, which is necessary to prevent multiple simultaneous streams for the
           // HTTP/1 codec.
-          request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          if (response_.stream_state_ != StreamState::Closed) {
+            request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          }
           resetStream();
           stream_reset_callback_();
         }));
@@ -516,7 +519,7 @@ using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
-enum class HttpVersion { Http1, Http2 };
+enum class HttpVersion { Http1, Http2Nghttp2, Http2WrappedNghttp2, Http2Oghttp2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
@@ -537,12 +540,33 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   HttpStream::ConnectionContext connection_context(&conn_manager_config, server_connection,
                                                    client_connection);
+  TestScopedRuntime scoped_runtime;
 
   Http1::CodecStats::AtomicPtr http1_stats;
   Http2::CodecStats::AtomicPtr http2_stats;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
-  const bool http2 = http_version == HttpVersion::Http2;
+  bool http2 = false;
+
+  switch (http_version) {
+  case HttpVersion::Http1:
+    break;
+  case HttpVersion::Http2Nghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+    break;
+  case HttpVersion::Http2WrappedNghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+    break;
+  case HttpVersion::Http2Oghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+    break;
+  }
 
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
@@ -742,7 +766,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // Validate input early.
     TestUtility::validate(input);
     codecFuzz(input, HttpVersion::Http1);
-    codecFuzz(input, HttpVersion::Http2);
+    codecFuzz(input, HttpVersion::Http2Nghttp2);
+    codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+    codecFuzz(input, HttpVersion::Http2Oghttp2);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }

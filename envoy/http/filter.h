@@ -1001,6 +1001,15 @@ public:
   virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const Network::Address::Instance& localAddress() const {
+    return *connectionInfoProvider().localAddress();
+  }
+
+  const Network::Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
 };
 
 /**
