@@ -386,6 +386,8 @@ protected:
   uint32_t connecting_stream_capacity_{0};
 
 private:
+  void drainClients(std::list<ActiveClientPtr>& clients);
+
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.

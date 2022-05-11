@@ -400,6 +400,15 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   }
 }
 
+void ConnPoolImplBase::drainClients(std::list<ActiveClientPtr>& clients) {
+  while (!clients.empty()) {
+    ASSERT(clients.front()->numActiveStreams() > 0u);
+    ENVOY_LOG_EVENT(debug, "draining_non_idle_client", "draining client {} for cluster {}",
+                    clients.front()->id(), host_->cluster().name());
+    transitionActiveClientState(*clients.front(), ActiveClient::State::Draining);
+  }
+}
+
 void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     is_draining_for_deletion_ = true;
@@ -407,25 +416,20 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
     return;
   }
   closeIdleConnectionsForDrainingPool();
+  // closeIdleConnectionsForDrainingPool() closes all connections in ready_clients_ with no active
+  // streams and if no pending streams, all connections in early_data_clients_ with no active
+  // streams as well, so all remaining entries in ready_clients_ are serving streams. Move them and
+  // all entries in busy_clients_ to draining.
   if (pending_streams_.empty()) {
     // The remaining early data clients are non-idle.
-    while (!early_data_clients_.empty()) {
-      ASSERT(early_data_clients_.back()->numActiveStreams() > 0u);
-      ENVOY_LOG_EVENT(debug, "draining_non_idle_early_data_client",
-                      "draining early data client {} for cluster {}",
-                      early_data_clients_.front()->id(), host_->cluster().name());
-      transitionActiveClientState(*early_data_clients_.front(), ActiveClient::State::Draining);
-    }
+    ENVOY_LOG_EVENT(debug, "draining_non_idle_early_data_client",
+                    "draining early data clients for cluster {}", host_->cluster().name());
+    drainClients(early_data_clients_);
   }
 
-  // closeIdleConnectionsForDrainingPool() closes all connections in ready_clients_ with no active
-  // streams, so all remaining entries in ready_clients_ are serving streams. Move them and all
-  // entries in busy_clients_ to draining.
-  while (!ready_clients_.empty()) {
-    ENVOY_LOG_EVENT(debug, "draining_ready_client", "draining active client {} for cluster {}",
-                    ready_clients_.front()->id(), host_->cluster().name());
-    transitionActiveClientState(*ready_clients_.front(), ActiveClient::State::Draining);
-  }
+  ENVOY_LOG_EVENT(debug, "draining_ready_client", "draining active clients for cluster {}",
+                  host_->cluster().name());
+  drainClients(ready_clients_);
 
   // Changing busy_clients_ to Draining does not move them between lists,
   // so use a for-loop since the list is not mutated.
@@ -473,7 +477,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
     }
-    const bool contributed_to_connecting_stream_capacity = client.currentUnusedCapacity() > 0;
     decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
 
     // Make sure that onStreamClosed won't double count.
@@ -493,27 +496,25 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->stats().cx_connect_fail_.inc();
 
       onConnectFailed(client);
-      if (contributed_to_connecting_stream_capacity) {
-        // Purge pending streams only if this client doesn't contribute to the local connecting
-        // stream capacity. In other words, the rest clients  would be able to handle all the
-        // pending stream once they are connected.
-        ConnectionPool::PoolFailureReason reason;
-        if (client.timed_out_) {
-          reason = ConnectionPool::PoolFailureReason::Timeout;
-        } else if (event == Network::ConnectionEvent::RemoteClose) {
-          reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
-        } else {
-          reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
-        }
-
-        // Raw connect failures should never happen under normal circumstances. If we have an
-        // upstream that is behaving badly, streams can get stuck here in the pending state. If we
-        // see a connect failure, we purge all pending streams so that calling code can determine
-        // what to do with the stream.
-        // NOTE: We move the existing pending streams to a temporary list. This is done so that
-        //       if retry logic submits a new stream to the pool, we don't fail it inline.
-        purgePendingStreams(client.real_host_description_, failure_reason, reason);
+      // Purge pending streams only if this client doesn't contribute to the local connecting
+      // stream capacity. In other words, the rest clients  would be able to handle all the
+      // pending stream once they are connected.
+      ConnectionPool::PoolFailureReason reason;
+      if (client.timed_out_) {
+        reason = ConnectionPool::PoolFailureReason::Timeout;
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
+      } else {
+        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
+
+      // Raw connect failures should never happen under normal circumstances. If we have an
+      // upstream that is behaving badly, streams can get stuck here in the pending state. If we
+      // see a connect failure, we purge all pending streams so that calling code can determine
+      // what to do with the stream.
+      // NOTE: We move the existing pending streams to a temporary list. This is done so that
+      //       if retry logic submits a new stream to the pool, we don't fail it inline.
+      purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
       if (!is_draining_for_deletion_) {
         tryCreateNewConnections();
@@ -597,7 +598,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // No need to update connecting capacity and connect_timer_ as the client is still connecting.
     ASSERT(client.state() == ActiveClient::State::Connecting);
     host()->cluster().stats().upstream_cx_connect_with_0_rtt_.inc();
-    transitionActiveClientState(client, ActiveClient::State::ReadyForEarlyData);
+    transitionActiveClientState(client, (client.currentUnusedCapacity() > 0
+                                             ? ActiveClient::State::ReadyForEarlyData
+                                             : ActiveClient::State::Busy));
     break;
   }
   }

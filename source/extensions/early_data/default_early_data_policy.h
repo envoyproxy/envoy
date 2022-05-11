@@ -24,11 +24,9 @@ class DefaultEarlyDataPolicyFactory : public EarlyDataPolicyFactory {
 public:
   std::string name() const override { return "envoy.route.early_data_policy.default"; }
 
-  EarlyDataPolicyPtr createEarlyDataPolicy(const Protobuf::Message& config) override {
-    auto& early_data_config =
-        dynamic_cast<const envoy::extensions::early_data::v3::DefaultEarlyDataPolicy&>(config);
+  EarlyDataPolicyPtr createEarlyDataPolicy(const Protobuf::Message& /*config*/) override {
     return std::make_unique<DefaultEarlyDataPolicy>(
-        early_data_config.early_data_allows_safe_requests());
+        /*allow_safe_request=*/false);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

@@ -6575,25 +6575,6 @@ virtual_hosts:
         name: envoy.route.early_data_policy.default
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
-  - match:
-      prefix: "/baz"
-    route:
-      cluster: www2
-      early_data_policy:
-        name: envoy.route.early_data_policy.default
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
-          early_data_allows_safe_requests: false
-  - match:
-      prefix: "/eep"
-    route:
-      cluster: www2
-      early_data_policy:
-        name: envoy.route.early_data_policy.default
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
-          early_data_allows_safe_requests: true
-
  )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
@@ -6622,23 +6603,6 @@ virtual_hosts:
                    ->routeEntry()
                    ->earlyDataPolicy()
                    .allowsEarlyDataForRequest(bar_request2));
-  Http::TestRequestHeaderMapImpl baz_request = genHeaders("www.lyft.com", "/baz", "GET");
-  EXPECT_FALSE(config.route(baz_request, 0)
-                   ->routeEntry()
-                   ->earlyDataPolicy()
-                   .allowsEarlyDataForRequest(baz_request));
-
-  // If explicitly turned on, allows safe requests using early data.
-  Http::TestRequestHeaderMapImpl eep_request1 = genHeaders("www.lyft.com", "/eep", "HEAD");
-  EXPECT_TRUE(config.route(eep_request1, 0)
-                  ->routeEntry()
-                  ->earlyDataPolicy()
-                  .allowsEarlyDataForRequest(eep_request1));
-  Http::TestRequestHeaderMapImpl eep_request2 = genHeaders("www.lyft.com", "/eep", "POST");
-  EXPECT_FALSE(config.route(eep_request2, 0)
-                   ->routeEntry()
-                   ->earlyDataPolicy()
-                   .allowsEarlyDataForRequest(eep_request2));
 }
 
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};
