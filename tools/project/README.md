@@ -46,9 +46,9 @@ The commit this creates:
 
 ```console
 # git show
-commit d927574b58536e709bf5f9df239e9f755aa8e14e (HEAD -> project-release)
+commit 05e6bb8b5d34758fb984044be512fb31f5557edc (HEAD -> project-release)
 Author: Your Name <you@example.com>
-Date:   Tue May 10 17:23:51 2022 +0000
+Date:   Wed May 11 13:10:56 2022 +0000
 
     repo: Sync
 
@@ -56,29 +56,19 @@ Date:   Tue May 10 17:23:51 2022 +0000
 
 diff --git a/changelogs/1.21.2.yaml b/changelogs/1.21.2.yaml
 new file mode 100644
-index 0000000000..6aa9405be9
+index 0000000000..ddc79f2e88
 --- /dev/null
 +++ b/changelogs/1.21.2.yaml
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,10 @@
 +date: April 27, 2022
-+
-+behavior_changes: []
 +
 +minor_behavior_changes:
 +- area: cryptomb
-+  change: |-
++  change: |
 +    remove RSA PKCS1 v1.5 padding support.
 +- area: perf
-+  change: |-
++  change: |
 +    ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
-+
-+bug_fixes: []
-+
-+removed_config_or_runtime: []
-+
-+new_features: []
-+
-+deprecated: []
 +
 diff --git a/docs/inventories/v1.21/objects.inv b/docs/inventories/v1.21/objects.inv
 index c6579605b2..6f972f337f 100644
@@ -120,13 +110,13 @@ This command can only be run when the repo is in "dev" mode.
 # bazel run //tools/project:release
 ...
 ProjectRunner SUCCESS [version] 1.23.0
-ProjectRunner SUCCESS [changelog] current: May 10, 2022
+ProjectRunner SUCCESS [changelog] current: May 11, 2022
 ProjectRunner SUCCESS [changelog] up to date
 ProjectRunner SUCCESS [inventory] up to date
 ProjectRunner INFO [git] add: VERSION.txt
 ProjectRunner INFO [git] add: changelogs/current.yaml
 ProjectRunner INFO [git] commit: "repo: Release `1.23.0`"
-ProjectRunner NOTICE Release created (1.23.0): May 10, 2022
+ProjectRunner NOTICE Release created (1.23.0): May 11, 2022
 
 ```
 
@@ -134,9 +124,9 @@ Which produces the following commit:
 
 ```console
 # git show --compact-summary
-commit e7cf02c3545ff00248f7da793367ed3b38c64947 (HEAD -> project-release)
+commit 3bc20808c31ecde39c9b4b03d6bdeb52344ae667 (HEAD -> project-release)
 Author: Your Name <you@example.com>
-Date:   Tue May 10 17:26:45 2022 +0000
+Date:   Wed May 11 13:11:51 2022 +0000
 
     repo: Release `1.23.0`
 
@@ -184,9 +174,9 @@ Which produces the following commit:
 
 ```console
 # git show --compact-summary
-commit 3fff0c39d82cfe8d8c5cefbdc3b710c65e7f1d72 (HEAD -> project-release)
+commit cfd462d8101558553bfbfc0421e56bafaf316e6f (HEAD -> project-release)
 Author: Your Name <you@example.com>
-Date:   Tue May 10 17:28:19 2022 +0000
+Date:   Wed May 11 13:14:04 2022 +0000
 
     repo: Dev `1.24.0-dev`
 
@@ -237,9 +227,8 @@ This changes the same files as without the `--patch` option:
 
 ```console
 # git show --compact-summary
-commit 98851d6c044cebee9a2bd1e41a86d18a037b8031 (HEAD -> project-release)
 Author: Your Name <you@example.com>
-Date:   Tue May 10 17:31:28 2022 +0000
+Date:   Wed May 11 13:16:27 2022 +0000
 
     repo: Dev `1.23.1-dev`
 
@@ -256,6 +245,7 @@ But, in this case, the *patch* version is incremented instead.
 
 ```console
 diff --git a/VERSION.txt b/VERSION.txt
+diff --git a/VERSION.txt b/VERSION.txt
 index a6c2798a48..4d1e5d262c 100644
 --- a/VERSION.txt
 +++ b/VERSION.txt
@@ -264,8 +254,6 @@ index a6c2798a48..4d1e5d262c 100644
 +1.23.1-dev
 
 ```
-
-
 
 ## Workflows
 
