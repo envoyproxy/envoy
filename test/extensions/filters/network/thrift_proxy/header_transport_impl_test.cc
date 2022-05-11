@@ -436,24 +436,23 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
   }
 }
 
-MessageMetadata testInfoBlock(bool case_sensitive = false) {
+MessageMetadata testInfoBlock(bool case_sensitive, const std::string& key,
+                              const std::string& value) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata(case_sensitive);
 
   metadata.headers().addCopy(Http::LowerCaseString("not"), "empty");
 
-  const char* key = case_sensitive ? "Key" : "key";
-  const char* value = case_sensitive ? "Value" : "value";
   buffer.writeBEInt<int32_t>(200);
   buffer.writeBEInt<int16_t>(0x0FFF);
   buffer.writeBEInt<int16_t>(0);
   buffer.writeBEInt<int32_t>(1);  // sequence number
   buffer.writeBEInt<int16_t>(38); // size 152
   addSeq(buffer, {0, 0, 1, 3}); // 0 = binary proto, 0 = num transforms, 1 = key value, 3 = num kvs
-  buffer.writeByte(std::strlen(key));
+  buffer.writeByte(key.size());
   buffer.add(key);
-  buffer.writeByte(std::strlen(value));
+  buffer.writeByte(value.size());
   buffer.add(value);
   buffer.writeByte(4);
   buffer.add("key2");
@@ -465,7 +464,9 @@ MessageMetadata testInfoBlock(bool case_sensitive = false) {
 
   Http::TestRequestHeaderMapImpl expected_headers;
   expected_headers.addCopy(Http::LowerCaseString("not"), "empty");
-  expected_headers.addCopy(Http::LowerCaseString("key"), value);
+  expected_headers.addCopy(Http::LowerCaseString(absl::StrReplaceAll(
+                               key, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}})),
+                           value);
   expected_headers.addCopy(Http::LowerCaseString("key2"), std::string(128, 'x'));
   expected_headers.addCopy(Http::LowerCaseString(""), "");
 
@@ -478,10 +479,10 @@ MessageMetadata testInfoBlock(bool case_sensitive = false) {
   return metadata;
 }
 
-TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(); }
+TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(false /* case-sensitive */, "key", "value"); }
 
 TEST(HeaderTransportTest, InfoBlockCaseSensitive) {
-  auto metadata = testInfoBlock(true /* case-sensitive */);
+  auto metadata = testInfoBlock(true /* case-sensitive */, "Key", "Value");
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl msg;
@@ -494,6 +495,23 @@ TEST(HeaderTransportTest, InfoBlockCaseSensitive) {
                         "xxxxxxxxxxxxx\0\0\0\0\0fake message",
                         190),
             buffer.toString());
+}
+
+TEST(HeaderTransportTest, InfoBlockCaseSensitiveNewline) {
+  auto metadata = testInfoBlock(true /* case-sensitive */, "K\ny", "Value");
+  HeaderTransportImpl transport;
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl msg;
+  msg.add("fake message");
+  transport.encodeFrame(buffer, metadata, msg);
+  EXPECT_EQ(0, msg.length());
+  EXPECT_EQ(
+      std::string("\0\0\0\xBA\xF\xFF\0\0\0\0\0\x1\0)\0\0\x1\x4\x3not\x5"
+                  "empty\x3K\ny\x5Value\x4key2\x80\x1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  "xxxxxxxxxxxxx\0\0\0\0\0fake message",
+                  190),
+      buffer.toString());
 }
 
 TEST(HeaderTransportTest, DecodeFrameEnd) {
