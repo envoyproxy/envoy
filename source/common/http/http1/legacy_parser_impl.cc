@@ -44,32 +44,32 @@ public:
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onMessageBegin();
-          return conn_impl->setAndCheckCallbackStatus(std::move(status));
+          return statusToInt(conn_impl->setAndCheckCallbackStatus(std::move(status)));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onUrl(at, length);
-          return conn_impl->setAndCheckCallbackStatus(std::move(status));
+          return statusToInt(conn_impl->setAndCheckCallbackStatus(std::move(status)));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onStatus(at, length);
-          return conn_impl->setAndCheckCallbackStatus(std::move(status));
+          return statusToInt(conn_impl->setAndCheckCallbackStatus(std::move(status)));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onHeaderField(at, length);
-          return conn_impl->setAndCheckCallbackStatus(std::move(status));
+          return statusToInt(conn_impl->setAndCheckCallbackStatus(std::move(status)));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onHeaderValue(at, length);
-          return conn_impl->setAndCheckCallbackStatus(std::move(status));
+          return statusToInt(conn_impl->setAndCheckCallbackStatus(std::move(status)));
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto statusor = conn_impl->onHeadersComplete();
-          return conn_impl->setAndCheckCallbackStatusOr(std::move(statusor));
+          return statusToInt(conn_impl->setAndCheckCallbackStatusOr(std::move(statusor)));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           static_cast<ParserCallbacks*>(parser->data)->bufferBody(at, length);
@@ -78,7 +78,7 @@ public:
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onMessageComplete();
-          return conn_impl->setAndCheckCallbackStatusOr(std::move(status));
+          return statusToInt(conn_impl->setAndCheckCallbackStatusOr(std::move(status)));
         },
         [](http_parser* parser) -> int {
           // A 0-byte chunk header is used to signal the end of the chunked body.

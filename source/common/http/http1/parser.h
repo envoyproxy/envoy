@@ -106,8 +106,8 @@ public:
    */
   virtual void onChunkHeader(bool) PURE;
 
-  virtual int setAndCheckCallbackStatus(Status&& status) PURE;
-  virtual int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;
+  virtual ParserStatus setAndCheckCallbackStatus(Status&& status) PURE;
+  virtual ParserStatus setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;
 };
 
 class Parser {
