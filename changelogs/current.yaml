@@ -86,6 +86,9 @@ new_features:
 - area: http
   change: |
     added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
+- area: http
+  change: |
+    preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
