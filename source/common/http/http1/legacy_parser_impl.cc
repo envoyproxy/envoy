@@ -31,10 +31,10 @@ ParserStatus intToStatus(int rc) {
   }
 }
 
-int statusToInt(const ParserStatus code) {
+int statusToInt(const ParserStatus status) {
   // See
   // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
-  switch (code) {
+  switch (status) {
   case ParserStatus::Error:
     return -1;
   case ParserStatus::Success:
@@ -200,8 +200,8 @@ bool LegacyHttpParserImpl::isChunked() const { return impl_->isChunked(); }
 
 absl::string_view LegacyHttpParserImpl::methodName() const { return impl_->methodName(); }
 
-absl::string_view LegacyHttpParserImpl::errnoName(ParserStatus rc) const {
-  return http_errno_name(static_cast<http_errno>(statusToInt(rc)));
+absl::string_view LegacyHttpParserImpl::errnoName(ParserStatus status) const {
+  return http_errno_name(static_cast<http_errno>(statusToInt(status)));
 }
 
 int LegacyHttpParserImpl::hasTransferEncoding() const { return impl_->hasTransferEncoding(); }

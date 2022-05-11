@@ -116,8 +116,8 @@ public:
   struct RcVal {
     // Number of parsed bytes.
     size_t nread;
-    // Integer error from parser indicating return code.
-    ParserStatus rc;
+    // Status from parser.
+    ParserStatus status;
   };
   virtual ~Parser() = default;
 
@@ -155,7 +155,7 @@ public:
   virtual absl::string_view methodName() const PURE;
 
   // Returns a textual representation of the given parser status.
-  virtual absl::string_view errnoName(ParserStatus rc) const PURE;
+  virtual absl::string_view errnoName(ParserStatus status) const PURE;
 
   // Returns whether the Transfer-Encoding header is present.
   virtual int hasTransferEncoding() const PURE;

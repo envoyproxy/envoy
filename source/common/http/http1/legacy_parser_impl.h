@@ -24,7 +24,7 @@ public:
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
   absl::string_view methodName() const override;
-  absl::string_view errnoName(ParserStatus rc) const override;
+  absl::string_view errnoName(ParserStatus status) const override;
   int hasTransferEncoding() const override;
 
 private:
