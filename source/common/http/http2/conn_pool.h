@@ -17,6 +17,8 @@ namespace Http2 {
  */
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
+  // Calculate the expected streams allowed for this host, based on both
+  // configuration and cached SETTINGS.
   static uint32_t
   calculateInitialStreams(Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
                           absl::optional<HttpServerPropertiesCache::Origin>& origin,

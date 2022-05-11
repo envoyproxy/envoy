@@ -18,11 +18,11 @@ uint32_t ActiveClient::calculateInitialStreams(
     Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
     absl::optional<HttpServerPropertiesCache::Origin>& origin,
     Upstream::HostDescriptionConstSharedPtr host) {
+  uint32_t initial_streams = host->cluster().http2Options().max_concurrent_streams().value();
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    return host->cluster().http2Options().max_concurrent_streams().value();
+    return initial_streams;
   }
-  uint32_t initial_streams = host->cluster().http2Options().max_concurrent_streams().value();
   if (http_server_properties_cache && origin.has_value()) {
     uint32_t cached_concurrency =
         http_server_properties_cache->getConcurrentStreams(origin.value());
@@ -33,7 +33,7 @@ uint32_t ActiveClient::calculateInitialStreams(
       initial_streams = cached_concurrency;
     }
   }
-  auto max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
+  uint64_t max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
       host->cluster().maxRequestsPerConnection());
   if (max_requests < initial_streams) {
     initial_streams = max_requests;

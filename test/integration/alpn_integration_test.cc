@@ -20,6 +20,8 @@ public:
 
   void initialize() override {
     config_helper_.configureUpstreamTls(true);
+    // If the test is configured to have multiple upstreams, make sure the Envoy
+    // config also has 2 upstreams.
     if (fake_upstreams_count_ == 2) {
       config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         auto* static_resources = bootstrap.mutable_static_resources();

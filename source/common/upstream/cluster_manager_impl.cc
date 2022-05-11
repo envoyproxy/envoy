@@ -1846,6 +1846,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
   Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
   if (alternate_protocol_options.has_value()) {
+    // If there is configuration for an alternate protocols cache, always create one.
     alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
         alternate_protocol_options.value(), dispatcher);
   } else if (!alternate_protocol_options.has_value() &&
@@ -1853,6 +1854,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
               (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2)) &&
              Runtime::runtimeFeatureEnabled(
                  "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+    // If there is no configuration for an alternate protocols cache, still
+    // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
+    // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
+    // connections.
     envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
     default_options.set_name(host->cluster().name());
     alternate_protocols_cache =
