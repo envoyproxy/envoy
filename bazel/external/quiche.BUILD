@@ -56,6 +56,10 @@ test_suite(
     name = "ci_tests",
     tests = [
         "http2_platform_api_test",
+        "quiche_common_balsa_balsa_frame_test",
+        "quiche_common_balsa_balsa_headers_test",
+        "quiche_common_balsa_header_properties_test",
+        "quiche_common_balsa_simple_buffer_test",
         "quiche_common_test",
     ],
 )
@@ -5284,7 +5288,7 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_cc_library(
-    name = "balsa_enums_lib",
+    name = "quiche_common_balsa_balsa_enums_lib",
     srcs = ["quiche/common/balsa/balsa_enums.cc"],
     hdrs = ["quiche/common/balsa/balsa_enums.h"],
     copts = quiche_copts,
@@ -5295,33 +5299,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "balsa_visitor_interface_lib",
+    name = "quiche_common_balsa_balsa_visitor_interface_lib",
     hdrs = ["quiche/common/balsa/balsa_visitor_interface.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":balsa_enums_lib",
+        ":quiche_common_balsa_balsa_enums_lib",
         ":quiche_common_platform_export",
     ],
 )
 
 envoy_cc_library(
-    name = "noop_balsa_visitor_lib",
+    name = "quiche_common_balsa_noop_balsa_visitor_lib",
     hdrs = ["quiche/common/balsa/noop_balsa_visitor.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":balsa_visitor_interface_lib",
+        ":quiche_common_balsa_balsa_visitor_interface_lib",
         ":quiche_common_platform_export",
     ],
 )
 
 envoy_cc_library(
-    name = "standard_header_map_lib",
+    name = "quiche_common_balsa_standard_header_map_lib",
     srcs = ["quiche/common/balsa/standard_header_map.cc"],
     hdrs = ["quiche/common/balsa/standard_header_map.h"],
     copts = quiche_copts,
@@ -5335,7 +5339,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "framer_interface_lib",
+    name = "quiche_common_balsa_framer_interface_lib",
     hdrs = ["quiche/common/balsa/framer_interface.h"],
     copts = quiche_copts,
     repository = "@envoy",
@@ -5344,7 +5348,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http_validation_policy_lib",
+    name = "quiche_common_balsa_http_validation_policy_lib",
     srcs = ["quiche/common/balsa/http_validation_policy.cc"],
     hdrs = ["quiche/common/balsa/http_validation_policy.h"],
     copts = quiche_copts,
@@ -5357,7 +5361,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "header_api_lib",
+    name = "quiche_common_balsa_header_api_lib",
     hdrs = ["quiche/common/balsa/header_api.h"],
     copts = quiche_copts,
     repository = "@envoy",
@@ -5370,7 +5374,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "simple_buffer_lib",
+    name = "quiche_common_balsa_simple_buffer_lib",
     srcs = ["quiche/common/balsa/simple_buffer.cc"],
     hdrs = ["quiche/common/balsa/simple_buffer.h"],
     copts = quiche_copts,
@@ -5386,20 +5390,20 @@ envoy_cc_library(
 )
 
 envoy_cc_test(
-    name = "simple_buffer_test",
+    name = "quiche_common_balsa_simple_buffer_test",
     srcs = ["quiche/common/balsa/simple_buffer_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quiche_common_balsa_simple_buffer_lib",
         ":quiche_common_platform_test",
-        ":simple_buffer_lib",
         "@com_google_absl//absl/strings",
     ],
 )
 
 envoy_cc_library(
-    name = "header_properties_lib",
+    name = "quiche_common_balsa_header_properties_lib",
     srcs = ["quiche/common/balsa/header_properties.cc"],
     hdrs = ["quiche/common/balsa/header_properties.h"],
     copts = quiche_copts,
@@ -5414,19 +5418,19 @@ envoy_cc_library(
 )
 
 envoy_cc_test(
-    name = "header_properties_test",
+    name = "quiche_common_balsa_header_properties_test",
     srcs = ["quiche/common/balsa/header_properties_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":header_properties_lib",
+        ":quiche_common_balsa_header_properties_lib",
         ":quiche_common_platform_test",
     ],
 )
 
 envoy_cc_library(
-    name = "balsa_headers_lib",
+    name = "quiche_common_balsa_balsa_headers_lib",
     srcs = ["quiche/common/balsa/balsa_headers.cc"],
     hdrs = ["quiche/common/balsa/balsa_headers.h"],
     copts = quiche_copts,
@@ -5434,14 +5438,14 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":balsa_enums_lib",
-        ":header_api_lib",
-        ":header_properties_lib",
+        ":quiche_common_balsa_balsa_enums_lib",
+        ":quiche_common_balsa_header_api_lib",
+        ":quiche_common_balsa_header_properties_lib",
+        ":quiche_common_balsa_standard_header_map_lib",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_header_policy",
         ":quiche_common_platform_logging",
-        ":standard_header_map_lib",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -5449,18 +5453,18 @@ envoy_cc_library(
 )
 
 envoy_cc_test(
-    name = "balsa_headers_test",
+    name = "quiche_common_balsa_balsa_headers_test",
     srcs = ["quiche/common/balsa/balsa_headers_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":balsa_enums_lib",
-        ":balsa_frame_lib",
-        ":balsa_headers_lib",
+        ":quiche_common_balsa_balsa_enums_lib",
+        ":quiche_common_balsa_balsa_frame_lib",
+        ":quiche_common_balsa_balsa_headers_lib",
+        ":quiche_common_balsa_simple_buffer_lib",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
         ":quiche_common_test_tools_test_utils_lib",
-        ":simple_buffer_lib",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -5469,7 +5473,7 @@ envoy_cc_test(
 )
 
 envoy_cc_library(
-    name = "balsa_frame_lib",
+    name = "quiche_common_balsa_balsa_frame_lib",
     srcs = ["quiche/common/balsa/balsa_frame.cc"],
     hdrs = ["quiche/common/balsa/balsa_frame.h"],
     copts = quiche_copts,
@@ -5477,13 +5481,13 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":balsa_enums_lib",
-        ":balsa_headers_lib",
-        ":balsa_visitor_interface_lib",
-        ":framer_interface_lib",
-        ":header_properties_lib",
-        ":http_validation_policy_lib",
-        ":noop_balsa_visitor_lib",
+        ":quiche_common_balsa_balsa_enums_lib",
+        ":quiche_common_balsa_balsa_headers_lib",
+        ":quiche_common_balsa_balsa_visitor_interface_lib",
+        ":quiche_common_balsa_framer_interface_lib",
+        ":quiche_common_balsa_header_properties_lib",
+        ":quiche_common_balsa_http_validation_policy_lib",
+        ":quiche_common_balsa_noop_balsa_visitor_lib",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
@@ -5492,21 +5496,21 @@ envoy_cc_library(
 )
 
 envoy_cc_test(
-    name = "balsa_frame_test",
+    name = "quiche_common_balsa_balsa_frame_test",
     srcs = ["quiche/common/balsa/balsa_frame_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":balsa_enums_lib",
-        ":balsa_frame_lib",
-        ":balsa_headers_lib",
-        ":balsa_visitor_interface_lib",
-        ":http_validation_policy_lib",
-        ":noop_balsa_visitor_lib",
+        ":quiche_common_balsa_balsa_enums_lib",
+        ":quiche_common_balsa_balsa_frame_lib",
+        ":quiche_common_balsa_balsa_headers_lib",
+        ":quiche_common_balsa_balsa_visitor_interface_lib",
+        ":quiche_common_balsa_http_validation_policy_lib",
+        ":quiche_common_balsa_noop_balsa_visitor_lib",
+        ":quiche_common_balsa_simple_buffer_lib",
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
-        ":simple_buffer_lib",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
