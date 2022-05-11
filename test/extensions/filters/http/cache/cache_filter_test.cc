@@ -250,6 +250,34 @@ TEST_F(CacheFilterTest, CacheMiss) {
   }
 }
 
+TEST_F(CacheFilterTest, CacheMissWithTrailers) {
+  request_headers_.setHost("CacheMissWithTrailers");
+  const std::string body = "abc";
+  Buffer::OwnedImpl body_buffer(body);
+  Http::TestResponseTrailerMapImpl trailers;
+
+  for (int request = 1; request <= 2; request++) {
+    // Each iteration a request is sent to a different host, therefore the second one is a miss
+    request_headers_.setHost("CacheMissWithTrailers" + std::to_string(request));
+
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response header
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(body_buffer, false), Http::FilterDataStatus::Continue);
+    EXPECT_EQ(filter->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+
+    filter->onDestroy();
+  }
+}
+
 TEST_F(CacheFilterTest, CacheHitNoBody) {
   request_headers_.setHost("CacheHitNoBody");
 
