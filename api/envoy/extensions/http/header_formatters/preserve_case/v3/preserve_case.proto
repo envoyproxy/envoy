@@ -23,7 +23,7 @@ message PreserveCaseFormatterConfig {
     DEFAULT = 0;
 
     // Use ProperCaseHeaderKeyFormatter on Envoy added headers that upper cases the first character
-    // in each word: The first character as well as any alpha character following a special
+    // in each word. The first character as well as any alpha character following a special
     // character is upper cased.
     PROPER_CASE = 1;
   }

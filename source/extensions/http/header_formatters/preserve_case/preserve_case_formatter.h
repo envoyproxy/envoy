@@ -31,10 +31,8 @@ private:
   StringUtil::CaseUnorderedSet original_header_keys_;
   bool forward_reason_phrase_{false};
   std::string reason_phrase_;
-  envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
-      FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers_{
-          envoy::extensions::http::header_formatters::preserve_case::v3::
-              PreserveCaseFormatterConfig::DEFAULT};
+  const envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers_;
   Envoy::Http::HeaderKeyFormatterConstPtr header_key_formatter_on_enovy_headers_;
 };
 

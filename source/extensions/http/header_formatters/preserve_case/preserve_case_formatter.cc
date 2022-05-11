@@ -23,7 +23,7 @@ PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
         std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>();
     break;
   default:
-    throw EnvoyException(fmt::format("Not support FormatterTypeOnEnvoyHeaders: {}.",
+    throw EnvoyException(fmt::format("Not supported FormatterTypeOnEnvoyHeaders: {}.",
                                      formatter_type_on_envoy_headers_));
   }
 }
