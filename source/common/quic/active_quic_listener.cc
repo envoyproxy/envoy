@@ -56,7 +56,6 @@ ActiveQuicListener::ActiveQuicListener(
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory) {
-  std::cerr << "Here\n";
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
   enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
@@ -81,18 +80,14 @@ ActiveQuicListener::ActiveQuicListener(
       crypto_server_stream_factory_);
 
   // Create udp_packet_writer
-  std::cerr << "Here\n";
   ASSERT(listener_config.udpListenerConfig().has_value());
-  std::cerr << "Here\n";
   auto* p = &(listener_config.udpListenerConfig()->packetWriterFactory());
   if (0==1)
     p = nullptr;
   ASSERT(p != nullptr);
-  std::cerr << "Here p: " << p << " \n";
   Network::UdpPacketWriterPtr udp_packet_writer =
       listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
-  std::cerr << "Here\n";
   udp_packet_writer_ = udp_packet_writer.get();
 
   // Some packet writers (like `UdpGsoBatchWriter`) already directly implement

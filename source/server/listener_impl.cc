@@ -538,11 +538,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config_.udp_listener_config());
-  std::cerr << "Here pre: " << udp_listener_config_->writer_factory_ << " \n";
   if (config_.udp_listener_config().has_udp_packet_packet_writer_config()) {
     udp_listener_config_->writer_factory_ = Config::Utility::getFactory<Network::UdpPacketWriterFactory>(config_.udp_listener_config().udp_packet_packet_writer_config());
     ASSERT(udp_listener_config_->writer_factory_ != nullptr);
-    std::cerr << "Here explicit p: " << udp_listener_config_->writer_factory_ << " \n";
   }
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
@@ -559,10 +557,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     // wise to enable to globally for now. I will circle back and fix both of the above with
     // a non-QUICHE GSO implementation.
     if (udp_listener_config_->writer_factory_ == nullptr && Api::OsSysCallsSingleton::get().supportsUdpGso()) {
-      //udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
-      udp_listener_config_->writer_factory_ = &(Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>("envoy.udp.writer.factory.gso"));
-      ASSERT(udp_listener_config_->writer_factory_ != nullptr);
-    std::cerr << "Here gso p: " << udp_listener_config_->writer_factory_ << " \n";
+      udp_listener_config_->writer_factory_ = &(Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>(Quic::UdpGsoBatchWriterFactory::kName));
     }
 #endif
 #else
@@ -575,12 +570,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   udp_listener_config_->listener_worker_router_ =
       std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
   if (udp_listener_config_->writer_factory_ == nullptr) {
-    //udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
-    udp_listener_config_->writer_factory_ = &(Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>("envoy.udp.writer.factory.default"));
-    ASSERT(udp_listener_config_->writer_factory_ != nullptr);
-    std::cerr << "Here default p: " << udp_listener_config_->writer_factory_ << " \n";
+    udp_listener_config_->writer_factory_ = &(Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>(Network::UdpDefaultWriterFactory::kName));
   }
-  std::cerr << "Here final: " << udp_listener_config_->writer_factory_ << " \n";
   ASSERT(udp_listener_config_->writer_factory_ != nullptr);
 }
 
