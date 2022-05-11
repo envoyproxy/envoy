@@ -45,9 +45,7 @@ private:
 
 class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  static constexpr char kName[] = "envoy.udp.writer.factory.default";
-
-  std::string name() const override { return kName; }
+  std::string name() const override { return "envoy.udp.writer.factory.default"; }
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope&) override {
     return std::make_unique<UdpDefaultWriter>(io_handle);

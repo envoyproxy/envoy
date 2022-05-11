@@ -560,8 +560,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     if (!udp_listener_config_->writer_factory_.has_value() &&
         Api::OsSysCallsSingleton::get().supportsUdpGso()) {
       udp_listener_config_->writer_factory_ =
-          Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>(
-              Quic::UdpGsoBatchWriterFactory::kName);
+          *Registry::FactoryRegistry<Network::UdpPacketWriterFactory>::getFactoryByType(
+              Quic::UdpGsoBatchWriterFactory().configType());
     }
 #endif
 #else
@@ -575,8 +575,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
       std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
   if (!udp_listener_config_->writer_factory_.has_value()) {
     udp_listener_config_->writer_factory_ =
-        Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>(
-            Network::UdpDefaultWriterFactory::kName);
+        *Registry::FactoryRegistry<Network::UdpPacketWriterFactory>::getFactoryByType(
+            Network::UdpDefaultWriterFactory().configType());
   }
 }
 

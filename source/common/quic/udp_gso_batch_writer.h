@@ -94,8 +94,7 @@ private:
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  static constexpr char kName[] = "envoy.udp.writer.factory.gso";
-  std::string name() const override { return kName; }
+  std::string name() const override { return "envoy.udp.writer.factory.gso"; }
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope& scope) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
