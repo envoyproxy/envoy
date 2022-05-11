@@ -91,7 +91,7 @@ TEST(PreserveCaseFormatterTest, InvalidFormatterOnEnvoyHeaders) {
       PreserveCaseHeaderFormatter formatter(
           false, static_cast<envoy::extensions::http::header_formatters::preserve_case::v3::
                                  PreserveCaseFormatterConfig::FormatterTypeOnEnvoyHeaders>(-1)),
-      EnvoyException, "Not support FormatterTypeOnEnvoyHeaders:.*");
+      EnvoyException, "Not supported FormatterTypeOnEnvoyHeaders:.*");
 }
 
 } // namespace PreserveCase
