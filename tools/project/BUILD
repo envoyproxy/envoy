@@ -12,10 +12,6 @@ envoy_entry_point(
         "release",
         PATH,
     ],
-    data = [
-        "//changelogs",
-        "//changelogs:sections.yaml",
-    ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
 )
@@ -26,10 +22,6 @@ envoy_entry_point(
         "dev",
         PATH,
     ],
-    data = [
-        "//changelogs",
-        "//changelogs:sections.yaml",
-    ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
 )
@@ -39,11 +31,6 @@ envoy_entry_point(
     args = [
         "sync",
         PATH,
-    ],
-    data = [
-        "//changelogs",
-        "//changelogs:sections.yaml",
-        "//docs:inventories",
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
