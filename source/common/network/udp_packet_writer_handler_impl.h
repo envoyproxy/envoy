@@ -1,8 +1,10 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/extensions/quic/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/socket.h"
 #include "envoy/network/udp_packet_writer_handler.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/network/io_socket_error_impl.h"
 
@@ -43,11 +45,20 @@ private:
 
 class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
+  std::string name() const override { return "envoy.udp.writer.factory.default"; }
+  std::string category() const override { return "envoy.udp"; }
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope&) override {
     return std::make_unique<UdpDefaultWriter>(io_handle);
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::quic::udp_packet_writer::v3::UdpDefaultWriterFactory>();
+  }
 };
+
+DECLARE_FACTORY(UdpDefaultWriterFactory);
+
 
 } // namespace Network
 } // namespace Envoy

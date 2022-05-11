@@ -4,6 +4,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/quic/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
@@ -537,6 +538,12 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config_.udp_listener_config());
+  std::cerr << "Here pre: " << udp_listener_config_->writer_factory_ << " \n";
+  if (config_.udp_listener_config().has_udp_packet_packet_writer_config()) {
+    udp_listener_config_->writer_factory_ = Config::Utility::getFactory<Network::UdpPacketWriterFactory>(config_.udp_listener_config().udp_packet_packet_writer_config());
+    ASSERT(udp_listener_config_->writer_factory_ != nullptr);
+    std::cerr << "Here explicit p: " << udp_listener_config_->writer_factory_ << " \n";
+  }
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
     if (config_.has_connection_balance_config()) {
@@ -551,8 +558,11 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     // looking at the GSO code there are substantial copying inefficiency so I don't think it's
     // wise to enable to globally for now. I will circle back and fix both of the above with
     // a non-QUICHE GSO implementation.
-    if (Api::OsSysCallsSingleton::get().supportsUdpGso()) {
-      udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
+    if (udp_listener_config_->writer_factory_ == nullptr && Api::OsSysCallsSingleton::get().supportsUdpGso()) {
+      //udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
+      udp_listener_config_->writer_factory_ = &(Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>("envoy.udp.writer.factory.gso"));
+      ASSERT(udp_listener_config_->writer_factory_ != nullptr);
+    std::cerr << "Here gso p: " << udp_listener_config_->writer_factory_ << " \n";
     }
 #endif
 #else
@@ -565,8 +575,13 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   udp_listener_config_->listener_worker_router_ =
       std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
   if (udp_listener_config_->writer_factory_ == nullptr) {
-    udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
+    //udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
+    udp_listener_config_->writer_factory_ = &(Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterFactory>("envoy.udp.writer.factory.default"));
+    ASSERT(udp_listener_config_->writer_factory_ != nullptr);
+    std::cerr << "Here default p: " << udp_listener_config_->writer_factory_ << " \n";
   }
+  std::cerr << "Here final: " << udp_listener_config_->writer_factory_ << " \n";
+  ASSERT(udp_listener_config_->writer_factory_ != nullptr);
 }
 
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {

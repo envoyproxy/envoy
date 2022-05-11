@@ -177,6 +177,7 @@ proto_library(
         "//envoy/extensions/network/socket_interface/v3:pkg",
         "//envoy/extensions/quic/crypto_stream/v3:pkg",
         "//envoy/extensions/quic/proof_source/v3:pkg",
+        "//envoy/extensions/quic/udp_packet_writer/v3:pkg",
         "//envoy/extensions/rate_limit_descriptors/expr/v3:pkg",
         "//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",

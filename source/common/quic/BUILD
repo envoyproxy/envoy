@@ -478,6 +478,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib",
+        "@envoy_api//envoy/extensions/quic/udp_packet_writer/v3:pkg_cc_proto",
     ],
 )
 

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 import "envoy/config/listener/v3/quic_config.proto";
 
@@ -35,6 +36,8 @@ message UdpListenerConfig {
   // Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
   // to the default object to enable QUIC without modifying any additional options.
   QuicProtocolOptions quic_options = 7;
+
+  core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
 }
 
 message ActiveRawUdpListenerConfig {

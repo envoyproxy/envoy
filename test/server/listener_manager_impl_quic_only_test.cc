@@ -208,6 +208,10 @@ filter_chains:
             san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
+  udp_packet_packet_writer_config:
+    name: envoy.udp.writer.factory.default
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.quic.udp_packet_writer.v3.UdpDefaultWriterFactory
   )EOF",
                                                        Network::Address::IpVersion::v4);
 

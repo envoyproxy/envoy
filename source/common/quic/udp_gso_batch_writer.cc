@@ -112,5 +112,7 @@ UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle, St
   return std::make_unique<UdpGsoBatchWriter>(io_handle, scope);
 }
 
+REGISTER_FACTORY(UdpGsoBatchWriterFactory, Network::UdpPacketWriterFactory);
+
 } // namespace Quic
 } // namespace Envoy

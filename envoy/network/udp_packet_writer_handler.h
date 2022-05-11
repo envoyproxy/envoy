@@ -5,6 +5,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 #include "envoy/stats/scope.h"
@@ -100,7 +101,7 @@ public:
 
 using UdpPacketWriterPtr = std::unique_ptr<UdpPacketWriter>;
 
-class UdpPacketWriterFactory {
+class UdpPacketWriterFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~UdpPacketWriterFactory() = default;
 
