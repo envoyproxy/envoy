@@ -151,7 +151,7 @@ public:
     }
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
-    bool bindToPort() override { return bind_to_port_; }
+    bool bindToPort() const override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }

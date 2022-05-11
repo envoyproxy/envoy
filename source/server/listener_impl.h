@@ -302,12 +302,14 @@ public:
 
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
+  // Check whether a new listener has duplicated listening address this listener.
+  bool hasDuplicatedAddress(const ListenerImpl& other) const;
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
-  bool bindToPort() override { return bind_to_port_; }
+  bool bindToPort() const override { return bind_to_port_; }
   bool mptcpEnabled() { return mptcp_enabled_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
