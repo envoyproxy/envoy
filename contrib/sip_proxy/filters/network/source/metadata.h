@@ -191,9 +191,9 @@ private:
 
   absl::optional<absl::string_view> transaction_id_{};
 
-  std::string destination_ = "";
+  std::string destination_{};
 
-  std::vector<AffinityEntry> affinity_;
+  std::vector<AffinityEntry> affinity_{};
   std::vector<AffinityEntry>::iterator affinity_iteration_{affinity_.begin()};
 
   std::string raw_msg_{};

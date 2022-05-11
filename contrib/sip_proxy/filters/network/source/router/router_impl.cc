@@ -133,8 +133,8 @@ void Router::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callb
 QueryStatus Router::handleCustomizedAffinity(const std::string& header, const std::string& type,
                                              const std::string& key,
                                              MessageMetadataSharedPtr metadata) {
-  QueryStatus ret = QueryStatus::Stop;
   std::string host;
+  QueryStatus ret = QueryStatus::Stop;
 
   if (type == "ep") {
     if ((metadata->header(HeaderType::Route).empty() &&
@@ -144,7 +144,11 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
       host = std::string(metadata->header(HeaderType::Route).param("ep"));
     }
 
-    ret = QueryStatus::Continue;
+    if (!host.empty()) {
+      ret = QueryStatus::Continue;
+    } else {
+      ret = QueryStatus::Stop;
+    }
   } else if (type == "text") {
     auto header_type = HeaderTypes::get().str2Header(header);
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
@@ -235,6 +239,9 @@ FilterStatus Router::handleAffinity() {
       }
     }
 
+    // NOTE: After constructed metadata->affinity(), must invoke metadata->resetAffinityIteration()
+    // to set the iterator correctly. otherwise affinityIteration can't point to the changed
+    // affinity correctly.
     metadata->resetAffinityIteration();
   }
 

@@ -169,6 +169,7 @@ template <typename K, typename V> class Cache {
 public:
   Cache(unsigned int max_size = 1024)
       : max_size_(max_size), ring_buffer_(max_size_), it_(ring_buffer_.begin()) {}
+
   Cache(const Cache&) = delete;
   Cache(const Cache&&) = delete;
   Cache& operator=(const Cache&) = delete;
@@ -203,11 +204,19 @@ public:
   bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
 
   void erase(const K& key) {
-    *(cache_[key].it_) = "";
-    cache_.erase(key);
+    if (contains(key)) {
+      *(cache_[key].it_) = "";
+      cache_.erase(key);
+    }
   }
 
-  V& operator[](const K& key) { return cache_[key].value_; }
+  V& operator[](const K& key) {
+    if (contains(key)) {
+      return cache_[key].value_;
+    } else {
+      return default_value_;
+    }
+  }
 
 private:
   struct Data {
@@ -219,6 +228,8 @@ private:
   std::map<K, Data> cache_;
   std::list<K> ring_buffer_;
   typename std::list<K>::iterator it_;
+
+  V default_value_{};
 };
 
 template <typename T, typename K, typename V> class CacheManager {
