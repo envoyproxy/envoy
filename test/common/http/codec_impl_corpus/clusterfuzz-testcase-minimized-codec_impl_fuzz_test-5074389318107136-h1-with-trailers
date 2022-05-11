@@ -2,6 +2,9 @@ h1_settings {
   server {
     enable_trailers: true
   }
+  client {
+    enable_trailers: true
+  }
 }
 actions {
   new_stream {

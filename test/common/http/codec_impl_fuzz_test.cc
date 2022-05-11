@@ -676,7 +676,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         }
       }
 
-      const auto allow_h1_trailers = input.h1_settings().server().enable_trailers();
+      const auto allow_h1_trailers = input.h1_settings().server().enable_trailers() &&
+                                     input.h1_settings().client().enable_trailers();
       HttpStreamPtr stream = std::make_unique<HttpStream>(
           *client,
           fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
