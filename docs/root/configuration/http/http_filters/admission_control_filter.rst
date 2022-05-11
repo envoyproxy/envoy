@@ -87,7 +87,8 @@ fields can be overridden via runtime settings.
       runtime_key: "admission_control.enabled"
     sampling_window: 120s
     sr_threshold:
-      default_value: 95.0
+      default_value:
+        value: 95.0
       runtime_key: "admission_control.sr_threshold"
     aggression:
       default_value: 1.5
@@ -96,7 +97,8 @@ fields can be overridden via runtime settings.
       default_value: 5
       runtime_key: "admission_control.rps_threshold"
     max_rejection_probability:
-      default_value: 80.0
+      default_value:
+        value: 80.0
       runtime_key: "admission_control.max_rejection_probability"
     success_criteria:
       http_criteria:
