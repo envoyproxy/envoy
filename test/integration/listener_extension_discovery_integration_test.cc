@@ -30,7 +30,8 @@ public:
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false) {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
+                                      this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener_filter =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
       listener_filter->set_name(name);

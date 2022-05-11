@@ -108,8 +108,8 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context)
                 -> std::vector<Network::FilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                           context);
+              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
+                  filters, context);
             }));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -117,8 +117,12 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> Filter::ListenerFilterFactoriesList {
-              return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
-                  filters, context, listener_manager_.getTcpListenerConfigProviderManager());
+              Server::ProdListenerComponentFactory* listener_component =
+                  dynamic_cast<Server::ProdListenerComponentFactory*>(&listener_manager_.factory_);
+              auto& cfg_provider_manager =
+                  listener_component->getTcpListenerConfigProviderManager();
+              return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+                  filters, context, cfg_provider_manager);
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -126,7 +130,7 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
             }));
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));

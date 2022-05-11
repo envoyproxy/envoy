@@ -77,7 +77,8 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 }
 } // namespace
 
-std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+std::vector<Network::FilterFactoryCb>
+ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
@@ -108,7 +109,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
   return ret;
 }
 
-Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListenerFilterFactoryList_(
+Filter::ListenerFilterFactoriesList
+ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context,
     Filter::TcpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
@@ -170,7 +172,7 @@ Filter::ListenerFilterFactoriesList ProdListenerComponentFactory::createListener
 }
 
 std::vector<Network::UdpListenerFilterFactoryCb>
-ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::UdpListenerFilterFactoryCb> ret;
@@ -284,9 +286,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
           [this](const Matchers::StringMatcher& name_matcher) {
             return dumpListenerConfigs(name_matcher);
           })),
-      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names),
-      tcp_listener_config_provider_manager_(
-          std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
