@@ -298,11 +298,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
-    : parent_(parent), socket_type_(config.has_address()
-                         ? Network::Utility::protobufAddressSocketType(config.address())
-                         : Network::Utility::protobufAddressSocketType(config.addresses(0))),
-      bind_to_port_(shouldBindToPort(config)),
-      mptcp_enabled_(config.enable_mptcp()),
+    : parent_(parent),
+      socket_type_(config.has_address()
+                       ? Network::Utility::protobufAddressSocketType(config.address())
+                       : Network::Utility::protobufAddressSocketType(config.addresses(0))),
+      bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -415,8 +415,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash)
     : parent_(parent), socket_type_(origin.socket_type_), addresses_(origin.addresses_),
-      bind_to_port_(shouldBindToPort(config)),
-      mptcp_enabled_(config.enable_mptcp()),
+      bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -1000,9 +999,25 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
 }
 
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
-  // TODO (soulxu): support multiple addresses.
-  return *addresses()[0] == *other.addresses()[0] &&
-         socket_type_ == other.socket_type_;
+  if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size())) {
+    return false;
+  }
+
+  // Since there can be multiple zero port addresses, create a copy
+  // of other's addresses, remove it for any finding to avoid matching same zero port
+  // address to the same one.
+  auto other_addresses = other.addresses();
+  for (auto& addr : addresses()) {
+    auto iter = std::find_if(other_addresses.begin(), other_addresses.end(),
+                             [&addr](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                               return *addr == *other_addr;
+                             });
+    if (iter == other_addresses.end()) {
+      return false;
+    }
+    other_addresses.erase(iter);
+  }
+  return true;
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
