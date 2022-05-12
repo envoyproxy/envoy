@@ -19,6 +19,7 @@ Features:
 
 - api: add option to extend the keepalive timeout when any frame is received on the owning HTTP/2 connection. (:issue:`#2229 <2229>`)
 - api: add option to control whether Envoy should drain connections after a soft DNS refresh completes. (:issue:`#2225 <2225>`, :issue:`#2242 <2242>`)
+- configuration: enable h2 ping by default. (:issue: `#2270 <2270>`)
 - android: enable the filtering of unroutable families by default. (:issues: `#2267 <2267>`)
 
 0.4.6 (April 26, 2022)
