@@ -109,7 +109,7 @@ new_features:
     official released binary is now built with Clang 14.0.0.
 - area: udp
   change: |
-    added config to specify the UDP packet writer factory. See :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>`.
+    added config to specify the UDP packet writer factory. See :ref:`udp_packet_packet_writer_config <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>`.
 
 deprecated:
 - area: dubbo_proxy
