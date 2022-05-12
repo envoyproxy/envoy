@@ -28,8 +28,7 @@ JNIEnv* get_env() {
     JavaVMAttachArgs args = {JNI_VERSION, "EnvoyMain", NULL};
     result = attach_jvm(static_jvm, &local_env, &args);
   }
-  // TODO(goaway): add assertions and uncomment
-  // ASSERT(result == JNI_OK);
+  RELEASE_ASSERT(result == JNI_OK, "Unable to get a JVM env for the current thread");
   return local_env;
 }
 
