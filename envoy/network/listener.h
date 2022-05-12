@@ -148,7 +148,7 @@ public:
   /**
    * @return ListenSocketFactory& the factory to create listen socket.
    */
-  virtual ListenSocketFactory& listenSocketFactory() PURE;
+  virtual const std::vector<ListenSocketFactoryPtr>& listenSocketFactories() PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.

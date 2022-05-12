@@ -61,7 +61,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
     details->typed_listener_ = *internal_listener;
     details->listener_ = std::move(internal_listener);
-  } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
+  } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
     if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
       if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
           iter != listener_map_by_tag_.end()) {
@@ -73,7 +73,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     // worker_index_ doesn't have a value on the main thread for the admin server.
     auto tcp_listener =
         std::make_unique<ActiveTcpListener>(*this, config, runtime,
-                                            config.listenSocketFactory().getListenSocket(
+                                            config.listenSocketFactories()[0]->getListenSocket(
                                                 worker_index_.has_value() ? *worker_index_ : 0));
     details->typed_listener_ = *tcp_listener;
     details->listener_ = std::move(tcp_listener);
@@ -83,7 +83,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     ConnectionHandler::ActiveUdpListenerPtr udp_listener =
         config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
             runtime, *worker_index_, *this,
-            config.listenSocketFactory().getListenSocket(*worker_index_), dispatcher_, config);
+            config.listenSocketFactories()[0]->getListenSocket(*worker_index_), dispatcher_,
+            config);
     details->typed_listener_ = *udp_listener;
     details->listener_ = std::move(udp_listener);
   }
@@ -96,7 +97,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   }
 
   details->listener_tag_ = config.listenerTag();
-  details->address_ = config.listenSocketFactory().localAddress();
+  details->address_ = config.listenSocketFactories()[0]->localAddress();
 
   ASSERT(!listener_map_by_tag_.contains(config.listenerTag()));
 
@@ -105,7 +106,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
           details->typed_listener_)) {
     tcp_listener_map_by_address_.insert_or_assign(
-        config.listenSocketFactory().localAddress()->asStringView(), details);
+        config.listenSocketFactories()[0]->localAddress()->asStringView(), details);
 
     auto& address = details->address_;
     // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the Ipv6
@@ -138,7 +139,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   } else if (absl::holds_alternative<std::reference_wrapper<ActiveInternalListener>>(
                  details->typed_listener_)) {
     internal_listener_map_by_address_.insert_or_assign(
-        config.listenSocketFactory().localAddress()->asStringView(), details);
+        config.listenSocketFactories()[0]->localAddress()->asStringView(), details);
   }
 }
 

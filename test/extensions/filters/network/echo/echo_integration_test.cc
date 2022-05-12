@@ -78,8 +78,8 @@ filter_chains:
                                    .listenerManager()
                                    .listeners()[1]
                                    .get()
-                                   .listenSocketFactory()
-                                   .localAddress()
+                                   .listenSocketFactories()[0]
+                                   ->localAddress()
                                    ->ip()
                                    ->port();
 

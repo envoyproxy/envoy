@@ -92,9 +92,11 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
-
-    ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
+    socket_factories_.emplace_back(std::make_unique<NiceMock<Network::MockListenSocketFactory>>());
+    ON_CALL(listener_config_, listenSocketFactories()).WillByDefault(ReturnRef(socket_factories_));
+    ON_CALL(*static_cast<NiceMock<Network::MockListenSocketFactory>*>(socket_factories_[0].get()),
+            getListenSocket(_))
+        .WillByDefault(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -121,7 +123,7 @@ protected:
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             scoped_runtime_.loader(), 0, connection_handler_,
-            listener_config_.listenSocketFactory().getListenSocket(0), *dispatcher_,
+            listener_config_.listenSocketFactories()[0]->getListenSocket(0), *dispatcher_,
             listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
@@ -293,7 +295,7 @@ protected:
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
   Network::ActiveUdpListenerFactoryPtr listener_factory_;
-  NiceMock<Network::MockListenSocketFactory> socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   EnvoyQuicDispatcher* quic_dispatcher_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;

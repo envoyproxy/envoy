@@ -138,7 +138,7 @@ filter_chain_matcher:
                    ->listenerFactory()
                    .isTransportConnectionless());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
 
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
