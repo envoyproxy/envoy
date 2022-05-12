@@ -696,7 +696,7 @@ TEST_F(TwitterProtocolTest, ParseResponseHeader) {
     EXPECT_FALSE(span.debug_);
   }
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
+  Http::TestResponseHeaderMapImpl test_headers(metadata_->responseHeaders());
   EXPECT_EQ(2, test_headers.size());
   EXPECT_EQ("v1", test_headers.get_("k1"));
   EXPECT_EQ("v2", test_headers.get_("k2"));
@@ -798,7 +798,7 @@ TEST_F(TwitterProtocolTest, WriteResponseHeader) {
   EXPECT_TRUE(span2.binary_annotations_.empty());
   EXPECT_FALSE(span2.debug_);
 
-  Http::TestRequestHeaderMapImpl test_headers(metadata_->requestHeaders());
+  Http::TestResponseHeaderMapImpl test_headers(metadata_->responseHeaders());
   EXPECT_EQ("value1", test_headers.get_("key1"));
   EXPECT_EQ("value2", test_headers.get_("key2"));
 }

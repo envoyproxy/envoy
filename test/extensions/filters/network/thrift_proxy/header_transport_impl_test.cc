@@ -31,6 +31,7 @@ public:
 MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
   MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
 
+  metadata->setFromClient(true);
   while (num_headers-- > 0) {
     metadata->requestHeaders().addCopy(Http::LowerCaseString("x"), "y");
   }
@@ -440,6 +441,8 @@ TEST(HeaderTransportTest, InfoBlock) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata;
+
+  metadata.setFromClient(true);
   metadata.requestHeaders().addCopy(Http::LowerCaseString("not"), "empty");
 
   buffer.writeBEInt<int32_t>(200);
@@ -545,6 +548,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
+    metadata.setFromClient(true);
     metadata.setProtocol(ProtocolType::Binary);
     metadata.requestHeaders().addCopy(Http::LowerCaseString("key"), std::string(32768, 'x'));
 
@@ -559,6 +563,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
+    metadata.setFromClient(true);
     metadata.setProtocol(ProtocolType::Binary);
     metadata.requestHeaders().addCopy(Http::LowerCaseString("k1"), std::string(16384, 'x'));
     metadata.requestHeaders().addCopy(Http::LowerCaseString("k2"), std::string(16384, 'x'));
@@ -619,6 +624,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
+    metadata.setFromClient(true);
     metadata.setProtocol(ProtocolType::Compact);
     metadata.setSequenceId(10);
     metadata.requestHeaders().addCopy(Http::LowerCaseString("key"), "value");
