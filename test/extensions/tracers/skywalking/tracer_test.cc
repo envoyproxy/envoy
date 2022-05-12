@@ -78,10 +78,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Create a new SegmentContext.
   auto segment_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
 
-  Envoy::Tracing::SpanPtr org_span = tracer_->startSpan("TEST_OP", segment_context);
-  {
-    Span* span = dynamic_cast<Span*>(org_span.get());
+  Envoy::Tracing::SpanPtr org_span = tracer_->startSpan("/downstream/path", segment_context);
+  Span* span = dynamic_cast<Span*>(org_span.get());
 
+  {
     EXPECT_TRUE(span->spanEntity()->spanType() == skywalking::v3::SpanType::Entry);
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
@@ -95,7 +95,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     // The initial operation name is consistent with the 'operation' parameter in the 'startSpan'
     // method call.
-    EXPECT_EQ("TEST_OP", span->spanEntity()->operationName());
+    EXPECT_EQ("/downstream/path", span->spanEntity()->operationName());
 
     // Test whether the tag can be set correctly.
     span->setTag("TestTagKeyA", "TestTagValueA");
@@ -146,64 +146,74 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ(1, first_child_span->spanEntity()->spanId());
     EXPECT_EQ(0, first_child_span->spanEntity()->parentSpanId());
 
-    EXPECT_EQ("TestChild", first_child_span->spanEntity()->operationName());
+    // "TestChild" will be ignored and operation name of parent span will be used by default for
+    // child span (EXIT span).
+    EXPECT_EQ(span->spanEntity()->operationName(), first_child_span->spanEntity()->operationName());
 
-    first_child_span->finishSpan();
-    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
-
-    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"},
+                                                       {":path", "/upstream/path"}};
     Upstream::HostDescriptionConstSharedPtr host{
         new testing::NiceMock<Upstream::MockHostDescription>()};
 
     first_child_span->injectContext(first_child_headers, host);
+    // Operation name of child span (EXIT span) will be override by the latest path of upstream
+    // request.
+    EXPECT_EQ("/upstream/path", first_child_span->spanEntity()->operationName());
+
     auto sp = createSpanContext(first_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
-    EXPECT_EQ("TEST_OP", sp->endpoint());
+    EXPECT_EQ("/downstream/path", sp->endpoint());
     EXPECT_EQ("10.0.0.1:443", sp->targetAddress());
-  }
-
-  {
-    Envoy::Tracing::SpanPtr org_first_child_span =
-        org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
-
-    Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
-
-    EXPECT_TRUE(first_child_span->spanEntity()->spanType() == skywalking::v3::SpanType::Exit);
-
-    EXPECT_FALSE(first_child_span->spanEntity()->skipAnalysis());
-    EXPECT_EQ(2, first_child_span->spanEntity()->spanId());
-    EXPECT_EQ(0, first_child_span->spanEntity()->parentSpanId());
-
-    EXPECT_EQ("TestChild", first_child_span->spanEntity()->operationName());
 
     first_child_span->finishSpan();
     EXPECT_NE(0, first_child_span->spanEntity()->endTime());
+  }
 
-    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+  {
+    Envoy::Tracing::SpanPtr org_second_child_span =
+        org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
 
-    first_child_span->injectContext(first_child_headers, nullptr);
-    auto sp = createSpanContext(first_child_headers.get_("sw8"));
+    Span* second_child_span = dynamic_cast<Span*>(org_second_child_span.get());
+
+    EXPECT_TRUE(second_child_span->spanEntity()->spanType() == skywalking::v3::SpanType::Exit);
+
+    EXPECT_FALSE(second_child_span->spanEntity()->skipAnalysis());
+    EXPECT_EQ(2, second_child_span->spanEntity()->spanId());
+    EXPECT_EQ(0, second_child_span->spanEntity()->parentSpanId());
+
+    // "TestChild" will be ignored and operation name of parent span will be used by default for
+    // child span (EXIT span).
+    EXPECT_EQ(span->spanEntity()->operationName(),
+              second_child_span->spanEntity()->operationName());
+
+    Http::TestRequestHeaderMapImpl second_child_headers{{":authority", "test.com"}};
+
+    second_child_span->injectContext(second_child_headers, nullptr);
+    auto sp = createSpanContext(second_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
-    EXPECT_EQ("TEST_OP", sp->endpoint());
+    EXPECT_EQ("/downstream/path", sp->endpoint());
     EXPECT_EQ("test.com", sp->targetAddress());
+
+    second_child_span->finishSpan();
+    EXPECT_NE(0, second_child_span->spanEntity()->endTime());
   }
 
   segment_context->setSkipAnalysis();
 
   {
-    Envoy::Tracing::SpanPtr org_second_child_span =
+    Envoy::Tracing::SpanPtr org_third_child_span =
         org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
-    Span* second_child_span = dynamic_cast<Span*>(org_second_child_span.get());
+    Span* third_child_span = dynamic_cast<Span*>(org_third_child_span.get());
 
     // SkipAnalysis is true by default with calling setSkipAnalysis() on segment_context.
-    EXPECT_TRUE(second_child_span->spanEntity()->skipAnalysis());
-    EXPECT_EQ(3, second_child_span->spanEntity()->spanId());
-    EXPECT_EQ(0, second_child_span->spanEntity()->parentSpanId());
+    EXPECT_TRUE(third_child_span->spanEntity()->skipAnalysis());
+    EXPECT_EQ(3, third_child_span->spanEntity()->spanId());
+    EXPECT_EQ(0, third_child_span->spanEntity()->parentSpanId());
 
-    second_child_span->finishSpan();
-    EXPECT_NE(0, second_child_span->spanEntity()->endTime());
+    third_child_span->finishSpan();
+    EXPECT_NE(0, third_child_span->spanEntity()->endTime());
   }
 
   // When the child span ends, the data is not reported immediately, but the end time is set.

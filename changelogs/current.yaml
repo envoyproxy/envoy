@@ -33,6 +33,13 @@ minor_behavior_changes:
   change: |
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
     that loads shared object libraries, such as those installed via luarocks.
+- area: admin
+  change: |
+    changed default regex engine for /stats?filter= from std::regex to RE2, improving filtering speed
+    20x.
+- area: skywalking
+  change: |
+    use request path as operation name of ENTRY/EXIT spans.
 - area: skywalking
   change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.
@@ -40,6 +47,11 @@ minor_behavior_changes:
   change: |
     allow propagating DNS responses with no records back to callers like strict_dns cluster,
     guarded by ``envoy.reloadable_features.cares_accept_nodata``.
+- area: router
+  change: |
+    get route config factories by the configuration proto full names by default. This behavior change
+    can be reverted by setting the ``envoy.reloadable_features.get_route_config_factory_by_type``
+    runtime flag to false.
 
 bug_fixes:
 
@@ -66,6 +78,9 @@ removed_config_or_runtime:
 - area: tcp_proxy
   change: |
     removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
+- area: tls
+  change: |
+    fixed a bug when a certificate is invalid, ``days_until_expiration`` reports a big number. After this fix, when a certificate expires, it reports as ``0``.
 - area: conn pool
   change: |
     removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
@@ -86,6 +101,9 @@ new_features:
 - area: http
   change: |
     added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
+- area: http
+  change: |
+    preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
@@ -110,6 +128,9 @@ new_features:
 - area: build
   change: |
     official released binary is now built with Clang 14.0.0.
+- area: http
+  change: |
+    added :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
 
 deprecated:
 - area: dubbo_proxy
