@@ -138,7 +138,7 @@ deadline of 3 weeks.
   notes](changelogs/current.yaml) for the following version. E.g., "1.7.0 (pending)". Use
   this text as the template for the new file:
 ```yaml
-date: Pending                                                                                                                     
+date: Pending
 behavior_changes:
 // Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required
 
