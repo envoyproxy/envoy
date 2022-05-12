@@ -14,7 +14,7 @@ public:
   ~LegacyHttpParserImpl() override;
 
   // Http1::Parser
-  RcVal execute(const char* data, int len) override;
+  size_t execute(const char* slice, int len) override;
   void resume() override;
   ParserStatus pause() override;
   ParserStatus getStatus() override;
@@ -24,7 +24,7 @@ public:
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
   absl::string_view methodName() const override;
-  absl::string_view errnoName(int rc) const override;
+  absl::string_view errorMessage() const override;
   int hasTransferEncoding() const override;
   int statusToInt(const ParserStatus code) const override;
 
