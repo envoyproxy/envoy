@@ -110,6 +110,8 @@ By default the minor version is incremented:
 
 ```console
 # git diff HEAD~1 VERSION.txt
+```
+```diff
 diff --git a/VERSION.txt b/VERSION.txt
 index a6c2798a48..573ce34a59 100644
 --- a/VERSION.txt
@@ -161,6 +163,9 @@ Date:   Wed May 11 13:16:27 2022 +0000
 But, in this case, the *patch* version is incremented instead.
 
 ```console
+# git diff HEAD~1 VERSION.txt
+```
+```diff
 diff --git a/VERSION.txt b/VERSION.txt
 index a6c2798a48..4d1e5d262c 100644
 --- a/VERSION.txt
@@ -221,6 +226,8 @@ Date:   Wed May 11 13:10:56 2022 +0000
 
     Signed-off-by: Your Name <you@example.com>
 
+```
+```diff
 diff --git a/changelogs/1.21.2.yaml b/changelogs/1.21.2.yaml
 new file mode 100644
 index 0000000000..ddc79f2e88
