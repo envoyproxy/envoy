@@ -25,7 +25,7 @@ TEST(EnvoyDefaultUhvFactoryTest, Basic) {
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
         http1_protocol_options:
-          http1_allow_chunked_length: true
+          allow_chunked_length: true
 )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
 
