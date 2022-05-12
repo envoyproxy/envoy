@@ -4,26 +4,28 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/listener_manager.h"
 
+#include "source/server/listener_manager_impl.h"
+
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {
-class MockListenerComponentFactory : public ListenerComponentFactory {
-public:
-  MockListenerComponentFactory();
-  ~MockListenerComponentFactory() override;
 
-  DrainManagerPtr
-  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override {
+class MockProdListenerComponentFactory : public ProdListenerComponentFactory {
+public:
+  MockProdListenerComponentFactory(NiceMock<Server::MockInstance>& server);
+  ~MockProdListenerComponentFactory();
+
+  DrainManagerPtr createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) {
     return LdsApiPtr{createLdsApi_(lds_config, lds_resources_locator)};
   }
-
   MOCK_METHOD(LdsApi*, createLdsApi_,
               (const envoy::config::core::v3::ConfigSource&,
                const xds::core::v3::ResourceLocator*));
@@ -38,7 +40,8 @@ public:
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
               (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-               const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+               const Network::Socket::OptionsSharedPtr& options,
+               ListenerComponentFactory::BindType bind_type,
                const Network::SocketCreationOptions& creation_options, uint32_t worker_index));
   MOCK_METHOD(DrainManager*, createDrainManager_,
               (envoy::config::listener::v3::Listener::DrainType drain_type));
@@ -46,5 +49,6 @@ public:
 
   std::shared_ptr<Network::MockListenSocket> socket_;
 };
+
 } // namespace Server
 } // namespace Envoy

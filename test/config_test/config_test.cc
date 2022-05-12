@@ -56,7 +56,7 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options) {
+      : api_(Api::createApiForTest(time_system_)), options_(options), component_factory_(server_) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -152,7 +152,7 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  NiceMock<Server::MockProdListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
                                                 server_.quic_stat_names_};

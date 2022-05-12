@@ -65,7 +65,8 @@ public:
 
 protected:
   ListenerManagerImplTest()
-      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+      : listener_factory_(server_), api_(Api::createApiForTest(server_.api_.random_)),
+        use_matcher_(GetParam()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -94,7 +95,7 @@ protected:
                    Configuration::ListenerFactoryContext& context)
                 -> Filter::ListenerFilterFactoriesList {
               return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                  filters, context, manager_->getTcpListenerConfigProviderManager());
+                  filters, context, listener_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(
@@ -347,7 +348,7 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
-  NiceMock<MockListenerComponentFactory> listener_factory_;
+  NiceMock<MockProdListenerComponentFactory> listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;
