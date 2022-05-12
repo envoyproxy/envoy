@@ -40,10 +40,10 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
   return initial_streams;
 }
 
-ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, OptRef<Upstream::Host::CreateConnectionData> data)
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
+                           OptRef<Upstream::Host::CreateConnectionData> data)
     : MultiplexedActiveClientBase(
-          parent,
-          calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
+          parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(),
           parent.host()->cluster().stats().upstream_cx_http2_total_, data) {}
 
@@ -57,7 +57,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Http::HttpServerPropertiesCacheSharedPtr cache) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool, absl::nullopt); },
+      [](HttpConnPoolImplBase* pool) {
+        return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+      },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(CodecType::HTTP2, std::move(data.connection_),
                                                  data.host_description_, pool->dispatcher(),

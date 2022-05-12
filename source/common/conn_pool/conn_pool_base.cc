@@ -648,8 +648,8 @@ uint32_t translateZeroToUnlimited(uint32_t limit) {
 
 ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                            uint32_t concurrent_stream_limit)
-  : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit, concurrent_stream_limit) {
-}
+    : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit,
+                   concurrent_stream_limit) {}
 
 ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                            uint32_t effective_concurrent_streams, uint32_t concurrent_stream_limit)

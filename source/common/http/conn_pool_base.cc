@@ -207,11 +207,10 @@ uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_strea
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
-                                                         uint32_t effective_concurrent_streams,
-                                                         uint32_t max_configured_concurrent_streams,
-                                                         Stats::Counter& cx_total,
-                                                         OptRef<Upstream::Host::CreateConnectionData> data)
+MultiplexedActiveClientBase::MultiplexedActiveClientBase(
+    Envoy::Http::HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
+    uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
+    OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
           effective_concurrent_streams, max_configured_concurrent_streams, data) {

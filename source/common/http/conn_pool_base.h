@@ -102,9 +102,9 @@ protected:
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
   ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-                uint64_t effective_concurrent_stream_limit,
-                uint64_t configured_concurrent_stream_limit,
-                OptRef<Upstream::Host::CreateConnectionData> opt_data)
+               uint64_t effective_concurrent_stream_limit,
+               uint64_t configured_concurrent_stream_limit,
+               OptRef<Upstream::Host::CreateConnectionData> opt_data)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
                                             configured_concurrent_stream_limit) {
@@ -199,8 +199,8 @@ class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Envoy::Http::ActiveClient {
 public:
   MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
-                              uint32_t max_configured_concurrent_streams,
-                              Stats::Counter& cx_total, OptRef<Upstream::Host::CreateConnectionData> data);
+                              uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
+                              OptRef<Upstream::Host::CreateConnectionData> data);
   ~MultiplexedActiveClientBase() override = default;
   // Caps max streams per connection below 2^31 to prevent overflow.
   static uint64_t maxStreamsPerConnection(uint64_t max_streams_config);
