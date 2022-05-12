@@ -26,7 +26,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enableDrainPostDnsRefresh: Bool = false
-  private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 100000000
+  private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var h2ExtendKeepaliveTimeout: Bool = false
   private var h2RawDomains: [String] = []
@@ -203,7 +203,9 @@ open class EngineBuilder: NSObject {
   }
 
   /// Add a rate at which to ping h2 connections on new stream creation if the connection has
-  /// sat idle.
+  /// sat idle. Defaults to 1 millisecond which effectively enables h2 ping functionality
+  /// and results in a connection ping on every new stream creation. Set it to
+  /// 100000000 milliseconds to effectively disable the ping.
   ///
   /// - parameter h2ConnectionKeepaliveIdleIntervalMilliseconds: Rate in milliseconds.
   ///
