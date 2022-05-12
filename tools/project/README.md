@@ -203,7 +203,7 @@ index a6c2798a48..573ce34a59 100644
 
 ```
 
-#### Example: open (`release/vX.Y`) branch to development
+#### Example: open (`release/v1.23`) branch to development
 
 For non-`main` release branches this command can be called with the `--patch` option. In this case only the patch version will be
 incremented, rather than the minor version.
@@ -245,7 +245,6 @@ But, in this case, the *patch* version is incremented instead.
 
 ```console
 diff --git a/VERSION.txt b/VERSION.txt
-diff --git a/VERSION.txt b/VERSION.txt
 index a6c2798a48..4d1e5d262c 100644
 --- a/VERSION.txt
 +++ b/VERSION.txt
@@ -264,7 +263,7 @@ index a6c2798a48..4d1e5d262c 100644
 - fork `main` branch
 - run `bazel run //tools/project:release`
 - create PR with committed changes
-- wait for PR to land on `main` and for release to be tagged (2nd part could/should be automatic)
+- wait for PR to land on `main` and for release to be tagged
 
 At this point the `main` branch is in "release" mode and should not have any additional commits.
 
@@ -285,7 +284,7 @@ For example, using the `release/v1.23` branch:
 - fork `release/v1.23` branch
 - run `bazel run //tools/project:release`
 - create PR to the `release/v1.23` branch with committed changes
-- wait for PR to land on `release/v1.23` and for release to be tagged (2nd part could/should be automatic)
+- wait for PR to land on `release/v1.23` and for release to be tagged
 
 At this point the `release/v1.23` branch is in "release" mode and should not have any additional commits.
 
@@ -302,7 +301,7 @@ At this point the `release/v1.23` branch is in "release" mode and should not hav
 This can be done either on `main` or on another release branch, and would be typically done after an
 _earlier_ release branch had made a release.
 
-For example, supposing `release/v1.21` had just released `v1.23.7`, you might want to include
+For example, supposing `release/v1.21` had just released `v1.21.7`, you might want to include
 the changelog and the correct documentation mappings for this new version in all later release branches:
 
 - `release/v1.22`
@@ -311,7 +310,7 @@ the changelog and the correct documentation mappings for this new version in all
 - `main`
 
 As this step is done automatically when opening and closing a branch the most likely scenario for using
-this is to bring new releases -> `main`.
+this is to bring new releases -> `main` to update the "latest" docs.
 
 - fork `main` branch
 - run `bazel run //tools/project:sync`
