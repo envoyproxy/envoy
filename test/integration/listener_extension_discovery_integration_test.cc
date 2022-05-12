@@ -26,7 +26,7 @@ public:
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF"),
-        default_drain_bytes_(2), filter_name_("foo"), data_("HelloWorld"), port_name_("http") {}
+        filter_name_("foo"), data_("HelloWorld"), port_name_("http") {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false) {
@@ -140,7 +140,7 @@ public:
     tcp_client->close();
   }
 
-  const uint32_t default_drain_bytes_;
+  const uint32_t default_drain_bytes_{2};
   const std::string filter_name_;
   const std::string data_;
   const std::string port_name_;

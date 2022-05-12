@@ -17,13 +17,14 @@ namespace Server {
 class MockProdListenerComponentFactory : public ProdListenerComponentFactory {
 public:
   MockProdListenerComponentFactory(NiceMock<Server::MockInstance>& server);
-  ~MockProdListenerComponentFactory();
+  ~MockProdListenerComponentFactory() override;
 
-  DrainManagerPtr createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) {
+  DrainManagerPtr
+  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                         const xds::core::v3::ResourceLocator* lds_resources_locator) {
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return LdsApiPtr{createLdsApi_(lds_config, lds_resources_locator)};
   }
   MOCK_METHOD(LdsApi*, createLdsApi_,
