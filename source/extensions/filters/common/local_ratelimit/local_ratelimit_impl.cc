@@ -71,18 +71,10 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   // problem perfectly.
   if (!sorted_descriptors_.empty()) {
     std::sort(sorted_descriptors_.begin(), sorted_descriptors_.end(),
-              [](const LocalDescriptorImpl a, const LocalDescriptorImpl b) -> bool {
-                const int a_token_rate_per_second =
-                    a.token_bucket_.tokens_per_fill_ /
-                    (absl::ToInt64Seconds(a.token_bucket_.fill_interval_)
-                         ? absl::ToInt64Seconds(a.token_bucket_.fill_interval_)
-                         : 1);
-                const int b_token_rate_per_second =
-                    b.token_bucket_.tokens_per_fill_ /
-                    (absl::ToInt64Seconds(b.token_bucket_.fill_interval_)
-                         ? absl::ToInt64Seconds(b.token_bucket_.fill_interval_)
-                         : 1);
-                return a_token_rate_per_second < b_token_rate_per_second;
+              [this](LocalDescriptorImpl a, LocalDescriptorImpl b) -> bool {
+                const int a_token_fill_per_second = tokensFillPerSecond(a);
+                const int b_token_fill_per_second = tokensFillPerSecond(b);
+                return a_token_fill_per_second < b_token_fill_per_second;
               });
   }
 }
@@ -199,6 +191,13 @@ bool LocalRateLimiterImpl::requestAllowed(
 
   return descriptor.has_value() ? requestAllowedHelper(*descriptor.value().get().token_state_)
                                 : requestAllowedHelper(tokens_);
+}
+
+int LocalRateLimiterImpl::tokensFillPerSecond(LocalDescriptorImpl& descriptor) {
+  return descriptor.token_bucket_.tokens_per_fill_ /
+         (absl::ToInt64Seconds(descriptor.token_bucket_.fill_interval_)
+              ? absl::ToInt64Seconds(descriptor.token_bucket_.fill_interval_)
+              : 1);
 }
 
 uint32_t LocalRateLimiterImpl::maxTokens(

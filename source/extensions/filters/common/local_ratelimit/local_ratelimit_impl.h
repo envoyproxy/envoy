@@ -68,6 +68,7 @@ private:
   OptRef<const LocalDescriptorImpl>
   descriptorHelper(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool requestAllowedHelper(const TokenState& tokens) const;
+  int tokensFillPerSecond(LocalDescriptorImpl& descriptor);
 
   RateLimit::TokenBucket token_bucket_;
   const Event::TimerPtr fill_timer_;
