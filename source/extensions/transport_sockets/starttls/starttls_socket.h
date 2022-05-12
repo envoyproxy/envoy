@@ -71,6 +71,7 @@ private:
     bool shouldDrainReadBuffer() override { return parent_->shouldDrainReadBuffer(); }
     void setTransportSocketIsReadable() override { return parent_->setTransportSocketIsReadable(); }
     void raiseEvent(Network::ConnectionEvent event) override {
+#ifndef WIN32
       if (event == Network::ConnectionEvent::Connected) {
         // Don't send the connected event if we're already open
         if (is_open_) {
@@ -80,6 +81,7 @@ private:
       } else {
         is_open_ = false;
       }
+#endif
       parent_->raiseEvent(event);
     }
     void flushWriteBuffer() override { parent_->flushWriteBuffer(); }
