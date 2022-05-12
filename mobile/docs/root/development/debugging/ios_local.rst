@@ -68,7 +68,7 @@ by rules_xcodeproj, following these steps may work:
 4. Remove all apps without a provisioning profile from the ``xcodeproj``
    configuration in Envoy Mobile's root ``BUILD`` file.
 5. Follow the same steps as defined in the
-   :ref:`Using the Xcode GUI <using_xcode>`_ section above, but
+   :ref:`Using the Xcode GUI <using_xcode>` section above, but
    targeting your device instead of a simulator.
 
 *Note: You may need to clean from Xcode with cmd-shift-k between device
