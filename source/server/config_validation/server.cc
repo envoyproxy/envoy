@@ -42,9 +42,10 @@ ValidationInstance::ValidationInstance(
     const Network::Address::InstanceConstSharedPtr& local_address, Stats::IsolatedStoreImpl& store,
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
-    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             !options.ignoreUnknownDynamicFields()),
+    : ProdListenerComponentFactory(*dynamic_cast<Server::Instance*>(this)), options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          !options.ignoreUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_)),
@@ -59,8 +60,8 @@ ValidationInstance::ValidationInstance(
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
-              e.what());
+    ENVOY_LOG_MISC(critical, "error initializing configuration '{}': {}", options.configPath(),
+                   e.what());
     shutdown();
     throw;
   }

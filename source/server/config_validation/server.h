@@ -60,7 +60,7 @@ bool validateConfig(const Options& options,
  */
 class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
                                  public Instance,
-                                 public ListenerComponentFactory,
+                                 public ProdListenerComponentFactory,
                                  public ServerLifecycleNotifier,
                                  public WorkerFactory {
 public:
