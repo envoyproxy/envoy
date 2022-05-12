@@ -142,7 +142,7 @@ TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   const CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?format=(json|prometheus|text)\n\n", code_response.second);
+  EXPECT_EQ("usage: /stats?format=(html|json|prometheus|text)\n\n", code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsPlainText) {
@@ -183,7 +183,7 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   EXPECT_EQ(expected, code_response.second);
 }
 
-TEST_P(AdminStatsTest, HandlerStatsHtml) {
+TEST_F(AdminStatsTest, HandlerStatsHtml) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -216,8 +216,6 @@ TEST_P(AdminStatsTest, HandlerStatsHtml) {
        {"No Histograms found", "scope.g2: 2"});      // not expected
   test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
        {"scope1.scope2.unset"});                     // not expected
-=======
->>>>>>> main
 }
 
 TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {

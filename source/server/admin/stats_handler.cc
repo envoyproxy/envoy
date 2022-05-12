@@ -102,8 +102,9 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
                      [this]() -> Admin::UrlHandler { return statsHandler(); });
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params) {
-  return std::make_unique<StatsRequest>(stats, params);
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
+                                            StatsRequest::UrlHandlerFn url_handler_fn) {
+  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,

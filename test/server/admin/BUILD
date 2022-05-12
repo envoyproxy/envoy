@@ -88,6 +88,7 @@ envoy_cc_test(
     name = "stats_params_test",
     srcs = ["stats_params_test.cc"],
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
         "//test/test_common:test_runtime_lib",
     ],
@@ -116,15 +117,6 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "stats_params_test",
-    srcs = ["stats_params_test.cc"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/server/admin:stats_params_lib",
     ],
 )
 
