@@ -14,3 +14,4 @@ developing Envoy Mobile.
   testing/testing
   tools/tools
   debugging/android_local
+  debugging/ios_local

@@ -78,10 +78,12 @@ def swift_repos():
         url = "https://github.com/bazelbuild/rules_apple/archive/2d1fa9ea5f3544fed41d50c28c8508af035bc0a0.tar.gz",
     )
 
+    # TODO(jpsim): Update to the next release which includes https://github.com/bazelbuild/rules_swift/pull/818
     http_archive(
         name = "build_bazel_rules_swift",
-        sha256 = "a2fd565e527f83fb3f9eb07eb9737240e668c9242d3bc318712efa54a7deda97",
-        url = "https://github.com/bazelbuild/rules_swift/releases/download/0.27.0/rules_swift.0.27.0.tar.gz",
+        sha256 = "b5966b422113866398035cd970feffb4ab6c081fa1c96c02d942b17e5b8429c4",
+        strip_prefix = "rules_swift-8d4b096b90e47095755e47c27e749ae9b9f83e81",
+        url = "https://github.com/bazelbuild/rules_swift/archive/8d4b096b90e47095755e47c27e749ae9b9f83e81.tar.gz",
     )
 
     http_archive(
@@ -96,6 +98,14 @@ def swift_repos():
         build_file_content = """exports_files(["swiftlint"])""",
         sha256 = "61d335766a39ba8fa499017a560950bd9fa0b0e5bc318559a9c1c7f4da679256",
         url = "https://github.com/realm/SwiftLint/releases/download/0.47.1/portable_swiftlint.zip",
+    )
+
+    # TODO(jpsim): Update to the next release which includes https://github.com/buildbuddy-io/rules_xcodeproj/pull/407
+    http_archive(
+        name = "com_github_buildbuddy_io_rules_xcodeproj",
+        sha256 = "af9f6ebbf4d7c83cf35d7ced0b9d13fd6e91e9da5e4ceaf06614ed8caeab45aa",
+        strip_prefix = "rules_xcodeproj-96f59d785e8ec226b74af0586f856770b5e7e60c",
+        url = "https://github.com/buildbuddy-io/rules_xcodeproj/archive/96f59d785e8ec226b74af0586f856770b5e7e60c.tar.gz",
     )
 
 def kotlin_repos():

@@ -52,6 +52,8 @@ For local builds, set ``ANDROID_HOME`` and ``ANDROID_NDK_HOME`` to point to the 
 
 See `ci/mac_ci_setup.sh` for the specific NDK version used during builds.
 
+.. _ios_requirements:
+
 ----------------
 iOS requirements
 ----------------

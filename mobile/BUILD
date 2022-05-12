@@ -1,6 +1,7 @@
 load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
+load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
@@ -101,4 +102,20 @@ genrule(
         --editorconfig=$(location //:editor_config)
     """,
     tools = ["@kotlin_formatter//file"],
+)
+
+xcodeproj(
+    name = "xcodeproj",
+    archived_bundles_allowed = True,
+    build_mode = "bazel",
+    project_name = "Envoy",
+    tags = ["manual"],
+    targets = [
+        # TODO(jpsim): Fix Objective-C app support
+        # "//examples/objective-c/hello_world:app",
+        "//examples/swift/async_await:app",
+        "//examples/swift/hello_world:app",
+        "//test/swift/apps/baseline:app",
+        "//test/swift/apps/experimental:app",
+    ],
 )
