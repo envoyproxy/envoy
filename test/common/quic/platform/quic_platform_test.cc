@@ -38,7 +38,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
@@ -149,35 +148,6 @@ TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));
   EXPECT_EQ("quicwg.org", QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
-}
-
-TEST_F(QuicPlatformTest, QuicMockLog) {
-  ASSERT_EQ(spdlog::level::err, GetLogger().level());
-
-  {
-    // Test a mock log that is not capturing logs.
-    CREATE_QUIC_MOCK_LOG(log);
-    EXPECT_QUIC_LOG_CALL(log).Times(0);
-    QUIC_LOG(ERROR) << "This should be logged but not captured by the mock.";
-  }
-
-  // Test nested mock logs.
-  CREATE_QUIC_MOCK_LOG(outer_log);
-  outer_log.StartCapturingLogs();
-
-  {
-    // Test a mock log that captures logs.
-    CREATE_QUIC_MOCK_LOG(inner_log);
-    inner_log.StartCapturingLogs();
-
-    EXPECT_QUIC_LOG_CALL_CONTAINS(inner_log, ERROR, "Inner log message");
-    QUIC_LOG(ERROR) << "Inner log message should be captured.";
-
-    // Destruction of inner_log should restore the QUIC log sink to outer_log.
-  }
-
-  EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
-  QUIC_LOG(ERROR) << "Outer log message should be captured.";
 }
 
 TEST_F(QuicPlatformTest, QuicServerStats) {
