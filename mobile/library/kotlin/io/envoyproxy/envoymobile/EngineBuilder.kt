@@ -35,7 +35,7 @@ open class EngineBuilder(
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
   private var dnsFallbackNameservers = listOf<String>()
-  private var dnsFilterUnroutableFamilies = false
+  private var dnsFilterUnroutableFamilies = true
   private var dnsQueryTimeoutSeconds = 25
   private var dnsMinRefreshSeconds = 60
   private var dnsPreresolveHostnames = "[]"
@@ -190,6 +190,7 @@ open class EngineBuilder(
 
   /**
    * Specify whether to filter unroutable IP families during DNS resolution or not.
+   * Defaults to true.
    *
    * @param dnsFilterUnroutableFamilies whether to filter or not.
    *
