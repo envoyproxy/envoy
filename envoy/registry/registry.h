@@ -336,9 +336,7 @@ private:
       }
 
       for (const auto& config_type : factory->configTypes()) {
-        if (config_type.empty()) {
-          continue;
-        }
+        ASSERT(!config_type.empty(), "Extension config types can never be empty string");
 
         // Register config types in the mapping.
         auto it = mapping->find(config_type);
