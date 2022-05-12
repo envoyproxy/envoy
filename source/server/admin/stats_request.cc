@@ -34,8 +34,6 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
         std::make_unique<StatsHtmlRender>(response_headers, response_, url_handler_fn_(), params_);
     break;
   case StatsFormat::Prometheus:
-    ASSERT(false);
-  case StatsFormat::Prometheus:
     // TODO(#16139): once Prometheus shares this algorithm here, this becomes a legitimate choice.
     IS_ENVOY_BUG("reached Prometheus case in switch unexpectedly");
     return Http::Code::BadRequest;

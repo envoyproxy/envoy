@@ -125,6 +125,8 @@ envoy_cc_library(
     deps = [
         ":utils_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/server:admin_interface",
         "//source/common/stats:histogram_lib",
     ],
 )
@@ -144,19 +146,6 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",
         "@com_google_absl//absl/container:btree",
-    ],
-)
-
-envoy_cc_library(
-    name = "stats_params_lib",
-    srcs = ["stats_params.cc"],
-    hdrs = ["stats_params.h"],
-    deps = [
-        ":utils_lib",
-        "//envoy/buffer:buffer_interface",
-        "//envoy/http:codes_interface",
-        "//envoy/server:admin_interface",
-        "//source/common/stats:histogram_lib",
     ],
 )
 

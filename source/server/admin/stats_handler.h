@@ -90,9 +90,10 @@ public:
    */
   Admin::UrlHandler statsHandler();
 
-  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
-  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
-                                       StatsRequest::UrlHandlerFn url_handler_fn);
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params);
+  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream&);
+  //static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+  //                                     StatsRequest::UrlHandlerFn url_handler_fn);
 
 private:
   class Context;

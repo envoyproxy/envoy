@@ -9,6 +9,8 @@
 
 #include "source/server/admin/utils.h"
 
+#include "re2/re2.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -19,13 +21,6 @@ constexpr absl::string_view Gauges = "Gauges";
 constexpr absl::string_view Histograms = "Histograms";
 constexpr absl::string_view TextReadouts = "TextReadouts";
 } // namespace Labels
-
-enum class StatsFormat {
-=======
-#include "re2/re2.h"
-
-namespace Envoy {
-namespace Server {
 
 enum class StatsFormat {
   Html,

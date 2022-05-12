@@ -70,9 +70,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     } else if (format_value.value() == "html") {
       format_ = StatsFormat::Html;
     } else {
-      response.add("usage: /stats?format=json  or /stats?format=prometheus \n\n");
-    } else {
-      response.add("usage: /stats?format=(json|prometheus|text)\n\n");
+      response.add("usage: /stats?format=(html|json|prometheus|text)\n\n");
       return Http::Code::BadRequest;
     }
   }

@@ -181,7 +181,6 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
                               "P90(109,109) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
                               "P99.9(109.99,109.99) P100(110,110)\n";
   EXPECT_EQ(expected, code_response.second);
-<<<<<<< HEAD
 }
 
 TEST_P(AdminStatsTest, HandlerStatsHtml) {
