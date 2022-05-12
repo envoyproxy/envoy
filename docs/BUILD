@@ -45,32 +45,6 @@ filegroup(
 )
 
 genrule(
-    name = "v2_redirects",
-    outs = ["v2_redirects.txt"],
-    cmd = """
-    jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/"))
-          | with_entries(.value |= sub("^envoy/";"api-v2/"))
-          | to_entries[]
-          | "\\(.value)\t\t\\(.key)"' \\
-        $(location :v2_mapping.json) > $@
-    """,
-    tools = [":v2_mapping.json"],
-)
-
-genrule(
-    name = "redirects",
-    outs = ["envoy-redirects.txt"],
-    cmd = """
-    cat $(location :redirects.txt) > $@ \\
-    && cat $(location :v2_redirects) >> $@
-    """,
-    tools = [
-        ":redirects.txt",
-        ":v2_redirects",
-    ],
-)
-
-genrule(
     name = "extensions_security_rst",
     srcs = [
         "//source/extensions:extensions_metadata.yaml",
@@ -158,7 +132,7 @@ pkg_files(
         ],
     ) + [
         ":conf.py",
-        ":redirects",
+        ":redirects.txt",
         ":versions.yaml",
     ],
     strip_prefix = "/docs",
