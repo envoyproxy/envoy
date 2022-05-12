@@ -54,6 +54,10 @@ minor_behavior_changes:
     runtime flag to false.
 
 bug_fixes:
+- area: runtime
+  change: |
+    Fixed a bug where was ``envoy.restart_features.no_runtime_singleton`` was inverted.
+    Runtime singleton status is now guarded by non-inverted ``envoy.restart_features.remove_runtime_singleton``.
 
 - area: tcp_proxy
   change: |
@@ -84,6 +88,9 @@ removed_config_or_runtime:
 - area: conn pool
   change: |
     removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
+- area: runtime
+  change: |
+    removed ``envoy.restart_features.no_runtime_singleton`` and replaced with ``envoy.restart_features.remove_runtime_singleton``.
 
 new_features:
 - area: access_log
