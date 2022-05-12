@@ -281,7 +281,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   default:
     PANIC("not reached");
   }
-  stats_.counterFromElements(methodStr[metadata.methodType()], "local-generated-response").inc();
+  stats_.counterFromElements("", "local-generated-response").inc();
 }
 
 void ConnectionManager::doDeferredTransDestroy(ConnectionManager::ActiveTrans& trans) {
