@@ -33,11 +33,26 @@ minor_behavior_changes:
   change: |
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
     that loads shared object libraries, such as those installed via luarocks.
+- area: admin
+  change: |
+    changed default regex engine for /stats?filter= from std::regex to RE2, improving filtering speed
+    20x.
+- area: skywalking
+  change: |
+    use request path as operation name of ENTRY/EXIT spans.
 - area: skywalking
   change: |
     use upstream host address as ``addressUsedAtClient`` in propagation header.
+- area: dns
+  change: |
+    allow propagating DNS responses with no records back to callers like strict_dns cluster,
+    guarded by ``envoy.reloadable_features.cares_accept_nodata``.
 
 bug_fixes:
+
+- area: tcp_proxy
+  change: |
+    Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
 
 removed_config_or_runtime:
 - area: compressor
@@ -58,6 +73,9 @@ removed_config_or_runtime:
 - area: tcp_proxy
   change: |
     removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
+- area: tls
+  change: |
+    fixed a bug when a certificate is invalid, ``days_until_expiration`` reports a big number. After this fix, when a certificate expires, it reports as ``0``.
 - area: conn pool
   change: |
     removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
@@ -75,15 +93,27 @@ new_features:
 - area: ext_proc
   change: |
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
+- area: http
+  change: |
+    added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
+- area: http
+  change: |
+    preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
+- area: thrift
+  change: |
+    added support for access logging.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
 - area: on_demand
   change: |
     :ref:`OnDemand <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` got extended to hold configuration for on-demand cluster discovery. A similar message for :ref:`per-route configuration <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` is also added.
+- area: proxy_protcol
+  change: |
+    added :ref:`allow_requests_without_proxy_protocol<envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>` to allow requests without proxy protocol on the listener from trusted downstreams as an opt-in flag.
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
@@ -93,6 +123,9 @@ new_features:
 - area: rbac
   change: |
     added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
+- area: build
+  change: |
+    official released binary is now built with Clang 14.0.0.
 
 deprecated:
 - area: dubbo_proxy

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <regex>
 #include <string>
 
@@ -7,6 +8,8 @@
 #include "envoy/http/codes.h"
 
 #include "source/server/admin/utils.h"
+
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Server {
@@ -31,7 +34,8 @@ struct StatsParams {
   bool pretty_{false};
   StatsFormat format_{StatsFormat::Text};
   std::string filter_string_;
-  absl::optional<std::regex> filter_;
+  std::shared_ptr<std::regex> filter_;
+  std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;
 };

@@ -101,6 +101,7 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   TRY_ASSERT_MAIN_THREAD { server_.runtime().mergeValues(overrides); }
   END_TRY
   catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(error, "{}", e.what());
     response.add(e.what());
     return Http::Code::ServiceUnavailable;
   }

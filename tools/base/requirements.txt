@@ -346,9 +346,9 @@ envoy-distribution-verify==0.0.8 \
 envoy-docker-utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
     # via envoy-distribution-distrotest
-envoy-docs-sphinx-runner==0.1.0 \
-    --hash=sha256:8be22a71038dac272f20c43589155aa0adca64223d0c85ef8864d8b1ca272b4e \
-    --hash=sha256:c0031fc261621d00cc03ed1de47d947a720a4649d6be34d3dcd34986137bdc6a
+envoy-docs-sphinx-runner==0.1.1 \
+    --hash=sha256:a440b16c97f6ac1eaf8aa6c9aaace0fcfd3e2e80686f615c3960991e536291ab \
+    --hash=sha256:adf55be5b16c2845d48fb0d93ba417bff152aeb2fc80b46f2d47071546718b1b
     # via -r requirements.in
 envoy-github-abstract==0.0.21 \
     --hash=sha256:243dae9457243fb42e4643b1f45006c3b0d3151c808884217447d29a081b26a1 \
@@ -940,7 +940,7 @@ yarl==1.6.3 \
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==62.1.0 \
-    --hash=sha256:26ead7d1f93efc0f8c804d9fafafbe4a44b179580a7105754b245155f9af05a8 \
-    --hash=sha256:47c7b0c0f8fc10eec4cf1e71c6fdadf8decaa74ffa087e68cd1c20db7ad6a592
+setuptools==62.2.0 \
+    --hash=sha256:5534570b9980fc650d45c62877ff603c7aaaf24893371708736cc016bd221c3c \
+    --hash=sha256:ca6ba73b7fd5f734ae70ece8c4c1f7062b07f3352f6428f6277e27c8f5c64237
     # via -r requirements.in

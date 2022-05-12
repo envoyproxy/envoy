@@ -47,16 +47,17 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
                                                bool end_stream) {
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
-  ASSERT(upstream_request_->routeEntry().connectConfig().has_value());
-  Buffer::OwnedImpl data;
-  auto& connect_config = upstream_request_->routeEntry().connectConfig().value();
-  if (connect_config.has_proxy_protocol_config()) {
-    Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
-        connect_config.proxy_protocol_config(), upstream_request_->connection(), data);
-  }
+  if (upstream_request_->routeEntry().connectConfig().has_value()) {
+    Buffer::OwnedImpl data;
+    auto& connect_config = upstream_request_->routeEntry().connectConfig().value();
+    if (connect_config.has_proxy_protocol_config()) {
+      Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+          connect_config.proxy_protocol_config(), upstream_request_->connection(), data);
+    }
 
-  if (data.length() != 0 || end_stream) {
-    upstream_conn_data_->connection().write(data, end_stream);
+    if (data.length() != 0 || end_stream) {
+      upstream_conn_data_->connection().write(data, end_stream);
+    }
   }
 
   // TcpUpstream::encodeHeaders is called after the UpstreamRequest is fully initialized. Also use
