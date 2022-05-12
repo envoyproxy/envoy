@@ -41,6 +41,7 @@ def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], library_pa
         jvm_flags = [
             "-Djava.library.path={}".format(library_path),
             "-Denvoy_jni_library_name={}".format(lib_name),
+            "-Xcheck:jni",
         ],
         repository = repository,
         exec_properties = exec_properties,
