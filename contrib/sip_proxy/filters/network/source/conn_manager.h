@@ -250,10 +250,9 @@ private:
           metadata_(metadata), local_response_sent_(false) {}
     ~ActiveTrans() override {
       request_timer_->complete();
-      ENVOY_LOG(trace, "destruct activetrans {}", transaction_id_);
       parent_.stats_.request_active_.dec();
 
-      eraseActiveTransFromPendingList(transaction_id_);
+      parent_.eraseActiveTransFromPendingList(transaction_id_);
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
       }

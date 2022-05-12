@@ -324,8 +324,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  ENVOY_LOG(trace, "new decoder filter");
-
   stats_.request_active_.inc();
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 

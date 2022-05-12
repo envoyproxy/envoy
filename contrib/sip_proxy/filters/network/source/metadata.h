@@ -171,7 +171,7 @@ public:
   // TODO how to combine the interface of header and listHeader?
   SipHeader header(HeaderType type, unsigned int index = 0) {
     if (index >= headers_[type].size()) {
-      return SipHeader(type, "");
+      return SipHeader{type, ""};
     }
     return headers_[type].at(index);
   }
