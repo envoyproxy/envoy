@@ -24,7 +24,7 @@ public:
       : active_socket_(std::move(raw_socket)), tls_socket_(std::move(tls_socket)) {}
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
+    callbacks_.setParent(&callbacks);
     active_socket_->setTransportSocketCallbacks(callbacks_);
   }
 
@@ -85,6 +85,8 @@ private:
       parent_->raiseEvent(event);
     }
     void flushWriteBuffer() override { parent_->flushWriteBuffer(); }
+
+    void setParent(Network::TransportSocketCallbacks* parent) { parent_ = parent; }
 
   private:
     Network::TransportSocketCallbacks* parent_;
