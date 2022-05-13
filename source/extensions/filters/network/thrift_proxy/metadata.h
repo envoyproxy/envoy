@@ -28,7 +28,7 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata(bool is_request = false) : is_request_(is_request_) {}
+  MessageMetadata(bool is_request = false) : is_request_(is_request) {}
 
   std::shared_ptr<MessageMetadata> clone() const {
     auto copy = std::make_shared<MessageMetadata>(isRequest());
