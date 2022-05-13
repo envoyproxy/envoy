@@ -81,8 +81,8 @@ if one of them is limited, the remaining descriptors will not consume their toke
 However, in some cases, it may not work, for example, we have two descriptors
 A and B, A is limited 3 requests per second, and B is limited 20 requests per 10 seconds.
 Obviously B is stricter than A (token per second), as a result, if we send requests
-above 3 in a second, the limited requests form A will also consume tokens of B.
-Since global token is not sorted, so we suggest it should be larger than other descriptors.
+above 3 in a second, the limited requests from A will also consume tokens of B.
+Note that global tokens are not sorted, so we suggest they should be larger than other descriptors.
 
 Example filter configuration using descriptors:
 
