@@ -1388,6 +1388,12 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
   return cannotHaveBody() ? ParserStatus::NoBody : ParserStatus::Success;
 }
 
+void ClientConnectionImpl::onEncodeComplete() {
+  if (pending_response_.has_value()) {
+    onMessageCompleteBase();
+  }
+}
+
 bool ClientConnectionImpl::upgradeAllowed() const {
   if (pending_response_.has_value()) {
     return pending_response_->encoder_.upgradeRequest();

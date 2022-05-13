@@ -294,7 +294,8 @@ public:
     }
     case test::common::http::DirectionalAction::kTrailers: {
       // Allow trailers for http >= 2 or for http1x only, when they are configured.
-      if ((http_protocol_ > Protocol::Http11 || http1_allow_trailers_) && state.isLocalOpen() &&
+      if (/*(http_protocol_ > Protocol::Http11 || http1_allow_trailers_) && */ state
+              .isLocalOpen() &&
           state.stream_state_ == StreamState::PendingDataOrTrailers) {
         if (response) {
           state.response_encoder_->encodeTrailers(
@@ -425,7 +426,9 @@ public:
       ENVOY_LOG_MISC(debug, "Response stream action on {} in state {} {}", stream_index_,
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
-      directionalAction(response_, stream_action.response());
+      if (response_.stream_state_ != HttpStream::StreamState::Closed) {
+        directionalAction(response_, stream_action.response());
+      }
       break;
     }
     default:
