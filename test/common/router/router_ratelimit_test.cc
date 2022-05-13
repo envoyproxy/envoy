@@ -1185,6 +1185,50 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
+const std::string RequestHeaderMatchInputDescriptor = R"EOF(
+actions:
+- extension:
+    name: my_header_name
+    typed_config:
+      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+      header_name: x-header-name
+  )EOF";
+
+TEST_F(RateLimitPolicyEntryTest, RequestMatchInput) {
+  setupTest(RequestHeaderMatchInputDescriptor);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "service_cluster", header,
+                                              stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"my_header_name", "test_value"}}}}),
+      testing::ContainerEq(local_descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, RequestMatchInputEmpty) {
+  setupTest(RequestHeaderMatchInputDescriptor);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", ""}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "service_cluster", header,
+                                              stream_info_);
+  EXPECT_FALSE(descriptors_.empty());
+  EXPECT_FALSE(local_descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, RequestMatchInputSkip) {
+  setupTest(RequestHeaderMatchInputDescriptor);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header_, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "service_cluster", header_,
+                                              stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+  EXPECT_TRUE(local_descriptors_.empty());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
