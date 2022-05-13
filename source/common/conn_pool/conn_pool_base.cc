@@ -403,8 +403,10 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
 void ConnPoolImplBase::drainClients(std::list<ActiveClientPtr>& clients) {
   while (!clients.empty()) {
     ASSERT(clients.front()->numActiveStreams() > 0u);
-    ENVOY_LOG_EVENT(debug, "draining_non_idle_client", "draining client {} for cluster {}",
-                    clients.front()->id(), host_->cluster().name());
+    ENVOY_LOG_EVENT(
+        debug, "draining_non_idle_client", "draining {} client {} for cluster {}",
+        (clients.front()->state() == ActiveClient::State::Ready ? "ready" : "early data"),
+        clients.front()->id(), host_->cluster().name());
     transitionActiveClientState(*clients.front(), ActiveClient::State::Draining);
   }
 }
@@ -422,13 +424,9 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   // all entries in busy_clients_ to draining.
   if (pending_streams_.empty()) {
     // The remaining early data clients are non-idle.
-    ENVOY_LOG_EVENT(debug, "draining_non_idle_early_data_client",
-                    "draining early data clients for cluster {}", host_->cluster().name());
     drainClients(early_data_clients_);
   }
 
-  ENVOY_LOG_EVENT(debug, "draining_ready_client", "draining active clients for cluster {}",
-                  host_->cluster().name());
   drainClients(ready_clients_);
 
   // Changing busy_clients_ to Draining does not move them between lists,
@@ -710,6 +708,8 @@ void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   ASSERT(!client.hasHandshakeCompleted() && client.readyForStream());
   // Check pending streams backward for safe request.
+  // Note that this is a O(n) search, but the expected size of pending_streams_ should be small. If
+  // this becomes a problem, we could split pending_streams_ into 2 lists.
   auto it = pending_streams_.end();
   if (it == pending_streams_.begin()) {
     return;

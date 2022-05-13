@@ -386,6 +386,8 @@ protected:
   uint32_t connecting_stream_capacity_{0};
 
 private:
+  // Drain all the clients in the given list.
+  // Prerequisite: the given clients shouldn't be idle.
   void drainClients(std::list<ActiveClientPtr>& clients);
 
   std::list<PendingStreamPtr> pending_streams_;

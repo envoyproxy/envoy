@@ -352,6 +352,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
                                              Http3Used http3_used, DoRetryResetCallback callback) {
+  std::cerr << "======== shouldRetryReset\n";
 
   // Following wouldRetryFromReset() may override the value.
   bool disable_http3 = false;

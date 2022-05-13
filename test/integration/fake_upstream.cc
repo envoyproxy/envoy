@@ -509,7 +509,11 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
-                   config) {}
+                   config) {
+  std::cerr << "=========== start FakeUpstream\n";
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.no_extension_lookup_by_name", false);
+  ASSERT(!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name"));
+}
 
 static Network::SocketPtr
 makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {

@@ -312,6 +312,8 @@ public:
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
     Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
+      std::cerr
+          << "================== envoy.reloadable_features.no_extension_lookup_by_name true\n";
       if (factory == nullptr && !is_optional) {
         ExceptionUtil::throwEnvoyException(
             fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
