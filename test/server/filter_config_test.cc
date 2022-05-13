@@ -39,7 +39,7 @@ public:
   }
 
   std::string name() const override { return "envoy.test.http_filter"; }
-  std::string configType() override { return ""; };
+  std::set<std::string> configTypes() override { return {}; };
 };
 
 TEST(NamedHttpFilterConfigFactoryTest, CreateFilterFactory) {

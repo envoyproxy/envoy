@@ -77,6 +77,9 @@ public:
   // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
   virtual void createUpstreams();
+  // Create a single upstream, based on the supplied config.
+  void createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
+                      FakeUpstreamConfig& config);
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
