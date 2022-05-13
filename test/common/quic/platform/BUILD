@@ -40,7 +40,6 @@ envoy_cc_test(
         "@com_github_google_quiche//:quic_core_quic_epoll_clock_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",
-        "@com_github_google_quiche//:quic_platform_mock_log",
         "@com_github_google_quiche//:quic_platform_test",
         "@com_github_google_quiche//:quic_platform_test_output",
         "@com_github_google_quiche//:quic_platform_thread",
@@ -86,15 +85,7 @@ envoy_quiche_platform_impl_cc_test_library(
     tags = ["nofips"],
     deps = [
         "@com_github_google_quiche//:quic_platform_base",
-        "@com_github_google_quiche//:quic_platform_mock_log",
     ],
-)
-
-envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_mock_log_impl_lib",
-    hdrs = ["quiche_mock_log_impl.h"],
-    tags = ["nofips"],
-    deps = ["@com_github_google_quiche//:quic_platform_base"],
 )
 
 envoy_quiche_platform_impl_cc_test_library(

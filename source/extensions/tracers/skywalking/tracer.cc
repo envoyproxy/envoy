@@ -48,21 +48,24 @@ void Span::finishSpan() {
 
 void Span::injectContext(Tracing::TraceContext& trace_context,
                          const Upstream::HostDescriptionConstSharedPtr& upstream) {
-  const auto remote_address = upstream != nullptr ? upstream->address()->asString()
-                                                  : std::string(trace_context.authority());
-  // TODO(wbpcode): Due to https://github.com/SkyAPM/cpp2sky/issues/83 in cpp2sky, it is necessary
-  // to ensure that there is '\0' at the end of the string_view parameter to ensure that the
-  // corresponding trace header is generated correctly. For this reason, we cannot directly use host
-  // as argument. We need create a copy of std::string based on host and std::string will
-  // automatically add '\0' to the end of the string content.
-  auto sw8_header = tracing_context_->createSW8HeaderValue(remote_address);
+  absl::string_view remote_address =
+      upstream != nullptr ? upstream->address()->asStringView() : trace_context.authority();
+
+  auto sw8_header =
+      tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});
   if (sw8_header.has_value()) {
     trace_context.setByReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
+
+    // Rewrite operation name with latest upstream request path for the EXIT span.
+    absl::string_view upstream_request_path = trace_context.path();
+    span_entity_->setOperationName({upstream_request_path.data(), upstream_request_path.size()});
   }
 }
 
-Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name, SystemTime) {
-  return std::make_unique<Span>(name, *this, tracing_context_, parent_tracer_);
+Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string&, SystemTime) {
+  // Reuse operation name of parent span by default.
+  return std::make_unique<Span>(span_entity_->operationName(), *this, tracing_context_,
+                                parent_tracer_);
 }
 
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
@@ -74,7 +77,7 @@ void Tracer::sendSegment(TracingContextPtr segment_context) {
   }
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& name, TracingContextPtr tracing_context) {
+Tracing::SpanPtr Tracer::startSpan(absl::string_view name, TracingContextPtr tracing_context) {
   return std::make_unique<Span>(name, tracing_context, *this);
 }
 } // namespace SkyWalking

@@ -1,0 +1,32 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "content-length"
+        value: "2"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3
+    }
+    dispatching_action {
+      data: 3
+    }
+  }
+}
