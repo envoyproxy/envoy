@@ -253,7 +253,11 @@ public:
   }
 };
 
-template <class MatchingDataType> class UriSanInputBaseFactory {
+template <class MatchingDataType>
+class UriSanInputBaseFactory
+    : public BaseFactory<UriSanInput<MatchingDataType>,
+                         envoy::extensions::matching::common_inputs::network::v3::UriSanInput,
+                         MatchingDataType> {
 public:
   UriSanInputBaseFactory()
       : BaseFactory<UriSanInput<MatchingDataType>,
@@ -273,7 +277,11 @@ public:
   }
 };
 
-template <class MatchingDataType> class DnsSanInputBaseFactory {
+template <class MatchingDataType>
+class DnsSanInputBaseFactory
+    : public BaseFactory<DnsSanInput<MatchingDataType>,
+                         envoy::extensions::matching::common_inputs::network::v3::DnsSanInput,
+                         MatchingDataType> {
 public:
   DnsSanInputBaseFactory()
       : BaseFactory<DnsSanInput<MatchingDataType>,
@@ -292,7 +300,11 @@ public:
   }
 };
 
-template <class MatchingDataType> class SubjectInputBaseFactory {
+template <class MatchingDataType>
+class SubjectInputBaseFactory
+    : public BaseFactory<SubjectInput<MatchingDataType>,
+                         envoy::extensions::matching::common_inputs::network::v3::SubjectInput,
+                         MatchingDataType> {
 public:
   SubjectInputBaseFactory()
       : BaseFactory<SubjectInput<MatchingDataType>,
