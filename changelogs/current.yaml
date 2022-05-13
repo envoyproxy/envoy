@@ -139,6 +139,9 @@ new_features:
 - area: ratelimit
   change: |
     added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
+- area: ratelimit
+  change: |
+    added support for :ref:`HTTP matching input functions <arch_overview_matching_api>` as descriptor producers.
 - area: build
   change: |
     official released binary is now built with Clang 14.0.0.
