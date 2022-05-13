@@ -28,10 +28,10 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata() = default;
+  MessageMetadata(bool is_request = false) : is_request_(is_request_) {}
 
   std::shared_ptr<MessageMetadata> clone() const {
-    auto copy = std::make_shared<MessageMetadata>();
+    auto copy = std::make_shared<MessageMetadata>(isRequest());
 
     if (hasFrameSize()) {
       copy->setFrameSize(frameSize());
@@ -168,7 +168,6 @@ public:
   void setDraining(bool draining) { is_draining_ = draining; }
 
   bool isRequest() const { return is_request_; }
-  void setIsRequest(bool is_request) { is_request_ = is_request; }
 
   absl::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
@@ -209,7 +208,7 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
-  bool is_request_{false};
+  const bool is_request_;
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

@@ -29,9 +29,8 @@ public:
 };
 
 MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
-  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>(true);
 
-  metadata->setIsRequest(true);
   while (num_headers-- > 0) {
     metadata->requestHeaders().addCopy(Http::LowerCaseString("x"), "y");
   }
@@ -440,9 +439,8 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
 TEST(HeaderTransportTest, InfoBlock) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
-  MessageMetadata metadata;
+  MessageMetadata metadata(true);
 
-  metadata.setIsRequest(true);
   metadata.requestHeaders().addCopy(Http::LowerCaseString("not"), "empty");
 
   buffer.writeBEInt<int32_t>(200);
@@ -547,8 +545,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   // Header string too large
   {
     Buffer::OwnedImpl buffer;
-    MessageMetadata metadata;
-    metadata.setIsRequest(true);
+    MessageMetadata metadata(true);
     metadata.setProtocol(ProtocolType::Binary);
     metadata.requestHeaders().addCopy(Http::LowerCaseString("key"), std::string(32768, 'x'));
 
@@ -562,8 +559,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   // Header info block too large
   {
     Buffer::OwnedImpl buffer;
-    MessageMetadata metadata;
-    metadata.setIsRequest(true);
+    MessageMetadata metadata(true);
     metadata.setProtocol(ProtocolType::Binary);
     metadata.requestHeaders().addCopy(Http::LowerCaseString("k1"), std::string(16384, 'x'));
     metadata.requestHeaders().addCopy(Http::LowerCaseString("k2"), std::string(16384, 'x'));
@@ -623,8 +619,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   // Frame with headers
   {
     Buffer::OwnedImpl buffer;
-    MessageMetadata metadata;
-    metadata.setIsRequest(true);
+    MessageMetadata metadata(true);
     metadata.setProtocol(ProtocolType::Compact);
     metadata.setSequenceId(10);
     metadata.requestHeaders().addCopy(Http::LowerCaseString("key"), "value");
