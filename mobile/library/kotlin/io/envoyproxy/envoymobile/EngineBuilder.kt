@@ -41,7 +41,7 @@ open class EngineBuilder(
   private var dnsPreresolveHostnames = "[]"
   private var enableDrainPostDnsRefresh = false
   private var enableHttp3 = false
-  private var enableHappyEyeballs = false
+  private var enableHappyEyeballs = true
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
@@ -231,7 +231,8 @@ open class EngineBuilder(
   }
 
   /**
-   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported.
+   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
+   * true.
    *
    * @param enableHappyEyeballs whether to enable RFC 6555 handling for IPv4/IPv6.
    *

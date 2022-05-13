@@ -50,7 +50,6 @@ class MainActivity : Activity() {
       .addPlatformFilter(::DemoFilter)
       .addPlatformFilter(::BufferDemoFilter)
       .addPlatformFilter(::AsyncDemoFilter)
-      .enableHappyEyeballs(true)
       .h2ExtendKeepaliveTimeout(true)
       .enableInterfaceBinding(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")

@@ -45,9 +45,9 @@ const std::string config_header = R"(
 - &dns_fail_base_interval 2s
 - &dns_fail_max_interval 10s
 - &dns_query_timeout 25s
-- &dns_lookup_family V4_PREFERRED
+- &dns_lookup_family ALL
 - &dns_min_refresh_rate 60s
-- &dns_multiple_addresses false
+- &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
 - &dns_refresh_rate 60s
 - &dns_resolver_name envoy.network.dns_resolver.cares
