@@ -139,8 +139,15 @@ envoy_cc_test(
 
 envoy_cc_library(
     name = "http2_adapter_header_validator",
-    srcs = ["quiche/http2/adapter/header_validator.cc"],
-    hdrs = ["quiche/http2/adapter/header_validator.h"],
+    srcs = [
+        "quiche/http2/adapter/header_validator.cc",
+        "quiche/http2/adapter/noop_header_validator.cc",
+    ],
+    hdrs = [
+        "quiche/http2/adapter/header_validator.h",
+        "quiche/http2/adapter/header_validator_base.h",
+        "quiche/http2/adapter/noop_header_validator.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
@@ -151,7 +158,10 @@ envoy_cc_library(
 
 envoy_cc_test(
     name = "http2_adapter_header_validator_test",
-    srcs = ["quiche/http2/adapter/header_validator_test.cc"],
+    srcs = [
+        "quiche/http2/adapter/header_validator_test.cc",
+        "quiche/http2/adapter/noop_header_validator_test.cc",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
@@ -364,8 +374,8 @@ envoy_cc_test(
         ":http2_adapter_nghttp2_util",
         ":http2_adapter_test_frame_sequence",
         ":http2_adapter_test_utils",
+        ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_test",
-        ":quiche_common_platform_test_helpers_lib",
     ],
 )
 
@@ -463,8 +473,8 @@ envoy_cc_test(
         ":http2_adapter_oghttp2_util",
         ":http2_adapter_test_frame_sequence",
         ":http2_adapter_test_utils",
+        ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_test",
-        ":quiche_common_platform_test_helpers_lib",
     ],
 )
 
@@ -604,9 +614,9 @@ envoy_cc_test(
     deps = [
         ":http2_adapter_window_manager",
         ":http2_test_tools_random",
+        ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_export",
         ":quiche_common_platform_test",
-        ":quiche_common_platform_test_helpers_lib",
         "@com_google_absl//absl/functional:bind_front",
     ],
 )
@@ -1665,16 +1675,6 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
-    name = "quiche_common_platform_test_helpers_lib",
-    hdrs = ["quiche/common/platform/api/quiche_test_helpers.h"],
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "quic_platform_epoll_lib",
     hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
     repository = "@envoy",
@@ -1740,14 +1740,6 @@ envoy_cc_library(
         ":quic_platform_export",
         ":quic_platform_ip_address_family",
     ],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_mock_log",
-    hdrs = ["quiche/quic/platform/api/quic_mock_log.h"],
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [":quiche_common_platform_mock_log"],
 )
 
 envoy_cc_test_library(
@@ -4885,19 +4877,6 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "quiche_common_platform_mock_log",
-    hdrs = [
-        "quiche/common/platform/api/quiche_mock_log.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_mock_log_impl_lib",
-    ],
-)
-
 envoy_cc_library(
     name = "quiche_common_platform_udp_socket_platform",
     hdrs = select({
@@ -5134,7 +5113,6 @@ envoy_cc_test_library(
     name = "quiche_common_test_tools_test_utils_lib",
     srcs = ["quiche/common/test_tools/quiche_test_utils.cc"],
     hdrs = [
-        "quiche/common/platform/api/quiche_test_helpers.h",
         "quiche/common/test_tools/quiche_test_utils.h",
     ],
     repository = "@envoy",

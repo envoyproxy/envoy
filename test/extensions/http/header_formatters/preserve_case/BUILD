@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -31,8 +32,10 @@ envoy_extension_cc_test(
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
+        "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
     ],
 )
 
@@ -43,9 +46,23 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
     deps = [
+        "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
+    deps = [
+        "//envoy/registry",
+        "//source/common/common:utility_lib",
+        "//source/extensions/http/header_formatters/preserve_case:config",
+        "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "//test/test_common:utility_lib",
     ],
 )
