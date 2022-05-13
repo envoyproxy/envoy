@@ -7,6 +7,8 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -63,6 +65,17 @@ public:
 } // namespace Server
 } // namespace Envoy
 
+class UseRe2Filters {
+public:
+  UseRe2Filters(bool use_re2) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.admin_stats_filter_use_re2", use_re2 ? "true" : "false"}});
+  }
+
+private:
+  Envoy::TestScopedRuntime scoped_runtime_;
+};
+
 Envoy::Server::StatsHandlerTest& testContext() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(Envoy::Server::StatsHandlerTest);
 }
@@ -97,6 +110,7 @@ BENCHMARK(BM_UsedCountersText)->Unit(benchmark::kMillisecond);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FilteredCountersText(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext();
+  UseRe2Filters use_re2_filters(false);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?filter=no-match", response);
@@ -107,6 +121,21 @@ static void BM_FilteredCountersText(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FilteredCountersText)->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_Re2FilteredCountersText(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext();
+  UseRe2Filters use_re2_filters(true);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?filter=no-match", response);
+
+  for (auto _ : state) { // NOLINT
+    uint64_t count = test_context.handlerStats(params);
+    RELEASE_ASSERT(count == 0, "expected count == 0");
+  }
+}
+BENCHMARK(BM_Re2FilteredCountersText)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AllCountersJson(benchmark::State& state) {
@@ -140,6 +169,7 @@ BENCHMARK(BM_UsedCountersJson)->Unit(benchmark::kMillisecond);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FilteredCountersJson(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext();
+  UseRe2Filters use_re2_filters(false);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=json&filter=no-match", response);
@@ -150,6 +180,21 @@ static void BM_FilteredCountersJson(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FilteredCountersJson)->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_Re2FilteredCountersJson(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext();
+  UseRe2Filters use_re2_filters(true);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?format=json&filter=no-match", response);
+
+  for (auto _ : state) { // NOLINT
+    uint64_t count = test_context.handlerStats(params);
+    RELEASE_ASSERT(count < 100, "expected count < 100"); // actual = 12
+  }
+}
+BENCHMARK(BM_Re2FilteredCountersJson)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AllCountersPrometheus(benchmark::State& state) {
@@ -183,6 +228,7 @@ BENCHMARK(BM_UsedCountersPrometheus)->Unit(benchmark::kMillisecond);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FilteredCountersPrometheus(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext();
+  UseRe2Filters use_re2_filters(false);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=prometheus&filter=no-match", response);
@@ -193,3 +239,18 @@ static void BM_FilteredCountersPrometheus(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_Re2FilteredCountersPrometheus(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext();
+  UseRe2Filters use_re2_filters(true);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?format=prometheus&filter=no-match", response);
+
+  for (auto _ : state) { // NOLINT
+    uint64_t count = test_context.handlerStats(params);
+    RELEASE_ASSERT(count == 0, "expected count == 0");
+  }
+}
+BENCHMARK(BM_Re2FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);

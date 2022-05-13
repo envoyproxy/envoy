@@ -100,12 +100,12 @@ deadline of 3 weeks.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
   particularly risky PRs until after the release is tagged. This is because we aim for main to be
   at release candidate quality at all times.
-* Do a final check of the [release notes](docs/root/version_history/current.rst):
+* Do a final check of the [release notes](changelogs/current.yaml):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.
   * If the "Deprecated" section is empty, delete it.
-  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
+  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](changelogs/current.yaml).
   * Switch the [VERSION.txt](VERSION.txt) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
@@ -129,45 +129,37 @@ deadline of 3 weeks.
   post.
 * Do a new PR to setup the next version
   * Update [VERSION.txt](VERSION.txt) to the next development release. E.g., "1.7.0-dev".
-  * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
+  * `git mv changelogs/current.yaml changelogs/1.6.0.yaml`, filling in the previous
     release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
     Add an entry for the new file in the `toctree` in
     [version_history.rst](docs/root/version_history/version_history.rst).
   * Edit the file you just created (eg `docs/root/version_history/v1.6.0.rst`) replacing the link part (between the `<>`) of any `ref:` links to point at the version - eg `` :ref:`Some link text <actual link>` `` -> `` :ref:`Some link text <v1.16:actual link>` ``
   * Create a new "current" version history file at the [release
-  notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
+  notes](changelogs/current.yaml) for the following version. E.g., "1.7.0 (pending)". Use
   this text as the template for the new file:
+```yaml
+date: Pending
+behavior_changes:
+# Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required
+
+minor_behavior_changes:
+# Changes that may cause incompatibilities for some users, but should not for most*
+
+bug_fixes:
+# Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
+
+# Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
+#  to file tracking issues for runtime guarded code which can be removed.
+# Check source/common/runtime/runtime_features.cc and see if any runtime guards in
+# disabled_runtime_features should be reassessed, and ping on the relevant issues.
 ```
-1.7.0 (Pending)
-===============
-
-Incompatible Behavior Changes
------------------------------
-*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-Minor Behavior Changes
-----------------------
-*Changes that may cause incompatibilities for some users, but should not for most*
-
-Bug Fixes
----------
-*Changes expected to improve the state of the world and are unlikely to have negative effects*
-
-Removed Config or Runtime
--------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-New Features
-------------
-
-Deprecated
-----------
-```
-* Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
-  to file tracking issues for runtime guarded code which can be removed.
-* Check source/common/runtime/runtime_features.cc and see if any runtime guards in
-  disabled_runtime_features should be reassessed, and ping on the relevant issues.
-
 
 ## Security release schedule
 

@@ -21,7 +21,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return std::make_unique<test::integration::filters::TestInspectorFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.listener.test"; }

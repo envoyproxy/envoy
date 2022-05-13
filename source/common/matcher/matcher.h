@@ -79,6 +79,68 @@ public:
 };
 
 /**
+ * Constructs a data input function for a data type.
+ **/
+template <class DataType> class MatchInputFactory {
+public:
+  MatchInputFactory(ProtobufMessage::ValidationVisitor& validator,
+                    MatchTreeValidationVisitor<DataType>& validation_visitor)
+      : validator_(validator), validation_visitor_(validation_visitor) {}
+
+  DataInputFactoryCb<DataType> createDataInput(const xds::core::v3::TypedExtensionConfig& config) {
+    return createDataInputBase(config);
+  }
+
+  DataInputFactoryCb<DataType>
+  createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
+    return createDataInputBase(config);
+  }
+
+private:
+  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
+  class CommonProtocolInputWrapper : public DataInput<DataType> {
+  public:
+    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+        : common_protocol_input_(std::move(common_protocol_input)) {}
+
+    DataInputGetResult get(const DataType&) const override {
+      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
+                                common_protocol_input_->get()};
+    }
+
+  private:
+    const CommonProtocolInputPtr common_protocol_input_;
+  };
+
+  template <class TypedExtensionConfigType>
+  DataInputFactoryCb<DataType> createDataInputBase(const TypedExtensionConfigType& config) {
+    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+    if (factory != nullptr) {
+      validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
+
+      ProtobufTypes::MessagePtr message =
+          Config::Utility::translateAnyToFactoryConfig(config.typed_config(), validator_, *factory);
+      auto data_input = factory->createDataInputFactoryCb(*message, validator_);
+      return data_input;
+    }
+
+    // If the provided config doesn't match a typed input, assume that this is one of the common
+    // inputs.
+    auto& common_input_factory =
+        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config.typed_config(), validator_, common_input_factory);
+    auto common_input =
+        common_input_factory.createCommonProtocolInputFactoryCb(*message, validator_);
+    return
+        [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
+  }
+
+  ProtobufMessage::ValidationVisitor& validator_;
+  MatchTreeValidationVisitor<DataType>& validation_visitor_;
+};
+
+/**
  * Recursively constructs a MatchTree from a protobuf configuration.
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
@@ -90,7 +152,7 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
-        validation_visitor_(validation_visitor) {}
+        match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
   template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {
@@ -173,7 +235,8 @@ private:
   FieldMatcherFactoryCb<DataType> createFieldMatcher(const FieldMatcherType& field_predicate) {
     switch (field_predicate.match_type_case()) {
     case (PredicateType::kSinglePredicate): {
-      auto data_input = createDataInput(field_predicate.single_predicate().input());
+      auto data_input =
+          match_input_factory_.createDataInput(field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
       return [data_input, input_matcher]() {
@@ -201,7 +264,7 @@ private:
 
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
-    auto data_input = createDataInput(matcher.matcher_tree().input());
+    auto data_input = match_input_factory_.createDataInput(matcher.matcher_tree().input());
     auto on_no_match = createOnMatch(matcher.on_no_match());
 
     switch (matcher.matcher_tree().tree_type_case()) {
@@ -271,47 +334,6 @@ private:
     return absl::nullopt;
   }
 
-  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
-  class CommonProtocolInputWrapper : public DataInput<DataType> {
-  public:
-    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
-        : common_protocol_input_(std::move(common_protocol_input)) {}
-
-    DataInputGetResult get(const DataType&) const override {
-      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                common_protocol_input_->get()};
-    }
-
-  private:
-    const CommonProtocolInputPtr common_protocol_input_;
-  };
-
-  template <class TypedExtensionConfigType>
-  DataInputFactoryCb<DataType> createDataInput(const TypedExtensionConfigType& config) {
-    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
-    if (factory != nullptr) {
-      validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
-
-      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          config.typed_config(), server_factory_context_.messageValidationVisitor(), *factory);
-      auto data_input = factory->createDataInputFactoryCb(
-          *message, server_factory_context_.messageValidationVisitor());
-      return data_input;
-    }
-
-    // If the provided config doesn't match a typed input, assume that this is one of the common
-    // inputs.
-    auto& common_input_factory =
-        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), server_factory_context_.messageValidationVisitor(),
-        common_input_factory);
-    auto common_input = common_input_factory.createCommonProtocolInputFactoryCb(
-        *message, server_factory_context_.messageValidationVisitor());
-    return
-        [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
-  }
-
   template <class SinglePredicateType>
   InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
     switch (predicate.matcher_case()) {
@@ -337,7 +359,7 @@ private:
   const std::string stats_prefix_;
   ActionFactoryContext& action_factory_context_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
-  MatchTreeValidationVisitor<DataType>& validation_visitor_;
+  MatchInputFactory<DataType> match_input_factory_;
 };
 } // namespace Matcher
 } // namespace Envoy
