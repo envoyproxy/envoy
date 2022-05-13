@@ -321,15 +321,18 @@ message Action {
   //
   // Actions:
   //
-  //  * ALLOW: Allows the request if and only if the matcher that matches the
-  //    request.
-  //  * DENY: Allows the request if and only if the matcher that does not match
-  //    the request.
-  //  * LOG: Allows the request if and only if the matcher that matches the
-  //    request. If the matcher matches, the dynamic metadata key
-  //    `access_log_hint` is set to the value `true` under the shared key
-  //    namespace 'envoy.common'. If the matcher does not match, it is set to
-  //    `false`.
+  //  * ALLOW: If the request gets matched on ALLOW, it is permitted.
+  //  * DENY: If the request gets matched on DENY, it is not permitted.
+  //  * LOG: If the request gets matched on LOG, it is permitted. Besides, the
+  //    dynamic metadata key `access_log_hint` under the shared key namespace
+  //    'envoy.common' will be set to the value `true`.
+  //  * If the request cannot get matched, it will fallback to DENY.
+  //
+  // Log behavior:
+  //
+  //  If the RBAC matcher contains at least one LOG action, the dynamic
+  //  metadata key `access_log_hint` will be set based on if the request
+  //  get matched on the LOG action.
   //
   RBAC.Action action = 2;
 }
