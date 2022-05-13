@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
-#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/integration/filters/header_to_filter_state.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 
@@ -55,13 +54,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {
-public:
-  LocalJwksIntegrationTest() : registration_(factory_) {}
-
-  HeaderToFilterStateFilterConfig factory_;
-  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
-};
+class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -227,7 +220,14 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 )";
 
   config_helper_.prependFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.prependFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
+  config_helper_.prependFilter(R"(
+  name: header-to-filter-state
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
+    header_name: jwt_selector
+    state_name: jwt_selector
+    read_only: true
+)");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
