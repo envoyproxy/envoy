@@ -464,6 +464,7 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
+        const auto buf_length_old = buf.length();
         if (should_close_connection_) {
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
           return codecClientError("preventing buffer drain due to connection closure");
@@ -472,6 +473,9 @@ public:
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
           return status;
+        }
+        if (buf_length_old == buf.length()) {
+          return Http::codecProtocolError("No progress in draining buffer. Breaking endless loop.");
         }
       }
       bufs_.pop_front();

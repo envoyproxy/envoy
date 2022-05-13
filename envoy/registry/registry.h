@@ -19,6 +19,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "fmt/ranges.h"
 
 namespace Envoy {
 namespace Registry {
@@ -334,22 +335,20 @@ private:
         continue;
       }
 
-      // Skip untyped factories.
-      std::string config_type = factory->configType();
-      if (config_type.empty()) {
-        continue;
-      }
+      for (const auto& config_type : factory->configTypes()) {
+        ASSERT(!config_type.empty(), "Extension config types can never be empty string");
 
-      // Register config types in the mapping.
-      auto it = mapping->find(config_type);
-      if (it != mapping->end() && it->second != factory) {
-        // Mark double-registered types with a nullptr.
-        // See issue https://github.com/envoyproxy/envoy/issues/9643.
-        ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
-                  factory->name(), it->second ? it->second->name() : "");
-        it->second = nullptr;
-      } else {
-        mapping->emplace(std::make_pair(config_type, factory));
+        // Register config types in the mapping.
+        auto it = mapping->find(config_type);
+        if (it != mapping->end() && it->second != factory) {
+          // Mark double-registered types with a nullptr.
+          // See issue https://github.com/envoyproxy/envoy/issues/9643.
+          ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                    factory->name(), it->second ? it->second->name() : "");
+          it->second = nullptr;
+        } else {
+          mapping->emplace(std::make_pair(config_type, factory));
+        }
       }
     }
 
@@ -386,10 +385,10 @@ private:
 
       ENVOY_LOG(
           info, "Factory '{}' (type '{}') displaced-by-name with test factory '{}' (type '{}')",
-          prev_by_name->name(), prev_by_name->configType(), factory.name(), factory.configType());
+          prev_by_name->name(), prev_by_name->configTypes(), factory.name(), factory.configTypes());
     } else {
       ENVOY_LOG(info, "Factory '{}' (type '{}') registered for tests", factory.name(),
-                factory.configType());
+                factory.configTypes());
     }
 
     factories().emplace(factory.name(), &factory);
@@ -407,7 +406,7 @@ private:
           ENVOY_LOG(
               info,
               "Deprecated name '{}' (mapped to '{}') displaced with test factory '{}' (type '{}')",
-              it->first, it->second, factory.name(), factory.configType());
+              it->first, it->second, factory.name(), factory.configTypes());
         } else {
           // Name not previously mapped, remember to remove it.
           prev_deprecated_names.emplace_back(std::make_pair(deprecated_name, ""));
@@ -432,14 +431,14 @@ private:
       factories().erase(replacement->name());
 
       ENVOY_LOG(info, "Removed test factory '{}' (type '{}')", replacement->name(),
-                replacement->configType());
+                replacement->configTypes());
 
       if (prev_by_name) {
         // Restore any factory displaced by name, but only register the type if it's non-empty.
         factories().emplace(prev_by_name->name(), prev_by_name);
 
         ENVOY_LOG(info, "Restored factory '{}' (type '{}'), formerly displaced-by-name",
-                  prev_by_name->name(), prev_by_name->configType());
+                  prev_by_name->name(), prev_by_name->configTypes());
       }
 
       for (auto [prev_deprecated_name, mapped_canonical_name] : prev_deprecated_names) {

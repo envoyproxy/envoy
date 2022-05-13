@@ -89,6 +89,10 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     Span* span = dynamic_cast<Span*>(org_span.get());
     ASSERT(span);
 
+    // "TEST_OP" will be ignored and path of downstream request will be used as the operation name
+    // of ENTRY span.
+    EXPECT_EQ("/path", span->spanEntity()->operationName());
+
     EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->service());
     EXPECT_EQ("FAKE_FAKE_FAKE_INSTANCE", span->tracingContext()->serviceInstance());
 
@@ -112,6 +116,9 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
     Span* span = dynamic_cast<Span*>(org_span.get());
     ASSERT(span);
+
+    // Path of downstream request will be used as the operation name of ENTRY span.
+    EXPECT_EQ("/path", span->spanEntity()->operationName());
 
     EXPECT_FALSE(span->tracingContext()->skipAnalysis());
 
