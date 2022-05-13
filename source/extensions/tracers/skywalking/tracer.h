@@ -41,7 +41,7 @@ public:
    *
    * @return The unique ptr to the newly created span.
    */
-  Tracing::SpanPtr startSpan(const std::string& name, TracingContextPtr tracing_context);
+  Tracing::SpanPtr startSpan(absl::string_view name, TracingContextPtr tracing_context);
 
 private:
   TraceSegmentReporterPtr reporter_;
@@ -51,16 +51,16 @@ using TracerPtr = std::unique_ptr<Tracer>;
 
 class Span : public Tracing::Span {
 public:
-  Span(const std::string& name, TracingContextPtr tracing_context, Tracer& parent_tracer)
+  Span(absl::string_view name, TracingContextPtr tracing_context, Tracer& parent_tracer)
       : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
         span_entity_(tracing_context_->createEntrySpan()) {
-    span_entity_->startSpan(name);
+    span_entity_->startSpan({name.data(), name.size()});
   }
-  Span(const std::string& name, Span& parent_span, TracingContextPtr tracing_context,
+  Span(absl::string_view name, Span& parent_span, TracingContextPtr tracing_context,
        Tracer& parent_tracer)
       : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
         span_entity_(tracing_context_->createExitSpan(parent_span.spanEntity())) {
-    span_entity_->startSpan(name);
+    span_entity_->startSpan({name.data(), name.size()});
   }
 
   // Tracing::Span

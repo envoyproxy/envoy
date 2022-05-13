@@ -122,9 +122,11 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
     if (settings.maxConcurrentStreams().has_value()) {
       int64_t old_unused_capacity = currentUnusedCapacity();
       // Given config limits old_unused_capacity should never exceed int32_t.
-      // TODO(alyssawilk) move remaining_streams_, concurrent_stream_limit_ and
-      // currentUnusedCapacity() to be explicit int32_t
       ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
+      if (parent().cache() && parent().origin().has_value()) {
+        parent().cache()->setConcurrentStreams(*parent().origin(),
+                                               settings.maxConcurrentStreams().value());
+      }
       concurrent_stream_limit_ =
           std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
 

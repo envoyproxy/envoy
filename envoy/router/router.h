@@ -481,10 +481,18 @@ public:
   virtual ~ShadowPolicy() = default;
 
   /**
-   * @return the name of the cluster that a matching request should be shadowed to. Returns empty
+   * @return the name of the cluster that a matching request should be shadowed to.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
    *         string if no shadowing should take place.
    */
   virtual const std::string& cluster() const PURE;
+
+  /**
+   * @return the cluster header name that router can get the cluster name from request headers.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
+   *         string if no shadowing should take place.
+   */
+  virtual const Http::LowerCaseString& clusterHeader() const PURE;
 
   /**
    * @return the runtime key that will be used to determine whether an individual request should

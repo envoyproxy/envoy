@@ -246,7 +246,8 @@ public:
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
                                                           *context_.conn_manager_config_,
                                                           /*via=*/"", stream_info_, /*node_id=*/"");
-          if (headers.Status() == nullptr) {
+          // Check for validity of response-status explicitly, as encodeHeaders() might throw.
+          if (!Utility::getResponseStatusNoThrow(headers).has_value()) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);
@@ -657,11 +658,11 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   constexpr auto max_actions = 1024;
   bool codec_error = false;
-  for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection &&
-                  !codec_error;
-       ++i) {
+  const auto num_actions = std::min(max_actions, input.actions().size());
+  for (int i = 0; i < num_actions && !should_close_connection && !codec_error; ++i) {
     const auto& action = input.actions(i);
-    ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
+    ENVOY_LOG_MISC(trace, "action #{}/{}: {} with {} streams", i, num_actions, action.DebugString(),
+                   streams.size());
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       if (!http2) {

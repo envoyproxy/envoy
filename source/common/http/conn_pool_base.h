@@ -8,6 +8,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/conn_pool/conn_pool_base.h"
 #include "source/common/http/codec_client.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -87,8 +88,12 @@ public:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
+  virtual absl::optional<HttpServerPropertiesCache::Origin> origin() { return {}; }
+  virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
+
 protected:
   friend class ActiveClient;
+
   Random::RandomGenerator& random_generator_;
 };
 
@@ -153,10 +158,13 @@ public:
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
-      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
+      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
+      absl::optional<Http::HttpServerPropertiesCache::Origin> origin = absl::nullopt,
+      Http::HttpServerPropertiesCacheSharedPtr cache = nullptr)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
-        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]), origin_(origin),
+        cache_(cache) {
     ASSERT(protocols.size() == 1);
   }
 
@@ -172,10 +180,16 @@ public:
     return Utility::getProtocolString(protocol_);
   }
 
+  absl::optional<HttpServerPropertiesCache::Origin> origin() override { return origin_; }
+  Http::HttpServerPropertiesCacheSharedPtr cache() override { return cache_; }
+
 protected:
   const CreateCodecFn codec_fn_;
   const CreateClientFn client_fn_;
   const Http::Protocol protocol_;
+
+  absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  Http::HttpServerPropertiesCacheSharedPtr cache_;
 };
 
 /**
