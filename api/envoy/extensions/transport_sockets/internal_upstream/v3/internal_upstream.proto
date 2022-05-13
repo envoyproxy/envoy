@@ -38,9 +38,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //  IPs.
 message InternalUpstreamTransport {
   // Describes the location of the imported metadata value.
+  // If the metadata with the given name is not present at the source location,
+  // then no metadata is passed through for this particular instance.
   message MetadataValueSource {
     // Specifies what kind of metadata.
-    type.metadata.v3.MetadataKind kind = 1;
+    type.metadata.v3.MetadataKind kind = 1 [(validate.rules).message = {required: true}];
 
     // Name is the filter namespace used in the dynamic metadata.
     string name = 2 [(validate.rules).string = {min_len: 1}];
@@ -49,11 +51,14 @@ message InternalUpstreamTransport {
   // Describes the location of the imported filter state object from the downstream connection.
   message FilterStateSource {
     // Name is the imported filter state object name.
-    string name = 2 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   // Specifies the metadata namespaces and values to insert into the downstream
-  // internal connection dynamic metadata when an internal address is used as a host.
+  // internal connection dynamic metadata when an internal address is used as a
+  // host. If the destination name is repeated across two metadata source
+  // locations, and both locations contains the metadata with the given name,
+  // then the latter in the list overrides the former.
   repeated MetadataValueSource passthrough_metadata = 1;
 
   // Specifies the list of the filter state object names to insert into the
