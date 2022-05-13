@@ -571,7 +571,7 @@ private:
   Status onStatus(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
-  void onEncodeComplete() override;
+  void onEncodeComplete() override {}
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (pending_response_.has_value()) {
       return *(pending_response_->encoder_.getStream().bytesMeter());
