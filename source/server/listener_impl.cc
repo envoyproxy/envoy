@@ -1078,6 +1078,12 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   return false;
 }
 
+void ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {
+  for (auto& socket_factory : other.getSocketFactories()) {
+    addSocketFactory(socket_factory->clone());
+  }
+}
+
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                                 const envoy::config::listener::v3::Listener& rhs) {
   Protobuf::util::MessageDifferencer differencer;

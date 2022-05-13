@@ -298,12 +298,8 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
-  void setNewOrDrainingSocketFactory(const std::string& name,
-                                     const envoy::config::core::v3::Address& proto_address,
-                                     ListenerImpl& listener);
-  Network::ListenSocketFactoryPtr
-  createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
-                            ListenerImpl& listener);
+  void setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
+  void createListenSocketFactory(ListenerImpl& listener);
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
 

@@ -300,6 +300,9 @@ public:
   }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
   const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
+  const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
+    return socket_factories_;
+  }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const {
@@ -373,6 +376,10 @@ public:
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
+
+  void cloneSocketFactoryFrom(const ListenerImpl& other);
+
+  Network::Socket::Type socketType() const { return socket_type_; }
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,

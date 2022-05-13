@@ -311,7 +311,7 @@ filter_chains:
   name: foo
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
                             "error adding listener: 'bar' has duplicate address "
@@ -393,9 +393,9 @@ filter_chains:
   name: foo
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
 }
 
@@ -751,7 +751,8 @@ filter_chains:
   )EOF";
 
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0));
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
+      .Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
@@ -2012,7 +2013,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -2040,7 +2041,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
 
@@ -2080,7 +2081,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(3);
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -2112,7 +2113,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(3);
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
 
