@@ -27,7 +27,7 @@ public:
 
   /**
    * Validate the entire request header map.
-   * This method may mutate header map as well, for example by normalizing URI path.
+   * This method may mutate the header map as well, for example by normalizing URI path.
    * Returning the Reject value form this method causes HTTP requests to be rejected with 400
    * status, and gRPC requests with the the INTERNAL (13) error code. Returning the Redirect value
    * causes HTTP requests to be redirected to the :path presudo header in the request map. gRPC
@@ -39,7 +39,8 @@ public:
 
   /**
    * Validate the entire response header map.
-   * Returning the Reject value causes the request to be rejected with the 502 status.
+   * Returning the Reject value causes HTTP requests to be rejected with the 502 status,
+   * and gRPC requests with the the UNAVAILABLE (14) error code.
    */
   enum class ResponseHeaderMapValidationResult { Accept, Reject };
   virtual ResponseHeaderMapValidationResult
