@@ -139,7 +139,7 @@ ConfigImpl::ConfigImpl(
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),
       max_requests_per_connection_(config.max_requests_per_connection().value()),
-      header_keys_case_sensitive_(config.header_keys_case_sensitive()) {
+      header_keys_preserve_case_(config.header_keys_preserve_case()) {
 
   if (config.thrift_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");

@@ -248,7 +248,7 @@ public:
     return FilterStatus::Continue;
   }
   bool passthroughEnabled() const override { return false; }
-  bool headerKeysCaseSensitive() const override { return false; }
+  bool headerKeysPreserveCase() const override { return false; }
 
   // ThriftObject
   bool onData(Buffer::Instance& buffer) override;

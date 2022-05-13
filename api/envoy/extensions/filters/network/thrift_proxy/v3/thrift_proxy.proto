@@ -118,11 +118,12 @@ message ThriftProxy {
   // emitted by Thrift proxy.
   repeated config.accesslog.v3.AccessLog access_log = 9;
 
-  // If set to true, Envoy will treat header keys in Thrift as case-sensitive instead of converting
-  // them to lower case as per the default behavior.
+  // If set to true, Envoy will preserve the case of Thrift header keys instead of serializing them to
+  // lower case as per the default behavior. Note that NUL, CR and LF characters will also be preserved
+  // as per mandated by the Thrift spec.
   //
   // More info: https://github.com/apache/thrift/commit/e165fa3c85d00cb984f4d9635ed60909a1266ce1.
-  bool header_keys_case_sensitive = 10;
+  bool header_keys_preserve_case = 10;
 }
 
 // ThriftFilter configures a Thrift filter.

@@ -200,7 +200,7 @@ public:
   /**
    * @return True if payload header keys should be treated as case-sensitive.
    */
-  virtual bool headerKeysCaseSensitive() const PURE;
+  virtual bool headerKeysPreserveCase() const PURE;
 };
 
 /**
