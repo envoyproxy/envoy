@@ -357,6 +357,10 @@ public:
     }
   }
 
+  void cloneSocketFactoryFrom(const ListenerImpl& other);
+
+  Network::Socket::Type socketType() const { return socket_type_; }
+
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;

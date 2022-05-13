@@ -468,21 +468,18 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(
-          name, config.has_address() ? config.address() : config.addresses(0), *new_listener);
+      setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
-      new_listener->addSocketFactory(
-          (*existing_warming_listener)->getSocketFactories()[0]->clone());
+      new_listener->cloneSocketFactoryFrom(**existing_warming_listener);
     }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(
-          name, config.has_address() ? config.address() : config.addresses(0), *new_listener);
+      setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
-      new_listener->addSocketFactory((*existing_active_listener)->getSocketFactories()[0]->clone());
+      new_listener->cloneSocketFactoryFrom(**existing_active_listener);
     }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -494,8 +491,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
-    setNewOrDrainingSocketFactory(
-        name, config.has_address() ? config.address() : config.addresses(0), *new_listener);
+    setNewOrDrainingSocketFactory(name, *new_listener);
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -992,9 +988,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   return filter_chain_res;
 }
 
-void ListenerManagerImpl::setNewOrDrainingSocketFactory(
-    const std::string& name, const envoy::config::core::v3::Address& proto_address,
-    ListenerImpl& listener) {
+void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
+                                                        ListenerImpl& listener) {
   if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
       hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
@@ -1040,14 +1035,16 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     }
   }
 
-  listener.addSocketFactory(draining_listen_socket_factory != nullptr
-                                ? draining_listen_socket_factory->clone()
-                                : createListenSocketFactory(proto_address, listener));
+  if (draining_listen_socket_factory != nullptr) {
+    // TODO (soulxu): multiple addresses;
+    listener.addSocketFactory(draining_listen_socket_factory->clone());
+  } else {
+    createListenSocketFactory(listener);
+  }
 }
 
-Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
-    const envoy::config::core::v3::Address& proto_address, ListenerImpl& listener) {
-  Network::Socket::Type socket_type = Network::Utility::protobufAddressSocketType(proto_address);
+void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
+  Network::Socket::Type socket_type = listener.socketType();
   ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::NoBind;
   if (listener.bindToPort()) {
     bind_type = listener.reusePort() ? ListenerComponentFactory::BindType::ReusePort
@@ -1056,11 +1053,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
-    // TODO (soulxu): support multiple addresses.
-    return std::make_unique<ListenSocketFactoryImpl>(
-        factory_, listener.addresses()[0], socket_type, listener.listenSocketOptions(),
-        listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
-        server_.options().concurrency());
+    for (auto& address : listener.addresses()) {
+      listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
+          factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),
+          listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency()));
+    }
   }
   END_TRY
   catch (const EnvoyException& e) {
