@@ -57,7 +57,10 @@ jobs:
         with:
           name: envoy_android_aar_sources
           path: .
-      - run: tar -xvf envoy_android_aar_sources.tar.gz
+      - name: Expand archive
+        run: |
+          tar -xvf envoy_android_aar_sources.tar.gz
+          mv bazel-bin/library/kotlin/io/envoyproxy/envoymobile/* .
       - name: 'Configure envoy-bot git user'
         run: |
           # Switch global user to be envoy-bot for deployment
@@ -79,10 +82,10 @@ jobs:
           gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
           shred signing-key
 
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar -o aar.asc
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml -o xml.asc
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar -o javadoc.asc
-          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar -o sources.asc
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy.aar
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-pom.xml
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-javadoc.jar
+          gpg --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE -ab envoy-sources.jar
       - name: 'Release to sonatype repository'
         env:
           READWRITE_USER: ${{ secrets.sonatype_user }}
@@ -94,15 +97,15 @@ jobs:
             --profile_id=$ENVOY_PROXY_PROFILE_ID \
             --version="${current_release_tag:1}" \
             --files \
-                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar \
-                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml \
-                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar \
-                bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar \
+                envoy.aar \
+                envoy-pom.xml \
+                envoy-sources.jar \
+                envoy-javadoc.jar \
           --signed_files \
-                sources.asc \
-                aar.asc \
-                xml.asc \
-                javadoc.asc
+                envoy.aar.asc \
+                envoy-pom.xml.asc \
+                envoy-sources.jar.asc \
+                envoy-javadoc.jar.asc
 
   ios_release_artifacts:
     name: ios_release_artifacts
