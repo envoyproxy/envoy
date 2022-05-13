@@ -51,7 +51,7 @@ protected:
   ::Envoy::Http::HeaderValidatorFactorySharedPtr uhv_factory_;
 };
 
-TEST_F(HeaderValidatorTest, Http1HeaderNameValidation) {
+TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
   auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
@@ -60,7 +60,21 @@ TEST_F(HeaderValidatorTest, Http1HeaderNameValidation) {
   for (int c = 0; c <= 0xff; ++c) {
     key_value[1] = c;
     setHeaderStringUnvalidated(key, key_value);
-    EXPECT_EQ(uhv->validateHeaderEntry(key, value),
+    EXPECT_EQ(uhv->validateRequestHeaderEntry(key, value),
+              ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept);
+  }
+}
+
+TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
+  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  // Since the default UHV does not yet check anything all header values should be accepted
+  std::string key_value("aaa");
+  HeaderString key(key_value);
+  HeaderString value("valid");
+  for (int c = 0; c <= 0xff; ++c) {
+    key_value[1] = c;
+    setHeaderStringUnvalidated(key, key_value);
+    EXPECT_EQ(uhv->validateResponseHeaderEntry(key, value),
               ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept);
   }
 }

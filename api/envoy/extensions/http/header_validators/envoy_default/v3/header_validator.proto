@@ -80,7 +80,7 @@ message HeaderValidatorConfig {
     bool skip_merging_slashes = 2;
 
     // The action to take when request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c).
-    // This operation overwrites the original request URI path and the new path is used for processing of
+    // This operation may overwrite the original request URI path and the new path is used for processing of
     // the request by HTTP filters and proxied to the upstream service.
     PathWithEscapedSlashesAction path_with_escaped_slashes_action = 3;
   }

@@ -19,11 +19,18 @@ public:
   enum class HeaderEntryValidationResult { Accept, Reject };
 
   /**
-   * Method for validating a header entry. This is called for both request and response headers.
+   * Method for validating a request header entry.
    * Returning the Reject value causes the request to be rejected with the 400 status.
    */
-  virtual HeaderEntryValidationResult validateHeaderEntry(const HeaderString& key,
-                                                          const HeaderString& value) PURE;
+  virtual HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString& key,
+                                                                 const HeaderString& value) PURE;
+
+  /**
+   * Method for validating a response header entry.
+   * Returning the Reject value causes the downstream request to be rejected with the 502 status.
+   */
+  virtual HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString& key,
+                                                                  const HeaderString& value) PURE;
 
   /**
    * Validate the entire request header map.

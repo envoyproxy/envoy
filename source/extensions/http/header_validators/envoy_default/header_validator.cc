@@ -21,7 +21,12 @@ HeaderValidator::HeaderValidator(const HeaderValidatorConfig&,
                                  ::Envoy::Http::HeaderValidatorFactory::Protocol) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-HeaderValidator::validateHeaderEntry(const HeaderString&, const HeaderString&) {
+HeaderValidator::validateRequestHeaderEntry(const HeaderString&, const HeaderString&) {
+  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+}
+
+::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::validateResponseHeaderEntry(const HeaderString&, const HeaderString&) {
   return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 

@@ -20,8 +20,12 @@ public:
       ::Envoy::Http::HeaderValidatorFactory::Protocol protocol);
 
   HeaderEntryValidationResult
-  validateHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                      const ::Envoy::Http::HeaderString& value) override;
+  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                             const ::Envoy::Http::HeaderString& value) override;
+
+  HeaderEntryValidationResult
+  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                              const ::Envoy::Http::HeaderString& value) override;
 
   RequestHeaderMapValidationResult
   validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
