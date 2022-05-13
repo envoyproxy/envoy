@@ -13,12 +13,14 @@ HeaderValidatorFactory::HeaderValidatorFactory(const HeaderValidatorConfig& conf
     : config_(config) {}
 
 ::Envoy::Http::HeaderValidatorPtr
-HeaderValidatorFactory::create(::Envoy::Http::HeaderValidatorFactory::Protocol protocol) {
-  return std::make_unique<HeaderValidator>(config_, protocol);
+HeaderValidatorFactory::create(::Envoy::Http::HeaderValidatorFactory::Protocol protocol,
+                               StreamInfo::StreamInfo& stream_info) {
+  return std::make_unique<HeaderValidator>(config_, protocol, stream_info);
 }
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig&,
-                                 ::Envoy::Http::HeaderValidatorFactory::Protocol) {}
+                                 ::Envoy::Http::HeaderValidatorFactory::Protocol,
+                                 StreamInfo::StreamInfo&) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateRequestHeaderEntry(const HeaderString&, const HeaderString&) {

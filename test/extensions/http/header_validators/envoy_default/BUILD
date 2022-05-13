@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],

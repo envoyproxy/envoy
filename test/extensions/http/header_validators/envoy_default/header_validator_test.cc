@@ -4,6 +4,7 @@
 #include "source/extensions/http/header_validators/envoy_default/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -40,7 +41,7 @@ protected:
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
     uhv_factory_ = factory->createFromProto(typed_config.typed_config(), context_);
-    return uhv_factory_->create(protocol);
+    return uhv_factory_->create(protocol, stream_info_);
   }
 
   void setHeaderStringUnvalidated(HeaderString& header_string, absl::string_view value) {
@@ -49,6 +50,7 @@ protected:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   ::Envoy::Http::HeaderValidatorFactorySharedPtr uhv_factory_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {

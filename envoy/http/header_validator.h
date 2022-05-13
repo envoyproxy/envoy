@@ -3,6 +3,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Http {
@@ -68,7 +69,7 @@ public:
   /**
    * Create a new header validator for the specified protocol.
    */
-  virtual HeaderValidatorPtr create(Protocol protocol) PURE;
+  virtual HeaderValidatorPtr create(Protocol protocol, StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using HeaderValidatorFactorySharedPtr = std::shared_ptr<HeaderValidatorFactory>;
