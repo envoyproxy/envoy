@@ -292,16 +292,10 @@ filter_chain_matcher:
       manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
 
   Network::UdpPacketWriterFactory& udp_packet_writer_factory =
-      manager_->listeners()
-          .front()
-          .get()
-          .udpListenerConfig()
-      ->packetWriterFactory();
+      manager_->listeners().front().get().udpListenerConfig()->packetWriterFactory();
   EXPECT_EQ("envoy.udp.writer.factory.default", udp_packet_writer_factory.name());
-  Network::UdpPacketWriterPtr udp_packet_writer =
-      udp_packet_writer_factory
-          .createUdpPacketWriter(listen_socket->ioHandle(),
-                                 manager_->listeners()[0].get().listenerScope());
+  Network::UdpPacketWriterPtr udp_packet_writer = udp_packet_writer_factory.createUdpPacketWriter(
+      listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
   // Even though GSO is enabled, the default writer should be used.
   EXPECT_EQ(false, udp_packet_writer->isBatchMode());
 }
