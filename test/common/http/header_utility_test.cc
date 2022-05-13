@@ -308,6 +308,18 @@ invert_match: true
   EXPECT_EQ(true, header_data.invert_match_);
 }
 
+TEST(MatchHeadersTest, MatchMethodHeader) {
+  TestRequestHeaderMapImpl headers{{":method", "POST"}};
+  const std::string yaml = R"EOF(
+name: ":method"
+exact_match: "POST"
+)EOF";
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+}
+
 TEST(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
   TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
