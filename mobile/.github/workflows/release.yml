@@ -57,7 +57,7 @@ jobs:
         with:
           name: envoy_android_aar_sources
           path: .
-      - run: tar -xvf dist/envoy_android_aar_sources.tar.gz
+      - run: tar -xvf envoy_android_aar_sources.tar.gz
       - name: 'Configure envoy-bot git user'
         run: |
           # Switch global user to be envoy-bot for deployment
