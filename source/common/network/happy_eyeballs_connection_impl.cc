@@ -157,6 +157,10 @@ bool HappyEyeballsConnectionImpl::readEnabled() const {
   return connections_[0]->readEnabled();
 }
 
+ConnectionInfoSetter& HappyEyeballsConnectionImpl::connectionInfoSetter() {
+  return connections_[0]->connectionInfoSetter();
+}
+
 const ConnectionInfoProvider& HappyEyeballsConnectionImpl::connectionInfoProvider() const {
   return connections_[0]->connectionInfoProvider();
 }
