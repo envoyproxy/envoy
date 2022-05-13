@@ -215,11 +215,11 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
     }
 
     int idx = 0;
-    full_msg[idx++] = 0x0; // first header byte
-    full_msg[idx++] = 0x1; // second header byte
+    full_msg[idx++] = 0x0;                     // first header byte
+    full_msg[idx++] = 0x1;                     // second header byte
     memset(full_msg + idx, 0xff, padding_len); // padding
     idx += padding_len;
-    full_msg[idx++] = 0x0; // third header byte
+    full_msg[idx++] = 0x0;                // third header byte
     memcpy(full_msg + idx, msg, msg_len); // NOLINT(safe-memcpy)
 
     if (prefix_allocated) {
