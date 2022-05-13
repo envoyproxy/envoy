@@ -264,6 +264,8 @@ compressChunks8192/5/manual_time        15.9 ms         16.1 ms           45
 */
 // SPELLCHECKER(on)
 
+#if defined(GZIP_TEST) || !defined(ZSTD_TEST)
+
 static std::vector<CompressionParams> gzip_compression_params = {
     // Speed + Standard + Small Window + Low mem level
     {Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 9, 1},
@@ -371,6 +373,9 @@ BENCHMARK(compressChunks1024WithGzip)
     ->DenseRange(0, 8, 1)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
+#endif
+
+#if defined(ZSTD_TEST)
 
 static std::vector<CompressionParams> zstd_compression_params = {
     // level1 + default
@@ -518,6 +523,8 @@ BENCHMARK(compressChunks1024WithZstd)
     ->DenseRange(0, 21, 1)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
+
+#endif
 
 } // namespace Compressor
 } // namespace HttpFilters
