@@ -140,25 +140,25 @@ deadline of 3 weeks.
 ```yaml
 date: Pending
 behavior_changes:
-// Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required
+# Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required
 
 minor_behavior_changes:
-// Changes that may cause incompatibilities for some users, but should not for most*
+# Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-// Changes expected to improve the state of the world and are unlikely to have negative effects*
+# Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 removed_config_or_runtime:
-// Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+# Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
 
 deprecated:
 
-// Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
-//  to file tracking issues for runtime guarded code which can be removed.
-// Check source/common/runtime/runtime_features.cc and see if any runtime guards in
-// disabled_runtime_features should be reassessed, and ping on the relevant issues.
+# Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
+#  to file tracking issues for runtime guarded code which can be removed.
+# Check source/common/runtime/runtime_features.cc and see if any runtime guards in
+# disabled_runtime_features should be reassessed, and ping on the relevant issues.
 ```
 
 ## Security release schedule
