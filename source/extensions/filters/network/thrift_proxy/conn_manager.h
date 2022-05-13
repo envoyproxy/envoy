@@ -70,7 +70,7 @@ public:
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
   bool passthroughEnabled() const override;
-  bool fromClient() const override { return true; }
+  bool isRequest() const override { return true; }
 
 private:
   struct ActiveRpc;
@@ -115,7 +115,7 @@ private:
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
-    bool fromClient() const override { return false; }
+    bool isRequest() const override { return false; }
 
     void finalizeResponse();
 

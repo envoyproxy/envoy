@@ -202,7 +202,7 @@ public:
    *
    * See https://github.com/apache/thrift/blob/master/lib/ts/thrift.d.ts#L68.
    */
-  virtual bool fromClient() const PURE;
+  virtual bool isRequest() const PURE;
 };
 
 /**

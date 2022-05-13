@@ -131,7 +131,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     return true;
   }
 
-  const bool from_client = metadata.fromClient();
+  const bool is_request = metadata.isRequest();
 
   while (header_size > 0) {
     // Attempt to read info blocks
@@ -156,7 +156,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
       const Http::LowerCaseString key = Http::LowerCaseString(key_string);
       const std::string value = drainVarString(buffer, header_size, "header value");
 
-      if (from_client) {
+      if (is_request) {
         metadata.requestHeaders().addCopy(key, value);
       } else {
         metadata.responseHeaders().addCopy(key, value);
@@ -187,7 +187,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   }
 
   const uint32_t headers_size =
-      metadata.fromClient() ? metadata.requestHeaders().size() : metadata.responseHeaders().size();
+      metadata.isRequest() ? metadata.requestHeaders().size() : metadata.responseHeaders().size();
   if (headers_size > MaxHeadersSize / 2) {
     // Each header takes a minimum of 2 bytes, yielding this limit.
     throw EnvoyException(
@@ -221,7 +221,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     // Num headers
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers_size));
 
-    if (metadata.fromClient()) {
+    if (metadata.isRequest()) {
       metadata.requestHeaders().iterate(
           [&header_buffer](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
             writeVarString(header_buffer, header.key().getStringView());

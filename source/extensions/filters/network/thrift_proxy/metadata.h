@@ -167,8 +167,8 @@ public:
   bool isDraining() const { return is_draining_; }
   void setDraining(bool draining) { is_draining_ = draining; }
 
-  bool fromClient() const { return from_client_; }
-  void setFromClient(bool from_client) { from_client_ = from_client; }
+  bool isRequest() const { return is_request_; }
+  void setIsRequest(bool is_request) { is_request_ = is_request; }
 
   absl::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
@@ -209,7 +209,7 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
-  bool from_client_{false};
+  bool is_request_{false};
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;
