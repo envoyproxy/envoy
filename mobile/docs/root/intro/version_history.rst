@@ -7,6 +7,7 @@ Pending Release
 Breaking changes:
 
 - api: replace the `drainConnections()` method with a broader `resetConnectivityState()`. (:issue:`#2225 <2225>`).
+- net: enable happy eyeballs by default (:issue:`#2272 <2272>`)
 
 Bugfixes:
 

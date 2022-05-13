@@ -22,7 +22,6 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(DemoFilter.init)
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
-      .enableHappyEyeballs(true)
       .h2ExtendKeepaliveTimeout(true)
       .enableInterfaceBinding(true)
       // swiftlint:disable:next line_length

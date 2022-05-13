@@ -22,7 +22,7 @@ open class EngineBuilder: NSObject {
   private var dnsMinRefreshSeconds: UInt32 = 60
   private var dnsPreresolveHostnames: String = "[]"
   private var dnsRefreshSeconds: UInt32 = 60
-  private var enableHappyEyeballs: Bool = false
+  private var enableHappyEyeballs: Bool = true
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enableDrainPostDnsRefresh: Bool = false
@@ -154,7 +154,8 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported.
+  /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
+  /// true.
   ///
   /// - parameter enableHappyEyeballs: whether to enable RFC 6555 handling for IPv4/IPv6.
   ///

@@ -392,7 +392,7 @@ on supported platforms (iOS 12+) to update the preferred Envoy network cluster (
 ``enableHappyEyeballs``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported.
+Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
 
 **Example**::
 
