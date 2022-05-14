@@ -91,7 +91,7 @@ class VersionFile:
             if section not in self.project.changelogs.sections:
                 errors.append(f"{self.changelog.version} Unrecognized changelog section: {section}")
             if section == "changes":
-                if version.Version(self.changelog.version) > version.Version("1.16"):
+                if self.changelog.version > version.Version("1.16"):
                     errors.append(f"Removed `changes` section found: {self.changelog.version}")
             if not entries:
                 continue

@@ -95,10 +95,10 @@ Initial release date:
 """
 
 VERSION_HISTORY_TPL = """
-.. _version_history_{{ changelog.version }}:
+.. _version_history_{{ changelog.base_version }}:
 
-{{ changelog.version }} ({{ changelog.release_date }})
-{{ "=" * (changelog.version|length + changelog.release_date|length + 4) }}
+{{ changelog.base_version }} ({{ changelog.release_date }})
+{{ "=" * (changelog.base_version|length + changelog.release_date|length + 4) }}
 
 {% for name, section in sections.items() %}
 {% if changelog.data[name] %}
