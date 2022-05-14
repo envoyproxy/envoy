@@ -157,14 +157,11 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
               proto_config);
       const auto message = Config::Utility::translateToFactoryConfig(
           proto_config, context.messageValidationVisitor(), factory);
-
-      Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
+      const auto callback = factory.createListenerFilterFactoryFromProto(
           *message, createListenerFilterMatcher(proto_config), context);
-
       auto filter_config_provider =
           config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name());
-
-      ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
+      ENVOY_LOG(debug, "      filter config provider name: {}", filter_config_provider->name());
       ret.push_back(std::move(filter_config_provider));
     }
   }

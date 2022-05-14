@@ -61,8 +61,8 @@ ValidationInstance::ValidationInstance(
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(critical, "error initializing configuration '{}': {}", options.configPath(),
-                   e.what());
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+              e.what());
     shutdown();
     throw;
   }
