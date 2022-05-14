@@ -601,9 +601,9 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  EXPECT_CALL(*listener, disable());
   EXPECT_CALL(test_listener->socketFactory(), localAddress())
       .WillRepeatedly(ReturnRef(local_address_));
+  EXPECT_CALL(*listener, disable());
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->disableListeners();
@@ -634,9 +634,9 @@ TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.12345f)));
   EXPECT_CALL(test_listener->socketFactory(), localAddress())
       .WillRepeatedly(ReturnRef(local_address_));
+  EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.12345f)));
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->setListenerRejectFraction(UnitFloat(0.12345f));
