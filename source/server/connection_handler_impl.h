@@ -72,7 +72,7 @@ public:
   findByAddress(const Network::Address::InstanceConstSharedPtr& listen_address) override;
 
 private:
-  struct ActiveListenerDetails {
+  struct PerAddressActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
     Network::Address::InstanceConstSharedPtr address_;
@@ -88,6 +88,39 @@ private:
     UdpListenerCallbacksOptRef udpListener();
     ActiveInternalListenerOptRef internalListener();
   };
+
+  struct ActiveListenerDetails {
+    std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_;
+
+    using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
+
+    void invokeListenerMethod(ListenerMethodFn fn) {
+      std::for_each(per_address_details_.begin(), per_address_details_.end(),
+                    [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
+                      fn(*details->listener_);
+                    });
+    }
+
+    template <class ActiveListener>
+    void addActiveListener(Network::ListenerConfig& config,
+                           const Network::ListenSocketFactoryPtr& socket_factory,
+                           UnitFloat& listener_reject_fraction, bool disable_listeners,
+                           ActiveListener&& listener) {
+      auto pre_address_details = std::make_shared<PerAddressActiveListenerDetails>();
+      pre_address_details->typed_listener_ = *listener;
+      pre_address_details->listener_ = std::move(listener);
+      pre_address_details->address_ = socket_factory->localAddress();
+      if (disable_listeners) {
+        pre_address_details->listener_->pauseListening();
+      }
+      if (auto* listener = pre_address_details->listener_->listener(); listener != nullptr) {
+        listener->setRejectFraction(listener_reject_fraction);
+      }
+      pre_address_details->listener_tag_ = config.listenerTag();
+      per_address_details_.emplace_back(pre_address_details);
+    }
+  };
+
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
@@ -95,10 +128,10 @@ private:
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
-  absl::flat_hash_map<uint64_t, std::shared_ptr<ActiveListenerDetails>> listener_map_by_tag_;
-  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
+  absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
+  absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
-  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
+  absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       internal_listener_map_by_address_;
 
   std::atomic<uint64_t> num_handler_connections_{};
