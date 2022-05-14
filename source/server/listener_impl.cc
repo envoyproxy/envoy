@@ -1084,6 +1084,12 @@ void ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {
   }
 }
 
+void ListenerImpl::closeAllSockets() {
+  for (auto& socket_factory : socket_factories_) {
+    socket_factory->closeAllSockets();
+  }
+}
+
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                                 const envoy::config::listener::v3::Listener& rhs) {
   Protobuf::util::MessageDifferencer differencer;

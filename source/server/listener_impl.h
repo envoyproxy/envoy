@@ -378,6 +378,7 @@ public:
   }
 
   void cloneSocketFactoryFrom(const ListenerImpl& other);
+  void closeAllSockets();
 
   Network::Socket::Type socketType() const { return socket_type_; }
 
