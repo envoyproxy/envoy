@@ -152,7 +152,11 @@ public:
     EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
   }
 
-  virtual const std::string getTypeUrl() const PURE;
+  const std::string getTypeUrl() const {
+    ProtoType proto;
+    return proto.GetDescriptor()->full_name();
+  }
+
   virtual const std::string getFilterType() const PURE;
   virtual const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const PURE;
   virtual const std::string getConfigReloadCounter() const PURE;
@@ -173,9 +177,6 @@ class HttpFilterConfigDiscoveryImplTest
 public:
   HttpFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
 
-  const std::string getTypeUrl() const override {
-    return "envoy.extensions.filters.http.router.v3.Router";
-  }
   const std::string getFilterType() const override { return "http"; }
   const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
     return matcher_;
@@ -194,11 +195,11 @@ public:
 class TcpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          TcpListenerFilterConfigProviderManagerImpl, Envoy::ProtobufWkt::Struct> {
+          TcpListenerFilterConfigProviderManagerImpl,
+          ::test::integration::filters::TestInspectorFilterConfig> {
 public:
   TcpListenerFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
 
-  const std::string getTypeUrl() const override { return "google.protobuf.Struct"; }
   const std::string getFilterType() const override { return "listener"; }
   const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
     return matcher_;
@@ -222,9 +223,6 @@ class UdpListenerFilterConfigDiscoveryImplTest
 public:
   UdpListenerFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
 
-  const std::string getTypeUrl() const override {
-    return "test.integration.filters.TestUdpListenerFilterConfig";
-  }
   const std::string getFilterType() const override { return "listener"; }
   const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
     return matcher_;

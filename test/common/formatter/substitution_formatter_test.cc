@@ -810,11 +810,11 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     std::string upstream_transport_failure_reason = "SSL error";
     stream_info.upstreamInfo()->setUpstreamTransportFailureReason(
         upstream_transport_failure_reason);
-    EXPECT_EQ("SSL error", upstream_format.format(request_headers, response_headers,
+    EXPECT_EQ("SSL_error", upstream_format.format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
-                ProtoEq(ValueUtil::stringValue("SSL error")));
+                ProtoEq(ValueUtil::stringValue("SSL_error")));
   }
   {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");

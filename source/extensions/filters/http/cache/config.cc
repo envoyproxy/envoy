@@ -18,15 +18,12 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
 
-  // Capture the cache instance as a reference; the factory must own it.
-  // TODO: getCache should be returning a shared_ptr (and using SingletonManager), to avoid
-  // keeping potentially large structures in static variables.
-  auto cache = std::ref(http_cache_factory->getCache(config, context));
+  auto cache = http_cache_factory->getCache(config, context);
 
   return [config, stats_prefix, &context,
           cache](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CacheFilter>(config, stats_prefix, context.scope(),
-                                                            context.timeSource(), cache));
+                                                            context.timeSource(), *cache));
   };
 }
 

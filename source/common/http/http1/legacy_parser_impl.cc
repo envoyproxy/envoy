@@ -93,8 +93,8 @@ public:
     };
   }
 
-  RcVal execute(const char* slice, int len) {
-    return {http_parser_execute(&parser_, &settings_, slice, len), HTTP_PARSER_ERRNO(&parser_)};
+  size_t execute(const char* slice, int len) {
+    return http_parser_execute(&parser_, &settings_, slice, len);
   }
 
   void resume() { http_parser_pause(&parser_, 0); }
@@ -154,7 +154,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
 // same compilation unit so that the destructor has a complete definition of Impl.
 LegacyHttpParserImpl::~LegacyHttpParserImpl() = default;
 
-LegacyHttpParserImpl::RcVal LegacyHttpParserImpl::execute(const char* slice, int len) {
+size_t LegacyHttpParserImpl::execute(const char* slice, int len) {
   return impl_->execute(slice, len);
 }
 
@@ -178,8 +178,8 @@ bool LegacyHttpParserImpl::isChunked() const { return impl_->isChunked(); }
 
 absl::string_view LegacyHttpParserImpl::methodName() const { return impl_->methodName(); }
 
-absl::string_view LegacyHttpParserImpl::errnoName(int rc) const {
-  return http_errno_name(static_cast<http_errno>(rc));
+absl::string_view LegacyHttpParserImpl::errorMessage() const {
+  return http_errno_name(static_cast<http_errno>(impl_->getErrno()));
 }
 
 int LegacyHttpParserImpl::hasTransferEncoding() const { return impl_->hasTransferEncoding(); }

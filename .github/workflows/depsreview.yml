@@ -4,6 +4,7 @@ on: [pull_request]
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    if: github.repository == 'envoyproxy/envoy'
     steps:
       - name: 'Checkout Repository'
         uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
