@@ -1003,7 +1003,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
   // the same address we are configured for. This is an edge case, but
   // may happen if a listener is removed and then added back with a same or different name and
   // intended to listen on the same address. This should work and not fail.
-  const Network::ListenSocketFactory* draining_listen_socket_factory = nullptr;
+  const ListenerImpl* draining_listener_ptr = nullptr;
   auto existing_draining_listener =
       std::find_if(draining_listeners_.cbegin(), draining_listeners_.cend(),
                    [&listener](const DrainingListener& draining_listener) {
@@ -1014,9 +1014,8 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
                    });
 
   if (existing_draining_listener != draining_listeners_.cend()) {
-    draining_listen_socket_factory =
-        existing_draining_listener->listener_->getSocketFactories()[0].get();
     existing_draining_listener->listener_->debugLog("clones listener sockets");
+    draining_listener_ptr = existing_draining_listener->listener_.get();
   } else {
     auto existing_draining_filter_chain = std::find_if(
         draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
@@ -1029,15 +1028,13 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
         });
 
     if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
-      draining_listen_socket_factory =
-          existing_draining_filter_chain->getDrainingListener().getSocketFactories()[0].get();
       existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+      draining_listener_ptr = &existing_draining_filter_chain->getDrainingListener();
     }
   }
 
-  if (draining_listen_socket_factory != nullptr) {
-    // TODO (soulxu): multiple addresses;
-    listener.addSocketFactory(draining_listen_socket_factory->clone());
+  if (draining_listener_ptr != nullptr) {
+    listener.cloneSocketFactoryFrom(*draining_listener_ptr);
   } else {
     createListenSocketFactory(listener);
   }
@@ -1075,7 +1072,7 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
     // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
     // close the socket because they need to receive packets for existing connections via the
     // listen sockets.
-    listener.listenSocketFactories()[0]->closeAllSockets();
+    listener.closeAllSockets();
 
     // In case of this listener was in-place updated previously and in the filter chains draining
     // procedure, so close the sockets for the previous draining listener.
@@ -1083,7 +1080,7 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
       // A listener can be in-place updated multiple times, so there may
       // have multiple draining listeners with same tag.
       if (manager.getDrainingListenerTag() == listener.listenerTag()) {
-        manager.getDrainingListener().listenSocketFactories()[0]->closeAllSockets();
+        manager.getDrainingListener().closeAllSockets();
       }
     }
   }
