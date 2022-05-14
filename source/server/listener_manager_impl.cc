@@ -641,7 +641,9 @@ ListenerManagerImpl::listeners(ListenerState state) {
 
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
-    listener.listenSocketFactory().doFinalPreWorkerInit();
+    for (auto& socket_factory : listener.listenSocketFactories()) {
+      socket_factory->doFinalPreWorkerInit();
+    }
     return true;
   }
   END_TRY
