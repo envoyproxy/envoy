@@ -117,12 +117,8 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> Filter::ListenerFilterFactoriesList {
-              Server::ProdListenerComponentFactory* listener_component =
-                  dynamic_cast<Server::ProdListenerComponentFactory*>(&listener_manager_.factory_);
-              auto& cfg_provider_manager =
-                  listener_component->getTcpListenerConfigProviderManager();
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                  filters, context, cfg_provider_manager);
+                  filters, context, component_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(

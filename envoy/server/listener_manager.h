@@ -116,6 +116,16 @@ public:
    * @return uint64_t a listener tag usable for connection handler tracking.
    */
   virtual uint64_t nextListenerTag() PURE;
+
+  /**
+   * Create static filter config provider using the tcp_listener_config_provider_manager_.
+   * @return Filter::FilterConfigProviderPtr a filter config provider pointer.
+   * @param callback supplies a callback object with type: ListenerFilterFactoryCb.
+   * @param filter_config_name a listener filter name.
+   */
+  virtual Filter::FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>
+  createStaticFilterConfigProvider(const Network::ListenerFilterFactoryCb& callback,
+                                   const std::string& filter_config_name) PURE;
 };
 
 /**

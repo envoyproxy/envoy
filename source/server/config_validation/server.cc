@@ -42,10 +42,9 @@ ValidationInstance::ValidationInstance(
     const Network::Address::InstanceConstSharedPtr& local_address, Stats::IsolatedStoreImpl& store,
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
-    : ProdListenerComponentFactory(*dynamic_cast<Server::Instance*>(this)), options_(options),
-      validation_context_(options_.allowUnknownStaticFields(),
-                          !options.rejectUnknownDynamicFields(),
-                          !options.ignoreUnknownDynamicFields()),
+    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields(),
+                                             !options.ignoreUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_)),
@@ -56,7 +55,9 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this),
-      quic_stat_names_(stats_store_.symbolTable()) {
+      quic_stat_names_(stats_store_.symbolTable()),
+      tcp_listener_config_provider_manager_(
+          std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {

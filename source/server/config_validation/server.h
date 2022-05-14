@@ -60,7 +60,7 @@ bool validateConfig(const Options& options,
  */
 class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
                                  public Instance,
-                                 public ProdListenerComponentFactory,
+                                 public ListenerComponentFactory,
                                  public ServerLifecycleNotifier,
                                  public WorkerFactory {
 public:
@@ -151,11 +151,8 @@ public:
   Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    ProdListenerComponentFactory* listener_component =
-        dynamic_cast<ProdListenerComponentFactory*>(&listener_manager_->factory_);
-    auto& cfg_provider_manager = listener_component->getTcpListenerConfigProviderManager();
-    return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(filters, context,
-                                                                             cfg_provider_manager);
+    return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+        filters, context, *tcp_listener_config_provider_manager_);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -176,7 +173,12 @@ public:
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }
-
+  Filter::FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>
+  createStaticFilterConfigProvider(const Network::ListenerFilterFactoryCb& callback,
+                                   const std::string& filter_config_name) override {
+    return tcp_listener_config_provider_manager_->createStaticFilterConfigProvider(
+        callback, filter_config_name);
+  }
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
@@ -234,6 +236,8 @@ private:
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
+  std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
 };
 
 } // namespace Server
