@@ -613,8 +613,9 @@ ListenerManagerImpl::listeners(ListenerState state) {
 
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
-    // TODO(soulxu): support multiple addresses.
-    listener.listenSocketFactories()[0]->doFinalPreWorkerInit();
+    for (auto& socket_factory : listener.listenSocketFactories()) {
+      socket_factory->doFinalPreWorkerInit();
+    }
     return true;
   }
   END_TRY
