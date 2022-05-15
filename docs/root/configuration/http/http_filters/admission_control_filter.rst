@@ -82,8 +82,8 @@ fields can be overridden via runtime settings.
 
 .. literalinclude:: _include/admission-control-filter.yaml
     :language: yaml
-    :lines: 13-48
-    :emphasize-lines: 16-45
+    :lines: 11-67
+    :emphasize-lines: 7-56
     :caption: :download:`admission-control-filter.yaml <_include/admission-control-filter.yaml>`
 
 The above configuration can be understood as follows:
