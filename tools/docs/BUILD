@@ -2,7 +2,6 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -48,8 +47,8 @@ envoy_entry_point(
 py_binary(
     name = "versions_check",
     srcs = ["versions_check.py"],
-    args = [VERSION],
     data = [
+        "//:VERSION.txt",
         "//changelogs",
         "//changelogs:sections.yaml",
     ],
