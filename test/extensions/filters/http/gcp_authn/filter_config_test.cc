@@ -35,8 +35,7 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithCorrectProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   GcpAuthnFilterFactory factory;
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(filter_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
