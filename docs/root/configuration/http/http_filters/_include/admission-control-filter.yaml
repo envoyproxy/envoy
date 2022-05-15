@@ -23,7 +23,7 @@ static_resources:
                           value: 99.0
                         runtime_key: "admission_control.sr_threshold"
                       aggression:
-                        default_value: 100.0
+                        default_value: 2.0
                         runtime_key: "admission_control.aggression"
                       rps_threshold:
                         default_value: 1
