@@ -20,6 +20,8 @@
 
 #include "source/common/common/interval_value.h"
 
+#include "address.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -215,10 +217,11 @@ public:
   virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
+   * @param address is used for query the address specific connection balancer.
    * @return the connection balancer for this listener. All listeners have a connection balancer,
    *         though the implementation may be a NOP balancer.
    */
-  virtual ConnectionBalancer& connectionBalancer() PURE;
+  virtual ConnectionBalancer& connectionBalancer(const Network::Address::Instance& address) PURE;
 
   /**
    * Open connection resources for this listener.

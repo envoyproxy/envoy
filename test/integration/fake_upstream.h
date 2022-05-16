@@ -809,7 +809,9 @@ private:
     Network::InternalListenerConfigOptRef internalListenerConfig() override {
       return Network::InternalListenerConfigOptRef();
     }
-    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+      return connection_balancer_;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }

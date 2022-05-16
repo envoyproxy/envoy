@@ -437,7 +437,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       udp_listener_config_(origin.udp_listener_config_),
-      connection_balancer_(origin.connection_balancer_),
+      connection_balancers_(origin.connection_balancers_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
@@ -696,9 +696,9 @@ void ListenerImpl::buildFilterChains() {
       *filter_chain_manager_);
 }
 
-void ListenerImpl::buildSocketOptions() {
-  // TCP specific setup.
-  if (connection_balancer_ == nullptr) {
+void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& address) {
+  auto iter = connection_balancers_.find(address.asString());
+  if (iter == connection_balancers_.end() && socket_type_ == Network::Socket::Type::Stream) {
 #ifdef WIN32
     // On Windows we use the exact connection balancer to dispatch connections
     // from worker 1 to all workers. This is a perf hit but it is the only way
@@ -710,19 +710,24 @@ void ListenerImpl::buildSocketOptions() {
               "Envoy is running on Windows."
               "ExactBalance is used to load balance connections between workers on Windows.",
               config_.name());
-    connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+    connection_balancers_.emplace(address.asString(),
+                                  std::make_shared<Network::ExactConnectionBalancerImpl>());
 #else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       // Currently exact balance is the only supported type and there are no options.
       ASSERT(config_.connection_balance_config().has_exact_balance());
-      connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+      connection_balancers_.emplace(address.asString(),
+                                    std::make_shared<Network::ExactConnectionBalancerImpl>());
     } else {
-      connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
+      connection_balancers_.emplace(address.asString(),
+                                    std::make_shared<Network::NopConnectionBalancerImpl>());
     }
 #endif
   }
+}
 
+void ListenerImpl::buildSocketOptions() {
   if (config_.has_tcp_fast_open_queue_length()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
         config_.tcp_fast_open_queue_length().value()));
@@ -889,6 +894,7 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
+  buildConnectionBalancer(*socket_factory->localAddress());
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 

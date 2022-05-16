@@ -13,6 +13,8 @@
 
 #include "source/common/common/interval_value.h"
 
+#include "address.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -174,14 +176,6 @@ using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 class TcpConnectionHandler : public virtual ConnectionHandler {
 public:
   virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * Obtain the rebalancer of the tcp listener.
-   * @param listener_tag supplies the tag of the tcp listener that was passed to addListener().
-   * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. `nullopt` if
-   * listener doesn't exist or rebalancer doesn't exist.
-   */
-  virtual BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) PURE;
 
   /**
    * Obtain the rebalancer of the tcp listener.
