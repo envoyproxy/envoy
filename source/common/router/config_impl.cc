@@ -1778,7 +1778,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   if (ignorePortInHostMatching()) {
     if (const absl::string_view::size_type port_start =
             Http::HeaderUtility::getPortStart(host_header_value);
-        port_start == absl::string_view::npos) {
+        port_start != absl::string_view::npos) {
       host_header_value = host_header_value.substr(0, port_start);
     }
   }
