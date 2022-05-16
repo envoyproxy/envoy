@@ -15,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -26,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -124,7 +126,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
-class ChunkedHandler : public Admin::Handler {
+class ChunkedHandler : public Admin::Request {
 public:
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
 
@@ -138,13 +140,14 @@ private:
 };
 
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = [](absl::string_view, AdminStream&) -> Admin::HandlerPtr {
-    Admin::HandlerPtr handler = Admin::HandlerPtr(new ChunkedHandler);
+  auto callback = [](absl::string_view, AdminStream&) -> Admin::RequestPtr {
+    Admin::RequestPtr handler = Admin::RequestPtr(new ChunkedHandler);
     return handler;
   };
 
   // Test removable handler.
-  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addChunkedHandler("/foo/bar", "hello", callback, true, false)));
+  EXPECT_NO_LOGS(
+      EXPECT_TRUE(admin_.addStreamingHandler("/foo/bar", "hello", callback, true, false)));
   Http::TestResponseHeaderMapImpl header_map;
   {
     Buffer::OwnedImpl response;
@@ -159,11 +162,11 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
-  EXPECT_TRUE(admin_.addChunkedHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_TRUE(admin_.addStreamingHandler("/foo/bar", "hello", callback, false, false));
   EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
 
   // Add again and make sure it is not there twice.
-  EXPECT_FALSE(admin_.addChunkedHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_FALSE(admin_.addStreamingHandler("/foo/bar", "hello", callback, false, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
@@ -172,6 +175,36 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
     EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
     EXPECT_EQ("Text Text Text ", response.toString());
   }
+}
+
+TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Stats::Store& store = server_.stats();
+
+  // Cover the case where multiple chunks are emitted by making a large number
+  // of stats with long names, based on the default chunk size. The actual
+  // chunk size can be changed in the unit test for StatsRequest, but it can't
+  // easily be changed from this test. This covers a bug fix due to
+  // AdminImpl::runRunCallback not draining the buffer after each chunk, which
+  // it is not required to do. This test ensures that StatsRequest::nextChunk
+  // writes up to StatsRequest::DefaultChunkSize *additional* bytes on each
+  // call.
+  const std::string prefix(1000, 'a');
+  uint32_t expected_size = 0;
+
+  // Declare enough counters so that we are sure to exceed the chunk size.
+  const uint32_t n = (StatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
+  for (uint32_t i = 0; i <= n; ++i) {
+    const std::string name = absl::StrCat(prefix, i);
+    store.counterFromString(name);
+    expected_size += name.size() + strlen(": 0\n");
+  }
+  EXPECT_EQ(Http::Code::OK, getCallback("/stats", header_map, response));
+  EXPECT_LT(expected_size, response.length());
+  EXPECT_LT(StatsRequest::DefaultChunkSize, response.length());
+  EXPECT_THAT(response.toString(), StartsWith(absl::StrCat(prefix, "0: 0\n", prefix)));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
@@ -205,7 +238,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const Http::HeaderString& content_type = header_map.ContentType()->value();
-  EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
+  EXPECT_THAT(std::string(content_type.getStringView()), HasSubstr("text/html"));
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0, 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
   EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0, 0));

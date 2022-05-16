@@ -115,7 +115,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                                                  pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http11});
+      std::vector<Protocol>{Protocol::Http11}, absl::nullopt, nullptr);
 }
 
 } // namespace Http1

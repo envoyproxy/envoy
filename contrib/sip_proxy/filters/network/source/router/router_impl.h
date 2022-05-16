@@ -160,13 +160,13 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
       }
 
       ++it;
-      /* In single thread, this condition should be cover in line 160
-       * And Envoy should be single thread
-      if (it->second->deleted()) {
-        transaction_info_map_.erase(it++);
-      } else {
-        ++it;
-      }*/
+      // In single thread, this condition should be cover in line 160
+      // And Envoy should be single thread
+      // if (it->second->deleted()) {
+      //   transaction_info_map_.erase(it++);
+      // } else {
+      //   ++it;
+      // }
     }
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
@@ -201,14 +201,26 @@ public:
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
                          std::shared_ptr<UpstreamRequest> upstream_request) {
+    if (hasTransaction(transaction_id)) {
+      return;
+    }
+
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
 
   void deleteTransaction(std::string&& transaction_id) {
-    tls_->getTyped<ThreadLocalTransactionInfo>()
-        .transaction_info_map_.at(transaction_id)
-        ->toDelete();
+    if (hasTransaction(transaction_id)) {
+      tls_->getTyped<ThreadLocalTransactionInfo>()
+          .transaction_info_map_.at(transaction_id)
+          ->toDelete();
+    }
+  }
+
+  bool hasTransaction(std::string& transaction_id) {
+    return tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.find(
+               transaction_id) !=
+           tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.end();
   }
 
   TransactionInfoItem& getTransaction(std::string&& transaction_id) {
@@ -222,11 +234,19 @@ public:
   }
 
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
-    try {
+    if (tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.find(host) !=
+        tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.end()) {
       return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } catch (std::out_of_range const&) {
+    } else {
       return nullptr;
     }
+#if 0
+    try {
+      return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
+    } catch (std::out_of_range const & e) {
+      return nullptr;
+    }
+#endif
   }
 
   void deleteUpstreamRequest(const std::string& host) {
@@ -271,7 +291,7 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (!metadata_->destination().empty()) {
+    if (metadata_->destination().empty()) {
       return false;
     }
     return host.address()->ip()->addressAsString() != metadata_->destination();
@@ -290,8 +310,8 @@ private:
                                               MessageMetadataSharedPtr metadata, std::string dest,
                                               bool& lb_ret);
 
-  QueryStatus handleCustomizedAffinity(std::string type, std::string key,
-                                       MessageMetadataSharedPtr metadata);
+  QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
+                                       const std::string& key, MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
@@ -307,7 +327,6 @@ private:
   std::shared_ptr<TransactionInfos> transaction_infos_{};
   std::shared_ptr<SipSettings> settings_;
   Server::Configuration::FactoryContext& context_;
-  // bool continue_handling_;
 };
 
 class ResponseDecoder : public DecoderCallbacks,
@@ -329,10 +348,7 @@ public:
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
 
   // DecoderCallbacks
-  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-    return *this;
-  }
+  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -347,7 +363,7 @@ class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public std::enable_shared_from_this<UpstreamRequest>,
                         public Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamRequest(Upstream::TcpPoolData& pool_data,
+  UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool_data,
                   std::shared_ptr<TransactionInfo> transaction_info);
   ~UpstreamRequest() override;
   FilterStatus start();
@@ -373,6 +389,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  SipFilters::DecoderFilterCallbacks& decoderFilterCallbacks() { return *callbacks_; }
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
@@ -387,7 +405,7 @@ public:
   std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
 
 private:
-  Upstream::TcpPoolData& conn_pool_;
+  std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;

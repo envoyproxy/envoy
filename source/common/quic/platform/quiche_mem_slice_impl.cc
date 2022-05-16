@@ -4,13 +4,19 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_mem_slice_impl.h"
-
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
 
+#include "quiche_platform_impl/quiche_mem_slice_impl.h"
+
 namespace quiche {
+
+namespace {
+
+size_t firstSliceLength(const Envoy::Buffer::Instance& buffer) { return buffer.frontSlice().len_; }
+
+} // namespace
 
 QuicheMemSliceImpl::QuicheMemSliceImpl(quiche::QuicheBuffer buffer) {
   size_t length = buffer.size();
@@ -18,7 +24,7 @@ QuicheMemSliceImpl::QuicheMemSliceImpl(quiche::QuicheBuffer buffer) {
   fragment_ = std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
       buffer_ptr.get(), length,
       // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
-      // of copy, so that the ownership of |buffer| can be transferred to lambda via capture
+      // of copy, so that the ownership of `buffer` can be transferred to lambda via capture
       // here and below to unify and simplify the constructor implementations.
       [allocator = buffer_ptr.get_deleter().allocator()](const void* p, size_t,
                                                          const Envoy::Buffer::BufferFragmentImpl*) {
@@ -53,10 +59,6 @@ QuicheMemSliceImpl::~QuicheMemSliceImpl() {
 
 const char* QuicheMemSliceImpl::data() const {
   return reinterpret_cast<const char*>(single_slice_buffer_.frontSlice().mem_);
-}
-
-size_t QuicheMemSliceImpl::firstSliceLength(Envoy::Buffer::Instance& buffer) {
-  return buffer.frontSlice().len_;
 }
 
 } // namespace quiche

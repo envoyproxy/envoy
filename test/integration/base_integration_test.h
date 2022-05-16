@@ -28,6 +28,22 @@
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
+#if defined(ENVOY_CONFIG_COVERAGE)
+#define DISABLE_UNDER_COVERAGE return
+#else
+#define DISABLE_UNDER_COVERAGE                                                                     \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 
 struct ApiFilesystemConfig {
@@ -61,6 +77,9 @@ public:
   // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
   virtual void createUpstreams();
+  // Create a single upstream, based on the supplied config.
+  void createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
+                      FakeUpstreamConfig& config);
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
@@ -74,6 +93,10 @@ public:
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
+
+  absl::optional<uint64_t> waitForNextRawUpstreamConnection(
+      const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
+      std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
@@ -341,6 +364,8 @@ public:
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
     return *fake_upstreams_.back();
   }
+
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
 
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,

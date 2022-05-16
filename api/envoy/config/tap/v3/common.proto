@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/route/v3/route_components.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -182,6 +183,7 @@ message OutputConfig {
 }
 
 // Tap output sink configuration.
+// [#next-free-field: 6]
 message OutputSink {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.OutputSink";
@@ -247,6 +249,16 @@ message OutputSink {
     // GrpcService to stream data to. The format argument must be PROTO_BINARY.
     // [#comment: TODO(samflattery): remove cleanup in uber_per_filter.cc once implemented]
     StreamingGrpcSink streaming_grpc = 4;
+
+    // Tap output will be buffered in a single block before flushing to the :http:post:`/tap` admin endpoint
+    //
+    // .. attention::
+    //
+    //   It is only allowed to specify the buffered admin output sink if the tap is being
+    //   configured from the :http:post:`/tap` admin endpoint. Thus, if an extension has
+    //   been configured to receive tap configuration from some other source (e.g., static
+    //   file, XDS, etc.) configuring the buffered admin output type will fail.
+    BufferedAdminSink buffered_admin = 5;
   }
 }
 
@@ -254,6 +266,23 @@ message OutputSink {
 message StreamingAdminSink {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.StreamingAdminSink";
+}
+
+// BufferedAdminSink configures a tap output to collect traces without returning them until
+// one of multiple criteria are satisfied.
+// Similar to StreamingAdminSink, it is only allowed to specify the buffered admin output
+// sink if the tap is being configured from the `/tap` admin endpoint.
+message BufferedAdminSink {
+  // Stop collecting traces when the specified number are collected.
+  // If other criteria for ending collection are reached first, this value will not be used.
+  uint64 max_traces = 1 [(validate.rules).uint64 = {gt: 0}];
+
+  // Acts as a fallback to prevent the client from waiting for long periods of time.
+  // After timeout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
+  // This may result in returning fewer traces than were requested, and in the case that no traces are
+  // buffered during this time, no traces will be returned.
+  // Specifying 0 for the timeout value (or not specifying a value at all) indicates an infinite timeout.
+  google.protobuf.Duration timeout = 2;
 }
 
 // The file per tap sink outputs a discrete file for every tapped stream.

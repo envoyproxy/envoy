@@ -106,6 +106,23 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
 }
 
+TEST(NetworkUtility, socketTypeFromUrl) {
+  EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
+  EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
+
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://foo"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://tmp/server"));
+
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("tcp://1.2.3.4:1234"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("tcp://0.0.0.0:0"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("tcp://[::1]:1"));
+
+  EXPECT_EQ(Network::Socket::Type::Datagram, *Utility::socketTypeFromUrl("udp://1.2.3.4:1234"));
+  EXPECT_EQ(Network::Socket::Type::Datagram, *Utility::socketTypeFromUrl("udp://0.0.0.0:0"));
+  EXPECT_EQ(Network::Socket::Type::Datagram, *Utility::socketTypeFromUrl("udp://[::1]:1"));
+}
+
 TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_THROW(Utility::parseInternetAddress(""), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("1.2.3"), EnvoyException);
@@ -252,71 +269,71 @@ TEST(NetworkUtility, LocalConnection) {
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("8.8.8.8"));
-  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 1234));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 4321));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::3"));
-  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2", 4321));
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2", 1234));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("fd00::"));
-  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 }
 
 TEST(NetworkUtility, InternalAddress) {

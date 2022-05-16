@@ -33,10 +33,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  std::string configType() override {
-    // Prevent registration of filters by type. This is only allowed in tests.
-    return "";
-  }
+  std::set<std::string> configTypes() override { return {}; }
 
   std::string name() const override { return name_; }
 

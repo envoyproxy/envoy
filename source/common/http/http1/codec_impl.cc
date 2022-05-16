@@ -476,13 +476,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
-      deferred_end_stream_headers_(false), dispatching_(false),
-      output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
-          [&]() -> void { this->onBelowLowWatermark(); },
-          [&]() -> void { this->onAboveHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
-  output_buffer_->setWatermarks(connection.bufferLimit());
+      deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
+      max_headers_count_(max_headers_count) {
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
 }
 
@@ -636,18 +631,18 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 
 Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ASSERT(codec_status_.ok() && dispatching_);
-  auto [nread, rc] = parser_->execute(slice, len);
+  const size_t nread = parser_->execute(slice, len);
   if (!codec_status_.ok()) {
     return codec_status_;
   }
 
-  if (rc != parser_->statusToInt(ParserStatus::Success) &&
-      rc != parser_->statusToInt(ParserStatus::Paused)) {
+  const ParserStatus status = parser_->getStatus();
+  if (status != ParserStatus::Success && status != ParserStatus::Paused) {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
     codec_status_ =
-        codecProtocolError(absl::StrCat("http/1.1 protocol error: ", parser_->errnoName(rc)));
+        codecProtocolError(absl::StrCat("http/1.1 protocol error: ", parser_->errorMessage()));
     return codec_status_;
   }
 
@@ -964,9 +959,17 @@ ServerConnectionImpl::ServerConnectionImpl(
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
       }),
+      owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
       headers_with_underscores_action_(headers_with_underscores_action),
       runtime_lazy_read_disable_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {
+  owned_output_buffer_->setWatermarks(connection.bufferLimit());
+  // Inform parent
+  output_buffer_ = owned_output_buffer_.get();
+}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
   // Add in the size of the request URL if processing request headers.
@@ -1273,7 +1276,15 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count) {}
+                     max_response_headers_count),
+      owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): handle overflow watermark */ })) {
+  owned_output_buffer_->setWatermarks(connection.bufferLimit());
+  // Inform parent
+  output_buffer_ = owned_output_buffer_.get();
+}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {

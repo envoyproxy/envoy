@@ -66,6 +66,9 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+  // Allow extension lookup by name in the integration tests.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
+                                    "false");
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -126,7 +129,7 @@ common_tls_context:
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   } else {
@@ -143,17 +146,20 @@ common_tls_context:
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-    Network::TransportSocketFactoryPtr factory =
-        upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                      : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
-    if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(new AutonomousUpstream(
-          std::move(factory), endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
-    } else {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(std::move(factory), endpoint, upstreamConfig()));
-    }
+    createUpstream(endpoint, upstreamConfig());
+  }
+}
+void BaseIntegrationTest::createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
+                                         FakeUpstreamConfig& config) {
+  Network::TransportSocketFactoryPtr factory = upstream_tls_
+                                                   ? createUpstreamTlsContext(config)
+                                                   : Network::Test::createRawBufferSocketFactory();
+  if (autonomous_upstream_) {
+    fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
+                                                        autonomous_allow_incomplete_streams_));
+  } else {
+    fake_upstreams_.emplace_back(new FakeUpstream(std::move(factory), endpoint, config));
   }
 }
 
@@ -270,6 +276,30 @@ void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
+}
+
+absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
+    const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
+    std::chrono::milliseconds connection_wait_timeout) {
+  AssertionResult result = AssertionFailure();
+  int upstream_index = 0;
+  Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
+  // Loop over the upstreams until the call times out or an upstream request is
+  // received.
+  while (!result) {
+    upstream_index = upstream_index % upstream_indices.size();
+    result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
+        fake_upstream_connection, std::chrono::milliseconds(5));
+    if (result) {
+      return upstream_index;
+    } else if (!bound.withinBound()) {
+      RELEASE_ASSERT(0, "Timed out waiting for new connection.");
+      break;
+    }
+    ++upstream_index;
+  }
+  RELEASE_ASSERT(result, result.message());
+  return {};
 }
 
 IntegrationTcpClientPtr
@@ -422,7 +452,10 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(
       },
       std::move(transport_socket));
 
-  connection->run();
+  if (connection->run() != testing::AssertionSuccess()) {
+    FAIL() << "Failed to get expected response within the time bound\n"
+           << "received " << *response << "\n";
+  }
 }
 
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {

@@ -151,6 +151,26 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
     }
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::HTTP2) {
+      // Sanity check on connection_keepalive interval and timeout.
+      try {
+        PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), interval);
+      } catch (const DurationUtil::OutOfRangeException& e) {
+        throw EnvoyException(
+            absl::StrCat("In http2_protocol_options.connection_keepalive interval shall not be "
+                         "negative. Exception {}",
+                         e.what()));
+      }
+      try {
+        PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), timeout);
+      } catch (const DurationUtil::OutOfRangeException& e) {
+        throw EnvoyException(
+            absl::StrCat("In http2_protocol_options.connection_keepalive timeout shall not be "
+                         "negative. Exception {}",
+                         e.what()));
+      }
+    }
   } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::
         EnvoyMobileHttpConnectionManager& config =

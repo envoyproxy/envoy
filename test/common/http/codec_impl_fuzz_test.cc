@@ -23,6 +23,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 
@@ -178,7 +179,9 @@ public:
           // that the internal book keeping resetStream() below is consistent with the state of the
           // client codec state, which is necessary to prevent multiple simultaneous streams for the
           // HTTP/1 codec.
-          request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          if (response_.stream_state_ != StreamState::Closed) {
+            request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          }
           resetStream();
           stream_reset_callback_();
         }));
@@ -243,7 +246,8 @@ public:
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
                                                           *context_.conn_manager_config_,
                                                           /*via=*/"", stream_info_, /*node_id=*/"");
-          if (headers.Status() == nullptr) {
+          // Check for validity of response-status explicitly, as encodeHeaders() might throw.
+          if (!Utility::getResponseStatusNoThrow(headers).has_value()) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);
@@ -461,6 +465,7 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
+        const auto buf_length_old = buf.length();
         if (should_close_connection_) {
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
           return codecClientError("preventing buffer drain due to connection closure");
@@ -469,6 +474,9 @@ public:
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
           return status;
+        }
+        if (buf_length_old == buf.length()) {
+          return Http::codecProtocolError("No progress in draining buffer. Breaking endless loop.");
         }
       }
       bufs_.pop_front();
@@ -516,7 +524,7 @@ using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
-enum class HttpVersion { Http1, Http2 };
+enum class HttpVersion { Http1, Http2Nghttp2, Http2WrappedNghttp2, Http2Oghttp2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
@@ -537,12 +545,33 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   HttpStream::ConnectionContext connection_context(&conn_manager_config, server_connection,
                                                    client_connection);
+  TestScopedRuntime scoped_runtime;
 
   Http1::CodecStats::AtomicPtr http1_stats;
   Http2::CodecStats::AtomicPtr http2_stats;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
-  const bool http2 = http_version == HttpVersion::Http2;
+  bool http2 = false;
+
+  switch (http_version) {
+  case HttpVersion::Http1:
+    break;
+  case HttpVersion::Http2Nghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+    break;
+  case HttpVersion::Http2WrappedNghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+    break;
+  case HttpVersion::Http2Oghttp2:
+    http2 = true;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
+    break;
+  }
 
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
@@ -629,11 +658,11 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   constexpr auto max_actions = 1024;
   bool codec_error = false;
-  for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection &&
-                  !codec_error;
-       ++i) {
+  const auto num_actions = std::min(max_actions, input.actions().size());
+  for (int i = 0; i < num_actions && !should_close_connection && !codec_error; ++i) {
     const auto& action = input.actions(i);
-    ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
+    ENVOY_LOG_MISC(trace, "action #{}/{}: {} with {} streams", i, num_actions, action.DebugString(),
+                   streams.size());
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       if (!http2) {
@@ -742,7 +771,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // Validate input early.
     TestUtility::validate(input);
     codecFuzz(input, HttpVersion::Http1);
-    codecFuzz(input, HttpVersion::Http2);
+    codecFuzz(input, HttpVersion::Http2Nghttp2);
+    codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+    codecFuzz(input, HttpVersion::Http2Oghttp2);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }

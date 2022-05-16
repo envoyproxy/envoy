@@ -2,7 +2,7 @@
 
 #include "source/extensions/filters/http/alternate_protocols_cache/filter.h"
 
-#include "test/mocks/http/alternate_protocols_cache.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -20,8 +20,8 @@ class FilterTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   FilterTest()
       : alternate_protocols_cache_manager_(
-            std::make_shared<Http::MockAlternateProtocolsCacheManager>()),
-        alternate_protocols_cache_(std::make_shared<Http::MockAlternateProtocolsCache>()) {
+            std::make_shared<Http::MockHttpServerPropertiesCacheManager>()),
+        alternate_protocols_cache_(std::make_shared<Http::MockHttpServerPropertiesCache>()) {
     initialize(true);
   }
 
@@ -42,21 +42,21 @@ public:
   }
 
   Event::MockDispatcher dispatcher_;
-  Http::MockAlternateProtocolsCacheManagerFactory alternate_protocols_cache_manager_factory_;
-  std::shared_ptr<Http::MockAlternateProtocolsCacheManager> alternate_protocols_cache_manager_;
-  std::shared_ptr<Http::MockAlternateProtocolsCache> alternate_protocols_cache_;
+  Http::MockHttpServerPropertiesCacheManagerFactory alternate_protocols_cache_manager_factory_;
+  std::shared_ptr<Http::MockHttpServerPropertiesCacheManager> alternate_protocols_cache_manager_;
+  std::shared_ptr<Http::MockHttpServerPropertiesCache> alternate_protocols_cache_;
   FilterConfigSharedPtr filter_config_;
   std::unique_ptr<Filter> filter_;
   Http::MockStreamEncoderFilterCallbacks callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };
 
-std::string dumpOrigin(const Http::AlternateProtocolsCache::Origin& origin) {
+std::string dumpOrigin(const Http::HttpServerPropertiesCache::Origin& origin) {
   return "{ scheme: '" + origin.scheme_ + "' host: '" + origin.hostname_ +
          "' port: " + absl::StrCat(origin.port_) + " }\n";
 }
 
-std::string dumpAlternative(const Http::AlternateProtocolsCache::AlternateProtocol& origin) {
+std::string dumpAlternative(const Http::HttpServerPropertiesCache::AlternateProtocol& origin) {
   return "{ alpn: '" + origin.alpn_ + "' host: '" + origin.hostname_ +
          "' port: " + absl::StrCat(origin.port_) + " }\n";
 }
@@ -73,7 +73,7 @@ TEST_F(FilterTest, NoCache) {
 
 TEST_F(FilterTest, NoAltSvc) {
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  Http::AlternateProtocolsCache::Origin expected_origin("https", "host1", 443);
+  Http::HttpServerPropertiesCache::Origin expected_origin("https", "host1", 443);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   filter_->onDestroy();
@@ -89,13 +89,13 @@ TEST_F(FilterTest, InvalidAltSvc) {
 TEST_F(FilterTest, ValidAltSvc) {
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
-  Http::AlternateProtocolsCache::Origin expected_origin("https", "host1", 443);
+  Http::HttpServerPropertiesCache::Origin expected_origin("https", "host1", 443);
   MonotonicTime now = simTime().monotonicTime();
-  const std::vector<Http::AlternateProtocolsCache::AlternateProtocol> expected_protocols = {
-      Http::AlternateProtocolsCache::AlternateProtocol("h3-29", "", 443,
-                                                       now + std::chrono::seconds(86400)),
-      Http::AlternateProtocolsCache::AlternateProtocol("h3", "", 443,
-                                                       now + std::chrono::seconds(60)),
+  const std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> expected_protocols = {
+      Http::HttpServerPropertiesCache::AlternateProtocol("h3-29", "", 443,
+                                                         now + std::chrono::seconds(86400)),
+      Http::HttpServerPropertiesCache::AlternateProtocol("h3", "", 443,
+                                                         now + std::chrono::seconds(60)),
   };
 
   std::shared_ptr<Network::MockResolvedAddress> address =
@@ -105,7 +105,7 @@ TEST_F(FilterTest, ValidAltSvc) {
   std::shared_ptr<Upstream::MockHostDescription> hd =
       std::make_shared<Upstream::MockHostDescription>();
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
+  EXPECT_CALL(callbacks_, streamInfo()).Times(2).WillOnce(ReturnRef(stream_info));
   stream_info.upstreamInfo()->setUpstreamHost(hd);
   EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
   EXPECT_CALL(*hd, address()).WillOnce(Return(address));

@@ -3,6 +3,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -46,6 +47,8 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
+  std::set<std::string> configTypes() override { return {}; }
+
   std::string name() const override {
     return absl::StrCat(category(), ".fake_config_validator_",
                         should_reject_ ? "reject" : "accept");
@@ -62,7 +65,10 @@ class CustomConfigValidatorsImplTest : public testing::Test {
 public:
   CustomConfigValidatorsImplTest()
       : factory_accept_(false), factory_reject_(true), register_factory_accept_(factory_accept_),
-        register_factory_reject_(factory_reject_) {}
+        register_factory_reject_(factory_reject_) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+  }
 
   static envoy::config::core::v3::TypedExtensionConfig parseConfig(const std::string& config) {
     envoy::config::core::v3::TypedExtensionConfig proto;
@@ -77,6 +83,7 @@ public:
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   const testing::NiceMock<Server::MockInstance> server_;
   const std::string type_url_{Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()};
+  TestScopedRuntime scoped_runtime_;
 
   static constexpr char AcceptValidatorConfig[] =
       "name: envoy.config.validators.fake_config_validator_accept";

@@ -13,9 +13,13 @@
 namespace Envoy {
 namespace Runtime {
 
+bool hasRuntimePrefix(absl::string_view feature);
 bool isRuntimeFeature(absl::string_view feature);
 bool runtimeFeatureEnabled(absl::string_view feature);
 uint64_t getInteger(absl::string_view feature, uint64_t default_value);
+
+void markRuntimeInitialized();
+bool isRuntimeInitialized();
 
 void maybeSetRuntimeGuard(absl::string_view name, bool value);
 

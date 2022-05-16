@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
@@ -90,10 +91,14 @@ public:
   processingMode() const {
     return processing_mode_;
   }
+  const absl::optional<envoy::config::core::v3::GrpcService>& grpcService() const {
+    return grpc_service_;
+  }
 
 private:
   bool disabled_;
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode> processing_mode_;
+  absl::optional<envoy::config::core::v3::GrpcService> grpc_service_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
@@ -112,9 +117,10 @@ class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
   };
 
 public:
-  Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
+  Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
+         const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        decoding_state_(*this, config->processingMode()),
+        grpc_service_(grpc_service), decoding_state_(*this, config->processingMode()),
         encoding_state_(*this, config->processingMode()) {}
 
   const FilterConfig& config() const { return *config_; }
@@ -166,12 +172,16 @@ private:
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
+  // Return a pair of whether to terminate returning the current result.
+  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state,
+                                                          Buffer::Instance& data, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
+  envoy::config::core::v3::GrpcService grpc_service_;
 
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;

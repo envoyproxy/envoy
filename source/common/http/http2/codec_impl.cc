@@ -27,9 +27,11 @@
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/container/fixed_array.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
+#include "quiche/http2/adapter/oghttp2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -124,12 +126,28 @@ void ProdNghttp2SessionFactory::initOld(
 
 std::unique_ptr<http2::adapter::Http2Adapter>
 ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
+                                  ConnectionImpl* connection,
+                                  const http2::adapter::OgHttp2Adapter::Options& options) {
+  auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
+      http2::adapter::Perspective::kClient, *callbacks, connection);
+  std::unique_ptr<http2::adapter::Http2Adapter> adapter =
+      http2::adapter::OgHttp2Adapter::Create(*visitor, options);
+  connection->setVisitor(std::move(visitor));
+  return adapter;
+}
+
+std::unique_ptr<http2::adapter::Http2Adapter>
+ProdNghttp2SessionFactory::create(const nghttp2_session_callbacks* callbacks,
                                   ConnectionImpl* connection, const nghttp2_option* options) {
   auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
       http2::adapter::Perspective::kClient, *callbacks, connection);
-  http2::adapter::Http2VisitorInterface& v = *visitor;
+  auto adapter = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor, options);
+  auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+    p->RemoveStream(stream_id);
+  };
+  visitor->set_stream_close_listener(std::move(stream_close_listener));
   connection->setVisitor(std::move(visitor));
-  return http2::adapter::NgHttp2Adapter::CreateClientAdapter(v, options);
+  return adapter;
 }
 
 void ProdNghttp2SessionFactory::init(ConnectionImpl* connection,
@@ -165,6 +183,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
   }
+  stream_manager_.defer_processing_segment_size_ = parent.connection_.bufferLimit();
 }
 
 void ConnectionImpl::StreamImpl::destroy() {
@@ -261,6 +280,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 
 Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                        bool end_stream) {
+  parent_.updateActiveStreamsOnEncode(*this);
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
@@ -293,6 +313,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
 
 void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
                                                      bool end_stream) {
+  parent_.updateActiveStreamsOnEncode(*this);
   // The contract is that client codecs must ensure that :status is present.
   ASSERT(headers.Status() != nullptr);
 
@@ -309,6 +330,7 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
+  parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   if (pending_send_data_->length() > 0) {
@@ -331,6 +353,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
+  parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(parent_.allow_metadata_);
   if (parent_.use_new_codec_wrapper_) {
     NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
@@ -357,12 +380,31 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
 void ConnectionImpl::StreamImpl::processBufferedData() {
   ENVOY_CONN_LOG(debug, "Stream {} processing buffered data.", parent_.connection_, stream_id_);
 
+  // Restore crash dump context when processing buffered data.
+  Event::Dispatcher& dispatcher = parent_.connection_.dispatcher();
+  // This method is only called from a callback placed directly on the
+  // dispatcher, as such the dispatcher shouldn't have any tracked objects.
+  ASSERT(dispatcher.trackedObjectStackIsEmpty());
+  Envoy::ScopeTrackedObjectStack stack;
+  stack.add(parent_.connection_);
+
+  absl::Cleanup clear_current_stream_id = [this]() { parent_.current_stream_id_.reset(); };
+  // TODO(kbaichoo): When we add support to *ConnectionImpl::getStream* for
+  // deferred closed streams we can use their stream id here.
+  if (!stream_manager_.buffered_on_stream_close_) {
+    ASSERT(!parent_.current_stream_id_.has_value());
+    parent_.current_stream_id_ = stream_id_;
+  }
+
+  stack.add(parent_);
+  ScopeTrackerScopeState scope{&stack, dispatcher};
+
   if (stream_manager_.body_buffered_ && continueProcessingBufferedData()) {
     decodeData();
   }
 
-  if (stream_manager_.trailers_buffered_ && continueProcessingBufferedData()) {
-    ASSERT(!stream_manager_.body_buffered_);
+  if (stream_manager_.trailers_buffered_ && !stream_manager_.body_buffered_ &&
+      continueProcessingBufferedData()) {
     decodeTrailers();
     ASSERT(!stream_manager_.trailers_buffered_);
   }
@@ -375,7 +417,10 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     ENVOY_CONN_LOG(debug, "invoking onStreamClose for stream: {} via processBufferedData",
                    parent_.connection_, stream_id_);
     // We only buffer the onStreamClose if we had no errors.
-    parent_.onStreamClose(this, 0);
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message());
+    }
   }
 }
 
@@ -402,14 +447,16 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffersOverrun()) {
-      scheduleProcessingOfBufferedData();
-      grantPeerAdditionalStreamWindow();
+      scheduleProcessingOfBufferedData(false);
+      if (shouldAllowPeerAdditionalStreamWindow()) {
+        grantPeerAdditionalStreamWindow();
+      }
     }
   }
 }
 
-void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
-  if (defer_processing_backedup_streams_) {
+void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_next_iteration) {
+  if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
           [this]() { processBufferedData(); });
@@ -417,7 +464,11 @@ void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
 
     // We schedule processing to occur in another callback to avoid
     // reentrant and deep call stacks.
-    process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+    if (schedule_next_iteration) {
+      process_buffered_data_callback_->scheduleCallbackNextIteration();
+    } else {
+      process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+    }
   }
 }
 
@@ -458,19 +509,47 @@ void ConnectionImpl::StreamImpl::decodeData() {
     return;
   }
 
-  // Any buffered data will be consumed.
+  // Some buffered body will be consumed. If there remains buffered body after
+  // this call, set this to true.
   stream_manager_.body_buffered_ = false;
 
+  bool already_drained_data = false;
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
-    decoder().decodeData(*pending_recv_data_, sendEndStream());
+    // We should decode data in chunks only if we have defer processing enabled
+    // with a non-zero defer_processing_segment_size, and the buffer holds more
+    // data than the defer_processing_segment_size. Otherwise, push the
+    // entire buffer through.
+    const bool decode_data_in_chunk =
+        defer_processing_backedup_streams_ && stream_manager_.decodeAsChunks() &&
+        pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
+
+    if (decode_data_in_chunk) {
+      Buffer::OwnedImpl chunk_buffer;
+      // TODO(kbaichoo): Consider implementing an approximate move for chunking.
+      chunk_buffer.move(*pending_recv_data_, stream_manager_.defer_processing_segment_size_);
+
+      // With the current implementation this should always be true,
+      // though this can change with approximation.
+      stream_manager_.body_buffered_ = true;
+      ASSERT(pending_recv_data_->length() > 0);
+
+      decoder().decodeData(chunk_buffer, sendEndStream());
+      already_drained_data = true;
+
+      if (!buffersOverrun()) {
+        scheduleProcessingOfBufferedData(true);
+      }
+    } else {
+      // Send the entire buffer through.
+      decoder().decodeData(*pending_recv_data_, sendEndStream());
+    }
   }
 
-  // TODO(kbaichoo): If dumping buffered data, we should do so in default read
-  // size chunks rather than dumping the entire buffer, which can have fairness
-  // issues.
-  pending_recv_data_->drain(pending_recv_data_->length());
+  if (!already_drained_data) {
+    pending_recv_data_->drain(pending_recv_data_->length());
+  }
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
@@ -705,6 +784,7 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
+  parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   encodeDataHelper(data, end_stream,
                    /*skip_encoding_empty_trailers=*/
@@ -764,7 +844,10 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
         parent_.connection_, stream_id_);
     // The stream didn't originally have an NGHTTP2 error, since we buffered
     // its stream close.
-    parent_.onStreamClose(this, 0);
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message());
+    }
     return;
   }
 
@@ -849,6 +932,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
     : use_new_codec_wrapper_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_new_codec_wrapper")),
+      use_oghttp2_library_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_oghttp2")),
       http2_callbacks_(use_new_codec_wrapper_), stats_(stats), connection_(connection),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
@@ -857,8 +942,14 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       protocol_constraints_(stats, http2_options),
       skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
-      dispatching_(false), raised_goaway_(false), random_(random_generator),
+      dispatching_(false), raised_goaway_(false),
+      delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_delay_keepalive_timeout")),
+      random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
+  // This library can only be used with the wrapper API enabled.
+  ASSERT(!use_oghttp2_library_ || use_new_codec_wrapper_);
+
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(http2_options.connection_keepalive(), interval, 0));
@@ -1128,6 +1219,16 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return okStatus();
   }
 
+  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
+  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
+  // timeout for another timeout period. This will still timeout the connection if there is no
+  // activity, but if there is frame activity we assume the connection is still healthy and the
+  // PING ACK may be delayed behind other frames.
+  if (delay_keepalive_timeout_ && keepalive_timeout_timer_ != nullptr &&
+      keepalive_timeout_timer_->enabled()) {
+    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+  }
+
   if (frame->hd.type == NGHTTP2_DATA) {
     RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->data.padlen));
   }
@@ -1356,7 +1457,7 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   return length;
 }
 
-int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
+Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
   if (stream) {
     const int32_t stream_id = stream->stream_id_;
 
@@ -1406,13 +1507,14 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
       // to end up invoking.
       stream->stream_manager_.buffered_on_stream_close_ = true;
       stats_.deferred_stream_close_.inc();
-      return 0;
+      return okStatus();
     }
 
     stream->destroy();
     current_stream_id_.reset();
     // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.
     pending_deferred_reset_streams_.erase(stream->stream_id_);
+
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
@@ -1428,10 +1530,10 @@ int ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     }
   }
 
-  return 0;
+  return okStatus();
 }
 
-int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
+Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   return onStreamClose(getStream(stream_id), error_code);
 }
 
@@ -1717,6 +1819,19 @@ void ConnectionImpl::onProtocolConstraintViolation() {
   connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
 }
 
+void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // Notify the streams based on least recently encoding to the connection.
+    for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
+      (*it)->runLowWatermarkCallbacks();
+    }
+  } else {
+    for (auto& stream : active_streams_) {
+      stream->runLowWatermarkCallbacks();
+    }
+  }
+}
+
 ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
   nghttp2_session_callbacks_new(&callbacks_);
   nghttp2_session_callbacks_set_send_callback(
@@ -1778,7 +1893,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
   nghttp2_session_callbacks_set_on_stream_close_callback(
       callbacks_,
       [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+            std::move(status));
       });
 
   nghttp2_session_callbacks_set_on_frame_send_callback(
@@ -1841,7 +1958,13 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks(bool use_new_codec_wrapper) {
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
 ConnectionImpl::Http2Options::Http2Options(
-    const envoy::config::core::v3::Http2ProtocolOptions& http2_options) {
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb) {
+  og_options_.perspective = http2::adapter::Perspective::kServer;
+  og_options_.max_hpack_encoding_table_capacity = http2_options.hpack_table_size().value();
+  og_options_.max_header_list_bytes = max_headers_kb * 1024;
+  og_options_.max_header_field_size = max_headers_kb * 1024;
+  og_options_.allow_extended_connect = http2_options.allow_connect();
+
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
@@ -1878,8 +2001,9 @@ ConnectionImpl::Http2Options::Http2Options(
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
-    const envoy::config::core::v3::Http2ProtocolOptions& http2_options)
-    : Http2Options(http2_options) {
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb)
+    : Http2Options(http2_options, max_headers_kb) {
+  og_options_.perspective = http2::adapter::Perspective::kClient;
   // Temporarily disable initial max streams limit/protection, since we might want to create
   // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
   //
@@ -2008,14 +2132,19 @@ ClientConnectionImpl::ClientConnectionImpl(
     Random::RandomGenerator& random_generator,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
-    Nghttp2SessionFactory& http2_session_factory)
+    Http2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
-  ClientHttp2Options client_http2_options(http2_options);
+  ClientHttp2Options client_http2_options(http2_options, max_response_headers_kb);
   if (use_new_codec_wrapper_) {
-    adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
-                                            client_http2_options.options());
+    if (use_oghttp2_library_) {
+      adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
+                                              client_http2_options.ogOptions());
+    } else {
+      adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
+                                              client_http2_options.options());
+    }
     http2_session_factory.init(base(), http2_options);
   } else {
     session_ = http2_session_factory.createOld(http2_callbacks_.callbacks(), base(),
@@ -2112,12 +2241,24 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
-  Http2Options h2_options(http2_options);
+  Http2Options h2_options(http2_options, max_request_headers_kb);
 
   if (use_new_codec_wrapper_) {
-    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
+    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
         http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
-    adapter_ = http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor_, h2_options.options());
+    if (use_oghttp2_library_) {
+      visitor_ = std::move(visitor);
+      adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    } else {
+      auto adapter =
+          http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
+      auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {
+        p->RemoveStream(stream_id);
+      };
+      visitor->set_stream_close_listener(std::move(stream_close_listener));
+      visitor_ = std::move(visitor);
+      adapter_ = std::move(adapter);
+    }
   } else {
     nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                                 h2_options.options());
