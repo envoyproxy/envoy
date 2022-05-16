@@ -41,8 +41,8 @@ public:
                Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
-  MOCK_METHOD(RequestPtr, startRequest, (absl::string_view path_and_query,
-                                         absl::string_view method));
+  MOCK_METHOD(RequestPtr, startRequest,
+              (absl::string_view path_and_query, absl::string_view method));
 
   NiceMock<MockConfigTracker> config_tracker_;
   NiceMock<Network::MockSocket> socket_;

@@ -196,6 +196,35 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   });
 }
 
+MainCommonBase::AdminRequestPtr MainCommonBase::adminRequest(absl::string_view path_and_query,
+                                                             absl::string_view method) {
+  return std::make_unique<AdminRequest>(path_and_query, method, *server_);
+}
+
+MainCommonBase::AdminRequest::AdminRequest(absl::string_view path_and_query,
+                                           absl::string_view method, Server::Instance& server)
+    : dispatcher_(server.dispatcher()) {
+  std::string path_and_query_buf = std::string(path_and_query);
+  std::string method_buf = std::string(method);
+  dispatcher_.post([this, path_and_query_buf, method_buf, &server]() {
+    request_ = server.admin().startRequest(path_and_query_buf, method_buf);
+  });
+}
+
+void MainCommonBase::AdminRequest::start(HeadersFn fn, Http::ResponseHeaderMap& response_headers) {
+  dispatcher_.post([this, fn, &response_headers]() {
+    Http::Code code = request_->start(response_headers);
+    fn(code);
+  });
+}
+
+void MainCommonBase::AdminRequest::nextChunk(ChunkFn fn, Buffer::Instance& response) {
+  dispatcher_.post([this, fn, &response]() {
+    bool more = request_->nextChunk(response);
+    fn(more);
+  });
+}
+
 MainCommon::MainCommon(const std::vector<std::string>& args)
     : options_(args, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,

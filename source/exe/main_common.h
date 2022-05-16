@@ -45,8 +45,34 @@ public:
   // Will be null if options.mode() == Server::Mode::Validate
   Server::Instance* server() { return server_.get(); }
 
+  class AdminRequest {
+  public:
+    AdminRequest(absl::string_view path_and_query, absl::string_view method,
+                 Server::Instance& server);
+
+    // Requests the headers. This can be called from any thread, but the
+    // callback will be delivered on the main thread.
+    using HeadersFn = std::function<void(Http::Code code)>;
+    void start(HeadersFn fn, Http::ResponseHeaderMap& response_headers);
+
+    // Requests the next chunk. This can be called from any thread, but the
+    // callback will be delivered on the main thread. The 'more' argument is
+    // set to true if more bytes are expected after the returned chunk.
+    using ChunkFn = std::function<void(bool more)>;
+    void nextChunk(ChunkFn fn, Buffer::Instance& response);
+
+  private:
+    void init(Server::Admin::RequestPtr&& request) { request_ = std::move(request); }
+
+    Server::Admin::RequestPtr request_;
+    Event::Dispatcher& dispatcher_;
+  };
+  using AdminRequestPtr = std::unique_ptr<AdminRequest>;
+
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
+
+  AdminRequestPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request
