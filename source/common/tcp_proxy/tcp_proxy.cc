@@ -480,10 +480,12 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
 }
 
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                  absl::string_view failure_reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamHost(host);
+  getStreamInfo().upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
