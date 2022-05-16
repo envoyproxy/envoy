@@ -16,7 +16,6 @@ public:
   void createL1Envoy();
 
   IntegrationTestServerPtr l1_server_;
-  Thread::SkipAsserts skip_;
 };
 
 void MultiEnvoyTest::createL1Envoy() {
