@@ -29,9 +29,9 @@ matcher_tree:
             value: foo
 )EOF";
 
-template <typename MatchingDataType> class InputsIntegrationTestBase : public ::testing::Test {
+class InputsIntegrationTest : public ::testing::Test {
 public:
-  explicit InputsIntegrationTestBase()
+  InputsIntegrationTest()
       : inject_action_(action_factory_), context_(""),
         matcher_factory_(context_, factory_context_, validation_visitor_) {
     EXPECT_CALL(validation_visitor_, performDataInputValidation(_, _)).Times(testing::AnyNumber());
@@ -49,13 +49,11 @@ protected:
   Matcher::StringActionFactory action_factory_;
   Registry::InjectFactory<Matcher::ActionFactory<absl::string_view>> inject_action_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
-  Matcher::MockMatchTreeValidationVisitor<MatchingDataType> validation_visitor_;
+  Matcher::MockMatchTreeValidationVisitor<Network::MatchingData> validation_visitor_;
   absl::string_view context_;
-  Matcher::MatchTreeFactory<MatchingDataType, absl::string_view> matcher_factory_;
-  Matcher::MatchTreeFactoryCb<MatchingDataType> match_tree_;
+  Matcher::MatchTreeFactory<Network::MatchingData, absl::string_view> matcher_factory_;
+  Matcher::MatchTreeFactoryCb<Network::MatchingData> match_tree_;
 };
-
-using InputsIntegrationTest = InputsIntegrationTestBase<Network::MatchingData>;
 
 TEST_F(InputsIntegrationTest, DestinationIPInput) {
   initialize("DestinationIPInput", "127.0.0.1");
@@ -173,7 +171,31 @@ TEST_F(InputsIntegrationTest, ApplicationProtocolInput) {
   EXPECT_TRUE(result.on_match_.has_value());
 }
 
-using UdpInputsIntegrationTest = InputsIntegrationTestBase<Network::UdpMatchingData>;
+class UdpInputsIntegrationTest : public ::testing::Test {
+public:
+  UdpInputsIntegrationTest()
+      : inject_action_(action_factory_), context_(""),
+        matcher_factory_(context_, factory_context_, validation_visitor_) {
+    EXPECT_CALL(validation_visitor_, performDataInputValidation(_, _)).Times(testing::AnyNumber());
+  }
+
+  void initialize(const std::string& input, const std::string& value) {
+    xds::type::matcher::v3::Matcher matcher;
+    MessageUtil::loadFromYaml(fmt::format(std::string(yaml), input, value), matcher,
+                              ProtobufMessage::getStrictValidationVisitor());
+
+    match_tree_ = matcher_factory_.create(matcher);
+  }
+
+protected:
+  Matcher::StringActionFactory action_factory_;
+  Registry::InjectFactory<Matcher::ActionFactory<absl::string_view>> inject_action_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  Matcher::MockMatchTreeValidationVisitor<Network::UdpMatchingData> validation_visitor_;
+  absl::string_view context_;
+  Matcher::MatchTreeFactory<Network::UdpMatchingData, absl::string_view> matcher_factory_;
+  Matcher::MatchTreeFactoryCb<Network::UdpMatchingData> match_tree_;
+};
 
 TEST_F(UdpInputsIntegrationTest, DestinationIPInput) {
   initialize("DestinationIPInput", "127.0.0.1");
@@ -213,69 +235,6 @@ TEST_F(UdpInputsIntegrationTest, SourcePortInput) {
 
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
   UdpMatchingDataImpl data(ip, ip);
-
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-}
-
-class AuthenticatedMatchingData {
-public:
-  AuthenticatedMatchingData() : ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
-
-  static absl::string_view name() { return "authenticated"; }
-
-  Ssl::ConnectionInfoConstSharedPtr ssl() const { return ssl_; }
-
-  std::shared_ptr<Ssl::MockConnectionInfo> ssl_;
-};
-
-using AuthenticatedInputsIntegrationTest = InputsIntegrationTestBase<AuthenticatedMatchingData>;
-
-TEST_F(AuthenticatedInputsIntegrationTest, UriSanInput) {
-  UriSanInputBaseFactory<AuthenticatedMatchingData> factory;
-  const auto host = "example.com";
-  Registry::InjectFactory<Matcher::DataInputFactory<AuthenticatedMatchingData>> registration(
-      factory);
-
-  initialize("UriSanInput", host);
-
-  AuthenticatedMatchingData data;
-  std::vector<std::string> uri_sans{host};
-  EXPECT_CALL(*data.ssl_, uriSanPeerCertificate()).WillOnce(Return(uri_sans));
-
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-}
-
-TEST_F(AuthenticatedInputsIntegrationTest, DnsSanInput) {
-  DnsSanInputBaseFactory<AuthenticatedMatchingData> factory;
-  const auto host = "example.com";
-  Registry::InjectFactory<Matcher::DataInputFactory<AuthenticatedMatchingData>> registration(
-      factory);
-
-  initialize("DnsSanInput", host);
-
-  AuthenticatedMatchingData data;
-  std::vector<std::string> dns_sans{host};
-  EXPECT_CALL(*data.ssl_, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
-
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-}
-
-TEST_F(AuthenticatedInputsIntegrationTest, SubjectInput) {
-  SubjectInputBaseFactory<AuthenticatedMatchingData> factory;
-  const std::string host = "example.com";
-  Registry::InjectFactory<Matcher::DataInputFactory<AuthenticatedMatchingData>> registration(
-      factory);
-
-  initialize("SubjectInput", host);
-
-  AuthenticatedMatchingData data;
-  EXPECT_CALL(*data.ssl_, subjectPeerCertificate()).WillOnce(testing::ReturnRef(host));
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
