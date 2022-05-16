@@ -2015,13 +2015,13 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
   EXPECT_CALL(*encoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        EXPECT_THAT(*metadata, HasNoRequestHeaders());
-        metadata->requestHeaders().addCopy(key, "value");
+        EXPECT_THAT(*metadata, HasNoResponseHeaders());
+        metadata->responseHeaders().addCopy(key, "value");
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*custom_encoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const auto header = metadata->requestHeaders().get(key);
+        const auto header = metadata->responseHeaders().get(key);
         EXPECT_FALSE(header.empty());
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
