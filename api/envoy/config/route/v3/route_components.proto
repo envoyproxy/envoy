@@ -219,7 +219,7 @@ message FilterAction {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -257,6 +257,20 @@ message Route {
     // xDS clients like the gRPC server. It could also be used in the future
     // in Envoy for a filter that directly generates responses for requests.
     NonForwardingAction non_forwarding_action = 18;
+
+    // [#not-implemented-hide:]
+    // The human readable prefix to use when emitting statistics for this endpoint.
+    // This should be set for highly critical
+    // endpoints that you wish to get “perfect” statistics on.
+    //
+    // This emits statistics documentation at :ref:`virtual cluster statistics <config_http_filters_router_vcluster_stats>`.
+    //
+    // .. note::
+    //
+    //    We do not recommend setting up a stat prefix for
+    //    every application endpoint. This is both not easily maintainable and as well the
+    //    statistics output is not free.
+    string stat_prefix = 19;
   }
 
   // The Metadata field can be used to provide additional information
