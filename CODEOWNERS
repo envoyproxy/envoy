@@ -255,6 +255,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
 
+# Connection Balance
+/*/extensions/common/network @mattklein123 @daixiang0
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
