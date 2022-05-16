@@ -69,11 +69,13 @@ message Listener {
     google.protobuf.BoolValue bind_to_port = 1;
   }
 
+  // [#extension: envoy.network.connection_balance]
   // Configuration for listener connection balancing.
   message ConnectionBalanceConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Listener.ConnectionBalanceConfig";
 
+    // [#protodoc-title: Exact Connection Balancer]
     // [#extension: envoy.network.connection_balance.exact]
     // A connection balancer implementation that does exact balancing. This means that a lock is
     // held during balancing so that connection counts are nearly exactly balanced between worker
