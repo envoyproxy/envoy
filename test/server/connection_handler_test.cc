@@ -437,14 +437,13 @@ public:
   Runtime::Loader& runtime_{scoped_runtime_.loader()};
 };
 
-/*
 // Verify that if a listener is removed while a rebalanced connection is in flight, we correctly
 // destroy the connection.
 TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   InSequence s;
 
   // For reasons I did not investigate, the death test below requires this, likely due to
-  forking.
+  // forking.
   // So we just leak the FDs for this test.
   ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
@@ -486,7 +485,6 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   post_cb();
 #endif
 }
-*/
 
 TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
   Network::TcpListenerCallbacks* listener_callbacks1;
