@@ -3625,6 +3625,24 @@ virtual_hosts:
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());
 }
 
+TEST_F(RouteMatcherTest, ClusterNotFound) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "route: unknown cluster*");
+}
+
 TEST_F(RouteMatcherTest, ShadowClusterNotFound) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3640,25 +3658,10 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-               EnvoyException);
-}
-
-TEST_F(RouteMatcherTest, ClusterNotFound) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains:
-  - www.lyft.com
-  routes:
-  - match:
-      prefix: "/foo"
-    route:
-      cluster: www2
-  )EOF";
-
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-               EnvoyException);
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "route: unknown shadow cluster*");
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundNotChecking) {
@@ -3851,6 +3854,129 @@ virtual_hosts:
   EXPECT_EQ("", boz_shadow_policies[0]->runtimeKey());
   EXPECT_EQ("some_cluster2", boz_shadow_policies[1]->cluster());
   EXPECT_EQ("foo", boz_shadow_policies[1]->runtimeKey());
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithBothClusterAndClusterHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          cluster_header: some_cluster_header
+        - cluster: some_cluster2
+          cluster_header: some_cluster_header_2
+          runtime_fraction:
+            default_value:
+              numerator: 20
+              denominator: HUNDRED
+            runtime_key: foo
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Only one of cluster '.*' or cluster_header '.*' in request mirror policy can be specified");
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithNoClusterSpecifier) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - runtime_fraction:
+            default_value:
+              numerator: 20
+              denominator: HUNDRED
+            runtime_key: foo
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithInvalidHttpHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster_header: "test\r"
+          runtime_fraction:
+            default_value:
+              numerator: 20
+              denominator: HUNDRED
+            runtime_key: foo
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Proto constraint validation failed.*");
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesClusterHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster_header: some_header
+        - cluster_header: some_header_2
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          runtime_fraction:
+            default_value:
+              numerator: 20
+              denominator: HUNDRED
+            runtime_key: foo
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  const auto& foo_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+
+  EXPECT_EQ(2, foo_shadow_policies.size());
+  EXPECT_EQ("some_header", foo_shadow_policies[0]->clusterHeader().get());
+  EXPECT_EQ("some_header_2", foo_shadow_policies[1]->clusterHeader().get());
+  EXPECT_EQ("", foo_shadow_policies[0]->cluster());
+  EXPECT_EQ("", foo_shadow_policies[1]->cluster());
+  EXPECT_EQ("", foo_shadow_policies[0]->runtimeKey());
+
+  const auto& bar_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, bar_shadow_policies.size());
+  EXPECT_EQ("some_cluster", bar_shadow_policies[0]->cluster());
+  EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
 }
 
 // Test if the higher level mirror policies are properly applied when routes
@@ -8658,6 +8784,7 @@ public:
       // Override this to guarantee that we have a different factory mapping by-type.
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
     }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
     Router::RouteSpecificFilterConfigConstSharedPtr
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
                                     Server::Configuration::ServerFactoryContext&,
@@ -8678,6 +8805,7 @@ public:
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
     }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Struct"}; }
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_most_specific_config,

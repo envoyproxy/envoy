@@ -2,7 +2,10 @@
 
 #include <chrono>
 
+#include "envoy/runtime/runtime.h"
+
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,16 +53,29 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
     new_descriptor.token_bucket_ = token_bucket;
 
-    auto token_state = std::make_unique<TokenState>();
+    auto token_state = std::make_shared<TokenState>();
     token_state->tokens_ = token_bucket.max_tokens_;
     token_state->fill_time_ = time_source_.monotonicTime();
-    new_descriptor.token_state_ = std::move(token_state);
+    new_descriptor.token_state_ = token_state;
 
-    auto result = descriptors_.emplace(std::move(new_descriptor));
+    auto result = descriptors_.emplace(new_descriptor);
     if (!result.second) {
       throw EnvoyException(absl::StrCat("duplicate descriptor in the local rate descriptor: ",
                                         result.first->toString()));
     }
+    sorted_descriptors_.push_back(new_descriptor);
+  }
+  // If a request is limited by a descriptor, it should not consume tokens from the remaining
+  // matched descriptors, so we sort the descriptors by tokens per second, as a result, in most
+  // cases the strictest descriptor will be consumed first. However, it can not solve the
+  // problem perfectly.
+  if (!sorted_descriptors_.empty()) {
+    std::sort(sorted_descriptors_.begin(), sorted_descriptors_.end(),
+              [this](LocalDescriptorImpl a, LocalDescriptorImpl b) -> bool {
+                const int a_token_fill_per_second = tokensFillPerSecond(a);
+                const int b_token_fill_per_second = tokensFillPerSecond(b);
+                return a_token_fill_per_second < b_token_fill_per_second;
+              });
   }
 }
 
@@ -145,10 +161,43 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_match_all_descriptors")) {
+
+    bool allow = requestAllowedHelper(tokens_);
+    // Global token is not enough. Since global token is not sorted, so we suggest it should be
+    // larger than other descriptors.
+    if (!allow) {
+      return allow;
+    }
+
+    if (!descriptors_.empty() && !request_descriptors.empty()) {
+      for (const auto& descriptor : sorted_descriptors_) {
+        for (const auto& request_descriptor : request_descriptors) {
+          if (descriptor == request_descriptor) {
+            allow &= requestAllowedHelper(*descriptor.token_state_);
+            // Descriptor token is not enough.
+            if (!allow) {
+              return allow;
+            }
+            break;
+          }
+        }
+      }
+    }
+    return allow;
+  }
   auto descriptor = descriptorHelper(request_descriptors);
 
   return descriptor.has_value() ? requestAllowedHelper(*descriptor.value().get().token_state_)
                                 : requestAllowedHelper(tokens_);
+}
+
+int LocalRateLimiterImpl::tokensFillPerSecond(LocalDescriptorImpl& descriptor) {
+  return descriptor.token_bucket_.tokens_per_fill_ /
+         (absl::ToInt64Seconds(descriptor.token_bucket_.fill_interval_)
+              ? absl::ToInt64Seconds(descriptor.token_bucket_.fill_interval_)
+              : 1);
 }
 
 uint32_t LocalRateLimiterImpl::maxTokens(

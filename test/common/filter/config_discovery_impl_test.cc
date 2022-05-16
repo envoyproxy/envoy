@@ -151,7 +151,11 @@ public:
     EXPECT_EQ(0UL, scope_.counter(getConfigFailCounter()).value());
   }
 
-  virtual const std::string getTypeUrl() const PURE;
+  const std::string getTypeUrl() const {
+    ProtoType proto;
+    return proto.GetDescriptor()->full_name();
+  }
+
   virtual const std::string getFilterType() const PURE;
   virtual const std::string getConfigReloadCounter() const PURE;
   virtual const std::string getConfigFailCounter() const PURE;
@@ -169,9 +173,6 @@ class HttpFilterConfigDiscoveryImplTest
                                            HttpFilterConfigProviderManagerImpl,
                                            envoy::extensions::filters::http::router::v3::Router> {
 public:
-  const std::string getTypeUrl() const override {
-    return "envoy.extensions.filters.http.router.v3.Router";
-  }
   const std::string getFilterType() const override { return "http"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_reload";
@@ -185,9 +186,9 @@ public:
 class TcpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
           Network::ListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
-          TcpListenerFilterConfigProviderManagerImpl, Envoy::ProtobufWkt::Struct> {
+          TcpListenerFilterConfigProviderManagerImpl,
+          ::test::integration::filters::TestInspectorFilterConfig> {
 public:
-  const std::string getTypeUrl() const override { return "google.protobuf.Struct"; }
   const std::string getFilterType() const override { return "listener"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_reload";
@@ -204,9 +205,6 @@ class UdpListenerFilterConfigDiscoveryImplTest
           UdpListenerFilterConfigProviderManagerImpl,
           test::integration::filters::TestUdpListenerFilterConfig> {
 public:
-  const std::string getTypeUrl() const override {
-    return "test.integration.filters.TestUdpListenerFilterConfig";
-  }
   const std::string getFilterType() const override { return "listener"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_reload";
