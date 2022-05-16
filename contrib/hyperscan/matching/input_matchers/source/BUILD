@@ -23,6 +23,8 @@ envoy_cmake(
     build_data = ["@org_boost//:header"],
     cache_entries = {
         "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
+        "BUILD_AVX512": "on",
+        "BUILD_AVX512VBMI": "on",
         "BUILD_EXAMPLES": "off",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "RAGEL": "$EXT_BUILD_DEPS/ragel/bin/ragel",
