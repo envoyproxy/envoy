@@ -27,6 +27,8 @@
 
 #include "gmock/gmock.h"
 
+#include "quiche/common/platform/api/quiche_logging.h"
+
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -787,6 +789,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     codecFuzz(input, HttpVersion::Http1);
     codecFuzz(input, HttpVersion::Http2Nghttp2);
     codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+    // Prevent oghttp2 from aborting the program.
+    quiche::setDFatalExitDisabled(true);
     codecFuzz(input, HttpVersion::Http2Oghttp2);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
