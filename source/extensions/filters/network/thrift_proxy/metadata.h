@@ -28,7 +28,13 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata(bool is_request = false) : is_request_(is_request) {}
+  MessageMetadata(bool is_request = false) : is_request_(is_request) {
+    if (is_request) {
+      request_headers_ = Http::RequestHeaderMapImpl::create();
+    } else {
+      response_headers_ = Http::ResponseHeaderMapImpl::create();
+    }
+  }
 
   std::shared_ptr<MessageMetadata> clone() const {
     auto copy = std::make_shared<MessageMetadata>(isRequest());
@@ -61,8 +67,11 @@ public:
       copy->setReplyType(replyType());
     }
 
-    Http::HeaderMapImpl::copyFrom(copy->requestHeaders(), requestHeaders());
-    Http::HeaderMapImpl::copyFrom(copy->responseHeaders(), responseHeaders());
+    if (isRequest()) {
+      Http::HeaderMapImpl::copyFrom(copy->requestHeaders(), requestHeaders());
+    } else {
+      Http::HeaderMapImpl::copyFrom(copy->responseHeaders(), responseHeaders());
+    }
 
     copy->mutableSpans().assign(spans().begin(), spans().end());
 
@@ -136,10 +145,22 @@ public:
   /**
    * @return HeaderMap of current headers (never throws)
    */
-  const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
-  Http::RequestHeaderMap& requestHeaders() { return *request_headers_; }
-  const Http::ResponseHeaderMap& responseHeaders() const { return *response_headers_; }
-  Http::ResponseHeaderMap& responseHeaders() { return *response_headers_; }
+  const Http::RequestHeaderMap& requestHeaders() const {
+    ASSERT(is_request_);
+    return *request_headers_;
+  }
+  Http::RequestHeaderMap& requestHeaders() {
+    ASSERT(is_request_);
+    return *request_headers_;
+  }
+  const Http::ResponseHeaderMap& responseHeaders() const {
+    ASSERT(!is_request_);
+    return *response_headers_;
+  }
+  Http::ResponseHeaderMap& responseHeaders() {
+    ASSERT(!is_request_);
+    return *response_headers_;
+  }
 
   /**
    * @return SpanList an immutable list of Spans
@@ -195,8 +216,8 @@ private:
   absl::optional<int32_t> seq_id_{};
   absl::optional<MessageType> msg_type_{};
   absl::optional<ReplyType> reply_type_{};
-  Http::RequestHeaderMapPtr request_headers_{Http::RequestHeaderMapImpl::create()};
-  Http::ResponseHeaderMapPtr response_headers_{Http::ResponseHeaderMapImpl::create()};
+  Http::RequestHeaderMapPtr request_headers_{nullptr};
+  Http::ResponseHeaderMapPtr response_headers_{nullptr};
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
