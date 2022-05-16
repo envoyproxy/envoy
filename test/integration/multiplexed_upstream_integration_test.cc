@@ -962,7 +962,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
                                        {":scheme", "http"},
                                        {":authority", "sni.lyft.com"},
                                        {"second-request", "1"}});
-    // Even though the fake upstream is not responding, the 2 GET requests should still be forwared
+    // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
     // as early data.
     test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
     EXPECT_EQ(1u,
@@ -1030,7 +1030,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
                                        {":scheme", "http"},
                                        {":authority", "sni.lyft.com"},
                                        {"forth-request", "1"}});
-    // Even though the fake upstream is not responding, the 2 GET requests should still be forwared
+    // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
     // as early data.
     test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 3);
     EXPECT_EQ(1u,
