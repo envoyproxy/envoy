@@ -352,7 +352,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.accessLogManager())),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
-          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}),
+      concurrency_(concurrency) {
 
   if ((address_->type() == Network::Address::Type::Ip &&
        config.address().socket_address().ipv4_compat()) &&
@@ -444,7 +445,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
-          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}),
+      concurrency_(origin.concurrency_) {
   buildAccessLog();
   validateConfig();
   buildListenSocketOptions();
@@ -528,6 +530,19 @@ void ListenerImpl::buildInternalListener() {
   }
 }
 
+void ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+                                                uint32_t concurrency) {
+  if (socket_type_ != Network::Socket::Type::Datagram) {
+    return;
+  }
+  auto iter = udp_listener_config_->listener_worker_routers_.find(address.asString());
+  if (iter != udp_listener_config_->listener_worker_routers_.end()) {
+    return;
+  }
+  udp_listener_config_->listener_worker_routers_.emplace(
+      address.asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency));
+}
+
 void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
   if (socket_type_ != Network::Socket::Type::Datagram) {
     return;
@@ -573,8 +588,6 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
     udp_listener_config_->listener_factory_ =
         std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
   }
-  udp_listener_config_->listener_worker_router_ =
-      std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
   if (udp_listener_config_->writer_factory_ == nullptr) {
     udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
   }
@@ -908,6 +921,7 @@ Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
   buildConnectionBalancer(*socket_factory->localAddress());
+  buildUdpListenerWorkerRouter(*socket_factory->localAddress(), concurrency_);
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 

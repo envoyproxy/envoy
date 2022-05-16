@@ -200,15 +200,18 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 }
 
 Network::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
   auto listener = findActiveListenerByTag(listener_tag);
   if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    // TODO(soulxu): return first listener here, this will be changed
-    // when UdpWorkerRouter supports the multiple addresses.
-    auto udp_listener = listener->get().per_address_details_list_[0]->udpListener();
-    ASSERT(udp_listener.has_value());
-    return udp_listener;
+    for (auto& details : listener->get().per_address_details_list_) {
+      if (*details->address_ == address) {
+        auto udp_listener = details->udpListener();
+        ASSERT(udp_listener.has_value());
+        return details->udpListener();
+      }
+    }
   }
 
   return absl::nullopt;

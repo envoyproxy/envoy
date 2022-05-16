@@ -27,7 +27,7 @@ namespace Network {
 
 MockUdpListenerConfig::MockUdpListenerConfig()
     : udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
-  ON_CALL(*this, listenerWorkerRouter()).WillByDefault(ReturnRef(*udp_listener_worker_router_));
+  ON_CALL(*this, listenerWorkerRouter(_)).WillByDefault(ReturnRef(*udp_listener_worker_router_));
   ON_CALL(*this, config()).WillByDefault(ReturnRef(config_));
 }
 MockUdpListenerConfig::~MockUdpListenerConfig() = default;

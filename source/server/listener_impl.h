@@ -387,15 +387,18 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
-    Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
-      return *listener_worker_router_;
+    Network::UdpListenerWorkerRouter&
+    listenerWorkerRouter(const Network::Address::Instance& address) override {
+      auto iter = listener_worker_routers_.find(address.asString());
+      ASSERT(iter != listener_worker_routers_.end());
+      return *iter->second;
     }
     const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
 
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
-    Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+    absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 
   class InternalListenerConfigImpl : public Network::InternalListenerConfig {
@@ -422,6 +425,8 @@ private:
   void buildAccessLog();
   void buildInternalListener();
   void validateConfig();
+  void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+                                    uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
   void buildListenSocketOptions();
   void createListenerFilterFactories();
@@ -494,6 +499,7 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   MissingListenerConfigStats missing_listener_config_stats_;
+  uint32_t concurrency_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
