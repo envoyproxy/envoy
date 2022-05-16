@@ -6,9 +6,6 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/network/utility.h"
-#include "source/common/protobuf/utility.h"
-
-#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Network {
@@ -239,77 +236,6 @@ class ApplicationProtocolInputFactory
           MatchingData> {
 public:
   ApplicationProtocolInputFactory() : BaseFactory("application_protocol") {}
-};
-
-template <class MatchingDataType> class UriSanInput : public Matcher::DataInput<MatchingDataType> {
-public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto uri = data.ssl()->uriSanPeerCertificate();
-    if (!uri.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(uri, ",")};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-};
-
-template <class MatchingDataType>
-class UriSanInputBaseFactory
-    : public BaseFactory<UriSanInput<MatchingDataType>,
-                         envoy::extensions::matching::common_inputs::network::v3::UriSanInput,
-                         MatchingDataType> {
-public:
-  UriSanInputBaseFactory()
-      : BaseFactory<UriSanInput<MatchingDataType>,
-                    envoy::extensions::matching::common_inputs::network::v3::UriSanInput,
-                    MatchingDataType>("uri_san") {}
-};
-
-template <class MatchingDataType> class DnsSanInput : public Matcher::DataInput<MatchingDataType> {
-public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto uri = data.ssl()->dnsSansPeerCertificate();
-    if (!uri.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(uri, ",")};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-};
-
-template <class MatchingDataType>
-class DnsSanInputBaseFactory
-    : public BaseFactory<DnsSanInput<MatchingDataType>,
-                         envoy::extensions::matching::common_inputs::network::v3::DnsSanInput,
-                         MatchingDataType> {
-public:
-  DnsSanInputBaseFactory()
-      : BaseFactory<DnsSanInput<MatchingDataType>,
-                    envoy::extensions::matching::common_inputs::network::v3::DnsSanInput,
-                    MatchingDataType>("dns_san") {}
-};
-
-template <class MatchingDataType> class SubjectInput : public Matcher::DataInput<MatchingDataType> {
-public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto uri = data.ssl()->subjectPeerCertificate();
-    if (!uri.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::string(uri)};
-    }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-  }
-};
-
-template <class MatchingDataType>
-class SubjectInputBaseFactory
-    : public BaseFactory<SubjectInput<MatchingDataType>,
-                         envoy::extensions::matching::common_inputs::network::v3::SubjectInput,
-                         MatchingDataType> {
-public:
-  SubjectInputBaseFactory()
-      : BaseFactory<SubjectInput<MatchingDataType>,
-                    envoy::extensions::matching::common_inputs::network::v3::SubjectInput,
-                    MatchingDataType>("subject") {}
 };
 
 } // namespace Matching

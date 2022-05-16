@@ -52,14 +52,20 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
-* :ref:`URI SAN <extension_envoy.matching.inputs.uri_san>`.
-* :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
-* :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
 These input functions are available for matching TCP connections:
 
 * :ref:`Transport protocol <extension_envoy.matching.inputs.transport_protocol>`.
 * :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
+
+SSL Input Functions
+*******************
+
+These input functions are available for matching SSL connections:
+
+* :ref:`URI SAN <extension_envoy.matching.inputs.uri_san>`.
+* :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
+* :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
 Common Input Functons
 *********************

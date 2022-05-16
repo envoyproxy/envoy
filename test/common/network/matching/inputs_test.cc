@@ -6,15 +6,10 @@
 #include "source/common/network/matching/inputs.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 
 namespace Envoy {
 namespace Network {
 namespace Matching {
-
-using testing::Const;
-using testing::Return;
-using testing::ReturnRef;
 
 TEST(MatchingData, DestinationIPInput) {
   DestinationIPInput<MatchingData> input;
@@ -386,104 +381,6 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
-  }
-}
-
-TEST(Authentication, UriSanInput) {
-  UriSanInput<Envoy::Network::MockConnection> input;
-  Envoy::Network::MockConnection conn;
-  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
-
-  {
-    std::vector<std::string> uri_sans;
-    EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
-
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
-  }
-
-  {
-    std::vector<std::string> uri_sans{"foo"};
-    EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
-
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
-  }
-
-  {
-    std::vector<std::string> uri_sans{"foo", "bar"};
-    EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
-
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo,bar");
-  }
-}
-
-TEST(Authentication, DnsSanInput) {
-  DnsSanInput<Envoy::Network::MockConnection> input;
-  Envoy::Network::MockConnection conn;
-  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
-
-  {
-    std::vector<std::string> dns_sans;
-    EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
-
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
-  }
-
-  {
-    std::vector<std::string> dns_sans{"foo"};
-    EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
-
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
-  }
-
-  {
-    std::vector<std::string> dns_sans{"foo", "bar"};
-    EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
-
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo,bar");
-  }
-}
-
-TEST(Authentication, SubjectInput) {
-  SubjectInput<Envoy::Network::MockConnection> input;
-  Envoy::Network::MockConnection conn;
-  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
-  std::string subject;
-  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
-
-  {
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
-  }
-
-  {
-    subject = "foo";
-    const auto result = input.get(conn);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
   }
 }
 

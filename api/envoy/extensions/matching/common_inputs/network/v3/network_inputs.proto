@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.matching.common_inputs.network.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.network.v3";
 option java_outer_classname = "NetworkInputsProto";
@@ -95,20 +94,4 @@ message TransportProtocolInput {
 //   unless all connecting clients are known to use ALPN.
 // [#extension: envoy.matching.inputs.application_protocol]
 message ApplicationProtocolInput {
-}
-
-// List of comma-delimited URIs in the SAN field of the peer certificate for a downstream.
-// [#extension: envoy.matching.inputs.uri_san]
-message UriSanInput {
-}
-
-// List of comma-delimited DNS entries in the SAN field of the peer certificate for a downstream.
-// [#extension: envoy.matching.inputs.dns_san]
-message DnsSanInput {
-}
-
-// Input that matches the subject field of the peer certificate in RFC 2253 format for a
-// downstream.
-// [#extension: envoy.matching.inputs.subject]
-message SubjectInput {
 }

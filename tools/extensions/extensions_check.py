@@ -62,7 +62,7 @@ EXTENSION_CATEGORIES = (
     "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
     "envoy.wasm.runtime", "envoy.common.key_value", "envoy.network.dns_resolver",
     "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session",
-    "envoy.matching.http.input", "envoy.matching.network.input",
+    "envoy.matching.http.input", "envoy.matching.network.input", "envoy.matching.ssl.input",
     "envoy.matching.network.custom_matchers")
 
 EXTENSION_STATUS_VALUES = (

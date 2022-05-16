@@ -844,17 +844,17 @@ envoy.matching.inputs.application_protocol:
   status: alpha
 envoy.matching.inputs.uri_san:
   categories:
-  - envoy.matching.network.input
+  - envoy.matching.ssl.input
   security_posture: unknown
   status: alpha
 envoy.matching.inputs.dns_san:
   categories:
-  - envoy.matching.network.input
+  - envoy.matching.ssl.input
   security_posture: unknown
   status: alpha
 envoy.matching.inputs.subject:
   categories:
-  - envoy.matching.network.input
+  - envoy.matching.ssl.input
   security_posture: unknown
   status: alpha
 envoy.matching.custom_matchers.trie_matcher:
