@@ -346,7 +346,12 @@ public:
     return internal_listener_config_ != nullptr ? *internal_listener_config_
                                                 : Network::InternalListenerConfigOptRef();
   }
-  Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+  Network::ConnectionBalancer&
+  connectionBalancer(const Network::Address::Instance& address) override {
+    auto balancer = connection_balancers_.find(address.asString());
+    ASSERT(balancer != connection_balancers_.end());
+    return *balancer->second;
+  }
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
@@ -422,6 +427,7 @@ private:
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
   void buildFilterChains();
+  void buildConnectionBalancer(const Network::Address::Instance& address);
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
@@ -464,7 +470,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
-  Network::ConnectionBalancerSharedPtr connection_balancer_;
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
   const bool reuse_port_;

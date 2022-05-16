@@ -27,9 +27,13 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
-                    Runtime::Loader& runtime, Network::SocketSharedPtr&& socket);
+                    Runtime::Loader& runtime, Network::SocketSharedPtr&& socket,
+                    Network::Address::InstanceConstSharedPtr& address,
+                    Network::ConnectionBalancer& connection_balancer);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
-                    Network::ListenerConfig& config, Runtime::Loader& runtime);
+                    Network::Address::InstanceConstSharedPtr& address,
+                    Network::ListenerConfig& config,
+                    Network::ConnectionBalancer& connection_balancer, Runtime::Loader& runtime);
   ~ActiveTcpListener() override;
 
   bool listenerConnectionLimitReached() const {
@@ -81,6 +85,9 @@ public:
   // The number of connections currently active on this listener. This is typically used for
   // connection balancing across per-handler listeners.
   std::atomic<uint64_t> num_listener_connections_{};
+
+  Network::ConnectionBalancer& connection_balancer_;
+  Network::Address::InstanceConstSharedPtr address_;
 };
 
 using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
