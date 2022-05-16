@@ -31,6 +31,7 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
 RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_replies);
+RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
@@ -75,8 +76,6 @@ RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
-// TODO(alyssawilk) flip true once H2 caching is on by default.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(kbaichoo): Make this enabled by default when fairness and chunking

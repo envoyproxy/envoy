@@ -88,34 +88,39 @@ public:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
-  virtual absl::optional<HttpServerPropertiesCache::Origin> origin() { return {}; }
+  virtual absl::optional<HttpServerPropertiesCache::Origin>& origin() { return origin_; }
   virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
 
 protected:
   friend class ActiveClient;
 
+  void setOrigin(absl::optional<HttpServerPropertiesCache::Origin> origin) { origin_ = origin; }
+
   Random::RandomGenerator& random_generator_;
+
+private:
+  absl::optional<HttpServerPropertiesCache::Origin> origin_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
-               uint32_t concurrent_stream_limit)
+  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+               uint64_t effective_concurrent_stream_limit,
+               uint64_t configured_concurrent_stream_limit,
+               OptRef<Upstream::Host::CreateConnectionData> opt_data)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
-                                            concurrent_stream_limit) {
+                                            effective_concurrent_stream_limit,
+                                            configured_concurrent_stream_limit) {
+    if (opt_data.has_value()) {
+      initialize(opt_data.value(), parent);
+      return;
+    }
     // The static cast makes sure we call the base class host() and not
     // HttpConnPoolImplBase::host which is of a different type.
     Upstream::Host::CreateConnectionData data =
         static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)->host()->createConnection(
             parent.dispatcher(), parent.socketOptions(), parent.transportSocketOptions());
-    initialize(data, parent);
-  }
-
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t concurrent_stream_limit, Upstream::Host::CreateConnectionData& data)
-      : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
-                                            concurrent_stream_limit) {
     initialize(data, parent);
   }
 
@@ -163,8 +168,8 @@ public:
       Http::HttpServerPropertiesCacheSharedPtr cache = nullptr)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
-        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]), origin_(origin),
-        cache_(cache) {
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]), cache_(cache) {
+    setOrigin(origin);
     ASSERT(protocols.size() == 1);
   }
 
@@ -180,7 +185,6 @@ public:
     return Utility::getProtocolString(protocol_);
   }
 
-  absl::optional<HttpServerPropertiesCache::Origin> origin() override { return origin_; }
   Http::HttpServerPropertiesCacheSharedPtr cache() override { return cache_; }
 
 protected:
@@ -188,7 +192,6 @@ protected:
   const CreateClientFn client_fn_;
   const Http::Protocol protocol_;
 
-  absl::optional<HttpServerPropertiesCache::Origin> origin_;
   Http::HttpServerPropertiesCacheSharedPtr cache_;
 };
 
@@ -199,10 +202,9 @@ class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Http::ConnectionCallbacks,
                                     public Envoy::Http::ActiveClient {
 public:
-  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
-                              Stats::Counter& cx_total);
-  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
-                              Stats::Counter& cx_total, Upstream::Host::CreateConnectionData& data);
+  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
+                              uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
+                              OptRef<Upstream::Host::CreateConnectionData> data);
   ~MultiplexedActiveClientBase() override = default;
   // Caps max streams per connection below 2^31 to prevent overflow.
   static uint64_t maxStreamsPerConnection(uint64_t max_streams_config);
@@ -218,11 +220,6 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
-
-protected:
-  MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
-                              Upstream::Host::CreateConnectionData& data,
-                              uint32_t max_concurrent_streams, Stats::Counter& cx_total);
 
 private:
   bool closed_with_active_rq_{};

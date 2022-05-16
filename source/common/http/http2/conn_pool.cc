@@ -13,7 +13,6 @@ namespace Http {
 
 namespace Http2 {
 
-// TODO(alyssar) use for normal HTTP/2 streams not just the mixed pool.
 uint32_t ActiveClient::calculateInitialStreamsLimit(
     Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
     absl::optional<HttpServerPropertiesCache::Origin>& origin,
@@ -41,16 +40,12 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
   return initial_streams;
 }
 
-ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
+                           OptRef<Upstream::Host::CreateConnectionData> data)
     : MultiplexedActiveClientBase(
-          parent, parent.host()->cluster().http2Options().max_concurrent_streams().value(),
-          parent.host()->cluster().stats().upstream_cx_http2_total_) {}
-
-ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-                           Upstream::Host::CreateConnectionData& data)
-    : MultiplexedActiveClientBase(
-          parent, data, parent.host()->cluster().http2Options().max_concurrent_streams().value(),
-          parent.host()->cluster().stats().upstream_cx_http2_total_) {}
+          parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
+          parent.host()->cluster().http2Options().max_concurrent_streams().value(),
+          parent.host()->cluster().stats().upstream_cx_http2_total_, data) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
@@ -62,7 +57,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Http::HttpServerPropertiesCacheSharedPtr cache) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+      [](HttpConnPoolImplBase* pool) {
+        return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+      },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(CodecType::HTTP2, std::move(data.connection_),
                                                  data.host_description_, pool->dispatcher(),
