@@ -28,7 +28,7 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata(bool is_request = false) : is_request_(is_request) {
+  MessageMetadata(bool is_request = true) : is_request_(is_request) {
     if (is_request) {
       request_headers_ = Http::RequestHeaderMapImpl::create();
     } else {
