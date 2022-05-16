@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* tls: if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
