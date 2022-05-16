@@ -229,7 +229,8 @@ private:
   /**
    * Creates a Request from a url.
    */
-  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
+  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream&);
+  RequestPtr startRequest(absl::string_view path_and_query, absl::string_view method) override;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.

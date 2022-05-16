@@ -187,7 +187,7 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
   // of stats with long names, based on the default chunk size. The actual
   // chunk size can be changed in the unit test for StatsRequest, but it can't
   // easily be changed from this test. This covers a bug fix due to
-  // AdminImpl::runRunCallback not draining the buffer after each chunk, which
+  // AdminImpl::runCallback not draining the buffer after each chunk, which
   // it is not required to do. This test ensures that StatsRequest::nextChunk
   // writes up to StatsRequest::DefaultChunkSize *additional* bytes on each
   // call.

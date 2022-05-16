@@ -219,6 +219,8 @@ public:
   virtual Http::Code request(absl::string_view path_and_query, absl::string_view method,
                              Http::ResponseHeaderMap& response_headers, std::string& body) PURE;
 
+  virtual RequestPtr startRequest(absl::string_view path_and_query, absl::string_view method) PURE;
+
   /**
    * Add this Admin's listener to the provided handler, if the listener exists.
    * Throws an exception if the listener does not exist.

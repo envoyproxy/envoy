@@ -331,6 +331,15 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
   return code;
 }
 
+Admin::RequestPtr AdminImpl::startRequest(absl::string_view path_and_query,
+                                          absl::string_view method) {
+  AdminFilter filter(createRequestFunction());
+  auto request_headers = Http::RequestHeaderMapImpl::create();
+  request_headers->setMethod(method);
+  filter.decodeHeaders(*request_headers, false);
+  return makeRequest(path_and_query, filter);
+}
+
 Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
                                          AdminStream& admin_stream) {
   std::string::size_type query_index = path_and_query.find('?');
