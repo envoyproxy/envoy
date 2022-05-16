@@ -43,8 +43,9 @@ struct ThreadIds {
     }
     if (it != main_threads_to_usage_count_.end()) {
       it->second--;
-      if (it->second == 0)
+      if (it->second == 0) {
         main_threads_to_usage_count_.erase(it);
+      }
     }
   }
 
