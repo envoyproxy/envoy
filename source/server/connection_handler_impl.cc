@@ -201,14 +201,18 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 }
 
 Network::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
   auto listener = findActiveListenerByTag(listener_tag);
   if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    // TODO(soulxu): find listener by address.
     auto udp_listener = listener->get().per_address_details_[0]->udpListener();
-    ASSERT(udp_listener.has_value());
-    return udp_listener;
+    for (auto& details : listener->get().per_address_details_) {
+      if (*details->address_ == address) {
+        ASSERT(udp_listener.has_value());
+        return details->udpListener();
+      }
+    }
   }
 
   return absl::nullopt;

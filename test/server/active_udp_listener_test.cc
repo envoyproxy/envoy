@@ -30,7 +30,7 @@ class MockUdpConnectionHandler : public Network::UdpConnectionHandler,
 public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::UdpListenerCallbacksOptRef, getUdpListenerCallbacks,
-              (uint64_t listener_tag));
+              (uint64_t listener_tag, const Network::Address::Instance& address));
 };
 
 class ActiveUdpListenerTest : public testing::TestWithParam<Network::Address::IpVersion>,

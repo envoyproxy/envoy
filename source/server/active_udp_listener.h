@@ -55,6 +55,7 @@ protected:
   Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
   UdpListenerStats udp_stats_;
+  Network::UdpListenerWorkerRouter& udp_listener_worker_router_;
 };
 
 /**
