@@ -8784,6 +8784,7 @@ public:
       // Override this to guarantee that we have a different factory mapping by-type.
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
     }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
     Router::RouteSpecificFilterConfigConstSharedPtr
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
                                     Server::Configuration::ServerFactoryContext&,
@@ -8804,6 +8805,7 @@ public:
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
     }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Struct"}; }
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_most_specific_config,

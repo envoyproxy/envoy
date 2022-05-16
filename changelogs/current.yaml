@@ -47,6 +47,11 @@ minor_behavior_changes:
   change: |
     allow propagating DNS responses with no records back to callers like strict_dns cluster,
     guarded by ``envoy.reloadable_features.cares_accept_nodata``.
+- area: local_ratelimit
+  change: |
+    local_ratelimit will consume tokens of all matched descriptors sorted by tokens per second.
+    This behavioral change can be reverted by setting runtime guard
+    envoy.reloadable_features.http_local_ratelimit_match_all_descriptors to false.
 - area: router
   change: |
     get route config factories by the configuration proto full names by default. This behavior change
@@ -134,6 +139,9 @@ new_features:
 - area: ratelimit
   change: |
     added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
+- area: ratelimit
+  change: |
+    added support for :ref:`HTTP matching input functions <arch_overview_matching_api>` as descriptor producers.
 - area: build
   change: |
     official released binary is now built with Clang 14.0.0.

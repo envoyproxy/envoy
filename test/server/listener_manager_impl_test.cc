@@ -2592,7 +2592,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         destination_port: 8080
@@ -2658,7 +2658,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         direct_source_prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2730,7 +2730,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2802,7 +2802,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         server_names: "server1.example.com"
@@ -2869,7 +2869,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
@@ -2931,7 +2931,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         application_protocols: "http/1.1"
@@ -2999,7 +2999,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -3078,7 +3078,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -3164,7 +3164,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -3230,7 +3230,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         source_ports:
@@ -3297,7 +3297,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSourceTyp
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -3444,7 +3444,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3564,7 +3564,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3702,7 +3702,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3834,7 +3834,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3934,7 +3934,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         # empty
@@ -4006,7 +4006,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -4084,7 +4084,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         # empty
@@ -4148,7 +4148,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -4195,7 +4195,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -4238,7 +4238,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: a.b.c.d, prefix_len: 32 }
@@ -4285,7 +4285,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - filter_chain_match:
         server_names: "*w.example.com"
@@ -4304,7 +4304,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - name : foo
       filter_chain_match:
@@ -4332,7 +4332,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -4356,7 +4356,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
     listener_filters:
     - name: "envoy.filters.listener.test"
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Struct
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
     filter_chains:
     - name: foo
       filter_chain_match:
