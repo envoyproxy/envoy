@@ -515,7 +515,7 @@ public:
 class FilterStateFormatter : public FormatterProvider {
 public:
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
-                       bool serialize_as_string);
+                       bool serialize_as_string, bool is_upstream = false);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -533,6 +533,7 @@ private:
   absl::optional<size_t> max_length_;
 
   bool serialize_as_string_;
+  const bool is_upstream_;
 };
 
 /**

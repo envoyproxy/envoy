@@ -449,6 +449,30 @@ SubstitutionFormatParser::getKnownFormatters() {
 
            return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
          }}},
+       {"UPSTREAM_FILTER_STATE",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](const std::string& format, const absl::optional<size_t>& max_length) {
+           std::string key, serialize_type;
+           static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
+           static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
+
+           SubstitutionFormatParser::parseSubcommand(format, ':', key, serialize_type);
+           if (key.empty()) {
+             throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+           }
+
+           if (serialize_type.empty()) {
+             serialize_type = std::string(TYPED_SERIALIZATION);
+           }
+           if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
+             throw EnvoyException("Invalid filter state serialize type, only "
+                                  "support PLAIN/TYPED.");
+           }
+           const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
+
+           return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string,
+                                                         true);
+         }}},
        {"DOWNSTREAM_PEER_CERT_V_START",
         {CommandSyntaxChecker::PARAMS_OPTIONAL,
          [](const std::string& format, const absl::optional<size_t>&) {
@@ -1820,13 +1844,23 @@ ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_nam
                         }) {}
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
                                            absl::optional<size_t> max_length,
-                                           bool serialize_as_string)
-    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string) {}
+                                           bool serialize_as_string, bool is_upstream)
+    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string),
+      is_upstream_(is_upstream) {}
 
 const Envoy::StreamInfo::FilterState::Object*
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
-  const StreamInfo::FilterState& filter_state = stream_info.filterState();
-  return filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
+  const StreamInfo::FilterState* filter_state = nullptr;
+  if (is_upstream_) {
+    const OptRef<const StreamInfo::UpstreamInfo> upstream_info = stream_info.upstreamInfo();
+    if (upstream_info) {
+      filter_state = upstream_info->upstreamFilterState().get();
+    }
+  } else {
+    filter_state = &stream_info.filterState();
+  }
+
+  return filter_state->getDataReadOnly<StreamInfo::FilterState::Object>(key_);
 }
 
 absl::optional<std::string> FilterStateFormatter::format(const Http::RequestHeaderMap&,

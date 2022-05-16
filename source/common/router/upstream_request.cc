@@ -450,8 +450,15 @@ void UpstreamRequest::onPoolReady(
     upstream_info.setUpstreamNumStreams(info.upstreamInfo().value().get().upstreamNumStreams());
   }
 
-  upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
-      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  // Upstream filters might have already created/set a filter state.
+  const StreamInfo::FilterStateSharedPtr& filter_state =
+      const_cast<StreamInfo::StreamInfo&>(info).filterState();
+  if (!filter_state) {
+    upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
+        info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  } else {
+    upstream_info.setUpstreamFilterState(filter_state);
+  }
   upstream_info.setUpstreamLocalAddress(upstream_local_address);
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
 
