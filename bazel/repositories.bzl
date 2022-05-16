@@ -899,10 +899,6 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:http2_adapter",
     )
     native.bind(
-        name = "quiche_http2_platform",
-        actual = "@com_github_google_quiche//:http2_platform",
-    )
-    native.bind(
         name = "quiche_spdy_platform",
         actual = "@com_github_google_quiche//:spdy_platform",
     )

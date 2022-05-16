@@ -453,20 +453,19 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   return okStatus();
 }
 
-int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
+ParserStatus ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
   ASSERT(codec_status_.ok());
   codec_status_ = std::move(status);
-  return codec_status_.ok() ? parser_->statusToInt(ParserStatus::Success)
-                            : parser_->statusToInt(ParserStatus::Error);
+  return codec_status_.ok() ? ParserStatus::Success : ParserStatus::Error;
 }
 
-int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) {
+ParserStatus ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) {
   ASSERT(codec_status_.ok());
   if (statusor.ok()) {
-    return parser_->statusToInt(statusor.value());
+    return statusor.value();
   } else {
     codec_status_ = std::move(statusor.status());
-    return parser_->statusToInt(ParserStatus::Error);
+    return ParserStatus::Error;
   }
 }
 
@@ -631,18 +630,18 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 
 Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ASSERT(codec_status_.ok() && dispatching_);
-  auto [nread, rc] = parser_->execute(slice, len);
+  const size_t nread = parser_->execute(slice, len);
   if (!codec_status_.ok()) {
     return codec_status_;
   }
 
-  if (rc != parser_->statusToInt(ParserStatus::Success) &&
-      rc != parser_->statusToInt(ParserStatus::Paused)) {
+  const ParserStatus status = parser_->getStatus();
+  if (status != ParserStatus::Success && status != ParserStatus::Paused) {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
     codec_status_ =
-        codecProtocolError(absl::StrCat("http/1.1 protocol error: ", parser_->errnoName(rc)));
+        codecProtocolError(absl::StrCat("http/1.1 protocol error: ", parser_->errorMessage()));
     return codec_status_;
   }
 

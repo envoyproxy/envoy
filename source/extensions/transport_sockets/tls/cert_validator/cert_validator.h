@@ -75,7 +75,7 @@ public:
                                         uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                         unsigned hash_length) PURE;
 
-  virtual size_t daysUntilFirstCertExpires() const PURE;
+  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
   virtual std::string getCaFileName() const PURE;
   virtual Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const PURE;
 };

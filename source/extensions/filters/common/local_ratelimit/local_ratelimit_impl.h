@@ -37,7 +37,7 @@ private:
     MonotonicTime fill_time_;
   };
   struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
-    std::unique_ptr<TokenState> token_state_;
+    std::shared_ptr<TokenState> token_state_;
     RateLimit::TokenBucket token_bucket_;
     std::string toString() const {
       std::vector<std::string> entries;
@@ -68,12 +68,14 @@ private:
   OptRef<const LocalDescriptorImpl>
   descriptorHelper(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool requestAllowedHelper(const TokenState& tokens) const;
+  int tokensFillPerSecond(LocalDescriptorImpl& descriptor);
 
   RateLimit::TokenBucket token_bucket_;
   const Event::TimerPtr fill_timer_;
   TimeSource& time_source_;
   TokenState tokens_;
   absl::flat_hash_set<LocalDescriptorImpl, LocalDescriptorHash, LocalDescriptorEqual> descriptors_;
+  std::vector<LocalDescriptorImpl> sorted_descriptors_;
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
 
   friend class LocalRateLimiterImplTest;
