@@ -55,8 +55,22 @@ quiche_copts = select({
 test_suite(
     name = "ci_tests",
     tests = [
+        "http2_adapter_callback_visitor_test",
+        "http2_adapter_event_forwarder_test",
+        "http2_adapter_header_validator_test",
+        "http2_adapter_impl_comparison_test",
+        "http2_adapter_nghttp2_adapter_test",
+        "http2_adapter_nghttp2_data_provider_test",
+        "http2_adapter_nghttp2_session_test",
+        "http2_adapter_nghttp2_util_test",
+        "http2_adapter_oghttp2_adapter_test",
+        "http2_adapter_oghttp2_session_test",
+        "http2_adapter_oghttp2_util_test",
+        "http2_adapter_recording_http2_visitor_test",
+        "http2_adapter_window_manager_test",
         "http2_platform_api_test",
         "quiche_common_test",
+        "spdy_core_header_block_test",
     ],
 )
 
