@@ -224,7 +224,7 @@ void SslSocket::drainErrorQueue() {
                                         absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
   if (!failure_reason_.empty()) {
-    ENVOY_CONN_LOG(debug, "remote address:{},  {}", callbacks_->connection(),
+    ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);
   }
