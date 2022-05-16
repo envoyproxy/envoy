@@ -68,8 +68,7 @@ message Listener {
     google.protobuf.BoolValue bind_to_port = 1;
   }
 
-  // [#protodoc-title: Connection Balancer]
-  // [#extension: envoy.network.connection_balance]
+  // [#extension-category: envoy.network.connection_balance]
   // Configuration for listener connection balancing.
   message ConnectionBalanceConfig {
     option (udpa.annotations.versioning).previous_message_type =
