@@ -94,8 +94,12 @@ public:
 protected:
   friend class ActiveClient;
 
-  absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  void setOrigin(absl::optional<HttpServerPropertiesCache::Origin> origin) { origin_ = origin; }
+
   Random::RandomGenerator& random_generator_;
+
+private:
+  absl::optional<HttpServerPropertiesCache::Origin> origin_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
@@ -165,7 +169,7 @@ public:
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
         codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]), cache_(cache) {
-    origin_ = origin;
+    setOrigin(origin);
     ASSERT(protocols.size() == 1);
   }
 

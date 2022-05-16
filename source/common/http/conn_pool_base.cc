@@ -208,7 +208,7 @@ uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_strea
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(
-    Envoy::Http::HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
+    HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
     uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
     OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
