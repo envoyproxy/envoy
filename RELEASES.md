@@ -104,15 +104,15 @@ deadline of 3 weeks.
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.
-  * If the "Deprecated" section is empty, delete it.
-  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](changelogs/current.yaml).
-  * Switch the [VERSION.txt](VERSION.txt) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-    "1.6.0".
+  * Switch the repo to "release" mode by running `bazel run //tools/project:release`. See the [project
+    tool](tools/project/README.md#bazel-run-toolsprojectrelease) for further information. This tool
+    will create a commit with the necessary changes for a release.
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
     release, please also make sure there's a stable maintainer signed up for next quarter,
     and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Wait for tests to pass on [main](https://dev.azure.com/cncf/envoy/_build).
+* Create a pull request with the commit created by the project tool and wait for tests to
+  pass on [main](https://dev.azure.com/cncf/envoy/_build).
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
@@ -127,39 +127,10 @@ deadline of 3 weeks.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
-* Do a new PR to setup the next version
-  * Update [VERSION.txt](VERSION.txt) to the next development release. E.g., "1.7.0-dev".
-  * `git mv changelogs/current.yaml changelogs/1.6.0.yaml`, filling in the previous
-    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
-    Add an entry for the new file in the `toctree` in
-    [version_history.rst](docs/root/version_history/version_history.rst).
-  * Edit the file you just created (eg `docs/root/version_history/v1.6.0.rst`) replacing the link part (between the `<>`) of any `ref:` links to point at the version - eg `` :ref:`Some link text <actual link>` `` -> `` :ref:`Some link text <v1.16:actual link>` ``
-  * Create a new "current" version history file at the [release
-  notes](changelogs/current.yaml) for the following version. E.g., "1.7.0 (pending)". Use
-  this text as the template for the new file:
-```yaml
-date: Pending
-behavior_changes:
-# Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required
-
-minor_behavior_changes:
-# Changes that may cause incompatibilities for some users, but should not for most*
-
-bug_fixes:
-# Changes expected to improve the state of the world and are unlikely to have negative effects*
-
-removed_config_or_runtime:
-# Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
-
-# Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
-#  to file tracking issues for runtime guarded code which can be removed.
-# Check source/common/runtime/runtime_features.cc and see if any runtime guards in
-# disabled_runtime_features should be reassessed, and ping on the relevant issues.
-```
+* Switch the repo back to "dev" mode by running `bazel run //tools/project:dev`. See the [project
+  tool](tools/project/README.md#bazel-run-toolsprojectdev) for further information. This tool will create a commit with the
+  necessary changes to continue development.
+* Create a pull request with commit created by the project tool.
 
 ## Security release schedule
 

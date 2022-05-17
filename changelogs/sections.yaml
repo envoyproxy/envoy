@@ -17,7 +17,7 @@ bug_fixes:
 removed_config_or_runtime:
   title: Removed config or runtime
   description: |
-    Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+    *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 new_features:
   title: New features
 deprecated:
