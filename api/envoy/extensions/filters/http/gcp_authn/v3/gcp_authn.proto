@@ -27,10 +27,18 @@ message GcpAuthnFilterConfig {
   // Retry policy for fetching tokens.
   // This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
   config.core.v3.RetryPolicy retry_policy = 2;
+
+  TokenCacheConfig cache_config = 3;
 }
 
 // Audience is the URL of the receiving service that performs token authentication.
 // It will be provided to the filter through cluster's typed_filter_metadata.
 message Audience {
   string url = 1 [(validate.rules).string = {min_len: 1}];
+}
+
+// Token Cache configuration.
+message TokenCacheConfig {
+  // The unit is the number of JWT tokens.
+  uint32 cache_size = 1;
 }

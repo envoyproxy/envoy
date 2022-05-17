@@ -13,6 +13,10 @@ envoy_cc_library(
     name = "gcp_authn",
     srcs = ["gcp_authn_filter.cc"],
     hdrs = ["gcp_authn_filter.h"],
+    external_deps = [
+        "jwt_verify_lib",
+        "simple_lru_cache_lib",
+    ],
     deps = [
         "gcp_authn_lib",
         "//source/common/http:headers_lib",
