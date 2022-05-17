@@ -349,13 +349,15 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++listener_it) {
-    for (auto& socket_factory : listener_it->get().listenSocketFactories()) {
-      const auto listen_addr = socket_factory->localAddress();
+    auto socket_factory_it = listener_it->get().listenSocketFactories().begin();
+    for (; socket_factory_it != listener_it->get().listenSocketFactories().end() &&
+           port_it != port_names.end();
+         ++socket_factory_it, ++port_it) {
+      const auto listen_addr = (*socket_factory_it)->localAddress();
       if (listen_addr->type() == Network::Address::Type::Ip) {
         ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
         registerPort(*port_it, listen_addr->ip()->port());
       }
-      port_it++;
     }
   }
   const auto admin_addr =
