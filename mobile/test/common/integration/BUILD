@@ -18,6 +18,8 @@ envoy_cc_test(
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//source/extensions/http/header_formatters/preserve_case:config",
+        "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/integration:http_integration_lib",
         "@envoy//test/server:utility_lib",

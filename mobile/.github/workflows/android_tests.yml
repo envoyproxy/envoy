@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:3f6b1b096f2c0652ed270c5564b292bdd9a520f6
+      image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -103,6 +103,8 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
+      - name: Add safe directory
+        run: git config --global --add safe.directory /__w/envoy-mobile/envoy-mobile
       - id: check_context
         name: 'Check whether to run'
         run: |

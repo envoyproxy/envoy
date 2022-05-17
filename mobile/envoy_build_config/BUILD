@@ -24,6 +24,7 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/dynamic_forward_proxy:config",
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
+        "@envoy//source/extensions/http/header_formatters/preserve_case:config",
         "@envoy//source/extensions/stat_sinks/metrics_service:config",
         "@envoy//source/extensions/stat_sinks/statsd:config",
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
