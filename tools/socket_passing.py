@@ -9,12 +9,10 @@
 
 import argparse
 import http.client
-import json
 import os.path
 import re
 import sys
 import time
-import json
 
 # Seconds to wait for the admin address output file to appear. The script exits
 # with failure if the file is not found.
@@ -42,7 +40,7 @@ def generate_new_config(original_yaml, admin_address, updated_json):
             index = 0
             for discovered in discovered_listeners['listener_statuses']:
                 replaced = False
-                for local_address in  discovered['local_addresses']:
+                for local_address in discovered['local_addresses']:
                     if 'pipe' in local_address:
                         path = local_address['pipe']['path']
                         for index in range(index + 1, len(raw_yaml) - 1):
