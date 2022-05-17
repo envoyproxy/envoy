@@ -102,7 +102,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           config, address, listener_reject_fraction_, disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
               runtime, *worker_index_, *this,
-              config.listenSocketFactories()[0]->getListenSocket(*worker_index_), dispatcher_,
+              socket_factory->getListenSocket(*worker_index_), dispatcher_,
               config));
     }
   }
