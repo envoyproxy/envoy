@@ -4890,15 +4890,19 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_server_stats",
-    hdrs = [
-        "quiche/common/platform/api/quiche_server_stats.h",
-    ],
+    hdrs = ["quiche/common/platform/api/quiche_server_stats.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_server_stats_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_server_stats_impl_lib",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_default_quiche_platform_impl_server_stats_impl_lib",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_server_stats_impl.h",
     ],
 )
 
