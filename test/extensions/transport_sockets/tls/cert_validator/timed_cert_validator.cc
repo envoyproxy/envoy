@@ -15,7 +15,7 @@ Ssl::ValidateResult TimedCertValidator::doCustomVerifyCertChain(
     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX* ssl_ctx,
     absl::string_view ech_name_override, bool is_server, std::string* /*error_details*/,
     uint8_t* out_alert) {
-  std::cerr << "============ doCustomVerifyCertChain " << static_cast<void*>(ssl_ctx) << "\n";
+  std::cerr << "============ doCustomVerifyCertChain \n";
   if (callback == nullptr) {
     ASSERT(ssl_extended_info);
     callback = ssl_extended_info->createValidateResultCallback(out_alert);

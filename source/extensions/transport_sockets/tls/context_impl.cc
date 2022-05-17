@@ -69,8 +69,10 @@ void logSslErrorChain() {
 enum ssl_verify_result_t ValidationResultToSslVerifyResult(Ssl::ValidateResult result) {
   switch (result) {
   case Ssl::ValidateResult::Failed:
+    std::cerr << "============ return ssl_verify_invalid\n";
     return ssl_verify_invalid;
   case Ssl::ValidateResult::Successful:
+        std::cerr << "============ return ssl_verify_ok\n";
     return ssl_verify_ok;
   case Ssl::ValidateResult::Pending:
     return ssl_verify_retry;
@@ -458,6 +460,7 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
         Ssl::ValidateResult::Pending) {
       return ssl_verify_retry;
     }
+    std::cerr << "=========== already has a result " << static_cast<int>(extended_socket_info->certificateValidationResult().value()) << " \n";
     // Already has a binary result, return immediately.
     *out_alert = extended_socket_info->tlsAlert();
     return ValidationResultToSslVerifyResult(

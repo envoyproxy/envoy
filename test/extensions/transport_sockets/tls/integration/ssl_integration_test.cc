@@ -11,7 +11,6 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
@@ -25,6 +24,9 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/registry.h"
+#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
+#include "test/common/config/dummy_config.pb.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
@@ -45,7 +47,8 @@ void SslIntegrationTestBase::initialize() {
                                   .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
                                                       keylog_local_negative_,
                                                       keylog_remote_negative_, keylog_path_,
-                                                      keylog_multiple_ips_, version_));
+                                                      keylog_multiple_ips_, version_)
+                                  );
 
   HttpIntegrationTest::initialize();
 
@@ -332,6 +335,39 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
   RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
 
   checkStats();
+}
+
+TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
+ config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    auto* connect_timeout = filter_chain->mutable_transport_socket_connect_timeout();
+    connect_timeout->set_seconds(2);
+    connect_timeout->set_nanos(0);
+  });
+
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+   auto cert_validator_factory = Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::getFactory(
+      "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)->setValidationTimeOutMs(std::chrono::milliseconds(0));
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection(ClientSslTransportOptions()
+                                  .setCustomCertValidatorConfig(custom_validator_config));
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
 class RawWriteSslIntegrationTest : public SslIntegrationTest {
