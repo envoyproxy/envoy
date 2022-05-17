@@ -682,7 +682,7 @@ void ListenerImpl::buildSocketOptions() {
         (config_.connection_balance_config().has_exact_balance() ||
          config_.connection_balance_config().has_extend_balance())) {
       if (config_.connection_balance_config().has_exact_balance()) {
-        connection_balancer_ = std::make_shared<Envoy::Network::ExactConnectionBalancerImpl>();
+        connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
       } else if (config_.connection_balance_config().has_extend_balance()) {
         const std::string connection_balance_library_type{TypeUtil::typeUrlToDescriptorFullName(
             config_.connection_balance_config().extend_balance().typed_config().type_url())};
@@ -697,7 +697,7 @@ void ListenerImpl::buildSocketOptions() {
             config_.connection_balance_config().extend_balance(), *listener_factory_context_);
       }
     } else {
-      connection_balancer_ = std::make_shared<Envoy::Network::NopConnectionBalancerImpl>();
+      connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
 #endif
   }
