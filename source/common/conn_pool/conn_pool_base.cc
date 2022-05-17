@@ -671,6 +671,7 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
     } else if (!early_data_clients_.empty()) {
       for (ActiveClientPtr& client : early_data_clients_) {
         if (client->numActiveStreams() == 0) {
+          // Find an idle early data client and check if it is excess.
           if (connectingConnectionIsExcess(*client)) {
             // Close the client after the for loop avoid messing up with iterator.
             transitionActiveClientState(*client, ActiveClient::State::Draining);
