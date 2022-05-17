@@ -67,7 +67,6 @@ envoy_quiche_platform_impl_cc_test_library(
         ":quiche_expect_bug_impl_lib",
         ":quiche_thread_impl_lib",
         "//envoy/network:address_interface",
-        "//source/common/quic/platform:quic_base_impl_lib",
         "//test/test_common:environment_lib",
     ],
 )

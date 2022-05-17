@@ -70,32 +70,6 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quic_base_impl_lib",
-    hdrs = [
-        "quic_flags_impl.h",
-    ],
-    external_deps = [
-        "abseil_base",
-        "abseil_hash",
-        "abseil_inlined_vector",
-        "abseil_memory",
-        "abseil_node_hash_map",
-        "abseil_node_hash_set",
-    ],
-    tags = ["nofips"],
-    deps = [
-        ":quiche_flags_impl_lib",
-        "//envoy/api:io_error_interface",
-        "//source/common/common:assert_lib",
-        "//source/server:backtrace_lib",
-        "@com_github_google_quiche//:quic_platform_export",
-        "@com_github_google_quiche//:quic_platform_ip_address_family",
-        "@com_github_google_quiche//:quiche_common_platform",
-        "@com_google_absl//absl/container:btree",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quiche_platform_iovec_impl_lib",
     hdrs = [
         "quiche_iovec_impl.h",
@@ -126,17 +100,6 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_stack_trace_impl_lib",
     hdrs = [
         "quiche_stack_trace_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_server_stats_impl_lib",
-    hdrs = [
-        "quiche_server_stats_impl.h",
     ],
     tags = ["nofips"],
     deps = [
