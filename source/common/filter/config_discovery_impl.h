@@ -466,7 +466,7 @@ protected:
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
     validateProtoConfigDefaultFactory(default_factory == nullptr, filter_config_name,
-                                      std::string(proto_config.type_url()));
+                                      proto_config.type_url());
     validateProtoConfigTypeUrl(Config::Utility::getFactoryType(proto_config), require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         proto_config, factory_context.messageValidationVisitor(), *default_factory);
