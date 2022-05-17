@@ -823,6 +823,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 class QuicCustomTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   QuicCustomTlsServerHandshaker(quic::QuicSession* session,
@@ -925,6 +926,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   EXPECT_LE(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
+
+#endif
 
 TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) {
 #ifdef WIN32
