@@ -269,7 +269,6 @@ message Listener {
   // can structurally only contain the fields of the relevant type.]
   ApiListener api_listener = 19;
 
-  // [#extension-category: envoy.network.connection_balance]
   // The listener's connection balancer configuration, currently only applicable to TCP listeners.
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
