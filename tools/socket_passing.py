@@ -14,6 +14,7 @@ import os.path
 import re
 import sys
 import time
+import json
 
 # Seconds to wait for the admin address output file to appear. The script exits
 # with failure if the file is not found.
@@ -41,37 +42,38 @@ def generate_new_config(original_yaml, admin_address, updated_json):
             index = 0
             for discovered in discovered_listeners['listener_statuses']:
                 replaced = False
-                if 'pipe' in discovered['local_address']:
-                    path = discovered['local_address']['pipe']['path']
-                    for index in range(index + 1, len(raw_yaml) - 1):
-                        if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
-                            raw_yaml[index + 1] = re.sub(
-                                'path:.*', 'path: "' + path + '"', raw_yaml[index + 1])
-                            replaced = True
-                            break
-                else:
-                    addr = discovered['local_address']['socket_address']['address']
-                    port = str(discovered['local_address']['socket_address']['port_value'])
-                    if addr[0] == '[':
-                        addr = addr[1:-1]  # strip [] from ipv6 address.
-                    for index in range(index + 1, len(raw_yaml) - 2):
-                        if ('socket_address:' in raw_yaml[index]
-                                and 'address:' in raw_yaml[index + 1]
-                                and 'port_value:' in raw_yaml[index + 2]):
-                            raw_yaml[index + 1] = re.sub(
-                                'address:.*', 'address: "' + addr + '"', raw_yaml[index + 1])
-                            raw_yaml[index + 2] = re.sub(
-                                'port_value:.*', 'port_value: ' + port, raw_yaml[index + 2])
-                            replaced = True
-                            break
-                if replaced:
-                    sys.stderr.write(
-                        'replaced listener at line ' + str(index) + ' with ' + str(discovered)
-                        + '\n')
-                else:
-                    sys.stderr.write(
-                        'Failed to replace a discovered listener ' + str(discovered) + '\n')
-                    return False
+                for local_address in  discovered['local_addresses']:
+                    if 'pipe' in local_address:
+                        path = local_address['pipe']['path']
+                        for index in range(index + 1, len(raw_yaml) - 1):
+                            if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
+                                raw_yaml[index + 1] = re.sub(
+                                    'path:.*', 'path: "' + path + '"', raw_yaml[index + 1])
+                                replaced = True
+                                break
+                    else:
+                        addr = local_address['socket_address']['address']
+                        port = str(local_address['socket_address']['port_value'])
+                        if addr[0] == '[':
+                            addr = addr[1:-1]  # strip [] from ipv6 address.
+                        for index in range(index + 1, len(raw_yaml) - 2):
+                            if ('socket_address:' in raw_yaml[index]
+                                    and 'address:' in raw_yaml[index + 1]
+                                    and 'port_value:' in raw_yaml[index + 2]):
+                                raw_yaml[index + 1] = re.sub(
+                                    'address:.*', 'address: "' + addr + '"', raw_yaml[index + 1])
+                                raw_yaml[index + 2] = re.sub(
+                                    'port_value:.*', 'port_value: ' + port, raw_yaml[index + 2])
+                                replaced = True
+                                break
+                    if replaced:
+                        sys.stderr.write(
+                            'replaced listener at line ' + str(index) + ' with ' + str(discovered)
+                            + '\n')
+                    else:
+                        sys.stderr.write(
+                            'Failed to replace a discovered listener ' + str(discovered) + '\n')
+                        return False
             with open(updated_json, 'w') as outfile:
                 outfile.writelines(raw_yaml)
         finally:
