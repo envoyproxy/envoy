@@ -57,18 +57,20 @@ void ListenersHandler::writeListenersAsJson(Buffer::Instance& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
     envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
     listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(
-        *listener.get().listenSocketFactories()[0]->localAddress(),
-        *listener_status.mutable_local_address());
+    for (auto& socket_factory : listener.get().listenSocketFactories()) {
+      auto address = listener_status.add_local_addresses();
+      Network::Utility::addressToProtobufAddress(*socket_factory->localAddress(), *address);
+    }
   }
   response.add(MessageUtil::getJsonStringFromMessageOrError(listeners, true)); // pretty-print
 }
 
 void ListenersHandler::writeListenersAsText(Buffer::Instance& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
-    response.add(
-        fmt::format("{}::{}\n", listener.get().name(),
-                    listener.get().listenSocketFactories()[0]->localAddress()->asString()));
+    for (auto& socket_factory : listener.get().listenSocketFactories()) {
+      response.add(fmt::format("{}::{}\n", listener.get().name(),
+                               socket_factory->localAddress()->asString()));
+    }
   }
 }
 
