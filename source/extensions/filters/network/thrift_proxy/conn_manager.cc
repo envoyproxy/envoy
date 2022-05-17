@@ -154,6 +154,10 @@ void ConnectionManager::continueDecoding() {
 }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
+  if (!rpc.inserted()) {
+    return;
+  }
+
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
   if (requests_overflow_ && rpcs_.empty()) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
