@@ -33,7 +33,11 @@ private:
 template <class MatchingDataType> class UriSanInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto uri = data.ssl()->uriSanPeerCertificate();
+    const auto& ssl = data.ssl();
+    if (!ssl) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    const auto& uri = ssl->uriSanPeerCertificate();
     if (!uri.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               absl::StrJoin(uri, ",")};
@@ -57,7 +61,11 @@ public:
 template <class MatchingDataType> class DnsSanInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto uri = data.ssl()->dnsSansPeerCertificate();
+    const auto& ssl = data.ssl();
+    if (!ssl) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    const auto& uri = ssl->dnsSansPeerCertificate();
     if (!uri.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               absl::StrJoin(uri, ",")};
@@ -81,7 +89,11 @@ public:
 template <class MatchingDataType> class SubjectInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto uri = data.ssl()->subjectPeerCertificate();
+    const auto& ssl = data.ssl();
+    if (!ssl) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    const auto& uri = ssl->subjectPeerCertificate();
     if (!uri.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::string(uri)};
     }

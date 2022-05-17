@@ -42,6 +42,15 @@ TEST(Authentication, UriSanInput) {
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo,bar");
   }
+
+  {
+    data.ssl_.reset();
+
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
 }
 
 TEST(Authentication, DnsSanInput) {
@@ -77,6 +86,15 @@ TEST(Authentication, DnsSanInput) {
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo,bar");
   }
+
+  {
+    data.ssl_.reset();
+
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
 }
 
 TEST(Authentication, SubjectInput) {
@@ -98,6 +116,15 @@ TEST(Authentication, SubjectInput) {
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
     EXPECT_EQ(result.data_, "foo");
+  }
+
+  {
+    data.ssl_.reset();
+
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
 
