@@ -15,6 +15,7 @@ void ProvisionalDispatcher::drain(Event::Dispatcher& event_dispatcher) {
 
   // Don't perform any work on the dispatcher if marked as terminated.
   if (terminated_) {
+    event_dispatcher.exit();
     return;
   }
 
@@ -89,6 +90,9 @@ TimeSource& ProvisionalDispatcher::timeSource() { return event_dispatcher_->time
 
 void ProvisionalDispatcher::terminate() {
   Thread::LockGuard lock(state_lock_);
+  if (drained_) {
+    event_dispatcher_->exit();
+  }
   terminated_ = true;
 }
 
