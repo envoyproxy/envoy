@@ -145,7 +145,8 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = ["inventories"],
+    srcs = glob(["inventories/**/*"]),
+    strip_prefix = "",
 )
 
 genrule(
