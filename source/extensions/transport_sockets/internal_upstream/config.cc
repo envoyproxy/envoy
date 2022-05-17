@@ -80,16 +80,19 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
   for (const auto& source : metadata_sources_) {
     OptRef<const envoy::config::core::v3::Metadata> source_metadata;
     switch (source.kind_) {
-    case MetadataKind::Host:
-      source_metadata = makeOptRef(*host->metadata());
+    case MetadataKind::Host: {
+      if (host->metadata()) {
+        source_metadata = makeOptRef(*host->metadata());
+      }
       break;
+    }
     case MetadataKind::Cluster:
       source_metadata = makeOptRef(host->cluster().metadata());
       break;
     default:
       PANIC("not reached");
     }
-    if (source_metadata->filter_metadata().contains(source.name_)) {
+    if (source_metadata && source_metadata->filter_metadata().contains(source.name_)) {
       (*metadata->mutable_filter_metadata())[source.name_] =
           source_metadata->filter_metadata().at(source.name_);
     } else {
