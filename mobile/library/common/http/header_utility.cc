@@ -26,7 +26,9 @@ RequestHeaderMapPtr toRequestHeaders(envoy_headers headers) {
   auto transformed_headers = RequestHeaderMapImpl::create();
   transformed_headers->setFormatter(
       std::make_unique<
-          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(false));
+          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(
+          false, envoy::extensions::http::header_formatters::preserve_case::v3::
+                     PreserveCaseFormatterConfig::DEFAULT));
   toEnvoyHeaders(*transformed_headers, headers);
   return transformed_headers;
 }
