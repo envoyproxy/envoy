@@ -170,8 +170,8 @@ class HttpResponseTrailersDataInputFactoryBase
 public:
   HttpResponseTrailersDataInputFactoryBase()
       : HttpHeadersDataInputFactoryBase<MatchingDataType,
-                                        HttpRequestTrailersDataInput<MatchingDataType>,
-                                        envoy::type::matcher::v3::HttpRequestTrailerMatchInput>(
+                                        HttpResponseTrailersDataInput<MatchingDataType>,
+                                        envoy::type::matcher::v3::HttpResponseTrailerMatchInput>(
             "response_trailers") {}
 };
 } // namespace Matching
