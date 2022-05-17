@@ -89,8 +89,6 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
     case MetadataKind::Cluster:
       source_metadata = makeOptRef(host->cluster().metadata());
       break;
-    default:
-      PANIC("not reached");
     }
     if (source_metadata && source_metadata->filter_metadata().contains(source.name_)) {
       (*metadata->mutable_filter_metadata())[source.name_] =
