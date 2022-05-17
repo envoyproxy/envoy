@@ -51,7 +51,7 @@ public:
   Envoy::Matcher::ActionFactoryCb
   createActionFactoryCb(const Protobuf::Message& config, ActionContext& context,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
-  std::string name() const override { return "action"; }
+  std::string name() const override { return "envoy.filters.rbac.action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::rbac::v3::Action>();
   }
