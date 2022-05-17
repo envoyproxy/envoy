@@ -4,6 +4,7 @@
 
 #include "library/common/api/c_types.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
+#include "library/common/extensions/key_value/platform/c_types.h"
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
@@ -787,6 +788,58 @@ static void* jvm_on_send_window_available(envoy_stream_intel stream_intel, void*
   return result;
 }
 
+// JvmKeyValueStoreContext
+static envoy_data jvm_kv_store_read(envoy_data key, const void* context) {
+  jni_log("[Envoy]", "jvm_kv_store_read");
+  JNIEnv* env = get_env();
+
+  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
+
+  jclass jcls_JvmKeyValueStoreContext = env->GetObjectClass(j_context);
+  jmethodID jmid_read = env->GetMethodID(jcls_JvmKeyValueStoreContext, "read", "([B)[B");
+  jbyteArray j_key = native_data_to_array(env, key);
+  jbyteArray j_value = (jbyteArray)env->CallObjectMethod(j_context, jmid_read, j_key);
+  envoy_data native_data = array_to_native_data(env, j_value);
+
+  env->DeleteLocalRef(j_value);
+  env->DeleteLocalRef(j_key);
+  env->DeleteLocalRef(jcls_JvmKeyValueStoreContext);
+
+  return native_data;
+}
+
+static void jvm_kv_store_remove(envoy_data key, const void* context) {
+  jni_log("[Envoy]", "jvm_kv_store_remove");
+  JNIEnv* env = get_env();
+
+  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
+
+  jclass jcls_JvmKeyValueStoreContext = env->GetObjectClass(j_context);
+  jmethodID jmid_remove = env->GetMethodID(jcls_JvmKeyValueStoreContext, "remove", "([B)V");
+  jbyteArray j_key = native_data_to_array(env, key);
+  env->CallVoidMethod(j_context, jmid_remove, j_key);
+
+  env->DeleteLocalRef(j_key);
+  env->DeleteLocalRef(jcls_JvmKeyValueStoreContext);
+}
+
+static void jvm_kv_store_save(envoy_data key, envoy_data value, const void* context) {
+  jni_log("[Envoy]", "jvm_kv_store_save");
+  JNIEnv* env = get_env();
+
+  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
+
+  jclass jcls_JvmKeyValueStoreContext = env->GetObjectClass(j_context);
+  jmethodID jmid_save = env->GetMethodID(jcls_JvmKeyValueStoreContext, "save", "([B[B)V");
+  jbyteArray j_key = native_data_to_array(env, key);
+  jbyteArray j_value = native_data_to_array(env, value);
+  env->CallVoidMethod(j_context, jmid_save, j_key, j_value);
+
+  env->DeleteLocalRef(j_value);
+  env->DeleteLocalRef(j_key);
+  env->DeleteLocalRef(jcls_JvmKeyValueStoreContext);
+}
+
 // JvmFilterFactoryContext
 
 static const void* jvm_http_filter_init(const void* context) {
@@ -859,6 +912,29 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   if (result != ENVOY_SUCCESS) {
     env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
   }
+  return result;
+}
+
+// EnvoyKeyValueStore
+
+extern "C" JNIEXPORT jint JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerKeyValueStore(JNIEnv* env, jclass,
+                                                                       jstring name,
+                                                                       jobject j_context) {
+
+  // TODO(goaway): The java context here leaks, but it's tied to the life of the engine.
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
+  jni_log("[Envoy]", "registerKeyValueStore");
+  jni_log_fmt("[Envoy]", "j_context: %p", j_context);
+  jobject retained_context = env->NewGlobalRef(j_context);
+  jni_log_fmt("[Envoy]", "retained_context: %p", retained_context);
+  envoy_kv_store* api = (envoy_kv_store*)safe_malloc(sizeof(envoy_kv_store));
+  api->save = jvm_kv_store_save;
+  api->read = jvm_kv_store_read;
+  api->remove = jvm_kv_store_remove;
+  api->context = retained_context;
+
+  envoy_status_t result = register_platform_api(env->GetStringUTFChars(name, nullptr), api);
   return result;
 }
 

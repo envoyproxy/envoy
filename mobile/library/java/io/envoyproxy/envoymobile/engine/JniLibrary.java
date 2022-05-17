@@ -306,6 +306,15 @@ public class JniLibrary {
   public static native String altProtocolCacheFilterInsert();
 
   /**
+   * Register a platform-provided key-value store implementation.
+   *
+   * @param name,    unique name identifying this key-value store.
+   * @param context, context containing logic necessary to invoke the key-value store.
+   * @return int,    the resulting status of the operation.
+   */
+  protected static native int registerKeyValueStore(String name, JvmKeyValueStoreContext context);
+
+  /**
    * Register a string accessor to get strings from the platform.
    *
    * @param accessorName, unique name identifying this accessor.

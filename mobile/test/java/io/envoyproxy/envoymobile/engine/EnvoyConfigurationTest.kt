@@ -92,6 +92,7 @@ class EnvoyConfigurationTest {
       virtualClusters,
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")),
       emptyList(),
+      emptyMap(),
       emptyMap()
     )
   }

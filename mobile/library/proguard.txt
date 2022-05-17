@@ -39,6 +39,10 @@
    <methods>;
 }
 
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmKeyValueStoreContext {
+   <methods>;
+}
+
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmStringAccessorContext {
    <methods>;
 }

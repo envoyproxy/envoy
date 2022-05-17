@@ -8,6 +8,16 @@
 // NOLINT(namespace-envoy)
 
 /**
+ * Throughout this file one may note that most callbacks take a void* context parameter, and most
+ * callback structs have a void* context field. In typical practice, the value for context on the
+ * struct is the one passed through in every call made to a callback. This allows platform
+ * callbacks to propagate state when supplying the callbacks and later, receiving them. Common code
+ * will not attempt to use or modify this state - it's purely for the platform implementation to
+ * leverage. Often that might mean it contains references to platform-native objects and/or thread
+ * dispatch mechanisms that can be used to dispatch the callback as appropriate to platform code.
+ */
+
+/**
  * Handle to an Envoy engine instance. Valid only for the lifetime of the engine and not intended
  * for any external interpretation or use.
  */
