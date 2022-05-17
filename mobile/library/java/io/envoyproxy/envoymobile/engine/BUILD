@@ -40,6 +40,7 @@ java_library(
         "JvmCallbackContext.java",
         "JvmFilterContext.java",
         "JvmFilterFactoryContext.java",
+        "JvmKeyValueStoreContext.java",
         "JvmStringAccessorContext.java",
     ],
     visibility = ["//visibility:public"],
