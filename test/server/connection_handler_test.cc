@@ -255,8 +255,6 @@ public:
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
           .WillRepeatedly(ReturnRef(address));
     }
-    EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
-        .WillRepeatedly(ReturnRef(address));
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
         .WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {
