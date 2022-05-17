@@ -7,7 +7,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-absl::string_view CacheLookupStatusToString(CacheLookupStatus status) {
+absl::string_view cacheLookupStatusToString(CacheLookupStatus status) {
   switch (status) {
   case CacheLookupStatus::Unknown:
     return "Unknown";
@@ -33,10 +33,10 @@ absl::string_view CacheLookupStatusToString(CacheLookupStatus status) {
 }
 
 std::ostream& operator<<(std::ostream& os, const CacheLookupStatus& request_cache_status) {
-  return os << CacheLookupStatusToString(request_cache_status);
+  return os << cacheLookupStatusToString(request_cache_status);
 }
 
-absl::string_view CacheInsertStatusToString(CacheInsertStatus status) {
+absl::string_view cacheInsertStatusToString(CacheInsertStatus status) {
   switch (status) {
   case CacheInsertStatus::InsertSucceeded:
     return "InsertSucceeded";
@@ -70,7 +70,7 @@ absl::string_view CacheInsertStatusToString(CacheInsertStatus status) {
 }
 
 std::ostream& operator<<(std::ostream& os, const CacheInsertStatus& cache_insert_status) {
-  return os << CacheInsertStatusToString(cache_insert_status);
+  return os << cacheInsertStatusToString(cache_insert_status);
 }
 
 } // namespace Cache

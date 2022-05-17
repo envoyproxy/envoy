@@ -57,7 +57,7 @@ protected:
   absl::StatusOr<CacheLookupStatus> cacheLookupStatus() {
     absl::StatusOr<const CacheFilterLoggingInfo> info_or = cacheFilterLoggingInfo();
     if (info_or.ok()) {
-      return info_or.value().cache_lookup_status();
+      return info_or.value().cacheLookupStatus();
     }
     return info_or.status();
   }
@@ -65,7 +65,7 @@ protected:
   absl::StatusOr<CacheInsertStatus> cacheInsertStatus() {
     absl::StatusOr<const CacheFilterLoggingInfo> info_or = cacheFilterLoggingInfo();
     if (info_or.ok()) {
-      return info_or.value().cache_insert_status();
+      return info_or.value().cacheInsertStatus();
     }
     return info_or.status();
   }

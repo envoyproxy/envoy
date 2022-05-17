@@ -38,7 +38,7 @@ enum class CacheLookupStatus {
   LookupError,
 };
 
-absl::string_view CacheLookupStatusToString(CacheLookupStatus status);
+absl::string_view cacheLookupStatusToString(CacheLookupStatus status);
 
 std::ostream& operator<<(std::ostream& os, const CacheLookupStatus& request_cache_status);
 
@@ -87,7 +87,7 @@ enum class CacheInsertStatus {
   NoInsertLookupError,
 };
 
-absl::string_view CacheInsertStatusToString(CacheInsertStatus status);
+absl::string_view cacheInsertStatusToString(CacheInsertStatus status);
 
 std::ostream& operator<<(std::ostream& os, const CacheInsertStatus& cache_insert_status);
 
@@ -101,9 +101,9 @@ public:
                          CacheInsertStatus cache_insert_status)
       : cache_lookup_status_(cache_lookup_status), cache_insert_status_(cache_insert_status) {}
 
-  CacheLookupStatus cache_lookup_status() const { return cache_lookup_status_; }
+  CacheLookupStatus cacheLookupStatus() const { return cache_lookup_status_; }
 
-  CacheInsertStatus cache_insert_status() const { return cache_insert_status_; }
+  CacheInsertStatus cacheInsertStatus() const { return cache_insert_status_; }
 
 private:
   const CacheLookupStatus cache_lookup_status_;
