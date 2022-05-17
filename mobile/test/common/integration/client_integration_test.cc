@@ -77,6 +77,20 @@ public:
     use_lds_ = false;
     autonomous_upstream_ = true;
     defer_listener_finalization_ = true;
+    HttpTestUtility::addDefaultHeaders(default_request_headers_);
+  }
+
+  void initialize() override {
+    BaseIntegrationTest::initialize();
+    ConditionalInitializer server_started;
+    test_server_->server().dispatcher().post([this, &server_started]() -> void {
+      http_client_ = std::make_unique<Http::Client>(
+          test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
+          test_server_->statStore(), test_server_->server().api().randomGenerator());
+      dispatcher_->drain(test_server_->server().dispatcher());
+      server_started.setReady();
+    });
+    server_started.waitReady();
   }
 
   void SetUp() override {
@@ -120,6 +134,13 @@ public:
       release_envoy_error(error);
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
       cc_->on_error_calls++;
+      cc_->terminal_callback->setReady();
+      return nullptr;
+    };
+    bridge_callbacks_.on_cancel = [](envoy_stream_intel, envoy_final_stream_intel,
+                                     void* context) -> void* {
+      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+      cc_->on_cancel_calls++;
       cc_->terminal_callback->setReady();
       return nullptr;
     };
@@ -175,6 +196,8 @@ api_listener:
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;
   callbacks_called cc_ = {0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_};
+  Http::TestRequestHeaderMapImpl default_request_headers_;
+  envoy_stream_t stream_ = 1;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -184,17 +207,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
 TEST_P(ClientIntegrationTest, Basic) {
   initialize();
 
-  ConditionalInitializer server_started;
-  test_server_->server().dispatcher().post([this, &server_started]() -> void {
-    http_client_ = std::make_unique<Http::Client>(
-        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), test_server_->server().api().randomGenerator());
-    dispatcher_->drain(test_server_->server().dispatcher());
-    server_started.setReady();
-  });
-  server_started.waitReady();
-
-  envoy_stream_t stream = 1;
   bridge_callbacks_.on_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                  void* context) -> void* {
     if (end_stream) {
@@ -213,8 +225,7 @@ TEST_P(ClientIntegrationTest, Basic) {
   Http::TestRequestHeaderMapImpl headers{
       {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_data.length())}};
 
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
 
   // Build body data
   envoy_data c_data = Data::Utility::toBridgeData(request_data);
@@ -226,10 +237,10 @@ TEST_P(ClientIntegrationTest, Basic) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks_, false);
-    http_client_->sendHeaders(stream, c_headers, false);
-    http_client_->sendData(stream, c_data, false);
-    http_client_->sendTrailers(stream, c_trailers);
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, false);
+    http_client_->sendData(stream_, c_data, false);
+    http_client_->sendTrailers(stream_, c_trailers);
   });
   terminal_callback_.waitReady();
 
@@ -247,31 +258,18 @@ TEST_P(ClientIntegrationTest, Basic) {
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
   initialize();
 
-  ConditionalInitializer server_started;
-  test_server_->server().dispatcher().post([this, &server_started]() -> void {
-    http_client_ = std::make_unique<Http::Client>(
-        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), test_server_->server().api().randomGenerator());
-    dispatcher_->drain(test_server_->server().dispatcher());
-    server_started.setReady();
-  });
-  server_started.waitReady();
-
   // Set response header status to be non-2xx to test that the correct stats get charged.
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
           Http::TestResponseHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
 
-  envoy_stream_t stream = 1;
   // Build a set of request headers.
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks_, false);
-    http_client_->sendHeaders(stream, c_headers, true);
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, true);
   });
   terminal_callback_.waitReady();
 
@@ -287,29 +285,14 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
 TEST_P(ClientIntegrationTest, BasicReset) {
   initialize();
 
-  ConditionalInitializer server_started;
-  test_server_->server().dispatcher().post([this, &server_started]() -> void {
-    http_client_ = std::make_unique<Http::Client>(
-        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), test_server_->server().api().randomGenerator());
-    dispatcher_->drain(test_server_->server().dispatcher());
-    server_started.setReady();
-  });
-  server_started.waitReady();
-
-  envoy_stream_t stream = 1;
-
-  // Build a set of request headers.
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
   // Cause an upstream reset after request is complete.
-  headers.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks_, false);
-    http_client_->sendHeaders(stream, c_headers, true);
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, true);
   });
   terminal_callback_.waitReady();
 
@@ -317,6 +300,57 @@ TEST_P(ClientIntegrationTest, BasicReset) {
   ASSERT_EQ(cc_.on_headers_calls, 0);
   // Reset causes a charge to stream_failure.
   test_server_->waitForCounterEq("http.client.stream_failure", 1);
+}
+
+TEST_P(ClientIntegrationTest, BasicCancel) {
+  autonomous_upstream_ = false;
+  initialize();
+
+  bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
+                                    void* context) -> void* {
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+    cc_->on_headers_calls++;
+    cc_->status = response_headers->Status()->value().getStringView();
+    // Lie and say the request is complete, so the test has something to wait
+    // on.
+    cc_->terminal_callback->setReady();
+    return nullptr;
+  };
+
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
+
+  // Create a stream.
+  dispatcher_->post([&]() -> void {
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, true);
+  });
+
+  Envoy::FakeRawConnectionPtr upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+
+  std::string upstream_request;
+  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
+                                               &upstream_request));
+
+  // Send an incomplete response.
+  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\n";
+  ASSERT_TRUE(upstream_connection->write(response));
+  // For this test only, the terminal callback is called when headers arrive.
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+
+  // Now cancel, and make sure the cancel is received.
+  dispatcher_->post([&]() -> void { http_client_->cancelStream(stream_); });
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+  ASSERT_EQ(cc_.on_cancel_calls, 1);
 }
 
 // TODO(junr03): test with envoy local reply with local stream not closed, which causes a reset
@@ -344,17 +378,6 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   autonomous_upstream_ = false;
   initialize();
 
-  ConditionalInitializer server_started;
-  test_server_->server().dispatcher().post([this, &server_started]() -> void {
-    http_client_ = std::make_unique<Http::Client>(
-        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), test_server_->server().api().randomGenerator());
-    dispatcher_->drain(test_server_->server().dispatcher());
-    server_started.setReady();
-  });
-  server_started.waitReady();
-
-  envoy_stream_t stream = 1;
   bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
                                     void* context) -> void* {
     Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
@@ -379,8 +402,8 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks_, false);
-    http_client_->sendHeaders(stream, c_headers, true);
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, true);
   });
 
   Envoy::FakeRawConnectionPtr upstream_connection;
@@ -421,17 +444,6 @@ TEST_P(ClientIntegrationTest, Timeout) {
   autonomous_upstream_ = false;
   initialize();
 
-  ConditionalInitializer server_started;
-  test_server_->server().dispatcher().post([this, &server_started]() -> void {
-    http_client_ = std::make_unique<Http::Client>(
-        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), test_server_->server().api().randomGenerator());
-    dispatcher_->drain(test_server_->server().dispatcher());
-    server_started.setReady();
-  });
-  server_started.waitReady();
-
-  envoy_stream_t stream = 1;
   bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
                                     void* context) -> void* {
     Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
@@ -448,8 +460,8 @@ TEST_P(ClientIntegrationTest, Timeout) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks_, false);
-    http_client_->sendHeaders(stream, c_headers, false);
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, false);
   });
 
   Envoy::FakeRawConnectionPtr upstream_connection;
