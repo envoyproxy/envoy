@@ -77,5 +77,5 @@ open class HeadersBuilder {
   }
 
   private fun isRestrictedHeader(name: String) = name.startsWith(":") ||
-    name.startsWith("x-envoy-mobile")
+    name.startsWith("x-envoy-mobile") || name == "host"
 }

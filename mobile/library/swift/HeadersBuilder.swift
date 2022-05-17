@@ -3,7 +3,7 @@ import Foundation
 private let kRestrictedPrefixes = [":", "x-envoy-mobile"]
 
 private func isRestrictedHeader(name: String) -> Bool {
-  return kRestrictedPrefixes.contains { name.hasPrefix($0) }
+  return name == "host" || kRestrictedPrefixes.contains { name.hasPrefix($0) }
 }
 
 /// Base builder class used to construct `Headers` instances.
