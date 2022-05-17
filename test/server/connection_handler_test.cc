@@ -249,7 +249,11 @@ public:
     }
     EXPECT_CALL(listeners_.back()->socketFactory(), socketType()).WillOnce(Return(socket_type));
     if (address == nullptr) {
-      address = local_address_;
+      EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
+          .WillRepeatedly(ReturnRef(local_address_));
+    } else {
+      EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
+          .WillRepeatedly(ReturnRef(address));
     }
     EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
         .WillRepeatedly(ReturnRef(address));
