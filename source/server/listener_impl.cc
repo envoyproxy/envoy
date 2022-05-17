@@ -678,17 +678,27 @@ void ListenerImpl::buildSocketOptions() {
     connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
 #else
     // Not in place listener update.
-    std::string name = "envoy.connection_balance.nop";
-
     if (config_.has_connection_balance_config() &&
-        !config_.connection_balance_config().balance_name().empty()) {
-      name = config_.connection_balance_config().balance_name();
+        (config_.connection_balance_config().has_exact_balance() ||
+         config_.connection_balance_config().has_extend_balance())) {
+      if (config_.connection_balance_config().has_exact_balance()) {
+        connection_balancer_ = std::make_shared<Envoy::Network::ExactConnectionBalancerImpl>();
+      } else if (config_.connection_balance_config().has_extend_balance()) {
+        const std::string connection_balance_library_type{TypeUtil::typeUrlToDescriptorFullName(
+            config_.connection_balance_config().extend_balance().typed_config().type_url())};
+        auto factory =
+            Envoy::Registry::FactoryRegistry<Network::ConnectionBalanceFactory>::getFactoryByType(
+                connection_balance_library_type);
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format("Didn't find a registered implementation for type: '{}'",
+                                           connection_balance_library_type));
+        }
+        connection_balancer_ = factory->createConnectionBalancerFromProto(
+            config_.connection_balance_config().extend_balance(), *listener_factory_context_);
+      }
+    } else {
+      connection_balancer_ = std::make_shared<Envoy::Network::NopConnectionBalancerImpl>();
     }
-    auto factory =
-        Envoy::Registry::FactoryRegistry<Network::ConnectionBalanceFactory>::getFactory(name);
-
-    connection_balancer_ = factory->createConnectionBalancerFromProto(
-        config_.connection_balance_config(), *listener_factory_context_);
 #endif
   }
 
