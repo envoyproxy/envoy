@@ -26,7 +26,6 @@ public:
   absl::string_view methodName() const override;
   absl::string_view errorMessage() const override;
   int hasTransferEncoding() const override;
-  int statusToInt(const ParserStatus code) const override;
 
 private:
   class Impl;

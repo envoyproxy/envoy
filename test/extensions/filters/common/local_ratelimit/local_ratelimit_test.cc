@@ -410,7 +410,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDiffere
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "1000s"),
                             *descriptors_.Add());
-  initializeWithDescriptor(std::chrono::milliseconds(50), 2, 1);
+  initializeWithDescriptor(std::chrono::milliseconds(50), 3, 1);
 
   // 1 -> 0 tokens for descriptor_ and descriptor2_
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
@@ -428,6 +428,23 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDiffere
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+}
+
+// Verify token bucket functionality with multiple descriptors sorted.
+TEST_F(LocalRateLimiterDescriptorImplTest,
+       TokenBucketDifferentDescriptorDifferentRateLimitsSorted) {
+  TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithDescriptor(std::chrono::milliseconds(50), 3, 3);
+  std::vector<RateLimit::LocalDescriptor> descriptors{{{{"hello", "world"}, {"foo", "bar"}}},
+                                                      {{{"foo2", "bar2"}}}};
+
+  // Descriptors are sorted as descriptor2 < descriptor < global
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors));
+  // Request limited by descriptor2 will not consume tokens from descriptor.
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
 }
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
@@ -487,9 +504,12 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
   EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 0);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  // Limited by global token
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
+  // A request limited by a descriptor or global token will not consume token from other matched
+  // descriptors.
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
 
   // 0 -> 0 tokens for descriptor_ and descriptor2_
@@ -499,7 +519,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
+  // A request limited by a descriptor or global token will not consume token from other matched
+  // descriptors.
+  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
 
   // 0 -> 1 tokens for descriptor2_

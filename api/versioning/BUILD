@@ -165,6 +165,7 @@ proto_library(
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
         "//envoy/extensions/key_value/file_based/v3:pkg",
+        "//envoy/extensions/load_balancing_policies/least_request/v3:pkg",
         "//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg",
         "//envoy/extensions/load_balancing_policies/round_robin/v3:pkg",
         "//envoy/extensions/load_balancing_policies/wrr_locality/v3:pkg",
