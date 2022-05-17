@@ -572,6 +572,191 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   }
 }
 
+// This is multiple addresses version test for the above one.
+TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    listener_config_.clear_address();
+    auto* address1 = listener_config_.mutable_address();
+    envoy::config::core::v3::SocketAddress& socket_address1 = *address1->mutable_socket_address();
+    socket_address1.set_address("127.0.0.1");
+    socket_address1.set_port_value(0);
+    auto* address2 = listener_config_.add_additional_addresses();
+    envoy::config::core::v3::SocketAddress& socket_address2 = *address2->mutable_address()->mutable_socket_address();
+    socket_address2.set_address("127.0.0.1");
+    socket_address2.set_port_value(0);
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"address1", "address2"});
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Make a connection to the listener from version 1.
+  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
+      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+
+  for (int version = 2; version <= 10; version++) {
+    // Touch the metadata to get a different hash.
+    (*(*listener_config_.mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
+          .mutable_fields())["random_key"]
+        .set_number_value(version);
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)},
+                    absl::StrCat(version));
+    sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"),
+                    absl::StrCat(version));
+
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", version);
+
+    // Wait for the client to be disconnected.
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+    const uint32_t response_size = 800;
+    const uint32_t request_size = 10;
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                     {"server_id", "cluster_0, backend_0"}};
+
+    // Make a new connection to the new listener's first address.
+    codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
+        Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
+        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+        nullptr));
+    auto response = sendRequestAndWaitForResponse(
+        Http::TestResponseHeaderMapImpl{
+            {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+        request_size, response_headers, response_size, /*cluster_0*/ 0);
+    verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(request_size, upstream_request_->bodyLength());
+    codec_client_->close();
+    // Wait for the client to be disconnected.
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+    // Make a new connection to the new listener's second address.
+    codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
+        Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address2"))),
+        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+        nullptr));
+    auto response2 = sendRequestAndWaitForResponse(
+        Http::TestResponseHeaderMapImpl{
+            {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+        request_size, response_headers, response_size, /*cluster_0*/ 0);
+    verifyResponse(std::move(response2), "200", response_headers, std::string(response_size, 'a'));
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  }
+}
+
+TEST_P(ListenerIntegrationTest, MultipleAddressesListenerInPlaceUpdate) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    listener_config_.clear_address();
+    auto* address1 = listener_config_.mutable_address();
+    envoy::config::core::v3::SocketAddress& socket_address1 = *address1->mutable_socket_address();
+    socket_address1.set_address("127.0.0.1");
+    socket_address1.set_port_value(0);
+    auto* address2 = listener_config_.add_additional_addresses();
+    envoy::config::core::v3::SocketAddress& socket_address2 = *address2->mutable_address()->mutable_socket_address();
+    socket_address2.set_address("127.0.0.1");
+    socket_address2.set_port_value(0);
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  setDrainTime(std::chrono::seconds(30));
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"address1", "address2"});
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Trigger a listener in-place updating.
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+
+  const uint32_t response_size = 800;
+  const uint32_t request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+
+  // Make a new connection to the new listener's first address.
+  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
+      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+
+  auto response1 = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response1), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  codec_client_->close();
+  // Wait for the client to be disconnected.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Make a new connection to the new listener's second address.
+  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
+      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address2"))),
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+
+  auto response2 = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response2), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+}
+
 // Create a listener, then do an in-place update for the listener.
 // Remove the listener before the filter chain draining is done,
 // then expect the connection will be reset.
