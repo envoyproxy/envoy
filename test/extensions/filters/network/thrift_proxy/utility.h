@@ -121,11 +121,11 @@ MATCHER(IsEmptyMetadata, "") {
     *result_listener << "has a message type of " << static_cast<int>(arg.messageType());
     return false;
   }
-  if (arg.requestHeaders().size() > 0) {
+  if (arg.isRequest() && arg.requestHeaders().size() > 0) {
     *result_listener << "has " << arg.requestHeaders().size() << " request headers";
     return false;
   }
-  if (arg.responseHeaders().size() > 0) {
+  if (!arg.isRequest() && arg.responseHeaders().size() > 0) {
     *result_listener << "has " << arg.responseHeaders().size() << " response headers";
     return false;
   }
@@ -137,9 +137,11 @@ MATCHER(IsEmptyMetadata, "") {
 }
 
 MATCHER_P(HasOnlyFrameSize, n, "") {
+  const auto headers_size =
+      arg.isRequest() ? arg.requestHeaders().size() : arg.responseHeaders().size();
   return arg.hasFrameSize() && arg.frameSize() == n && !arg.hasProtocol() && !arg.hasMethodName() &&
-         !arg.hasSequenceId() && !arg.hasMessageType() && arg.requestHeaders().size() == 0 &&
-         arg.responseHeaders().size() == 0 && !arg.hasAppException();
+         !arg.hasSequenceId() && !arg.hasMessageType() && headers_size == 0 &&
+         !arg.hasAppException();
 }
 
 MATCHER_P(HasFrameSize, n, "") {
