@@ -15,17 +15,26 @@ namespace Envoy {
 class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    config_helper_.addConfigModifier(
-        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto& hist_settings =
-              *bootstrap.mutable_stats_config()->mutable_histogram_bucket_settings();
-          envoy::config::metrics::v3::HistogramBucketSettings* setting = hist_settings.Add();
-          setting->mutable_match()->set_suffix("upstream_cx_connect_ms");
-          setting->mutable_buckets()->Add(1);
-          setting->mutable_buckets()->Add(2);
-          setting->mutable_buckets()->Add(3);
-          setting->mutable_buckets()->Add(4);
-        });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+                                         -> void {
+      auto listener_config = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener_config->clear_address();
+      auto address1 = listener_config->add_addresses();
+      envoy::config::core::v3::SocketAddress& socket_address1 = *address1->mutable_socket_address();
+      socket_address1.set_address("127.0.0.1");
+      socket_address1.set_port_value(0);
+      auto address2 = listener_config->add_addresses();
+      envoy::config::core::v3::SocketAddress& socket_address2 = *address2->mutable_socket_address();
+      socket_address2.set_address("127.0.0.2");
+      socket_address2.set_port_value(0);
+      auto& hist_settings = *bootstrap.mutable_stats_config()->mutable_histogram_bucket_settings();
+      envoy::config::metrics::v3::HistogramBucketSettings* setting = hist_settings.Add();
+      setting->mutable_match()->set_suffix("upstream_cx_connect_ms");
+      setting->mutable_buckets()->Add(1);
+      setting->mutable_buckets()->Add(2);
+      setting->mutable_buckets()->Add(3);
+      setting->mutable_buckets()->Add(4);
+    });
     HttpIntegrationTest::initialize();
   }
 
