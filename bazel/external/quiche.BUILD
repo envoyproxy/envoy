@@ -4987,6 +4987,8 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
+        "@envoy//source/common/quic/platform:quic_base_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
         "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
     ],
 )
