@@ -514,6 +514,9 @@ public:
  */
 class FilterStateFormatter : public FormatterProvider {
 public:
+  static std::unique_ptr<FilterStateFormatter>
+  create(const std::string& format, const absl::optional<size_t>& max_length, bool is_upstream);
+
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
                        bool serialize_as_string, bool is_upstream = false);
 
