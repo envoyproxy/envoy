@@ -45,10 +45,17 @@ private:
 
 class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  std::string name() const override { return "envoy.udp.writer.factory.default"; }
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope&) override {
     return std::make_unique<UdpDefaultWriter>(io_handle);
+  }
+};
+
+class UdpDefaultWriterFactoryFactory : public Network::UdpPacketWriterFactoryFactory {
+public:
+  std::string name() const override { return "envoy.udp.writer.factory.default"; }
+  UdpPacketWriterFactoryPtr createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
+    return std::make_unique<UdpDefaultWriterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

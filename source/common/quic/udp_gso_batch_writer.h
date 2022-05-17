@@ -94,9 +94,19 @@ private:
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  std::string name() const override { return "envoy.udp.writer.factory.gso"; }
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope& scope) override;
+
+private:
+  envoy::config::core::v3::RuntimeFeatureFlag enabled_;
+};
+
+class UdpGsoBatchWriterFactoryFactory : public Network::UdpPacketWriterFactoryFactory {
+public:
+  std::string name() const override { return "envoy.udp.writer.factory.gso"; }
+  Network::UdpPacketWriterFactoryPtr createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
+    return std::make_unique<UdpGsoBatchWriterFactory>();
+  }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::quic::udp_packet_writer::v3::UdpGsoBatchWriterFactory>();
@@ -106,7 +116,7 @@ private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
 };
 
-DECLARE_FACTORY(UdpGsoBatchWriterFactory);
+DECLARE_FACTORY(UdpGsoBatchWriterFactoryFactory);
 
 } // namespace Quic
 } // namespace Envoy

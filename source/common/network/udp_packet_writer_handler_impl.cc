@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Network {
 
-REGISTER_FACTORY(UdpDefaultWriterFactory, UdpPacketWriterFactory);
+REGISTER_FACTORY(UdpDefaultWriterFactoryFactory, UdpPacketWriterFactoryFactory);
 
 UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle)
     : write_blocked_(false), io_handle_(io_handle) {}

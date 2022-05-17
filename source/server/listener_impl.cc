@@ -538,10 +538,12 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config_.udp_listener_config());
+  ProtobufTypes::MessagePtr udp_packet_packet_writer_config;
   if (config_.udp_listener_config().has_udp_packet_packet_writer_config()) {
-    udp_listener_config_->writer_factory_ =
-        *Config::Utility::getFactory<Network::UdpPacketWriterFactory>(
+    auto* factory_factory =
+        Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
             config_.udp_listener_config().udp_packet_packet_writer_config());
+    udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(config_.udp_listener_config().udp_packet_packet_writer_config());
   }
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
@@ -557,11 +559,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     // looking at the GSO code there are substantial copying inefficiency so I don't think it's
     // wise to enable to globally for now. I will circle back and fix both of the above with
     // a non-QUICHE GSO implementation.
-    if (!udp_listener_config_->writer_factory_.has_value() &&
+    if (udp_listener_config_->writer_factory_ == nullptr &&
         Api::OsSysCallsSingleton::get().supportsUdpGso()) {
-      udp_listener_config_->writer_factory_ =
-          *Registry::FactoryRegistry<Network::UdpPacketWriterFactory>::getFactoryByType(
-              Quic::UdpGsoBatchWriterFactory().configType());
+      udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
     }
 #endif
 #else
@@ -573,10 +573,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
   udp_listener_config_->listener_worker_router_ =
       std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
-  if (!udp_listener_config_->writer_factory_.has_value()) {
-    udp_listener_config_->writer_factory_ =
-        *Registry::FactoryRegistry<Network::UdpPacketWriterFactory>::getFactoryByType(
-            Network::UdpDefaultWriterFactory().configType());
+  if (udp_listener_config_->writer_factory_ == nullptr) {
+    udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
   }
 }
 

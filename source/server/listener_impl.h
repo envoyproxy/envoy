@@ -373,7 +373,7 @@ private:
 
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
-    Network::UdpPacketWriterFactoryOptRef writer_factory_;
+    Network::UdpPacketWriterFactoryPtr writer_factory_;
     Network::UdpListenerWorkerRouterPtr listener_worker_router_;
   };
 

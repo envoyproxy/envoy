@@ -7,10 +7,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/config/core/v3/extension.pb.h"
 
 namespace Envoy {
 namespace Network {
@@ -102,7 +104,7 @@ public:
 
 using UdpPacketWriterPtr = std::unique_ptr<UdpPacketWriter>;
 
-class UdpPacketWriterFactory : public Envoy::Config::TypedFactory {
+class UdpPacketWriterFactory {
 public:
   virtual ~UdpPacketWriterFactory() = default;
 
@@ -113,11 +115,23 @@ public:
    */
   virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                    Stats::Scope& scope) PURE;
-  std::string category() const override { return "envoy.udp"; }
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
-using UdpPacketWriterFactoryOptRef = OptRef<UdpPacketWriterFactory>;
+
+class UdpPacketWriterFactoryFactory : public Envoy::Config::TypedFactory {
+public:
+  virtual ~UdpPacketWriterFactoryFactory() = default;
+
+  /**
+   * Creates an UdpPacketWriterFactory based on the specified config.
+   * @return the UdpPacketWriterFactory created.
+   */
+  virtual UdpPacketWriterFactoryPtr createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
+
+  std::string category() const override { return "envoy.udp"; }
+};
+
 
 } // namespace Network
 } // namespace Envoy
