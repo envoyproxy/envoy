@@ -26,7 +26,7 @@ message ListenerStatus {
   // Name of the listener
   string name = 1;
 
-  // The actual local address that the listener is listening on. If a listener was configured
+  // The actual local addresses that the listener is listening on. If a listener was configured
   // to listen on port 0, then this address has the port that was allocated by the OS.
   api.v2.core.Address local_address = 2;
 }
