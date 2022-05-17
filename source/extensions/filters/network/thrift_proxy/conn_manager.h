@@ -313,9 +313,8 @@ private:
     // @param filter    the last filter which is already applied to the decoder_event.
     //                  nullptr indicates none is applied and the decoder_event is applied from the
     //                  first filter.
-    FilterStatus applyDecoderFilters(DecoderEvent state, absl::any data,
-                                     ActiveRpcDecoderFilter* filter = nullptr);
-    FilterStatus applyEncoderFilters(DecoderEvent state, absl::any data,
+    FilterStatus applyDecoderFilters(DecoderEvent state, ActiveRpcDecoderFilter* filter = nullptr);
+    FilterStatus applyEncoderFilters(DecoderEvent state,
                                      ProtocolConverterSharedPtr protocol_converter,
                                      ActiveRpcEncoderFilter* filter = nullptr);
     template <typename FilterType>
@@ -324,7 +323,7 @@ private:
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
     // Helper to setup filter_action_ and filter_context_
-    void prepareFilterAction(DecoderEvent event, absl::any data);
+    void prepareFilterAction(DecoderEvent event);
 
     void finalizeRequest();
 
