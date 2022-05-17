@@ -1888,7 +1888,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
       ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
@@ -1905,6 +1904,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, origin,
                                          alternate_protocols_cache);
