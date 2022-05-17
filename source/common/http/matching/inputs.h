@@ -165,8 +165,8 @@ public:
 template <class MatchingDataType>
 class HttpResponseTrailersDataInputFactoryBase
     : public HttpHeadersDataInputFactoryBase<
-          MatchingDataType, HttpRequestTrailersDataInput<MatchingDataType>,
-          envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
+          MatchingDataType, HttpResponseTrailersDataInput<MatchingDataType>,
+          envoy::type::matcher::v3::HttpResponseTrailerMatchInput> {
 public:
   HttpResponseTrailersDataInputFactoryBase()
       : HttpHeadersDataInputFactoryBase<MatchingDataType,
