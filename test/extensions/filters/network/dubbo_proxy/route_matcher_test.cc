@@ -1046,7 +1046,7 @@ routes:
   v3.set_string_value("v3");
   HashedValue hv1(v1), hv2(v2), hv3(v3);
 
-  // match with multiple set of weighted cluster metadta criteria defined
+  // match with multiple set of weighted cluster metadata criteria defined
   {
 
     RouteConstSharedPtr route = matcher.route(metadata, 0);
