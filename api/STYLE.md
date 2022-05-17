@@ -161,7 +161,7 @@ To add an extension config to the API, the steps below should be followed:
    This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD) under `active_protos`. Without it `proto_format.sh` will delete the proto file.
 1. Add a reference to the v3 extension config in (2) in [api/BUILD](BUILD) under `v3_protos`. Without this, `proto_format.sh` will erase any imports of your proto file from other proto files.
 1. If you introduce a new extension category, you'll also need to add its name
-   under `EXTENSION_CATEGORIES` in: [tools/extensions/extensions_check.py](../tools/extensions/extensions_check.py).
+   under `categories` in: [tools/extensions/extensions_schema.yaml](../tools/extensions/extensions_schema.yaml).
 1. Run `./tools/proto_format/proto_format.sh fix`. Before running the script, you will need to commit your local changes to make them effective,
    otherwise it will skip proto_format.sh due to no API change detected. This should regenerate the `BUILD` file and reformat `foobar.proto` as needed.
 

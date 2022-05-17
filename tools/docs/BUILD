@@ -45,21 +45,6 @@ envoy_entry_point(
 )
 
 py_binary(
-    name = "versions_check",
-    srcs = ["versions_check.py"],
-    data = [
-        "//:VERSION.txt",
-        "//changelogs",
-        "//changelogs:sections.yaml",
-    ],
-    deps = [
-        requirement("aio.run.checker"),
-        requirement("envoy.base.utils"),
-        requirement("packaging"),
-    ],
-)
-
-py_binary(
     name = "generate_version_histories",
     srcs = [
         "generate_version_histories.py",
