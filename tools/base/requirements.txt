@@ -38,9 +38,9 @@ aio-api-nist==0.0.1 \
     # via
     #   -r requirements.in
     #   envoy-dependency-check
-aio-core==0.8.2 \
-    --hash=sha256:3833acebcd4f45a13bfe9e074d98cdc86629b8f58274e360cc887c310f21c312 \
-    --hash=sha256:88701254d5221d3c59a49452969d050e9dd5db043eefaeb82ea0586ad3fd2a8a
+aio-core==0.8.3 \
+    --hash=sha256:64b797bc4fcd4a6448fb039c395057eaaa9fa06ef4132fee761aaf5a136df0c9 \
+    --hash=sha256:fe752a2b40b875d5fd05eb5977cd3c1be3435a05250ff096e1b56cb96a5ca15f
     # via
     #   -r requirements.in
     #   aio-api-github
