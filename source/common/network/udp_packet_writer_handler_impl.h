@@ -54,7 +54,8 @@ public:
 class UdpDefaultWriterFactoryFactory : public Network::UdpPacketWriterFactoryFactory {
 public:
   std::string name() const override { return "envoy.udp.writer.factory.default"; }
-  UdpPacketWriterFactoryPtr createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
+  UdpPacketWriterFactoryPtr
+  createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
     return std::make_unique<UdpDefaultWriterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

@@ -540,10 +540,10 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config_.udp_listener_config());
   ProtobufTypes::MessagePtr udp_packet_packet_writer_config;
   if (config_.udp_listener_config().has_udp_packet_packet_writer_config()) {
-    auto* factory_factory =
-        Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
-            config_.udp_listener_config().udp_packet_packet_writer_config());
-    udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(config_.udp_listener_config().udp_packet_packet_writer_config());
+    auto* factory_factory = Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
+        config_.udp_listener_config().udp_packet_packet_writer_config());
+    udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
+        config_.udp_listener_config().udp_packet_packet_writer_config());
   }
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC

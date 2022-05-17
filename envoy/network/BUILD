@@ -64,6 +64,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

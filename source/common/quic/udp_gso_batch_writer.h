@@ -104,7 +104,8 @@ private:
 class UdpGsoBatchWriterFactoryFactory : public Network::UdpPacketWriterFactoryFactory {
 public:
   std::string name() const override { return "envoy.udp.writer.factory.gso"; }
-  Network::UdpPacketWriterFactoryPtr createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
+  Network::UdpPacketWriterFactoryPtr
+  createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
     return std::make_unique<UdpGsoBatchWriterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

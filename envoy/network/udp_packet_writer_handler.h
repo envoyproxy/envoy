@@ -6,13 +6,13 @@
 #include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/config/core/v3/extension.pb.h"
 
 namespace Envoy {
 namespace Network {
@@ -127,11 +127,11 @@ public:
    * Creates an UdpPacketWriterFactory based on the specified config.
    * @return the UdpPacketWriterFactory created.
    */
-  virtual UdpPacketWriterFactoryPtr createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
+  virtual UdpPacketWriterFactoryPtr
+  createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
 
   std::string category() const override { return "envoy.udp"; }
 };
-
 
 } // namespace Network
 } // namespace Envoy
