@@ -73,7 +73,20 @@ static_resources:
                      Platform::null_device_path, Platform::null_device_path);
 }
 
-std::string ConfigHelper::baseConfig() {
+std::string ConfigHelper::baseConfig(bool multiple_addresses) {
+  if (multiple_addresses) {
+    return absl::StrCat(baseConfigNoListeners(), R"EOF(
+  listeners:
+  - name: listener_0
+    addresses:
+    - socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    - socket_address:
+        address: 127.0.0.1
+        port_value: 0
+)EOF");
+  }
   return absl::StrCat(baseConfigNoListeners(), R"EOF(
   listeners:
   - name: listener_0
@@ -84,8 +97,9 @@ std::string ConfigHelper::baseConfig() {
 )EOF");
 }
 
-std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
-  return fmt::format(R"EOF(
+std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address,
+                                                bool multiple_addresses) {
+  std::string config = fmt::format(R"EOF(
 admin:
   access_log:
   - name: envoy.access_loggers.file
@@ -108,6 +122,26 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+                                   Platform::null_device_path);
+
+  if (multiple_addresses) {
+    return absl::StrCat(config, fmt::format(R"EOF(
+  listeners:
+    name: listener_0
+    addresses:
+    - socket_address:
+        address: {}
+        port_value: 0
+        protocol: udp
+    - socket_address:
+        address: {}
+        port_value: 0
+        protocol: udp
+)EOF",
+                                            listen_address, listen_address));
+  }
+  return absl::StrCat(config, fmt::format(R"EOF(
   listeners:
     name: listener_0
     address:
@@ -116,7 +150,7 @@ static_resources:
         port_value: 0
         protocol: udp
 )EOF",
-                     Platform::null_device_path, listen_address);
+                                          listen_address));
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -177,11 +211,11 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
+std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic, bool multiple_addresses) {
   if (downstream_use_quic) {
-    return quicHttpProxyConfig();
+    return quicHttpProxyConfig(multiple_addresses);
   }
-  return absl::StrCat(baseConfig(), fmt::format(R"EOF(
+  return absl::StrCat(baseConfig(multiple_addresses), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: http
@@ -213,14 +247,15 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
               domains: "*"
             name: route_config_0
 )EOF",
-                                                Platform::null_device_path));
+                                                                  Platform::null_device_path));
 }
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
-std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig("127.0.0.1"), fmt::format(R"EOF(
+std::string ConfigHelper::quicHttpProxyConfig(bool multiple_addresses) {
+  return absl::StrCat(baseUdpListenerConfig("127.0.0.1", multiple_addresses),
+                      fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -256,7 +291,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     udp_listener_config:
       quic_options: {{}}
 )EOF",
-                                                                      Platform::null_device_path));
+                                  Platform::null_device_path));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -685,23 +720,37 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
-    if (listener->mutable_address()->has_envoy_internal_address()) {
-      ENVOY_LOG_MISC(
-          debug, "Listener {} has internal address {}. Will not reset to loop back socket address.",
-          i, listener->mutable_address()->envoy_internal_address().server_listener_name());
-      continue;
-    }
-    if (listener->mutable_address()->has_pipe()) {
-      ENVOY_LOG_MISC(debug,
-                     "Listener {} has pipe address {}. Will not reset to loop back socket address.",
-                     i, listener->mutable_address()->pipe().path());
-      continue;
-    }
-    auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
-    if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
-      listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+    if (listener->addresses_size() == 0) {
+      if (listener->mutable_address()->has_envoy_internal_address()) {
+        ENVOY_LOG_MISC(
+            debug,
+            "Listener {} has internal address {}. Will not reset to loop back socket address.", i,
+            listener->mutable_address()->envoy_internal_address().server_listener_name());
+        continue;
+      }
+      if (listener->mutable_address()->has_pipe()) {
+        ENVOY_LOG_MISC(
+            debug, "Listener {} has pipe address {}. Will not reset to loop back socket address.",
+            i, listener->mutable_address()->pipe().path());
+        continue;
+      }
+
+      auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
+      if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
+        listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+      } else {
+        listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+      }
     } else {
-      listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+      for (int i = 0; i < listener->addresses_size(); i++) {
+        auto* listener_socket_addr = listener->mutable_addresses(i)->mutable_socket_address();
+        if (listener_socket_addr->address() == "0.0.0.0" ||
+            listener_socket_addr->address() == "::") {
+          listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+        } else {
+          listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+        }
+      }
     }
   }
 
