@@ -22,6 +22,23 @@ namespace {
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
+class SkipActionFactory
+    : public Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext> {
+public:
+  std::string name() const override { return "skip"; }
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
+                                                 Envoy::Http::Matching::HttpFilterActionContext&,
+                                                 ProtobufMessage::ValidationVisitor&) override {
+    return []() { return std::make_unique<SkipAction>(); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
+  }
+};
+
+REGISTER_FACTORY(SkipActionFactory,
+                 Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext>);
+
 class MatchTreeValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Envoy::Http::HttpMatchingData> {
 public:
