@@ -53,7 +53,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new test::integration::filters::TestTcpListenerFilterConfig()};
+    return std::make_unique<test::integration::filters::TestTcpListenerFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.tcp_listener.test"; }

@@ -17,16 +17,8 @@ class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegra
                                                   public BaseIntegrationTest {
 public:
   ListenerExtensionDiscoveryIntegrationTest()
-      : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig() + R"EOF(
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.tcp_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          stat_prefix: tcp_stats
-          cluster: cluster_0
-)EOF"),
-        filter_name_("foo"), data_("HelloWorld"), port_name_("http") {}
+      : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()), filter_name_("foo"),
+        data_("HelloWorld"), port_name_("http") {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false) {
@@ -63,6 +55,18 @@ public:
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
 
+    // Add a tcp_proxy network filter.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter_chain = listener->add_filter_chains();
+      auto* filter = filter_chain->add_filters();
+      filter->set_name("envoy.filters.network.tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+      config.set_stat_prefix("tcp_stats");
+      config.set_cluster("cluster_0");
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+
     // Add an xDS cluster for extension config discovery.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -94,9 +98,9 @@ public:
     // Wait for ECDS stream.
     auto& ecds_upstream = getEcdsFakeUpstream();
     AssertionResult result = ecds_upstream.waitForHttpConnection(*dispatcher_, ecds_connection_);
-    RELEASE_ASSERT(result, result.message());
+    ASSERT_TRUE(result);
     result = ecds_connection_->waitForNewStream(*dispatcher_, ecds_stream_);
-    RELEASE_ASSERT(result, result.message());
+    ASSERT_TRUE(result);
     ecds_stream_->startGrpcStream();
   }
 
@@ -309,7 +313,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   test_server_.reset();
   auto result = ecds_connection_->waitForDisconnect();
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(result);
   ecds_connection_.reset();
 }
 

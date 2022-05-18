@@ -89,7 +89,7 @@ public:
    * Creates a list of listener filter factories.
    * @param filters supplies the JSON configuration.
    * @param context supplies the factory creation context.
-   * @return ListenerFilterFactoriesList the list of filter factories.
+   * @return Filter::ListenerFilterFactoriesList the list of filter factories.
    */
   virtual Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
