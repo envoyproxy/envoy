@@ -5381,6 +5381,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":quiche_balsa_simple_buffer_lib",
+        ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_test",
         "@com_google_absl//absl/strings",
     ],
@@ -5446,6 +5447,7 @@ envoy_cc_test(
         ":quiche_balsa_balsa_frame_lib",
         ":quiche_balsa_balsa_headers_lib",
         ":quiche_balsa_simple_buffer_lib",
+        ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
         ":quiche_common_test_tools_test_utils_lib",
