@@ -942,7 +942,7 @@ routes:
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
 
-  // match with metadata
+  // Match with metadata
   {
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
@@ -976,7 +976,7 @@ routes:
     EXPECT_EQ(hv2, mmc[1]->value());
   }
 
-  // match with no metadata
+  // Match with no metadata
   {
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
@@ -1046,7 +1046,7 @@ routes:
   v3.set_string_value("v3");
   HashedValue hv1(v1), hv2(v2), hv3(v3);
 
-  // match with multiple set of weighted cluster metadata criteria defined
+  // Match with multiple set of weighted cluster metadata criteria defined
   {
 
     RouteConstSharedPtr route = matcher.route(metadata, 0);
@@ -1067,7 +1067,7 @@ routes:
     EXPECT_EQ(hv2, mmc[1]->value());
   }
 
-  // match with weighted cluster with different metadata key
+  // Match with weighted cluster with different metadata key
   {
     RouteConstSharedPtr route = matcher.route(metadata, 2001);
     EXPECT_NE(nullptr, route);
@@ -1075,7 +1075,7 @@ routes:
     EXPECT_EQ(nullptr, route->routeEntry()->metadataMatchCriteria());
   }
 
-  // weight cluster match with single metadata entry
+  // Weight cluster match with single metadata entry
   {
     RouteConstSharedPtr route = matcher.route(metadata, 5001);
     EXPECT_NE(nullptr, route);
@@ -1143,7 +1143,7 @@ routes:
   v3.set_string_value("v3");
   HashedValue hv1(v1), hv2(v2), hv3(v3);
 
-  // match with weighted cluster metadata and route action metadata
+  // Match with weighted cluster metadata and route action metadata
   {
 
     RouteConstSharedPtr route = matcher.route(metadata, 0);
@@ -1167,7 +1167,7 @@ routes:
     EXPECT_EQ(hv3, mmc[2]->value());
   }
 
-  // match with just route action metadata
+  // Match with just route action metadata
   {
     RouteConstSharedPtr route = matcher.route(metadata, 2001);
     EXPECT_NE(nullptr, route);
@@ -1186,7 +1186,7 @@ routes:
     EXPECT_EQ(hv2, mmc[1]->value());
   }
 
-  // match with weighted cluster metadata and route action metadata merged
+  // Match with weighted cluster metadata and route action metadata merged
   {
     RouteConstSharedPtr route = matcher.route(metadata, 5001);
     EXPECT_NE(nullptr, route);
