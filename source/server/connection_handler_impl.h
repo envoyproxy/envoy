@@ -61,6 +61,9 @@ public:
   // Network::TcpConnectionHandler
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Network::BalancedConnectionHandlerOptRef
+  getBalancedHandlerByTag(uint64_t listener_tag,
+                          const Network::Address::Instance& address) override;
+  Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
 
   // Network::UdpConnectionHandler

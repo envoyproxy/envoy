@@ -35,6 +35,8 @@ class MockTcpConnectionHandler : public Network::TcpConnectionHandler,
                                  public Network::MockConnectionHandler {
 public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByTag,
+              (uint64_t listener_tag, const Network::Address::Instance&));
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByAddress,
               (const Network::Address::Instance& address));
 };
@@ -639,12 +641,12 @@ TEST_F(ActiveTcpListenerTest, Rebalance) {
                                })),
                                ReturnRef(*active_listener2)));
 
-  EXPECT_CALL(conn_handler_, getBalancedHandlerByAddress)
-      .WillOnce(
-          Invoke([&normal_address, &active_listener2](const Network::Address::Instance& address) {
-            EXPECT_EQ(address, *normal_address);
-            return Network::BalancedConnectionHandlerOptRef(*active_listener2);
-          }));
+  EXPECT_CALL(conn_handler_, getBalancedHandlerByTag)
+      .WillOnce(Invoke([&normal_address,
+                        &active_listener2](uint64_t, const Network::Address::Instance& address) {
+        EXPECT_EQ(address, *normal_address);
+        return Network::BalancedConnectionHandlerOptRef(*active_listener2);
+      }));
   auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
   auto transport_socket_factory = Network::Test::createRawBufferSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();

@@ -179,6 +179,16 @@ public:
 
   /**
    * Obtain the rebalancer of the tcp listener.
+   * @param listener_tag supplies the tag of the tcp listener that was passed to addListener().
+   * @param address is used to query the address specific handler.
+   * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. `nullopt` if
+   * listener doesn't exist or rebalancer doesn't exist.
+   */
+  virtual BalancedConnectionHandlerOptRef
+  getBalancedHandlerByTag(uint64_t listener_tag, const Network::Address::Instance& address) PURE;
+
+  /**
+   * Obtain the rebalancer of the tcp listener.
    * @param address supplies the address of the tcp listener.
    * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. ``nullopt`` if
    * listener doesn't exist or rebalancer doesn't exist.

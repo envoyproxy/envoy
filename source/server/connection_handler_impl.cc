@@ -325,6 +325,23 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
 }
 
 Network::BalancedConnectionHandlerOptRef
+ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
+  auto active_listener = findActiveListenerByTag(listener_tag);
+  if (active_listener.has_value()) {
+    for (auto& details : active_listener->get().per_address_details_) {
+      if (*details->address_ == address) {
+        ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+                   details->typed_listener_) &&
+               details->listener_->listener() != nullptr);
+        return Network::BalancedConnectionHandlerOptRef(details->tcpListener().value().get());
+      }
+    }
+  }
+  return absl::nullopt;
+}
+
+Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
   // Only Ip address can be restored to original address and redirect.
   ASSERT(address.type() == Network::Address::Type::Ip);
