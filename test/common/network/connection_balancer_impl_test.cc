@@ -29,7 +29,6 @@ public:
 
   std::string name() const override { return "envoy.network.connection_balance.dummy"; }
 };
-REGISTER_FACTORY(DummyConnectionBalanceFactory, ConnectionBalanceFactory);
 
 ProtobufTypes::MessagePtr DummyConnectionBalanceFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
@@ -41,17 +40,20 @@ ConnectionBalancerSharedPtr DummyConnectionBalanceFactory::createConnectionBalan
 }
 
 TEST(ConnectionBalanceFactory, TestCreateConnectionBalancer) {
-  auto factory = Registry::FactoryRegistry<ConnectionBalanceFactory>::getFactory(
-      "envoy.network.connection_balance.dummy");
-  ASSERT_NE(factory, nullptr);
+  DummyConnectionBalanceFactory factory;
+  Registry::InjectFactory<ConnectionBalanceFactory> registration(factory);
 
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  auto dummy_factory = Registry::FactoryRegistry<ConnectionBalanceFactory>::getFactory(
+      "envoy.network.connection_balance.dummy");
+  ASSERT_NE(dummy_factory, nullptr);
+
+  ProtobufTypes::MessagePtr message = dummy_factory->createEmptyConfigProto();
   ASSERT_NE(message, nullptr);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   ConnectionBalancerSharedPtr connection_balancer =
-      factory->createConnectionBalancerFromProto(*message, factory_context);
-  ASSERT_NE(message.get(), nullptr);
+      dummy_factory->createConnectionBalancerFromProto(*message, factory_context);
+  ASSERT_NE(connection_balancer.get(), nullptr);
 }
 
 } // namespace
