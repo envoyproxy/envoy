@@ -648,7 +648,35 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   return nread;
 }
 
-Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
+ParserStatus ConnectionImpl::onMessageBegin() {
+  return setAndCheckCallbackStatus(onMessageBeginImpl());
+}
+
+ParserStatus ConnectionImpl::onUrl(const char* data, size_t length) {
+  return setAndCheckCallbackStatus(onUrlBase(data, length));
+}
+
+ParserStatus ConnectionImpl::onStatus(const char* data, size_t length) {
+  return setAndCheckCallbackStatus(onStatusBase(data, length));
+}
+
+ParserStatus ConnectionImpl::onHeaderField(const char* data, size_t length) {
+  return setAndCheckCallbackStatus(onHeaderFieldImpl(data, length));
+}
+
+ParserStatus ConnectionImpl::onHeaderValue(const char* data, size_t length) {
+  return setAndCheckCallbackStatus(onHeaderValueImpl(data, length));
+}
+
+ParserStatus ConnectionImpl::onHeadersComplete() {
+  return setAndCheckCallbackStatusOr(onHeadersCompleteImpl());
+}
+
+ParserStatus ConnectionImpl::onMessageComplete() {
+  return setAndCheckCallbackStatusOr(onMessageCompleteImpl());
+}
+
+Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
   ASSERT(dispatching_);
 
   getBytesMeter().addHeaderBytesReceived(length);
@@ -673,7 +701,7 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
   return checkMaxHeadersSize();
 }
 
-Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
+Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   ASSERT(dispatching_);
 
   getBytesMeter().addHeaderBytesReceived(length);
@@ -704,7 +732,7 @@ Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   return checkMaxHeadersSize();
 }
 
-StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
+StatusOr<ParserStatus> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
@@ -833,7 +861,7 @@ void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
   }
 }
 
-StatusOr<ParserStatus> ConnectionImpl::onMessageComplete() {
+StatusOr<ParserStatus> ConnectionImpl::onMessageCompleteImpl() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
   dispatchBufferedBody();
@@ -855,7 +883,7 @@ StatusOr<ParserStatus> ConnectionImpl::onMessageComplete() {
   return onMessageCompleteBase();
 }
 
-Status ConnectionImpl::onMessageBegin() {
+Status ConnectionImpl::onMessageBeginImpl() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
   // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
   // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
@@ -1129,7 +1157,7 @@ Status ServerConnectionImpl::onMessageBeginBase() {
   return okStatus();
 }
 
-Status ServerConnectionImpl::onUrl(const char* data, size_t length) {
+Status ServerConnectionImpl::onUrlBase(const char* data, size_t length) {
   if (active_request_) {
     active_request_->request_url_.append(data, length);
 
@@ -1212,7 +1240,7 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   // We do this here because we may get a protocol error before we have a logical stream.
   if (active_request_ == nullptr) {
-    RETURN_IF_ERROR(onMessageBegin());
+    RETURN_IF_ERROR(onMessageBeginImpl());
   }
   ASSERT(active_request_);
 
@@ -1311,7 +1339,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   return pending_response_.value().encoder_;
 }
 
-Status ClientConnectionImpl::onStatus(const char* data, size_t length) {
+Status ClientConnectionImpl::onStatusBase(const char* data, size_t length) {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   StatefulHeaderKeyFormatterOptRef formatter(headers->formatter());
   if (formatter.has_value()) {

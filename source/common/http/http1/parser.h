@@ -46,7 +46,7 @@ public:
    * Called when a request/response is beginning.
    * @return integer return code from the parser indicating status.
    */
-  virtual Status onMessageBegin() PURE;
+  virtual ParserStatus onMessageBegin() PURE;
 
   /**
    * Called when URL data is received.
@@ -54,23 +54,7 @@ public:
    * @param length supplies the length.
    * @return Status representing success or failure.
    */
-  virtual Status onUrl(const char* data, size_t length) PURE;
-
-  /**
-   * Called when header field data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   * @return Status representing success or failure.
-   */
-  virtual Status onHeaderField(const char* data, size_t length) PURE;
-
-  /**
-   * Called when header value data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   * @return Status representing success or failure.
-   */
-  virtual Status onHeaderValue(const char* data, size_t length) PURE;
+  virtual ParserStatus onUrl(const char* data, size_t length) PURE;
 
   /**
    * Called when response status data is received.
@@ -78,7 +62,23 @@ public:
    * @param length supplies the length.
    * @return Status representing success or failure.
    */
-  virtual Status onStatus(const char* data, size_t length) PURE;
+  virtual ParserStatus onStatus(const char* data, size_t length) PURE;
+
+  /**
+   * Called when header field data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   * @return Status representing success or failure.
+   */
+  virtual ParserStatus onHeaderField(const char* data, size_t length) PURE;
+
+  /**
+   * Called when header value data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   * @return Status representing success or failure.
+   */
+  virtual ParserStatus onHeaderValue(const char* data, size_t length) PURE;
 
   /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
@@ -86,7 +86,7 @@ public:
    * trailers are signaled via onMessageCompleteBase().
    * @return An error status or a ParserStatus.
    */
-  virtual Envoy::StatusOr<ParserStatus> onHeadersComplete() PURE;
+  virtual ParserStatus onHeadersComplete() PURE;
 
   /**
    * Called when body data is received.
@@ -99,15 +99,12 @@ public:
    * Called when the HTTP message has completed parsing.
    * @return An error status or a ParserStatus.
    */
-  virtual StatusOr<ParserStatus> onMessageComplete() PURE;
+  virtual ParserStatus onMessageComplete() PURE;
 
   /**
    * Called when accepting a chunk header.
    */
   virtual void onChunkHeader(bool) PURE;
-
-  virtual ParserStatus setAndCheckCallbackStatus(Status&& status) PURE;
-  virtual ParserStatus setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;
 };
 
 class Parser {
