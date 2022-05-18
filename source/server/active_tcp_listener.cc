@@ -159,6 +159,7 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
   dispatcher().post([socket_to_rebalance, address = address_, tag = config_->listenerTag(),
                      &tcp_conn_handler = tcp_conn_handler_,
                      handoff = config_->handOffRestoredDestinationConnections()]() {
+    // `getBalancedHandlerByAddress` only support the IP address but there can be unix socket also.
     auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
     if (balanced_handler.has_value()) {
       balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true);
