@@ -118,7 +118,6 @@ RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl
   has_log_ = context.has_log_;
 
   if (!validation_visitor.errors().empty()) {
-    // TODO(snowp): Output all violations.
     throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
                                      validation_visitor.errors()[0]));
   }
