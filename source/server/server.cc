@@ -82,11 +82,11 @@ InstanceImpl::InstanceImpl(
           process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
           watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
+      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
+                          store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
-      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
-                          store),
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -163,6 +163,11 @@ InstanceImpl::~InstanceImpl() {
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
+
+const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
   ASSERT(config_.clusterManager() != nullptr);
   return *config_.clusterManager();
 }
@@ -271,7 +276,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires());
+      sslContextManager().daysUntilFirstCertExpires().value());
 
   auto secs_until_ocsp_response_expires =
       sslContextManager().secondsUntilFirstOcspResponseExpires();
@@ -467,12 +472,6 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
-
-  assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
-      [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
-  envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
-      [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
-
   InstanceImpl::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
@@ -620,13 +619,20 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.no_runtime_singleton", false)) {
+  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
     runtime_ = std::move(runtime_ptr);
   } else {
     runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
   }
   initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
+
+  if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
+    assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
+        [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
+    envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
+        [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+  }
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
@@ -655,7 +661,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       *admin_, runtime(), stats_store_, thread_local_, dns_resolver_, *ssl_context_manager_,
       *dispatcher_, *local_info_, *secret_manager_, messageValidationContext(), *api_,
       http_context_, grpc_context_, router_context_, access_log_manager_, *singleton_manager_,
-      options_, quic_stat_names_);
+      options_, quic_stat_names_, *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl

@@ -74,8 +74,8 @@ configuration, you should see it is configured with the ``example_proxy_cluster`
    :language: json
    :emphasize-lines: 10, 18-19
 
-Step 4: Edit ``cds.yaml`` inside the container to update upstream cluster
-*************************************************************************
+Step 4: Replace ``cds.yaml`` inside the container to update upstream cluster
+****************************************************************************
 
 The example setup provides Envoy with two dynamic configuration files:
 
@@ -92,13 +92,17 @@ from ``service1`` to ``service2``:
    :linenos:
    :lines: 6-13
    :lineno-start: 6
-   :emphasize-lines: 8
+   :emphasize-lines: 7
 
 You can do this using ``sed`` inside the container:
 
 .. code-block:: console
 
    docker-compose exec -T proxy sed -i s/service1/service2/ /var/lib/envoy/cds.yaml
+
+.. note::
+
+   The above example uses ``sed -i``, which works as an inplace edit as `sed` does copy, edit and move in order to do this.
 
 Step 5: Check Envoy uses updated configuration
 **********************************************

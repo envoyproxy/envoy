@@ -20,6 +20,7 @@ envoy_cc_test_library(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -61,11 +62,50 @@ envoy_cc_test(
     srcs = ["stats_handler_test.cc"],
     deps = [
         ":admin_instance_lib",
+        "//source/common/common:regex_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//source/server/admin:stats_handler_lib",
         "//source/server/admin:utils_lib",
         "//test/mocks/server:admin_stream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:real_threads_test_helper_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_params_test",
+    srcs = ["stats_params_test.cc"],
+    deps = [
+        "//source/server/admin:stats_params_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_render_test",
+    srcs = ["stats_render_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_render_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_request_test",
+    srcs = ["stats_request_test.cc"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:stats_request_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -77,8 +117,17 @@ envoy_cc_benchmark_binary(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/server/admin:admin_lib",
         "//source/server/admin:stats_handler_lib",
-        "//test/mocks/server:admin_stream_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "utils_test",
+    srcs = ["utils_test.cc"],
+    deps = [
+        "//source/server/admin:utils_lib",
     ],
 )
 

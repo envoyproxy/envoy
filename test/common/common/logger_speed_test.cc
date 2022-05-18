@@ -17,7 +17,7 @@ static void fancySlowPath(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
-      std::string key = "k" + std::to_string(i + (state.thread_index << 8));
+      std::string key = "k" + std::to_string(i + (state.thread_index() << 8));
       getFancyContext().initFancyLogger(key, logger);
     }
   }

@@ -14,6 +14,10 @@ address ``10.1.2.3``, then Envoy will connect to the upstream with source IP ``1
 
  This filter is not supported on Windows.
 
+.. note::
+
+ The CAP_NET_ADMIN capability is required on Linux.
+
 Interaction with Proxy Protocol
 --------------------------------
 

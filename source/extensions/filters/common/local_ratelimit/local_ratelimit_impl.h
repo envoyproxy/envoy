@@ -26,15 +26,21 @@ public:
   ~LocalRateLimiterImpl();
 
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  int64_t
+  remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
 
 private:
   struct TokenState {
     mutable std::atomic<uint32_t> tokens_;
     MonotonicTime fill_time_;
   };
+  int64_t counter_{0};
   struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
-    std::unique_ptr<TokenState> token_state_;
+    std::shared_ptr<TokenState> token_state_;
     RateLimit::TokenBucket token_bucket_;
+    int64_t multiplier_;
     std::string toString() const {
       std::vector<std::string> entries;
       entries.reserve(entries_.size());
@@ -59,15 +65,19 @@ private:
   };
 
   void onFillTimer();
-  void onFillTimerHelper(const TokenState& state, const RateLimit::TokenBucket& bucket);
+  void onFillTimerHelper(TokenState& state, const RateLimit::TokenBucket& bucket);
   void onFillTimerDescriptorHelper();
+  OptRef<const LocalDescriptorImpl>
+  descriptorHelper(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool requestAllowedHelper(const TokenState& tokens) const;
+  int tokensFillPerSecond(LocalDescriptorImpl& descriptor);
 
   RateLimit::TokenBucket token_bucket_;
   const Event::TimerPtr fill_timer_;
   TimeSource& time_source_;
   TokenState tokens_;
   absl::flat_hash_set<LocalDescriptorImpl, LocalDescriptorHash, LocalDescriptorEqual> descriptors_;
+  std::vector<LocalDescriptorImpl> sorted_descriptors_;
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
 
   friend class LocalRateLimiterImplTest;

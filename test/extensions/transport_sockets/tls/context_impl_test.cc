@@ -153,7 +153,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   // Calculate the days until test cert expires
   auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
-  EXPECT_EQ(context->daysUntilFirstCertExpires(), days_until_expiry);
+  EXPECT_EQ(context->daysUntilFirstCertExpires().value(), days_until_expiry);
 }
 
 TEST_F(SslContextImplTest, TestExpiredCert) {
@@ -171,7 +171,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
+  EXPECT_EQ(absl::nullopt, context->daysUntilFirstCertExpires());
 }
 
 // Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
@@ -191,7 +191,7 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(expired_yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
 
   const std::string expiring_yaml = R"EOF(
   common_tls_context:
@@ -215,8 +215,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   // context expiry.
   auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
-  EXPECT_EQ(new_context->daysUntilFirstCertExpires(), days_until_expiry);
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), days_until_expiry);
+  EXPECT_EQ(new_context->daysUntilFirstCertExpires().value(), days_until_expiry);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires().value(), days_until_expiry);
 
   // Update the context again and validate daysUntilFirstCertExpires still reflects the current
   // expiry.
@@ -224,8 +224,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   manager_.removeContext(new_context);
   auto cleanup = cleanUpHelper(updated_context);
 
-  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), 0U);
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
@@ -1932,8 +1932,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
       "Certificate configuration can't have both private_key and private_key_provider");
 }
 
-// Test that we don't allow specification of both typed and untyped matchers for
-// sans.
+// Test that if both typed and untyped matchers for sans are specified, we
+// ignore the untyped matchers.
 TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
@@ -1943,22 +1943,42 @@ TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
   const std::string yaml =
       R"EOF(
       common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
         validation_context:
           trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
           allow_expired_certificate: true
           match_typed_subject_alt_names:
           - san_type: DNS
             matcher:
-              exact: "foo.example"
+              exact: "foo1.example"
           match_subject_alt_names:
-            exact: "foo.example"
+            exact: "foo2.example"
       )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
-      "SAN-based verification using both match_typed_subject_alt_names and "
-      "the deprecated match_subject_alt_names is not allowed");
+  absl::optional<ServerContextConfigImpl> server_context_config;
+  EXPECT_LOG_CONTAINS("warning",
+                      "Ignoring match_subject_alt_names as match_typed_subject_alt_names is also "
+                      "specified, and the former is deprecated.",
+                      server_context_config.emplace(tls_context, factory_context_));
+  EXPECT_EQ(
+      server_context_config.value().certificateValidationContext()->subjectAltNameMatchers().size(),
+      1);
+  EXPECT_EQ(server_context_config.value()
+                .certificateValidationContext()
+                ->subjectAltNameMatchers()[0]
+                .san_type(),
+            envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+  EXPECT_EQ(server_context_config.value()
+                .certificateValidationContext()
+                ->subjectAltNameMatchers()[0]
+                .matcher()
+                .exact(),
+            "foo1.example");
 }
 
 TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndMethod) {

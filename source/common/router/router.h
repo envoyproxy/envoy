@@ -431,13 +431,7 @@ public:
       return {};
     }
 
-    auto override_host = callbacks_->upstreamOverrideHost();
-    if (override_host.has_value()) {
-      // TODO(wbpcode): Currently we need to provide additional expected host status to the load
-      // balancer. This should be resolved after the `overrideHostToSelect()` refactoring.
-      return std::make_pair(std::string(override_host.value()), ~static_cast<uint32_t>(0));
-    }
-    return {};
+    return callbacks_->upstreamOverrideHost();
   }
 
   /**
@@ -531,6 +525,8 @@ private:
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
   UpstreamRequestPtr createUpstreamRequest();
+  absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
+                                                     const Http::HeaderMap& headers) const;
 
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);

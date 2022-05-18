@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -85,7 +86,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()) {
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
+      tls_keylog_local_(config.tlsKeyLogLocal()), tls_keylog_remote_(config.tlsKeyLogRemote()) {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -336,6 +338,43 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   //
   // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
+
+  if (!config.tlsKeyLogPath().empty()) {
+    ENVOY_LOG(debug, "Enable tls key log");
+    tls_keylog_file_ = config.accessLogManager().createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.tlsKeyLogPath()});
+    for (auto& context : tls_contexts_) {
+      SSL_CTX* ctx = context.ssl_ctx_.get();
+      ASSERT(ctx != nullptr);
+      SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+    }
+  }
+}
+
+void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
+  ASSERT(ssl != nullptr);
+  auto callbacks =
+      static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, sslSocketIndex()));
+  auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+  ASSERT(callbacks != nullptr);
+  ASSERT(ctx != nullptr);
+
+  if ((ctx->tls_keylog_local_.getIpListSize() == 0 ||
+       ctx->tls_keylog_local_.contains(
+           *(callbacks->connection().connectionInfoProvider().localAddress()))) &&
+      (ctx->tls_keylog_remote_.getIpListSize() == 0 ||
+       ctx->tls_keylog_remote_.contains(
+           *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
+    ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
+  }
+}
+
+int ContextImpl::sslSocketIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_socket_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_socket_index >= 0, "");
+    return ssl_socket_index;
+  }());
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
@@ -446,14 +485,18 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
-  for (auto& ctx : tls_contexts_) {
-    daysUntilExpiration = std::min<int>(
-        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_), daysUntilExpiration);
+absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+  if (!daysUntilExpiration.has_value()) {
+    return absl::nullopt;
   }
-  if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
-    return 0;
+  for (auto& ctx : tls_contexts_) {
+    const absl::optional<uint32_t> tmp =
+        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    }
+    daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }

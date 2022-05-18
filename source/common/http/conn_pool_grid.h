@@ -1,9 +1,8 @@
 #pragma once
 
-#include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
-#include "source/common/http/http3_status_tracker.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -137,9 +136,9 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                   AlternateProtocolsCacheSharedPtr alternate_protocols,
+                   HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -177,6 +176,7 @@ public:
 
   // Http3::PoolConnectResultCallback
   void onHandshakeComplete() override;
+  void onZeroRttHandshakeFailed() override;
 
 protected:
   // Set the required idle callback on the pool.
@@ -184,6 +184,10 @@ protected:
 
 private:
   friend class ConnectivityGridForTest;
+
+  // Return origin of the remote host. If the host doesn't have an IP address,
+  // the port of the origin will be 0.
+  HttpServerPropertiesCache::Http3StatusTracker& getHttp3StatusTracker() const;
 
   // Called by each pool as it idles. The grid is responsible for calling
   // idle_callbacks_ once all pools have idled.
@@ -207,8 +211,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  Http3StatusTracker http3_status_tracker_;
-  AlternateProtocolsCacheSharedPtr alternate_protocols_;
+  HttpServerPropertiesCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created
   // in this state.
@@ -233,6 +236,11 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  // The origin for this pool.
+  // Note the host name here is based off of the host name used for SNI, which
+  // may be from the cluster config, or the request headers for auto-sni.
+  HttpServerPropertiesCache::Origin origin_;
+  Http::PersistentQuicInfo& quic_info_;
 };
 
 } // namespace Http

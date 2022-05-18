@@ -481,10 +481,18 @@ public:
   virtual ~ShadowPolicy() = default;
 
   /**
-   * @return the name of the cluster that a matching request should be shadowed to. Returns empty
+   * @return the name of the cluster that a matching request should be shadowed to.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
    *         string if no shadowing should take place.
    */
   virtual const std::string& cluster() const PURE;
+
+  /**
+   * @return the cluster header name that router can get the cluster name from request headers.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
+   *         string if no shadowing should take place.
+   */
+  virtual const Http::LowerCaseString& clusterHeader() const PURE;
 
   /**
    * @return the runtime key that will be used to determine whether an individual request should
@@ -506,7 +514,7 @@ public:
   virtual bool traceSampled() const PURE;
 };
 
-using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
 
 /**
  * All virtual cluster stats. @see stats_macro.h
@@ -727,10 +735,13 @@ enum class PathMatchType {
   Prefix,
   Exact,
   Regex,
+  PathSeparatedPrefix,
 };
 
 /**
  * Criterion that a route entry uses for matching a particular path.
+ * Extensions can use this to gain better insights of chosen route paths,
+ * see: https://github.com/envoyproxy/envoy/pull/2531.
  */
 class PathMatchCriterion {
 public:

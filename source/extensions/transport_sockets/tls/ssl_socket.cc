@@ -76,6 +76,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
+  SSL_set_ex_data(rawSsl(), ContextImpl::sslSocketIndex(), static_cast<void*>(callbacks_));
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
@@ -223,7 +224,9 @@ void SslSocket::drainErrorQueue() {
                                         absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
   if (!failure_reason_.empty()) {
-    ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+    ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
+                   callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
+                   failure_reason_);
   }
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
@@ -416,8 +419,8 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   return ssl_ctx_;
 }
 
-Network::TransportSocketPtr
-ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
+Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -427,8 +430,8 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsCon
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                       config_->createHandshaker());
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

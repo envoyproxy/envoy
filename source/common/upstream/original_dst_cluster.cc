@@ -23,10 +23,8 @@ namespace Upstream {
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     // Check if override host header is present, if yes use it otherwise check local address.
-    Network::Address::InstanceConstSharedPtr dst_host = nullptr;
-    if (parent_->use_http_header_) {
-      dst_host = requestOverrideHost(context);
-    }
+    Network::Address::InstanceConstSharedPtr dst_host = requestOverrideHost(context);
+
     if (dst_host == nullptr) {
       const Network::Connection* connection = context->downstreamConnection();
       // The local address of the downstream connection is the original destination address,
@@ -82,43 +80,57 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 
 Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
-  Network::Address::InstanceConstSharedPtr request_host;
+  if (!http_header_name_.has_value()) {
+    return nullptr;
+  }
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
-  Http::HeaderMap::GetResult override_header;
-  if (downstream_headers) {
-    override_header = downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost);
+  if (!downstream_headers) {
+    return nullptr;
   }
-  if (!override_header.empty()) {
-    // This is an implicitly untrusted header, so per the API documentation only the first
-    // value is used.
-    const std::string request_override_host(override_header[0]->value().getStringView());
-    request_host =
-        Network::Utility::parseInternetAddressAndPortNoThrow(request_override_host, false);
-    if (request_host != nullptr) {
-      ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
-    } else {
-      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
-                request_override_host);
-      parent_->info()->stats().original_dst_host_invalid_.inc();
-    }
+  Http::HeaderMap::GetResult override_header = downstream_headers->get(*http_header_name_);
+  if (override_header.empty()) {
+    return nullptr;
   }
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  const std::string request_override_host(override_header[0]->value().getStringView());
+  Network::Address::InstanceConstSharedPtr request_host =
+      Network::Utility::parseInternetAddressAndPortNoThrow(request_override_host, false);
+  if (request_host == nullptr) {
+    ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
+              request_override_host);
+    parent_->info()->stats().original_dst_host_invalid_.inc();
+    return nullptr;
+  }
+  ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
   return request_host;
 }
 
 OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
                       factory_context.mainThreadDispatcher().timeSource()),
       dispatcher_(factory_context.mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
-      use_http_header_(info_->lbOriginalDstConfig()
-                           ? info_->lbOriginalDstConfig().value().use_http_header()
-                           : false),
       host_map_(std::make_shared<HostMap>()) {
+  if (const auto& config_opt = info_->lbOriginalDstConfig(); config_opt.has_value()) {
+    if (config_opt->use_http_header()) {
+      http_header_name_ = config_opt->http_header_name().empty()
+                              ? Http::Headers::get().EnvoyOriginalDstHost
+                              : Http::LowerCaseString(config_opt->http_header_name());
+    } else {
+      if (!config_opt->http_header_name().empty()) {
+        throw EnvoyException(fmt::format(
+            "ORIGINAL_DST cluster: invalid config http_header_name={} and use_http_header is "
+            "false. Set use_http_header to true if http_header_name is desired.",
+            config_opt->http_header_name()));
+      }
+    }
+  }
   if (config.has_load_assignment()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
@@ -182,7 +194,7 @@ std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
+    Stats::ScopeSharedPtr&& stats_scope) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     throw EnvoyException(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "

@@ -4,9 +4,8 @@ Extension configuration
 -----------------------
 
 Each configuration resource in Envoy has a type URL in the ``typed_config``. This
-type corresponds to a versioned schema. If the type URL uniquely identifies an
-extension capable of interpreting the configuration, then the extension is
-selected regardless of the ``name`` field. In this case the ``name`` field becomes
+type corresponds to a versioned schema. The type URL uniquely identifies an
+extension capable of interpreting the configuration. The ``name`` field is
 optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:
@@ -80,8 +79,9 @@ for HTTP filters.
 
 Extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at
-*<stat_prefix>.extension_config_discovery.<extension_config_name>*. In addition
-to the common subscription statistics, it also provides the following:
+*extension_config_discovery.<stat_prefix>.<extension_config_name>*. For HTTP
+filters, the value of *<stat_prefix>* is *http_filter*. In addition to the
+common subscription statistics, it also provides the following:
 
 .. csv-table::
   :header: Name, Type, Description

@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
@@ -117,6 +118,15 @@ public:
    * @return bool whether the socket can be flushed and closed.
    */
   virtual bool canFlushClose() PURE;
+
+  /**
+   * Connect the underlying transport.
+   * @param socket provides the socket to connect.
+   * @return int the result from connect.
+   */
+  virtual Api::SysCallIntResult connect(Network::ConnectionSocket& socket) {
+    return socket.connect(socket.connectionInfoProvider().remoteAddress());
+  }
 
   /**
    * Closes the transport socket.
@@ -252,6 +262,13 @@ public:
    * negotiation.
    */
   virtual bool supportsAlpn() const { return false; }
+
+  /**
+   * Returns the default SNI for transport sockets created by this factory.
+   * This will return an empty string view if the transport sockets created are
+   * not client-side TLS sockets.
+   */
+  virtual absl::string_view defaultServerNameIndication() const PURE;
 
   /**
    * @param key supplies a vector of bytes to which the option should append hash key data that will

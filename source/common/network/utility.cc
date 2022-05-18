@@ -52,6 +52,18 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
+StatusOr<Socket::Type> Utility::socketTypeFromUrl(const std::string& url) {
+  if (urlIsTcpScheme(url)) {
+    return Socket::Type::Stream;
+  } else if (urlIsUdpScheme(url)) {
+    return Socket::Type::Datagram;
+  } else if (urlIsUnixScheme(url)) {
+    return Socket::Type::Stream;
+  } else {
+    return absl::InvalidArgumentError(absl::StrCat("unknown protocol scheme: ", url));
+  }
+}
+
 bool Utility::urlIsTcpScheme(absl::string_view url) { return absl::StartsWith(url, TCP_SCHEME); }
 
 bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(url, UDP_SCHEME); }
@@ -137,6 +149,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
@@ -267,16 +280,16 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isSameIpOrLoopback(const ConnectionSocket& socket) {
+bool Utility::isSameIpOrLoopback(const ConnectionInfoProvider& connection_info_provider) {
   // These are local:
   // - Pipes
   // - Sockets to a loopback address
   // - Sockets where the local and remote address (ignoring port) are the same
-  const auto& remote_address = socket.connectionInfoProvider().remoteAddress();
+  const auto& remote_address = connection_info_provider.remoteAddress();
   if (remote_address->type() == Address::Type::Pipe || isLoopbackAddress(*remote_address)) {
     return true;
   }
-  const auto local_ip = socket.connectionInfoProvider().localAddress()->ip();
+  const auto local_ip = connection_info_provider.localAddress()->ip();
   const auto remote_ip = remote_address->ip();
   if (remote_ip != nullptr && local_ip != nullptr &&
       remote_ip->addressAsString() == local_ip->addressAsString()) {
@@ -421,7 +434,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (absl::StrContains(s, '-')) {
       char dash = 0;
       ss >> min;
       ss >> dash;

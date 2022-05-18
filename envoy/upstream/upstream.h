@@ -543,6 +543,7 @@ public:
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
+  COUNTER(upstream_cx_connect_with_0_rtt)                                                          \
   COUNTER(upstream_cx_destroy)                                                                     \
   COUNTER(upstream_cx_destroy_local)                                                               \
   COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
@@ -1000,6 +1001,11 @@ public:
    * computations until they have been health checked for the first time.
    */
   virtual bool warmHosts() const PURE;
+
+  /**
+   * @return true if this cluster is configured to set local interface name on upstream connections.
+   */
+  virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
 
   /**
    * @return eds cluster service_name of the cluster.

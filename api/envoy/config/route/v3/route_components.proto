@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -198,6 +198,11 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+
+  // Specify a set of default request mirroring policies for every route under this virtual host.
+  // It takes precedence over the route config mirror policy entirely.
+  // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
+  repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 22;
 }
 
 // A filter-defined action type.
@@ -448,7 +453,20 @@ message WeightedCluster {
   }
 }
 
-// [#next-free-field: 14]
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
+
+  // If is_optional is not set or is set to false and the plugin defined by this message is not a
+  // supported type, the containing resource is NACKed. If is_optional is set to true, the resource
+  // would not be NACKed for this reason. In this case, routes referencing this plugin's name would
+  // not be treated as an illegal configuration, but would result in a failure if the route is
+  // selected.
+  bool is_optional = 2;
+}
+
+// [#next-free-field: 15]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -513,6 +531,17 @@ message RouteMatch {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
+
+    // If specified, the route is a path-separated prefix rule meaning that the
+    // ``:path`` header (without the query string) must either exactly match the
+    // ``path_separated_prefix`` or have it as a prefix, followed by ``/``
+    //
+    // For example, ``/api/dev`` would match
+    // ``/api/dev``, ``/api/dev/``, ``/api/dev/v1``, and ``/api/dev?param=true``
+    // but would not match ``/api/developer``
+    //
+    // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
+    string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -627,7 +656,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -659,6 +688,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -667,9 +697,30 @@ message RouteAction {
 
     reserved "runtime_key";
 
+    // Only one of *cluster* and *cluster_header* can be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+    string cluster = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
+
+    // Only one of *cluster* and *cluster_header* can be specified.
+    // Envoy will determine the cluster to route to by reading the value of the
+    // HTTP header named by cluster_header from the request headers. Only the first value in header is used,
+    // and no shadow request will happen if the value is not found in headers. Envoy will not wait for
+    // the shadow cluster to respond before returning the response from the primary cluster.
+    //
+    // .. attention::
+    //
+    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
+    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
+    string cluster_header = 5 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+    ];
 
     // If not specified, all requests to the target cluster will be mirrored.
     //
@@ -904,13 +955,15 @@ message RouteAction {
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
 
-    // [#not-implemented-hide:]
-    // Name of the cluster specifier plugin to use to determine the cluster for
-    // requests on this route. The plugin name must be defined in the associated
-    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
-    // in the
-    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    // Name of the cluster specifier plugin to use to determine the cluster for requests on this route.
+    // The cluster specifier plugin name must be defined in the associated
+    // :ref:`cluster specifier plugins <envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins>`
+    // in the :ref:`name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` field.
     string cluster_specifier_plugin = 37;
+
+    // Custom cluster specifier plugin configuration to use to determine the cluster for requests
+    // on this route.
+    ClusterSpecifierPlugin inline_cluster_specifier_plugin = 39;
   }
 
   // The HTTP status code to use when configured cluster is not found.
@@ -1106,7 +1159,9 @@ message RouteAction {
   // should not be set if this field is used.
   google.protobuf.Any retry_policy_typed_config = 33;
 
-  // Indicates that the route has request mirroring policies.
+  // Specify a set of route request mirroring policies.
+  // It takes precedence over the virtual host and route config mirror policy entirely.
+  // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
@@ -1693,7 +1748,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1767,6 +1822,28 @@ message RateLimit {
           "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
     }
 
+    // The following descriptor entry is appended to the descriptor and is populated using the
+    // masked address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("masked_remote_address", "<masked address from x-forwarded-for>")
+    message MaskedRemoteAddress {
+      // Length of prefix mask len for IPv4 (e.g. 0, 32).
+      // Defaults to 32 when unset.
+      // For example, trusted address from x-forwarded-for is `192.168.1.1`,
+      // the descriptor entry is ("masked_remote_address", "192.168.1.1/32");
+      // if mask len is 24, the descriptor entry is ("masked_remote_address", "192.168.1.0/24").
+      google.protobuf.UInt32Value v4_prefix_mask_len = 1 [(validate.rules).uint32 = {lte: 32}];
+
+      // Length of prefix mask len for IPv6 (e.g. 0, 128).
+      // Defaults to 128 when unset.
+      // For example, trusted address from x-forwarded-for is `2001:abcd:ef01:2345:6789:abcd:ef01:234`,
+      // the descriptor entry is ("masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128");
+      // if mask len is 64, the descriptor entry is ("masked_remote_address", "2001:abcd:ef01:2345::/64").
+      google.protobuf.UInt32Value v6_prefix_mask_len = 2 [(validate.rules).uint32 = {lte: 128}];
+    }
+
     // The following descriptor entry is appended to the descriptor:
     //
     // .. code-block:: cpp
@@ -1792,6 +1869,9 @@ message RateLimit {
     message HeaderValueMatch {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
+
+      // The key to use in the descriptor entry. Defaults to `header_match`.
+      string descriptor_key = 4;
 
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
@@ -1896,8 +1976,17 @@ message RateLimit {
       MetaData metadata = 8;
 
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      //
+      // :ref:`HTTP matching input functions <arch_overview_matching_api>` are
+      // permitted as descriptor extensions. The input functions are only
+      // looked up if there is no rate limit descriptor extension matching
+      // the type URL.
+      //
       // [#extension-category: envoy.rate_limit_descriptors]
       core.v3.TypedExtensionConfig extension = 9;
+
+      // Rate limit on masked remote address.
+      MaskedRemoteAddress masked_remote_address = 10;
     }
   }
 

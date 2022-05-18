@@ -16,6 +16,7 @@
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
@@ -95,7 +96,7 @@ public:
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, router_context_);
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -140,7 +141,7 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
-        router_context_);
+        router_context_, server_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -193,6 +194,7 @@ public:
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
+  NiceMock<Server::MockInstance> server_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
@@ -469,6 +471,9 @@ public:
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
 };
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
@@ -490,6 +495,8 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
             http_protocol_options: {}
       transport_socket:
         name: envoy.transport_sockets.alpn
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
 }
@@ -1088,6 +1095,9 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
@@ -1339,9 +1349,8 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
       cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
       cluster_manager_->getThreadLocalCluster("cluster_1")->loadBalancer().chooseHost(nullptr));
 
-  // Local reference, primary reference, thread local reference, host reference, async client
-  // reference.
-  EXPECT_EQ(5U, cluster.info().use_count());
+  // Local reference, primary reference, thread local reference, host reference
+  EXPECT_EQ(4U, cluster.info().use_count());
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
@@ -2016,7 +2025,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
-  Network::MockClientConnection* connection = new Network::MockClientConnection();
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   ON_CALL(*cluster2->info_, features())
       .WillByDefault(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -4342,6 +4351,9 @@ public:
 
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
       factory);
@@ -5166,6 +5178,52 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   expectSetsockoptSoKeepalive(7, 4, 1);
 }
 
+// Make sure the drainConnections() with a predicate can correctly exclude a host.
+TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Set up the HostSet.
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81", time_system_);
+
+  HostVector hosts{host1, host2};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // Sending non-mergeable updates.
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  // Using RR LB get a pool for each host.
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
+  Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_NE(cp1, cp2);
+
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, drainConnections(_)).Times(0);
+  cluster_manager_->drainConnections("cluster_1", [](const Upstream::Host& host) {
+    return host.address()->asString() == "127.0.0.1:80";
+  });
+}
+
 TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -5380,7 +5438,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
 TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.conn_pool_delete_when_idle", "true"}});
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -5640,6 +5697,34 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
   EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("added_via_api"),
                             EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
+
+#ifdef WIN32
+TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWin32) {
+  const std::string yaml = fmt::format(R"EOF(
+ static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    upstream_connection_options:
+      set_local_interface_name_on_upstream_connections: true
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 5678
+  )EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "set_local_interface_name_on_upstream_connections_ cannot be set to "
+                            "true on Windows platforms");
+}
+#endif
 
 class PreconnectTest : public ClusterManagerImplTest {
 public:

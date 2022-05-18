@@ -260,10 +260,11 @@ for how to update or override dependencies.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
-1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
-   in your shell for buildifier to work.
-1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
-   in your shell for buildozer to work.
+   Make sure you have go version 1.17 or later.
+1. `go install github.com/bazelbuild/buildtools/buildifier@latest` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
+   in your shell for buildifier to work. If GOPATH is not set, it is $HOME/go by default.
+1. `go install github.com/bazelbuild/buildtools/buildozer@latest` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
+   in your shell for buildozer to work. If GOPATH is not set, it is $HOME/go by default.
 1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
 
@@ -348,8 +349,8 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 10.
+We now require Clang >= 9 due to C++17 support and tcmalloc requirement. GCC >= 9 is also known to work.
+Currently the CI is running with Clang 14.
 
 ## Clang STL debug symbols
 
@@ -668,8 +669,8 @@ The following optional features can be disabled on the Bazel build command-line:
 The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
-  This is useful in cases where you have a lua script that loads shared object libraries, such as
-  those installed via luarocks.
+  This config will exports all symbols and results in larger binary size. If partial symbols export
+  is required and target platform is Linux, then `bazel/exported_symbols.txt` can be used to land it.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
@@ -706,6 +707,13 @@ The extensions disabled by default can be enabled by adding the following parame
 The extensions enabled by default can be disabled by adding the following parameter to Bazel, for example to disable
 `envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
 Note not all extensions can be disabled.
+
+To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
+
+* `v8` (the default included engine)
+* `wamr`
+* `wasmtime`
+* `wavm`
 
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
@@ -913,32 +921,44 @@ Note that if you run the `check_spelling.py` script you will need to have `aspel
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
-The easiest way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
+
+A relatively easy way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
+
 * Run the ci docker image
+
 ```shell
 ci/run_envoy_docker.sh bash
 ```
+
 * Get the docker container ID
+
 ```shell
 dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
 ```
+
 * Copy the `clang-format` to host machine
+
 ```shell
-docker  copy $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
+docker cp $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
 ```
-* Replace the host `clang-format` with the new one. Ensure that the copied `clang-format` is the default one. You can do this by ensuring it is in `$PATH`:
+
+* Ensure that the copied `clang-format` is the default one, by ensuring it is in `$PATH`:
+
 ```shell
 cp clang-format-ci /usr/local/bin/clang-format
 ```
-If you are a non-root user, alternatively you can use a bin dir and add that to `$PATH`
+
+Alternatively, if you are a non-root user, you can use a bin dir and add that to `$PATH`
+
 ```shell
 mkdir bin
 mv clang-format-ci bin/clang-format
 export PATH=$PATH:$PWD/bin/
 ```
+
 Once this is set up, you can run clang-format without docker:
 
 ```shell

@@ -150,7 +150,12 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
+        auto san_matcher = createStringSanMatcher(matcher);
+        if (san_matcher == nullptr) {
+          throw EnvoyException(
+              absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
+        }
+        subject_alt_name_matchers_.push_back(std::move(san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -455,6 +460,10 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
+  // Set the verify_depth
+  if (config_->maxVerifyDepth().has_value()) {
+    SSL_CTX_set_verify_depth(ctx, config_->maxVerifyDepth().value());
+  }
 }
 
 Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() const {
@@ -464,7 +473,7 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), time_source_);
 }
 
-size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
+absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
 }
 

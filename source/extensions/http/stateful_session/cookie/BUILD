@@ -13,8 +13,6 @@ envoy_cc_library(
     name = "cookie_lib",
     srcs = ["cookie.cc"],
     hdrs = ["cookie.h"],
-    # This extension is core code.
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:stateful_session_interface",
         "//source/common/common:base64_lib",
@@ -28,8 +26,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # This extension is core code.
-    visibility = ["//visibility:public"],
     deps = [
         ":cookie_lib",
         "//envoy/http:stateful_session_interface",

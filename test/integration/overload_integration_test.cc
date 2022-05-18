@@ -287,7 +287,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
   test_server_->waitForCounterGe("http.config_test.downstream_rq_idle_timeout", 1);
   ASSERT_TRUE(response->waitForEndStream());
 
-  EXPECT_EQ(response->headers().getStatusValue(), "408");
+  EXPECT_EQ(response->headers().getStatusValue(), "504");
   EXPECT_THAT(response->body(), HasSubstr("stream timeout"));
 }
 

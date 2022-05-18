@@ -86,13 +86,13 @@ public:
   }
 
   JwtAuthentication proto_config_;
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ExtractorConstPtr extractor_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ProtobufWkt::Struct out_extracted_data_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };
@@ -315,19 +315,13 @@ TEST_F(AuthenticatorTest, TestWrongIssuerOKWithoutProvider) {
 }
 
 // Not "iss" in Jwt, "issuer" in JwtProvider is specified,
-// authenticator has a valid provider. The verification is OK.
+// authenticator has a valid provider. The verification fails.
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProvider) {
-  jwks_ = Jwks::createFrom(ES256PublicKey, Jwks::JWKS);
-  EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
-
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
-      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-        receiver.onJwksSuccess(std::move(jwks_));
-      }));
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(ES256WithoutIssToken)}};
-  expectVerifyStatus(Status::Ok, headers);
+  expectVerifyStatus(Status::JwtUnknownIssuer, headers);
 }
 
 // Not "iss" in Jwt, "issuer" in JwtProvider is specified,

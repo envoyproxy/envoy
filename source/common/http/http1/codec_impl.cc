@@ -369,7 +369,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
   connection_.readDisable(disable);
 }
 
-uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+uint32_t StreamEncoderImpl::bufferLimit() const { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
   return connection_.connection().connectionInfoProvider().localAddress();
@@ -453,20 +453,19 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   return okStatus();
 }
 
-int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
+ParserStatus ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
   ASSERT(codec_status_.ok());
   codec_status_ = std::move(status);
-  return codec_status_.ok() ? parser_->statusToInt(ParserStatus::Success)
-                            : parser_->statusToInt(ParserStatus::Error);
+  return codec_status_.ok() ? ParserStatus::Success : ParserStatus::Error;
 }
 
-int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) {
+ParserStatus ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) {
   ASSERT(codec_status_.ok());
   if (statusor.ok()) {
-    return parser_->statusToInt(statusor.value());
+    return statusor.value();
   } else {
     codec_status_ = std::move(statusor.status());
-    return parser_->statusToInt(ParserStatus::Error);
+    return ParserStatus::Error;
   }
 }
 
@@ -476,13 +475,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
-      deferred_end_stream_headers_(false), dispatching_(false),
-      output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
-          [&]() -> void { this->onBelowLowWatermark(); },
-          [&]() -> void { this->onAboveHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
-  output_buffer_->setWatermarks(connection.bufferLimit());
+      deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
+      max_headers_count_(max_headers_count) {
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
 }
 
@@ -636,18 +630,18 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 
 Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ASSERT(codec_status_.ok() && dispatching_);
-  auto [nread, rc] = parser_->execute(slice, len);
+  const size_t nread = parser_->execute(slice, len);
   if (!codec_status_.ok()) {
     return codec_status_;
   }
 
-  if (rc != parser_->statusToInt(ParserStatus::Success) &&
-      rc != parser_->statusToInt(ParserStatus::Paused)) {
+  const ParserStatus status = parser_->getStatus();
+  if (status != ParserStatus::Success && status != ParserStatus::Paused) {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
     codec_status_ =
-        codecProtocolError(absl::StrCat("http/1.1 protocol error: ", parser_->errnoName(rc)));
+        codecProtocolError(absl::StrCat("http/1.1 protocol error: ", parser_->errorMessage()));
     return codec_status_;
   }
 
@@ -964,7 +958,17 @@ ServerConnectionImpl::ServerConnectionImpl(
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
       }),
-      headers_with_underscores_action_(headers_with_underscores_action) {}
+      owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
+      headers_with_underscores_action_(headers_with_underscores_action),
+      runtime_lazy_read_disable_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {
+  owned_output_buffer_->setWatermarks(connection.bufferLimit());
+  // Inform parent
+  output_buffer_ = owned_output_buffer_.get();
+}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
   // Add in the size of the request URL if processing request headers.
@@ -1143,13 +1147,39 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   }
 }
 
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
+  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
+      active_request_->remote_complete_) {
+    // Eagerly read disable the connection if the downstream is sending pipelined requests as we
+    // serially process them. Reading from the connection will be re-enabled after the active
+    // request is completed.
+    active_request_->response_encoder_.readDisable(true);
+    return okStatus();
+  }
+
+  Http::Status status = ConnectionImpl::dispatch(data);
+
+  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
+      active_request_->remote_complete_) {
+    // Read disable the connection if the downstream is sending additional data while we are working
+    // on an existing request. Reading from the connection will be re-enabled after the active
+    // request is completed.
+    if (data.length() > 0) {
+      active_request_->response_encoder_.readDisable(true);
+    }
+  }
+  return status;
+}
+
 ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
   ASSERT(!handling_upgrade_);
   if (active_request_) {
 
     // The request_decoder should be non-null after we've called the newStream on callbacks.
     ASSERT(active_request_->request_decoder_);
-    active_request_->response_encoder_.readDisable(true);
+    if (!runtime_lazy_read_disable_) {
+      active_request_->response_encoder_.readDisable(true);
+    }
     active_request_->remote_complete_ = true;
 
     if (deferred_end_stream_headers_) {
@@ -1245,7 +1275,15 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count) {}
+                     max_response_headers_count),
+      owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): handle overflow watermark */ })) {
+  owned_output_buffer_->setWatermarks(connection.bufferLimit());
+  // Inform parent
+  output_buffer_ = owned_output_buffer_.get();
+}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {

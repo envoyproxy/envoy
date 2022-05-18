@@ -437,15 +437,6 @@ bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 const std::string& getProtocolString(const Protocol p);
 
 /**
- * Return the scheme of the request.
- * For legacy code (envoy.reloadable_features.correct_scheme_and_xfp == false) this
- * will be the value of the X-Forwarded-Proto header value. By default it will
- * return the scheme if present, otherwise the value of X-Forwarded-Proto if
- * present.
- */
-absl::string_view getScheme(const RequestHeaderMap& headers);
-
-/**
  * Constructs the original URI sent from the client from
  * the request headers.
  * @param request headers from the original request
@@ -629,6 +620,11 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
  * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
  */
 bool isSafeRequest(Http::RequestHeaderMap& request_headers);
+
+/**
+ * Return the GatewayTimeout HTTP code to indicate the request is full received.
+ */
+Http::Code maybeRequestTimeoutCode(bool remote_decode_complete);
 
 } // namespace Utility
 } // namespace Http

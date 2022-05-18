@@ -26,6 +26,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -1160,6 +1161,10 @@ TEST_F(HttpFilterTest, MetadataContext) {
   - jazz.sax
   - rock.guitar
   - hiphop.drums
+  - blues.piano
+  typed_metadata_context_namespaces:
+  - jazz.sax
+  - blues.piano
   )EOF");
 
   const std::string yaml = R"EOF(
@@ -1173,6 +1178,16 @@ TEST_F(HttpFilterTest, MetadataContext) {
     rock.guitar:
       hendrix: jimi
       richards: keith
+  typed_filter_metadata:
+    blues.piano:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: jack dupree
+    jazz.sax:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: shorter wayne
+    rock.bass:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: geddy lee
   )EOF";
 
   envoy::config::core::v3::Metadata metadata;
@@ -1213,6 +1228,24 @@ TEST_F(HttpFilterTest, MetadataContext) {
 
   EXPECT_EQ(0,
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
+
+  helloworld::HelloRequest hello;
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("blues.piano")
+      .UnpackTo(&hello);
+  EXPECT_EQ("jack dupree", hello.name());
+
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("jazz.sax")
+      .UnpackTo(&hello);
+  EXPECT_EQ("shorter wayne", hello.name());
+
+  EXPECT_EQ(
+      0, check_request.attributes().metadata_context().typed_filter_metadata().count("rock.bass"));
 }
 
 // Test that filter can be disabled via the filter_enabled field.
@@ -1684,18 +1717,6 @@ TEST_P(HttpFilterTestParam, NoRoute) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-}
-
-// Test that the authentication will be skipped when the filter_callbacks has no route(both
-// direct response and redirect have no route) when the runtime flag
-// `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect` is false.
-TEST_P(HttpFilterTestParam, NoRouteWithSkipAuth) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
-        "false"}});
-  EXPECT_CALL(*decoder_filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 // Test that the request is stopped till there is an OK response back after which it continues on.

@@ -5,13 +5,17 @@ namespace {
 
 class MultiEnvoyTest : public HttpProtocolIntegrationTest {
 public:
+  void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.disallow_global_stats", "true");
+    HttpProtocolIntegrationTest::initialize();
+  }
+
   ~MultiEnvoyTest() override { test_server_.reset(); }
 
   // Create an envoy in front of the original Envoy.
   void createL1Envoy();
 
   IntegrationTestServerPtr l1_server_;
-  Thread::SkipAsserts skip_;
 };
 
 void MultiEnvoyTest::createL1Envoy() {
@@ -48,7 +52,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiEnvoyTest,
 // This test does not currently support mixed protocol hops, or much of the other envoy test
 // framework knobs.
 TEST_P(MultiEnvoyTest, SimpleRequestAndResponse) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.no_runtime_singleton", "true");
+  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "true");
   initialize();
   createL1Envoy();
 
@@ -57,6 +61,36 @@ TEST_P(MultiEnvoyTest, SimpleRequestAndResponse) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   EXPECT_EQ(1, test_server_->counter("http.config_test.rq_total"));
   EXPECT_EQ(1, l1_server_->counter("http.config_test.rq_total"));
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  l1_server_.reset();
+
+  // At the point that the l1 is shut down, requests to the L2 should work.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Similar to SimpleRequestAndResponse but tear down the L2 first.
+TEST_P(MultiEnvoyTest, SimpleRequestAndResponseL2Teardown) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "true");
+  initialize();
+  createL1Envoy();
+
+  codec_client_ = makeHttpConnection(lookupPort("http_l1"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter("http.config_test.rq_total"));
+  EXPECT_EQ(1, l1_server_->counter("http.config_test.rq_total"));
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_.reset();
+
+  // At the point that the l2 is shut down, requests to the L2 should 503.
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   l1_server_.reset();
 }

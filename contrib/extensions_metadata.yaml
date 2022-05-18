@@ -53,3 +53,13 @@ envoy.bootstrap.vcl:
   - envoy.bootstrap
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.matching.input_matchers.hyperscan:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.language:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

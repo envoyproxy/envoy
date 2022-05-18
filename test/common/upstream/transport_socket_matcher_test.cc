@@ -32,6 +32,7 @@ class FakeTransportSocketFactory : public Network::TransportSocketFactory {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsConstSharedPtr), (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
@@ -57,6 +58,7 @@ public:
               (Network::TransportSocketOptionsConstSharedPtr), (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
 
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
@@ -109,7 +111,7 @@ protected:
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
   Network::TransportSocketFactoryPtr mock_default_factory_;
   Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
 };
 
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactoryWhenNoMatch) {

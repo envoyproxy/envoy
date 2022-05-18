@@ -98,11 +98,16 @@ void ActiveStreamFilterBase::commonContinue() {
 
   doMetadata();
 
+  // It is possible for trailers to be added during doData(). doData() itself handles continuation
+  // of trailers for the non-continuation case. Thus, we must keep track of whether we had
+  // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
+  // on doData() to do so.
+  const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
-    doData(complete() && !hasTrailers());
+    doData(complete() && !had_trailers_before_data);
   }
 
-  if (hasTrailers()) {
+  if (had_trailers_before_data) {
     doTrailers();
   }
 
@@ -614,9 +619,6 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
 
-  const bool fix_added_trailers =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_added_trailers");
-
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
   if (state_.local_complete_) {
@@ -703,9 +705,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
     if (!trailers_exists_at_start && filter_manager_callbacks_.requestTrailers() &&
         trailers_added_entry == decoder_filters_.end()) {
-      if (fix_added_trailers) {
-        end_stream = false;
-      }
+      end_stream = false;
       trailers_added_entry = entry;
     }
 
@@ -714,11 +714,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added trailers.
-      if (fix_added_trailers) {
-        break;
-      } else {
-        return;
-      }
+      break;
     }
   }
 
@@ -915,7 +911,6 @@ void FilterManager::sendLocalReply(
   }
 
   stream_info_.setResponseCodeDetails(details);
-
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
