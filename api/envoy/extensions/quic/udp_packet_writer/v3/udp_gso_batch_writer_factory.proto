@@ -11,7 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/qui
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: UDP packet writer config]
-// [#extension: envoy.quic.udp_packet_writer.server.quiche]
+// [#extension: envoy.quic.udp_packet_writer.gso]
 
 // Configuration for the UDP GSO batch packet writer factory.
 message UdpGsoBatchWriterFactory {

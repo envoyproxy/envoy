@@ -225,24 +225,6 @@ udp_listener_config:
       "@type": type.googleapis.com/envoy.extensions.quic.udp_packet_writer.v3.UdpDefaultWriterFactory
   )EOF",
                                                  Network::Address::IpVersion::v4);
-  if (use_matcher_) {
-    yaml = yaml + R"EOF(
-filter_chain_matcher:
-  matcher_tree:
-    input:
-      name: transport
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
-    exact_match_map:
-      map:
-        "quic":
-          action:
-            name: foo
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: foo
-    )EOF";
-  }
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
   // Configure GSO support but later verify that the default writer is used instead.
