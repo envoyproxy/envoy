@@ -77,7 +77,8 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 }
 } // namespace
 
-std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+std::vector<Network::FilterFactoryCb>
+ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
@@ -109,7 +110,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
 }
 
 std::vector<Network::ListenerFilterFactoryCb>
-ProdListenerComponentFactory::createListenerFilterFactoryList_(
+ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::ListenerFilterFactoryCb> ret;
@@ -134,7 +135,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 }
 
 std::vector<Network::UdpListenerFilterFactoryCb>
-ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::UdpListenerFilterFactoryCb> ret;

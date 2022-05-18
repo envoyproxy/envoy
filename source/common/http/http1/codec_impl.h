@@ -349,8 +349,8 @@ private:
   Envoy::StatusOr<ParserStatus> onHeadersComplete() override;
   void bufferBody(const char* data, size_t length) override;
   StatusOr<ParserStatus> onMessageComplete() override;
-  int setAndCheckCallbackStatus(Http::Status&& status) override;
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
+  ParserStatus setAndCheckCallbackStatus(Http::Status&& status) override;
+  ParserStatus setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
 
   // Connection specific callback methods.
   virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;

@@ -5151,7 +5151,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
                      Configuration::ListenerFactoryContext& context)
                      -> std::vector<Network::ListenerFilterFactoryCb> {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(filters,
+                                                                                     context);
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));

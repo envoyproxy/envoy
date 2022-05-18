@@ -134,17 +134,6 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_server_stats_impl_lib",
-    hdrs = [
-        "quiche_server_stats_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quiche_udp_socket_platform_impl_lib",
     hdrs = select({
         "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],

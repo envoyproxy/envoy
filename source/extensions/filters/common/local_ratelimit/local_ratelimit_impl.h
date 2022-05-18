@@ -36,9 +36,11 @@ private:
     mutable std::atomic<uint32_t> tokens_;
     MonotonicTime fill_time_;
   };
+  int64_t counter_{0};
   struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
     std::shared_ptr<TokenState> token_state_;
     RateLimit::TokenBucket token_bucket_;
+    int64_t multiplier_;
     std::string toString() const {
       std::vector<std::string> entries;
       entries.reserve(entries_.size());
