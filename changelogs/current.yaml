@@ -57,9 +57,6 @@ minor_behavior_changes:
     get route config factories by the configuration proto full names by default. This behavior change
     can be reverted by setting the ``envoy.reloadable_features.get_route_config_factory_by_type``
     runtime flag to false.
-- area: dubbo_proxy
-  change: |
-    add metadata_match in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteAction>` support to the dubbo proxy.
 
 bug_fixes:
 - area: runtime
@@ -154,6 +151,9 @@ new_features:
 - area: http
   change: |
     added :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
+- area: dubbo_proxy
+  change: |
+    add metadata_match in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteAction>` support to the dubbo proxy.
 
 deprecated:
 - area: dubbo_proxy
