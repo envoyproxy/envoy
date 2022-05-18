@@ -100,12 +100,10 @@ def swift_repos():
         url = "https://github.com/realm/SwiftLint/releases/download/0.47.1/portable_swiftlint.zip",
     )
 
-    # TODO(jpsim): Update to the next release which includes https://github.com/buildbuddy-io/rules_xcodeproj/pull/407
     http_archive(
         name = "com_github_buildbuddy_io_rules_xcodeproj",
-        sha256 = "af9f6ebbf4d7c83cf35d7ced0b9d13fd6e91e9da5e4ceaf06614ed8caeab45aa",
-        strip_prefix = "rules_xcodeproj-96f59d785e8ec226b74af0586f856770b5e7e60c",
-        url = "https://github.com/buildbuddy-io/rules_xcodeproj/archive/96f59d785e8ec226b74af0586f856770b5e7e60c.tar.gz",
+        sha256 = "5a902801e2337fc14faeb2613d70202f2dd4755bba3d94ba068c1f622edba89e",
+        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/0.3.0/release.tar.gz",
     )
 
 def kotlin_repos():
