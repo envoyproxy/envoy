@@ -205,9 +205,9 @@ ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
   auto listener = findActiveListenerByTag(listener_tag);
   if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    auto udp_listener = listener->get().per_address_details_[0]->udpListener();
     for (auto& details : listener->get().per_address_details_) {
       if (*details->address_ == address) {
+        auto udp_listener = details->udpListener();
         ASSERT(udp_listener.has_value());
         return details->udpListener();
       }
