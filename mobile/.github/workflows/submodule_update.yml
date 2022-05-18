@@ -24,6 +24,14 @@ jobs:
           echo "Detected changes..."
           echo "::set-output name=dirty::true"
         fi
+    - name: Get current support maintainer
+      if: steps.state.outputs.dirty == 'true'
+      id: support
+      run: |
+        maintainers_file=".github/lyft_maintainers.yml"
+        first_line="$(head -n 1 "$maintainers_file")"
+        current=${first_line#"current: "}
+        echo "::set-output name=maintainer::$current"
     - name: Create PR
       if: steps.state.outputs.dirty == 'true'
       uses: peter-evans/create-pull-request@v3
@@ -39,3 +47,4 @@ jobs:
         delete-branch: true
         branch: update-envoy
         branch-suffix: short-commit-hash
+        reviewers: ${{ steps.support.outputs.maintainer }}
