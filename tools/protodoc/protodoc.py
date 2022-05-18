@@ -3,10 +3,12 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
-from collections import defaultdict
 import json
+import logging
 import functools
 import sys
+from collections import defaultdict
+from functools import cached_property
 
 from google.protobuf import json_format
 from bazel_tools.tools.python.runfiles import runfiles
@@ -22,6 +24,7 @@ from jinja2 import Template
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from envoy.base import utils
+from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
@@ -33,6 +36,8 @@ from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
+
+logger = logging.getLogger(__name__)
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
@@ -723,6 +728,10 @@ class RstFormatVisitor(visitor.Visitor):
         self.protodoc_manifest = manifest_pb2.Manifest()
         json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 
+    @cached_property
+    def backticks_check(self):
+        return BackticksCheck()
+
     def visit_enum(self, enum_proto, type_context):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
@@ -751,10 +760,14 @@ class RstFormatVisitor(visitor.Visitor):
         if hide_not_implemented(leading_comment):
             return ''
 
-        return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
+        message = anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+        error = self.backticks_check(message)
+        if error:
+            logger.warning(f"Bad RST ({msg_proto.name}): {error}")
+        return message
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
         # If there is a file-level 'not-implemented-hide' annotation then return empty string.
