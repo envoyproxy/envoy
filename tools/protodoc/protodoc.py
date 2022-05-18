@@ -154,18 +154,6 @@ def build_categories(extensions_db):
 EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
 CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
 
-V2_LINK_TEMPLATE = Template(
-    """
-This documentation is for the Envoy v3 API.
-
-As of Envoy v1.18 the v2 API has been removed and is no longer supported.
-
-If you are upgrading from v2 API config you may wish to view the v2 API documentation:
-
-    :ref:`{{v2_text}} <{{v2_url}}>`
-
-""")
-
 
 class ProtodocError(Exception):
     """Base error class for the protodoc module."""
@@ -320,7 +308,7 @@ def format_extension_category(extension_category):
         contrib_extensions=sorted(contrib_extensions))
 
 
-def format_header_from_file(style, source_code_info, proto_name, v2_link):
+def format_header_from_file(style, source_code_info, proto_name):
     """Format RST header based on special file level title
 
     Args:
@@ -341,10 +329,10 @@ def format_header_from_file(style, source_code_info, proto_name, v2_link):
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
-        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[
+                annotations.DOC_TITLE_ANNOTATION]) + "\n\n" + formatted_extension, stripped_comment
     return anchor + format_header(
-        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
+        style, proto_name) + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -713,9 +701,6 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
-            self.v2_mapping = json.load(f)
-
         # Load as YAML, emit as JSON and then parse as proto to provide type
         # checking.
         protodoc_manifest_untyped = utils.from_yaml(
@@ -766,13 +751,6 @@ class RstFormatVisitor(visitor.Visitor):
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
 
-        v2_link = ""
-        if file_proto.name in self.v2_mapping:
-            v2_filepath = f"envoy_api_file_{self.v2_mapping[file_proto.name]}"
-            v2_text = v2_filepath.split('/', 1)[1]
-            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
-            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
-
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
         # in the common case.
@@ -786,7 +764,7 @@ class RstFormatVisitor(visitor.Visitor):
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name, v2_link)
+            '=', type_context.source_code_info, file_proto.name)
 
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
