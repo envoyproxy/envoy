@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.dlb.v3alpha;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.dlb.v3alpha";
+option java_outer_classname = "DlbProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/dlb/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dlb connection balancer configuration]
+// [#extension: envoy.network.connection_balance.dlb]
+
+// The DLB is a hardware managed system of queues and arbiters connecting producers and consumers. It is a PCI device
+// in the CPU package. It interacts with software running on cores and potentially other devices. The DLB implements the
+// load balancing features outlined earlier, including the following:
+// -  Lock-free multi-producer/multi-consumer operation.
+// -  Multiple priorities for varying traffic types.
+// -  Various distribution schemes.
+//
+// Dlb connection balancer use DLB hardware to balance connections. With it, the latency like P99 significantly reduces.
+// Since Dlb connection balancer needs help of DLB hardware, it should be used when there are big number connections
+// (e.g., Gateway).
+message Dlb {
+}
