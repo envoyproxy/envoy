@@ -1849,7 +1849,7 @@ FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) con
     filter_state = &stream_info.filterState();
   }
 
-  if (!filter_state) {
+  if (filter_state) {
     return filter_state->getDataReadOnly<StreamInfo::FilterState::Object>(key_);
   }
 
