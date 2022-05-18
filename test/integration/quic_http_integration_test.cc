@@ -408,43 +408,45 @@ public:
     for (size_t i = 0; i < concurrency_; ++i) {
       fake_upstream_connection_ = nullptr;
       upstream_request_ = nullptr;
-      auto encoder_decoder = codec_clients1[i]->startRequest(
-          Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                         {":path", "/test/long/url"},
-                                         {":scheme", "http"},
-                                         {":authority", "host"}});
-      auto& request_encoder = encoder_decoder.first;
-      auto response = std::move(encoder_decoder.second);
-      codec_clients1[i]->sendData(request_encoder, 1000, true);
-      waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                       {"set-cookie", "foo"},
-                                                                       {"set-cookie", "bar"}},
-                                       true);
+      if (i % 2) {
+        auto encoder_decoder = codec_clients1[i]->startRequest(
+            Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                           {":path", "/test/long/url"},
+                                           {":scheme", "http"},
+                                           {":authority", "host"}});
+        auto& request_encoder = encoder_decoder.first;
+        auto response = std::move(encoder_decoder.second);
+        codec_clients1[i]->sendData(request_encoder, 1000, true);
+        waitForNextUpstreamRequest();
+        upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                         {"set-cookie", "foo"},
+                                                                         {"set-cookie", "bar"}},
+                                         true);
 
-      ASSERT_TRUE(response->waitForEndStream());
-      EXPECT_TRUE(response->complete());
-      codec_clients1[i]->close();
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_TRUE(response->complete());
+        codec_clients1[i]->close();
+        codec_clients2[i]->close();
+      } else {
+        auto encoder_decoder = codec_clients2[i]->startRequest(
+            Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                           {":path", "/test/long/url"},
+                                           {":scheme", "http"},
+                                           {":authority", "host"}});
+        auto& request_encoder = encoder_decoder.first;
+        auto response = std::move(encoder_decoder.second);
+        codec_clients2[i]->sendData(request_encoder, 1000, true);
+        waitForNextUpstreamRequest();
+        upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                         {"set-cookie", "foo"},
+                                                                         {"set-cookie", "bar"}},
+                                         true);
 
-      fake_upstream_connection_ = nullptr;
-      upstream_request_ = nullptr;
-      auto encoder_decoder2 = codec_clients2[i]->startRequest(
-          Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                         {":path", "/test/long/url"},
-                                         {":scheme", "http"},
-                                         {":authority", "host"}});
-      auto& request_encoder2 = encoder_decoder2.first;
-      auto response2 = std::move(encoder_decoder2.second);
-      codec_clients2[i]->sendData(request_encoder2, 1000, true);
-      waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                       {"set-cookie", "foo"},
-                                                                       {"set-cookie", "bar"}},
-                                       true);
-
-      ASSERT_TRUE(response2->waitForEndStream());
-      EXPECT_TRUE(response2->complete());
-      codec_clients2[i]->close();
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_TRUE(response->complete());
+        codec_clients2[i]->close();
+        codec_clients1[i]->close();
+      }
     }
   }
 };
