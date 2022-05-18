@@ -26,23 +26,26 @@ using testing::StartsWith;
 namespace Envoy {
 namespace {
 
-class ListenerIntegrationTest : public HttpIntegrationTest,
-                                public Grpc::GrpcClientIntegrationParamTest {
-protected:
+class ListenerIntegrationTestBase : public HttpIntegrationTest {
+public:
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
     FakeUpstream* upstream_{};
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+  ListenerIntegrationTestBase(Network::Address::IpVersion version, const std::string& config)
+      : HttpIntegrationTest(Http::CodecType::HTTP1, version, config) {
     // TODO(ggreenway): add tag extraction rules.
     // Missing stat tag-extraction rule for stat
     // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
     skip_tag_extraction_rule_check_ = true;
   }
 
-  ~ListenerIntegrationTest() override { resetConnections(); }
+  ~ListenerIntegrationTestBase() override { resetConnections(); }
+
+  virtual void setUpGrpcRds() PURE;
+  virtual void setUpGrpcLds() PURE;
 
   void initialize() override {
     // We want to use the GRPC based LDS.
@@ -64,44 +67,12 @@ protected:
       ConfigHelper::setHttp2(*rds_cluster);
     });
 
-    config_helper_.addConfigModifier(
-        [this](
-            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                http_connection_manager) {
-          auto* rds_config = http_connection_manager.mutable_rds();
-          rds_config->set_route_config_name(route_table_name_);
-          rds_config->mutable_config_source()->set_resource_api_version(
-              envoy::config::core::v3::ApiVersion::V3);
-          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
-              rds_config->mutable_config_source()->mutable_api_config_source();
-          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-          envoy::config::core::v3::GrpcService* grpc_service =
-              rds_api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
-        });
-
+    setUpGrpcRds();
     // Note this has to be the last modifier as it nuke static_resource listeners.
     setUpGrpcLds();
     ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
 
     HttpIntegrationTest::initialize();
-  }
-
-  void setUpGrpcLds() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
-      listener_config_.set_name(listener_name_);
-      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
-      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
-      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
-      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-      envoy::config::core::v3::GrpcService* grpc_service =
-          lds_api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
-    });
   }
 
   void createUpstreams() override {
@@ -201,7 +172,98 @@ protected:
   FakeUpstreamInfo rds_upstream_info_;
 };
 
+class ListenerIntegrationTest : public ListenerIntegrationTestBase,
+                                public Grpc::GrpcClientIntegrationParamTest {
+public:
+  ListenerIntegrationTest()
+      : ListenerIntegrationTestBase(ipVersion(),
+                                    ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/false,
+                                                                  /*multiple_addresses=*/false)) {}
+
+  void setUpGrpcRds() override {
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                http_connection_manager) {
+          auto* rds_config = http_connection_manager.mutable_rds();
+          rds_config->set_route_config_name(route_table_name_);
+          rds_config->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
+              rds_config->mutable_config_source()->mutable_api_config_source();
+          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+          envoy::config::core::v3::GrpcService* grpc_service =
+              rds_api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+        });
+  }
+
+  void setUpGrpcLds() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name(listener_name_);
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      envoy::config::core::v3::GrpcService* grpc_service =
+          lds_api_config_source->add_grpc_services();
+      setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+  }
+};
+
+class ListenerMultiAddressesIntegrationTest : public ListenerIntegrationTestBase,
+                                              public Grpc::GrpcClientIntegrationParamTest {
+public:
+  ListenerMultiAddressesIntegrationTest()
+      : ListenerIntegrationTestBase(ipVersion(),
+                                    ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/false,
+                                                                  /*multiple_addresses=*/true)) {}
+
+  void setUpGrpcRds() override {
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                http_connection_manager) {
+          auto* rds_config = http_connection_manager.mutable_rds();
+          rds_config->set_route_config_name(route_table_name_);
+          rds_config->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
+              rds_config->mutable_config_source()->mutable_api_config_source();
+          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+          envoy::config::core::v3::GrpcService* grpc_service =
+              rds_api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+        });
+  }
+
+  void setUpGrpcLds() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name(listener_name_);
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      envoy::config::core::v3::GrpcService* grpc_service =
+          lds_api_config_source->add_grpc_services();
+      setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerMultiAddressesIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Tests that an update with an unknown filter config proto is rejected.
@@ -380,19 +442,9 @@ TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 }
 
-TEST_P(ListenerIntegrationTest, BasicSuccessWithMultiAddresses) {
+TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
   on_server_init_function_ = [&]() {
     createLdsStream();
-    listener_config_.clear_address();
-    auto address1 = listener_config_.mutable_address();
-    envoy::config::core::v3::SocketAddress& socket_address1 = *address1->mutable_socket_address();
-    socket_address1.set_address("127.0.0.1");
-    socket_address1.set_port_value(0);
-    auto address2 = listener_config_.add_additional_addresses();
-    envoy::config::core::v3::SocketAddress& socket_address2 =
-        *address2->mutable_address()->mutable_socket_address();
-    socket_address2.set_address("127.0.0.1");
-    socket_address2.set_port_value(0);
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
@@ -429,9 +481,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithMultiAddresses) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"server_id", "cluster_0, backend_0"}};
 
-  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
   auto response = sendRequestAndWaitForResponse(
       Http::TestResponseHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
@@ -443,9 +493,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithMultiAddresses) {
   // Wait for the client to be disconnected.
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
-  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address2"))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+  codec_client_ = makeHttpConnection(lookupPort("address2"));
   auto response2 = sendRequestAndWaitForResponse(
       Http::TestResponseHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
@@ -573,18 +621,10 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 }
 
 // This is multiple addresses version test for the above one.
-TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
+TEST_P(ListenerMultiAddressesIntegrationTest,
+       MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
   on_server_init_function_ = [&]() {
     createLdsStream();
-    listener_config_.clear_address();
-    auto* address1 = listener_config_.mutable_address();
-    envoy::config::core::v3::SocketAddress& socket_address1 = *address1->mutable_socket_address();
-    socket_address1.set_address("127.0.0.1");
-    socket_address1.set_port_value(0);
-    auto* address2 = listener_config_.add_additional_addresses();
-    envoy::config::core::v3::SocketAddress& socket_address2 = *address2->mutable_address()->mutable_socket_address();
-    socket_address2.set_address("127.0.0.1");
-    socket_address2.set_port_value(0);
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
@@ -615,9 +655,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactoryWith
   // NOTE: The line above doesn't tell you if listener is up and listening.
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   // Make a connection to the listener from version 1.
-  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
 
   for (int version = 2; version <= 10; version++) {
     // Touch the metadata to get a different hash.
@@ -640,10 +678,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactoryWith
                                                      {"server_id", "cluster_0, backend_0"}};
 
     // Make a new connection to the new listener's first address.
-    codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-        Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
-        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
-        nullptr));
+    codec_client_ = makeHttpConnection(lookupPort("address1"));
     auto response = sendRequestAndWaitForResponse(
         Http::TestResponseHeaderMapImpl{
             {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
@@ -656,10 +691,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactoryWith
     ASSERT_TRUE(codec_client_->waitForDisconnect());
 
     // Make a new connection to the new listener's second address.
-    codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-        Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address2"))),
-        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
-        nullptr));
+    codec_client_ = makeHttpConnection(lookupPort("address2"));
     auto response2 = sendRequestAndWaitForResponse(
         Http::TestResponseHeaderMapImpl{
             {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
@@ -670,18 +702,9 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactoryWith
   }
 }
 
-TEST_P(ListenerIntegrationTest, MultipleAddressesListenerInPlaceUpdate) {
+TEST_P(ListenerMultiAddressesIntegrationTest, MultipleAddressesListenerInPlaceUpdate) {
   on_server_init_function_ = [&]() {
     createLdsStream();
-    listener_config_.clear_address();
-    auto* address1 = listener_config_.mutable_address();
-    envoy::config::core::v3::SocketAddress& socket_address1 = *address1->mutable_socket_address();
-    socket_address1.set_address("127.0.0.1");
-    socket_address1.set_port_value(0);
-    auto* address2 = listener_config_.add_additional_addresses();
-    envoy::config::core::v3::SocketAddress& socket_address2 = *address2->mutable_address()->mutable_socket_address();
-    socket_address2.set_address("127.0.0.1");
-    socket_address2.set_port_value(0);
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
@@ -728,9 +751,7 @@ TEST_P(ListenerIntegrationTest, MultipleAddressesListenerInPlaceUpdate) {
                                                    {"server_id", "cluster_0, backend_0"}};
 
   // Make a new connection to the new listener's first address.
-  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address1"))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
 
   auto response1 = sendRequestAndWaitForResponse(
       Http::TestResponseHeaderMapImpl{
@@ -744,9 +765,7 @@ TEST_P(ListenerIntegrationTest, MultipleAddressesListenerInPlaceUpdate) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Make a new connection to the new listener's second address.
-  codec_client_ = makeHttpConnection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", lookupPort("address2"))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+  codec_client_ = makeHttpConnection(lookupPort("address2"));
 
   auto response2 = sendRequestAndWaitForResponse(
       Http::TestResponseHeaderMapImpl{
