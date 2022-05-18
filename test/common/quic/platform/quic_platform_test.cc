@@ -360,21 +360,11 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicBranchPrediction) {
-  GetLogger().set_level(spdlog::level::info);
-
-  if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
-    QUIC_LOG(INFO) << "Go buy some lottery tickets.";
-  } else {
-    QUIC_LOG(INFO) << "As predicted.";
-  }
-}
-
 TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
-  QUIC_NOTREACHED(); // Expect no-op.
+  QUICHE_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "reached unexpected code");
+  EXPECT_DEATH(QUICHE_NOTREACHED(), "reached unexpected code");
 #endif
 }
 
