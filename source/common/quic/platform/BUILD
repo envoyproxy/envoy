@@ -167,10 +167,3 @@ envoy_quiche_platform_impl_cc_library(
     tags = ["nofips"],
     deps = ["//envoy/http:header_map_interface"],
 )
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_export_impl_lib",
-    hdrs = ["quiche_export_impl.h"],
-    external_deps = ["abseil_base"],
-    tags = ["nofips"],
-)

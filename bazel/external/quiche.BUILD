@@ -5052,6 +5052,13 @@ envoy_quiche_platform_impl_cc_library(
     ],
 )
 
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
+    hdrs = [
+        "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
+    ],
+)
+
 envoy_cc_library(
     name = "quiche_common_platform_export",
     hdrs = [
@@ -5061,7 +5068,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "@envoy//source/common/quic/platform:quiche_export_impl_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
     ],
 )
 
