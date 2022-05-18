@@ -134,6 +134,7 @@ TEST(StartTlsTest, CallbackProxy) {
   // Connected should only called once. When ssl_socket takes over it also raises Connected,
   // which we don't want to propagate.
   EXPECT_CALL(transport_callbacks, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(transport_callbacks, flushWriteBuffer);
   proxy->raiseEvent(Network::ConnectionEvent::Connected);
   proxy->raiseEvent(Network::ConnectionEvent::Connected);
 
@@ -144,6 +145,7 @@ TEST(StartTlsTest, CallbackProxy) {
 
   // Connected should get raised again after !Connected but only once
   EXPECT_CALL(transport_callbacks, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(transport_callbacks, flushWriteBuffer);
   proxy->raiseEvent(Network::ConnectionEvent::Connected);
   proxy->raiseEvent(Network::ConnectionEvent::Connected);
 
