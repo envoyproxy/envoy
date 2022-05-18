@@ -424,6 +424,13 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
 
   fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       FORWARD_ONLY;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto listener = config_helper_.buildBaseListener(
+        "with_stat_prefix", Network::Test::getLoopbackAddressString(version_));
+    listener.set_stat_prefix("my_prefix");
+    *listener.mutable_filter_chains() = bootstrap.static_resources().listeners(0).filter_chains();
+    *bootstrap.mutable_static_resources()->add_listeners() = listener;
+  });
   initialize();
 
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
@@ -460,6 +467,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {listenerStatPrefix("server_ssl_socket_factory.downstream_context_secrets_not_ready"),
        "listener.server_ssl_socket_factory.downstream_context_secrets_not_ready"},
       {listenerStatPrefix("downstream_cx_total"), "listener.downstream_cx_total"},
+      {"listener.my_prefix.downstream_cx_total", "listener.downstream_cx_total"},
       {listenerStatPrefix("downstream_cx_destroy"), "listener.downstream_cx_destroy"},
       {listenerStatPrefix("ssl.ocsp_staple_requests"), "listener.ssl.ocsp_staple_requests"},
       {listenerStatPrefix("ssl.handshake"), "listener.ssl.handshake"},
@@ -658,10 +666,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"cluster.cluster_0.upstream_flow_control_drained_total",
        "cluster.upstream_flow_control_drained_total"},
       {"listener_manager.listener_removed", "listener_manager.listener_removed"},
-      {"listener.admin.downstream_cx_destroy", "listener.downstream_cx_destroy"},
-      {"listener.admin.downstream_cx_total", "listener.downstream_cx_total"},
-      {"listener.admin.downstream_cx_proxy_proto_error",
-       "listener.downstream_cx_proxy_proto_error"},
       {"cluster.cluster_0.upstream_rq_completed", "cluster.upstream_rq_completed"},
       {"cluster.cluster_0.bind_errors", "cluster.bind_errors"},
       {"cluster.cluster_0.upstream_rq_max_duration_reached",
@@ -837,7 +841,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_cx_http3_active", "http.downstream_cx_http3_active"},
       {"listener_manager.lds.update_time", "listener_manager.lds.update_time"},
       {"cluster_manager.active_clusters", "cluster_manager.active_clusters"},
-      {"listener.admin.downstream_cx_active", "listener.downstream_cx_active"},
       {"http.admin.downstream_cx_http2_active", "http.downstream_cx_http2_active"},
       {"runtime.admin_overrides_active", "runtime.admin_overrides_active"},
       {"server.memory_heap_size", "server.memory_heap_size"},
@@ -933,64 +936,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
     test_name_against_mapping(tag_extracted_gauge_map, *gauge);
   }
   EXPECT_EQ(tag_extracted_gauge_map, MetricMap{});
-}
-
-// Test that the old setting works with the appropriate runtime override disabled.
-TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTestDeprecatedListenerStatPrefix) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.listener_stat_prefix_tag_extraction",
-                                    "false");
-  fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      FORWARD_ONLY;
-  initialize();
-
-  absl::node_hash_map<std::string, std::string> tag_extracted_counter_map;
-  absl::node_hash_map<std::string, std::string> tag_extracted_gauge_map;
-
-  tag_extracted_counter_map = {
-      {listenerStatPrefix("downstream_cx_total"), "listener.downstream_cx_total"},
-      {listenerStatPrefix("http.router.downstream_rq_5xx"), "listener.http.downstream_rq_xx"},
-      {listenerStatPrefix("http.router.downstream_rq_4xx"), "listener.http.downstream_rq_xx"},
-      {listenerStatPrefix("http.router.downstream_rq_3xx"), "listener.http.downstream_rq_xx"},
-      {listenerStatPrefix("downstream_cx_destroy"), "listener.downstream_cx_destroy"},
-      {listenerStatPrefix("downstream_cx_proxy_proto_error"),
-       "listener.downstream_cx_proxy_proto_error"},
-      {listenerStatPrefix("http.router.downstream_rq_2xx"), "listener.http.downstream_rq_xx"},
-      {listenerStatPrefix("ssl.connection_error"), "listener.ssl.connection_error"},
-      {listenerStatPrefix("ssl.handshake"), "listener.ssl.handshake"},
-      {listenerStatPrefix("ssl.session_reused"), "listener.ssl.session_reused"},
-      {listenerStatPrefix("ssl.fail_verify_san"), "listener.ssl.fail_verify_san"},
-      {listenerStatPrefix("ssl.no_certificate"), "listener.ssl.no_certificate"},
-      {listenerStatPrefix("ssl.fail_verify_no_cert"), "listener.ssl.fail_verify_no_cert"},
-      {listenerStatPrefix("ssl.fail_verify_error"), "listener.ssl.fail_verify_error"},
-      {listenerStatPrefix("ssl.fail_verify_cert_hash"), "listener.ssl.fail_verify_cert_hash"},
-      {"listener.admin.downstream_cx_destroy", "listener.admin.downstream_cx_destroy"},
-      {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total"},
-      {"listener.admin.downstream_cx_proxy_proto_error",
-       "listener.admin.downstream_cx_proxy_proto_error"},
-  };
-  tag_extracted_gauge_map = {
-      {listenerStatPrefix("downstream_cx_active"), "listener.downstream_cx_active"},
-      {"listener.admin.downstream_cx_active", "listener.admin.downstream_cx_active"},
-  };
-
-  auto test_name_against_mapping =
-      [](const absl::node_hash_map<std::string, std::string>& extracted_name_map,
-         const Stats::Metric& metric) {
-        auto it = extracted_name_map.find(metric.name());
-        // Ignore any metrics that are not found in the map for ease of addition
-        if (it != extracted_name_map.end()) {
-          // Check that the tag extracted name matches the "golden" state.
-          EXPECT_EQ(it->second, metric.tagExtractedName());
-        }
-      };
-
-  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
-    test_name_against_mapping(tag_extracted_counter_map, *counter);
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : test_server_->gauges()) {
-    test_name_against_mapping(tag_extracted_gauge_map, *gauge);
-  }
 }
 } // namespace Xfcc
 } // namespace Envoy

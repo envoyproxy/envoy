@@ -70,6 +70,7 @@ public:
     const std::string name_;
     const std::string regex_;
     const std::string substr_;
+    const std::string negative_match_; // A value that will not match as the extracted tag value.
     const Regex::Type re_type_;
   };
 
@@ -143,7 +144,8 @@ public:
   }
 
 private:
-  void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
+  void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "",
+              const std::string& negative_matching_value = "");
 
   // See class doc for TagExtractorTokensImpl in
   // source/common/stats/tag_extractor_impl.h for details on the format of
