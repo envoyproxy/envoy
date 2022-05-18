@@ -21,7 +21,7 @@
 #include "source/extensions/filters/network/thrift_proxy/stats.h"
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
 
-#include "absl/types/any.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,6 +71,12 @@ public:
   DecoderEventHandler& newDecoderEventHandler() override;
   bool passthroughEnabled() const override;
   bool isRequest() const override { return true; }
+
+  using FilterContext =
+      absl::variant<absl::monostate, MessageMetadataSharedPtr, Buffer::Instance*,
+                    std::tuple<std::string, FieldType, int16_t>, bool, uint8_t, int16_t, int32_t,
+                    int64_t, double, std::string, std::tuple<FieldType, FieldType, uint32_t>,
+                    std::tuple<FieldType, uint32_t>>;
 
 private:
   struct ActiveRpc;
@@ -322,7 +328,7 @@ private:
                               std::list<std::unique_ptr<FilterType>>& filter_list,
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
-    // Helper to setup filter_action_ and filter_context_
+    // Helper to setup filter_action_
     void prepareFilterAction(DecoderEvent event);
 
     void finalizeRequest();
@@ -345,7 +351,7 @@ private:
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-    absl::any filter_context_;
+    FilterContext filter_context_;
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
     bool passthrough_ : 1;
