@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
@@ -45,42 +45,13 @@ envoy_entry_point(
 )
 
 py_binary(
-    name = "versions_check",
-    srcs = ["versions_check.py"],
-    args = [
-        "$(location //:VERSION.txt)",
-        "$(locations //changelogs)",
-    ],
-    data = [
-        "//:VERSION.txt",
-        "//changelogs",
-    ],
-    deps = [
-        ":project",
-        requirement("aio.run.checker"),
-    ],
-)
-
-py_library(
-    name = "project",
-    srcs = [
-        "project.py",
-    ],
-    deps = [
-        requirement("frozendict"),
-        requirement("packaging"),
-        requirement("pyyaml"),
-    ],
-)
-
-py_binary(
     name = "generate_version_histories",
     srcs = [
         "generate_version_histories.py",
     ],
     deps = [
-        ":project",
         requirement("aio.run.runner"),
+        requirement("envoy.base.utils"),
         requirement("frozendict"),
         requirement("jinja2"),
         requirement("packaging"),

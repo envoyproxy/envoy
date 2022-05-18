@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package test.integration.filters;
 
+// Configuration for inspector listener filter
+message TestInspectorFilterConfig {
+}
+
 // Configuration for UDP listener filter test
 message TestUdpListenerFilterConfig {
 }
