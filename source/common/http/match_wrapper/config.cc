@@ -1,16 +1,15 @@
 #include "source/common/http/match_wrapper/config.h"
 
+#include <memory>
+
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/http/matching/data_impl.h"
-#include "source/common/matcher/matcher.h"
 
 #include "absl/status/status.h"
-#include <memory>
 
 namespace Envoy {
 namespace Common {
@@ -69,191 +68,6 @@ private:
   absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
-class DelegatingStreamFilter : public Envoy::Http::StreamFilter {
-public:
-  using MatchDataUpdateFunc = std::function<void(Envoy::Http::Matching::HttpMatchingDataImpl&)>;
-
-  class FilterMatchState {
-  public:
-    FilterMatchState(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
-        : match_tree_(std::move(match_tree)), has_match_tree_(match_tree_ != nullptr) {}
-
-    void evaluateMatchTree(MatchDataUpdateFunc data_update_func) {
-      if (!has_match_tree_ || match_tree_evaluated_) {
-        return;
-      }
-      ASSERT(matching_data_ != nullptr);
-      data_update_func(*matching_data_);
-
-      const auto match_result =
-          Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*match_tree_, *matching_data_);
-
-      match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
-
-      if (match_tree_evaluated_ && match_result.result_) {
-        const auto result = match_result.result_();
-        if (SkipAction().typeUrl() == result->typeUrl()) {
-          skip_filter_ = true;
-        } else {
-          ASSERT(base_filter_ != nullptr);
-          base_filter_->onMatchCallback(*result);
-        }
-      }
-    }
-
-    bool skipFilter() const { return skip_filter_; }
-
-    void onStreamInfo(const StreamInfo::StreamInfo& stream_info) {
-      if (has_match_tree_ && matching_data_ == nullptr) {
-        matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(
-            stream_info.downstreamAddressProvider());
-      }
-    }
-    void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }
-
-  private:
-    Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
-    const bool has_match_tree_{};
-    Envoy::Http::StreamFilterBase* base_filter_{};
-
-    Envoy::Http::Matching::HttpMatchingDataImplSharedPtr matching_data_;
-    bool match_tree_evaluated_{};
-    bool skip_filter_{};
-  };
-  using FilterMatchStatePtr = std::unique_ptr<FilterMatchState>;
-
-  DelegatingStreamFilter(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree,
-                         Envoy::Http::StreamDecoderFilterSharedPtr decoder_filter,
-                         Envoy::Http::StreamEncoderFilterSharedPtr encoder_filter)
-      : match_state_(std::move(match_tree)), decoder_filter_(std::move(decoder_filter)),
-        encoder_filter_(std::move(encoder_filter)) {
-
-    ASSERT(!(decoder_filter_ == nullptr && encoder_filter_ == nullptr));
-
-    if (encoder_filter_ != nullptr) {
-      base_filter_ = encoder_filter_.get();
-    } else {
-      base_filter_ = decoder_filter_.get();
-    }
-    match_state_.setBaseFilter(base_filter_);
-  }
-
-  // Envoy::Http::StreamFilterBase
-  void onStreamComplete() override { base_filter_->onStreamComplete(); }
-  void onDestroy() override { base_filter_->onDestroy(); }
-  void onMatchCallback(const Matcher::Action& action) override {
-    base_filter_->onMatchCallback(action);
-  }
-  Envoy::Http::LocalErrorStatus onLocalReply(const LocalReplyData& data) override {
-    return base_filter_->onLocalReply(data);
-  }
-
-  // Envoy::Http::StreamDecoderFilter
-  Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
-                                                 bool end_stream) override {
-    match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
-      data.onRequestHeaders(headers);
-    });
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-    return decoder_filter_->decodeHeaders(headers, end_stream);
-  }
-  Envoy::Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterDataStatus::Continue;
-    }
-    return decoder_filter_->decodeData(data, end_stream);
-  }
-  Envoy::Http::FilterTrailersStatus
-  decodeTrailers(Envoy::Http::RequestTrailerMap& trailers) override {
-    match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
-      data.onRequestTrailers(trailers);
-    });
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterTrailersStatus::Continue;
-    }
-    return decoder_filter_->decodeTrailers(trailers);
-  }
-  Envoy::Http::FilterMetadataStatus
-  decodeMetadata(Envoy::Http::MetadataMap& metadata_map) override {
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterMetadataStatus::Continue;
-    }
-    return decoder_filter_->decodeMetadata(metadata_map);
-  }
-  void decodeComplete() override {
-    if (match_state_.skipFilter()) {
-      return;
-    }
-    decoder_filter_->decodeComplete();
-  }
-  void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override {
-    match_state_.onStreamInfo(callbacks.streamInfo());
-    decoder_filter_->setDecoderFilterCallbacks(callbacks);
-  }
-
-  // Envoy::Http::StreamEncoderFilter
-  Envoy::Http::FilterHeadersStatus
-  encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) override {
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-    return encoder_filter_->encode1xxHeaders(headers);
-  }
-  Envoy::Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
-                                                 bool end_stream) override {
-
-    match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
-      data.onResponseHeaders(headers);
-    });
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-    return encoder_filter_->encodeHeaders(headers, end_stream);
-  }
-  Envoy::Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterDataStatus::Continue;
-    }
-    return encoder_filter_->encodeData(data, end_stream);
-  }
-  Envoy::Http::FilterTrailersStatus
-  encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers) override {
-    match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
-      data.onResponseTrailers(trailers);
-    });
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterTrailersStatus::Continue;
-    }
-    return encoder_filter_->encodeTrailers(trailers);
-  }
-  Envoy::Http::FilterMetadataStatus
-  encodeMetadata(Envoy::Http::MetadataMap& metadata_map) override {
-    if (match_state_.skipFilter()) {
-      return Envoy::Http::FilterMetadataStatus::Continue;
-    }
-    return decoder_filter_->decodeMetadata(metadata_map);
-  }
-  void encodeComplete() override {
-    if (match_state_.skipFilter()) {
-      return;
-    }
-    encoder_filter_->encodeComplete();
-  }
-  void setEncoderFilterCallbacks(Envoy::Http::StreamEncoderFilterCallbacks& callbacks) override {
-    match_state_.onStreamInfo(callbacks.streamInfo());
-    encoder_filter_->setEncoderFilterCallbacks(callbacks);
-  }
-
-private:
-  FilterMatchState match_state_;
-
-  Envoy::Http::StreamDecoderFilterSharedPtr decoder_filter_;
-  Envoy::Http::StreamEncoderFilterSharedPtr encoder_filter_;
-  Envoy::Http::StreamFilterBase* base_filter_{};
-};
-
 struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallbacks {
   DelegatingFactoryCallbacks(Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks,
                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
@@ -265,26 +79,15 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
         std::make_shared<DelegatingStreamFilter>(match_tree_, std::move(filter), nullptr);
     delegated_callbacks_.addStreamDecoderFilter(std::move(delegating_filter));
   }
-  void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr,
-                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>) override {
-  }
   void addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr filter) override {
     auto delegating_filter =
         std::make_shared<DelegatingStreamFilter>(match_tree_, nullptr, std::move(filter));
     delegated_callbacks_.addStreamEncoderFilter(std::move(delegating_filter));
   }
-  void addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr,
-                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>) override {
-  }
   void addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter) override {
     auto delegating_filter = std::make_shared<DelegatingStreamFilter>(match_tree_, filter, filter);
     delegated_callbacks_.addStreamFilter(std::move(delegating_filter));
   }
-
-  // This method now is unnecessary because we we needn't inject match tree to the filter chain
-  // manager.
-  void addStreamFilter(Envoy::Http::StreamFilterSharedPtr,
-                       Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>) override {}
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
     delegated_callbacks_.addAccessLogHandler(std::move(handler));
@@ -293,7 +96,157 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
   Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
+
 } // namespace
+
+void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
+    MatchDataUpdateFunc data_update_func) {
+  if (!has_match_tree_ || match_tree_evaluated_) {
+    return;
+  }
+  ASSERT(matching_data_ != nullptr);
+  data_update_func(*matching_data_);
+
+  const auto match_result =
+      Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*match_tree_, *matching_data_);
+
+  match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
+
+  if (match_tree_evaluated_ && match_result.result_) {
+    const auto result = match_result.result_();
+    if (SkipAction().typeUrl() == result->typeUrl()) {
+      skip_filter_ = true;
+    } else {
+      ASSERT(base_filter_ != nullptr);
+      base_filter_->onMatchCallback(*result);
+    }
+  }
+}
+
+DelegatingStreamFilter::DelegatingStreamFilter(
+    Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree,
+    Envoy::Http::StreamDecoderFilterSharedPtr decoder_filter,
+    Envoy::Http::StreamEncoderFilterSharedPtr encoder_filter)
+    : match_state_(std::move(match_tree)), decoder_filter_(std::move(decoder_filter)),
+      encoder_filter_(std::move(encoder_filter)) {
+
+  if (encoder_filter_ != nullptr) {
+    base_filter_ = encoder_filter_.get();
+  } else {
+    base_filter_ = decoder_filter_.get();
+  }
+  match_state_.setBaseFilter(base_filter_);
+}
+
+Envoy::Http::FilterHeadersStatus
+DelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool end_stream) {
+  match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onRequestHeaders(headers);
+  });
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+  return decoder_filter_->decodeHeaders(headers, end_stream);
+}
+
+Envoy::Http::FilterDataStatus DelegatingStreamFilter::decodeData(Buffer::Instance& data,
+                                                                 bool end_stream) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+  return decoder_filter_->decodeData(data, end_stream);
+}
+Envoy::Http::FilterTrailersStatus
+DelegatingStreamFilter::decodeTrailers(Envoy::Http::RequestTrailerMap& trailers) {
+  match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onRequestTrailers(trailers);
+  });
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterTrailersStatus::Continue;
+  }
+  return decoder_filter_->decodeTrailers(trailers);
+}
+
+Envoy::Http::FilterMetadataStatus
+DelegatingStreamFilter::decodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterMetadataStatus::Continue;
+  }
+  return decoder_filter_->decodeMetadata(metadata_map);
+}
+
+void DelegatingStreamFilter::decodeComplete() {
+  if (match_state_.skipFilter()) {
+    return;
+  }
+  decoder_filter_->decodeComplete();
+}
+
+void DelegatingStreamFilter::setDecoderFilterCallbacks(
+    Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
+  match_state_.onStreamInfo(callbacks.streamInfo());
+  decoder_filter_->setDecoderFilterCallbacks(callbacks);
+}
+
+Envoy::Http::FilterHeadersStatus
+DelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+  return encoder_filter_->encode1xxHeaders(headers);
+}
+
+Envoy::Http::FilterHeadersStatus
+DelegatingStreamFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
+
+  match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onResponseHeaders(headers);
+  });
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+  return encoder_filter_->encodeHeaders(headers, end_stream);
+}
+
+Envoy::Http::FilterDataStatus DelegatingStreamFilter::encodeData(Buffer::Instance& data,
+                                                                 bool end_stream) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+  return encoder_filter_->encodeData(data, end_stream);
+}
+
+Envoy::Http::FilterTrailersStatus
+DelegatingStreamFilter::encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers) {
+  match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onResponseTrailers(trailers);
+  });
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterTrailersStatus::Continue;
+  }
+  return encoder_filter_->encodeTrailers(trailers);
+}
+
+Envoy::Http::FilterMetadataStatus
+DelegatingStreamFilter::encodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterMetadataStatus::Continue;
+  }
+  return decoder_filter_->decodeMetadata(metadata_map);
+}
+
+void DelegatingStreamFilter::encodeComplete() {
+  if (match_state_.skipFilter()) {
+    return;
+  }
+  encoder_filter_->encodeComplete();
+}
+
+void DelegatingStreamFilter::setEncoderFilterCallbacks(
+    Envoy::Http::StreamEncoderFilterCallbacks& callbacks) {
+  match_state_.onStreamInfo(callbacks.streamInfo());
+  encoder_filter_->setEncoderFilterCallbacks(callbacks);
+}
 
 Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
@@ -331,17 +284,17 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = factory_cb();
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);
-    return filter_factory(delegated_callbacks);
+    DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
+    return filter_factory(delegating_callbacks);
   };
 }
 
 /**
  * Static registration for the match wrapper filter. @see RegisterFactory.
  * Note that we register this as a filter in order to serve as a drop in wrapper for other HTTP
- * filters. While not a real filter, by being registered as one all the code paths that look up HTTP
- * filters will look up this filter factory instead, which does the work to create and associate a
- * match tree with the underlying filter.
+ * filters. While not a real filter, by being registered as one all the code paths that look up
+ * HTTP filters will look up this filter factory instead, which does the work to create and
+ * associate a match tree with the underlying filter.
  */
 REGISTER_FACTORY(MatchWrapperConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 

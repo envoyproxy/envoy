@@ -444,8 +444,7 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
                                                  bool dual_filter) {
-  ActiveStreamDecoderFilterPtr wrapper(
-      new ActiveStreamDecoderFilter(*this, std::move(filter), dual_filter));
+  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
 
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
@@ -461,8 +460,7 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
 
 void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
                                                  bool dual_filter) {
-  ActiveStreamEncoderFilterPtr wrapper(
-      new ActiveStreamEncoderFilter(*this, std::move(filter), dual_filter));
+  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
 
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.

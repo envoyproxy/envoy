@@ -29,10 +29,6 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
       callbacks.addStreamEncoderFilter(nullptr);
       callbacks.addStreamFilter(nullptr);
 
-      callbacks.addStreamDecoderFilter(nullptr, nullptr);
-      callbacks.addStreamEncoderFilter(nullptr, nullptr);
-      callbacks.addStreamFilter(nullptr, nullptr);
-
       callbacks.addAccessLogHandler(nullptr);
     };
   }
@@ -83,15 +79,20 @@ xds_matcher:
   Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
   testing::InSequence s;
 
-  // This matches the sequence of calls in the filter factory above: the ones that call the overload
-  // without a match tree has a match tree added, the other one does not.
-  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_, testing::NotNull()));
-  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_, testing::NotNull()));
-  EXPECT_CALL(factory_callbacks, addStreamFilter(_, testing::NotNull()));
-  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_, testing::IsNull()));
-  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_, testing::IsNull()));
-  EXPECT_CALL(factory_callbacks, addStreamFilter(_, testing::IsNull()));
-  EXPECT_CALL(factory_callbacks, addAccessLogHandler(_));
+  // Delegating filter will be created for this match wrapper.
+  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addStreamFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
   cb(factory_callbacks);
 }
 
@@ -130,15 +131,20 @@ matcher:
   Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
   testing::InSequence s;
 
-  // This matches the sequence of calls in the filter factory above: the ones that call the overload
-  // without a match tree has a match tree added, the other one does not.
-  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_, testing::NotNull()));
-  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_, testing::NotNull()));
-  EXPECT_CALL(factory_callbacks, addStreamFilter(_, testing::NotNull()));
-  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_, testing::IsNull()));
-  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_, testing::IsNull()));
-  EXPECT_CALL(factory_callbacks, addStreamFilter(_, testing::IsNull()));
-  EXPECT_CALL(factory_callbacks, addAccessLogHandler(_));
+  // Delegating filter will be created for this match wrapper.
+  EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addStreamFilter(_))
+      .WillOnce(Invoke([](Envoy::Http::StreamFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
+      }));
+  EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
   cb(factory_callbacks);
 }
 
