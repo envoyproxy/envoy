@@ -33,6 +33,8 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
+  std::set<std::string> configTypes() override { return {}; }
+
   std::string name() const override { return name_; }
 
 protected:

@@ -14,7 +14,7 @@ using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  return [config, &context, &stats_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [config, stats_prefix, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(config, context, stats_prefix));
   };
 }

@@ -47,6 +47,11 @@ minor_behavior_changes:
   change: |
     allow propagating DNS responses with no records back to callers like strict_dns cluster,
     guarded by ``envoy.reloadable_features.cares_accept_nodata``.
+- area: local_ratelimit
+  change: |
+    local_ratelimit will consume tokens of all matched descriptors sorted by tokens per second.
+    This behavioral change can be reverted by setting runtime guard
+    envoy.reloadable_features.http_local_ratelimit_match_all_descriptors to false.
 - area: router
   change: |
     get route config factories by the configuration proto full names by default. This behavior change
@@ -134,9 +139,15 @@ new_features:
 - area: ratelimit
   change: |
     added support for :ref:`masked_remote_address <envoy_v3_api_field_config.route.v3.RateLimit.Action.masked_remote_address>`.
+- area: ratelimit
+  change: |
+    added support for :ref:`HTTP matching input functions <arch_overview_matching_api>` as descriptor producers.
 - area: build
   change: |
     official released binary is now built with Clang 14.0.0.
+- area: conn pool
+  change: |
+    Changed HTTP/2 connection pooling and the :ref:`ALPN pool <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` to remember the number of streams allowed by the endpoint and cap multiplexed streams for subsequent connections based on that. With that working, defaulted the ALPN pool to assume HTTP/2 will work, as it will only incur a latency hit once until the TLS handshake is complete, and then will cache that the effective stream limit is 1.  This behavioral change can be revered by setting ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` to false.
 - area: http
   change: |
     added :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
