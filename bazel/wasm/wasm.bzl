@@ -51,7 +51,8 @@ def _wasm_attrs(transition):
     return {
         "binary": attr.label(mandatory = True, cfg = transition),
         "precompile": attr.bool(default = False),
-        "_compile_tool": attr.label(default = "@envoy//test/tools/wee8_compile:wee8_compile_tool", executable = True, cfg = "exec"),
+        # This is deliberately in target configuration to avoid compiling v8 twice.
+        "_compile_tool": attr.label(default = "@envoy//test/tools/wee8_compile:wee8_compile_tool", executable = True, cfg = "target"),
         "_whitelist_function_transition": attr.label(default = "@bazel_tools//tools/whitelists/function_transition_whitelist"),
     }
 
