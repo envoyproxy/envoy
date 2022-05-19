@@ -44,15 +44,11 @@ function set_maintainer() {
 
 maintainers_file=".github/lyft_maintainers.yml"
 first_line="$(head -n 1 "$maintainers_file")"
-current=${first_line#"current: "}
-next="$(next_maintainer "$current" "$maintainers_file")"
+previous=${first_line#"current: "}
+next="$(next_maintainer "$previous" "$maintainers_file")"
 set_maintainer "$next" "$maintainers_file"
 
-message="Lyft support maintainer changing from <https://github.com/$current|$current> to <https://github.com/$next|$next>"
-echo "$message"
+echo "::set-output name=PREVIOUS_MAINTAINER::$previous"
+echo "::set-output name=NEXT_MAINTAINER::$next"
 
-curl -H "Content-type: application/json; charset=utf-8" \
-  --data "{\"channel\":\"C02F93EEJCE\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"$message\"}}]}" \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  -X POST \
-  https://slack.com/api/chat.postMessage
+echo "Lyft support maintainer changing from $previous to $next"
