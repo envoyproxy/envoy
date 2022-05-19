@@ -56,16 +56,24 @@ private:
  */
 class MessageMetadata {
 public:
-  MessageMetadata(bool case_sensitive = false) {
-    auto headers = Http::RequestHeaderMapImpl::create();
-    if (case_sensitive) {
-      headers->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+  MessageMetadata(bool is_request = true, bool preserve_keys = false) : is_request_(is_request) {
+    if (is_request) {
+      request_headers_ = Http::RequestHeaderMapImpl::create();
+
+      if (preserve_keys) {
+        request_headers_->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+      }
+    } else {
+      response_headers_ = Http::ResponseHeaderMapImpl::create();
+
+      if (preserve_keys) {
+        response_headers_->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+      }
     }
-    headers_ = std::move(headers);
   }
 
   std::shared_ptr<MessageMetadata> clone() const {
-    auto copy = std::make_shared<MessageMetadata>();
+    auto copy = std::make_shared<MessageMetadata>(isRequest());
 
     if (hasFrameSize()) {
       copy->setFrameSize(frameSize());
@@ -95,7 +103,12 @@ public:
       copy->setReplyType(replyType());
     }
 
-    Http::HeaderMapImpl::copyFrom(copy->headers(), headers());
+    if (isRequest()) {
+      Http::HeaderMapImpl::copyFrom(copy->requestHeaders(), requestHeaders());
+    } else {
+      Http::HeaderMapImpl::copyFrom(copy->responseHeaders(), responseHeaders());
+    }
+
     copy->mutableSpans().assign(spans().begin(), spans().end());
 
     if (hasAppException()) {
@@ -168,8 +181,22 @@ public:
   /**
    * @return HeaderMap of current headers (never throws)
    */
-  const Http::HeaderMap& headers() const { return *headers_; }
-  Http::HeaderMap& headers() { return *headers_; }
+  const Http::RequestHeaderMap& requestHeaders() const {
+    ASSERT(is_request_);
+    return *request_headers_;
+  }
+  Http::RequestHeaderMap& requestHeaders() {
+    ASSERT(is_request_);
+    return *request_headers_;
+  }
+  const Http::ResponseHeaderMap& responseHeaders() const {
+    ASSERT(!is_request_);
+    return *response_headers_;
+  }
+  Http::ResponseHeaderMap& responseHeaders() {
+    ASSERT(!is_request_);
+    return *response_headers_;
+  }
 
   /**
    * @return SpanList an immutable list of Spans
@@ -197,6 +224,8 @@ public:
   bool isDraining() const { return is_draining_; }
   void setDraining(bool draining) { is_draining_ = draining; }
 
+  bool isRequest() const { return is_request_; }
+
   absl::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
 
@@ -223,7 +252,8 @@ private:
   absl::optional<int32_t> seq_id_{};
   absl::optional<MessageType> msg_type_{};
   absl::optional<ReplyType> reply_type_{};
-  Http::HeaderMapPtr headers_;
+  Http::RequestHeaderMapPtr request_headers_{nullptr};
+  Http::ResponseHeaderMapPtr response_headers_{nullptr};
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
@@ -235,6 +265,7 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
+  const bool is_request_;
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

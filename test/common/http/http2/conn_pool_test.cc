@@ -49,7 +49,9 @@ public:
       : FixedHttpConnPoolImpl(
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
             random_generator, state,
-            [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+            [](HttpConnPoolImplBase* pool) {
+              return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+            },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
             std::vector<Protocol>{Protocol::Http2}) {}
 
@@ -545,16 +547,19 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessMixedMultiplexing) {
   // Connection capacity is min(max requests per connection, max concurrent streams).
   // Use maxRequestsPerConnection here since max requests is tested above.
   EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(3));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(3));
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   ActiveTestRequest r2(*this, 0, false);
   ActiveTestRequest r3(*this, 0, false);
 
   EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(2));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(2));
   expectClientCreate();
   ActiveTestRequest r4(*this, 0, false);
   ActiveTestRequest r5(*this, 0, false);
 
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(6));
   EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(6));
   expectClientCreate();
   ActiveTestRequest r6(*this, 0, false);

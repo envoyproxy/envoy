@@ -48,6 +48,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
       throw EnvoyException(
           "local rate descriptor limit is not a multiple of token bucket fill timer");
     }
+    new_descriptor.multiplier_ = token_bucket.fill_interval_ / token_bucket_.fill_interval_;
     token_bucket.max_tokens_ = descriptor.token_bucket().max_tokens();
     token_bucket.tokens_per_fill_ =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
@@ -88,6 +89,7 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 void LocalRateLimiterImpl::onFillTimer() {
   onFillTimerHelper(tokens_, token_bucket_);
   onFillTimerDescriptorHelper();
+  counter_++;
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
@@ -113,11 +115,8 @@ void LocalRateLimiterImpl::onFillTimerHelper(TokenState& tokens,
 }
 
 void LocalRateLimiterImpl::onFillTimerDescriptorHelper() {
-  auto current_time = time_source_.monotonicTime();
   for (const auto& descriptor : descriptors_) {
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(
-            current_time - descriptor.token_state_->fill_time_) >=
-        absl::ToChronoMilliseconds(descriptor.token_bucket_.fill_interval_)) {
+    if (counter_ % descriptor.multiplier_ == 0) {
       onFillTimerHelper(*descriptor.token_state_, descriptor.token_bucket_);
     }
   }

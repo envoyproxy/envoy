@@ -198,6 +198,13 @@ public:
   virtual bool passthroughEnabled() const PURE;
 
   /**
+   * @return True if the expected message comes from the client.
+   *
+   * See https://github.com/apache/thrift/blob/master/lib/ts/thrift.d.ts#L68.
+   */
+  virtual bool isRequest() const PURE;
+
+  /**
    * @return True if payload header keys should be treated as case-sensitive.
    */
   virtual bool headerKeysPreserveCase() const PURE;

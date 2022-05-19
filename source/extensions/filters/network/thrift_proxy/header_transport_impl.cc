@@ -132,6 +132,8 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     return true;
   }
 
+  const bool is_request = metadata.isRequest();
+
   while (header_size > 0) {
     // Attempt to read info blocks
     int32_t info_id = drainVarIntI32(buffer, header_size, "info id");
@@ -159,7 +161,12 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
 
       const Http::LowerCaseString key = Http::LowerCaseString(key_string);
       const std::string value = drainVarString(buffer, header_size, "header value");
-      metadata.headers().addCopy(key, value);
+
+      if (is_request) {
+        metadata.requestHeaders().addCopy(key, value);
+      } else {
+        metadata.responseHeaders().addCopy(key, value);
+      }
     }
   }
 
@@ -185,11 +192,12 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     throw EnvoyException(absl::StrCat("invalid thrift header transport message size ", msg_size));
   }
 
-  const Http::HeaderMap& headers = metadata.headers();
-  if (headers.size() > MaxHeadersSize / 2) {
+  const uint32_t headers_size =
+      metadata.isRequest() ? metadata.requestHeaders().size() : metadata.responseHeaders().size();
+  if (headers_size > MaxHeadersSize / 2) {
     // Each header takes a minimum of 2 bytes, yielding this limit.
     throw EnvoyException(
-        absl::StrCat("invalid thrift header transport too many headers ", headers.size()));
+        absl::StrCat("invalid thrift header transport too many headers ", headers_size));
   }
 
   Buffer::OwnedImpl header_buffer;
@@ -211,22 +219,35 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   }
 
   BufferHelper::writeVarIntI32(header_buffer, 0); // num transforms
-  if (!headers.empty()) {
+
+  if (headers_size > 0) {
     // Info ID 1
     header_buffer.writeByte(1);
 
     // Num headers
-    BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers.size()));
+    BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers_size));
 
     const auto formatter = headers.formatter();
 
-    headers.iterate(
-        [&header_buffer, formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-          const auto header_key = header.key().getStringView();
-          writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
-          writeVarString(header_buffer, header.value().getStringView());
-          return Http::HeaderMap::Iterate::Continue;
-        });
+    if (metadata.isRequest()) {
+      metadata.requestHeaders().iterate(
+          [&header_buffer, formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+            const auto header_key = header.key().getStringView();
+
+            writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
+            writeVarString(header_buffer, header.value().getStringView());
+            return Http::HeaderMap::Iterate::Continue;
+          });
+    } else {
+      metadata.responseHeaders().iterate(
+          [&header_buffer, formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+            const auto header_key = header.key().getStringView();
+
+            writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
+            writeVarString(header_buffer, header.value().getStringView());
+            return Http::HeaderMap::Iterate::Continue;
+          });
+    }
   }
 
   uint64_t header_size = header_buffer.length();
