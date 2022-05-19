@@ -31,13 +31,13 @@ message FilterConfig {
   oneof per_method_stat_specifier {
     // If set, specifies an allowlist of service/methods that will have individual stats
     // emitted for them. Any call that does not match the allowlist will be counted
-    // in a stat with no method specifier: `cluster.<name>.grpc.*`.
+    // in a stat with no method specifier: ``cluster.<name>.grpc.*``.
     config.core.v3.GrpcMethodList individual_method_stats_allowlist = 2;
 
     // If set to true, emit stats for all service/method names.
     //
     // If set to false, emit stats for all service/message types to the same stats without including
-    // the service/method in the name, with prefix `cluster.<name>.grpc`. This can be useful if
+    // the service/method in the name, with prefix ``cluster.<name>.grpc``. This can be useful if
     // service/method granularity is not needed, or if each cluster only receives a single method.
     //
     // .. attention::
@@ -46,10 +46,10 @@ message FilterConfig {
     //   Envoy, using unbounded memory and potentially slowing down stats pipelines.
     //
     // .. attention::
-    //   If neither `individual_method_stats_allowlist` nor `stats_for_all_methods` is set, the
-    //   behavior will default to `stats_for_all_methods=false`. This default value is changed due
+    //   If neither ``individual_method_stats_allowlist`` nor ``stats_for_all_methods`` is set, the
+    //   behavior will default to ``stats_for_all_methods=false``. This default value is changed due
     //   to the previous value being deprecated. This behavior can be changed with runtime override
-    //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+    //   ``envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default``.
     google.protobuf.BoolValue stats_for_all_methods = 3;
   }
 

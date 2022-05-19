@@ -85,9 +85,9 @@ message VmConfig {
   config.core.v3.AsyncDataSource code = 3;
 
   // The Wasm configuration used in initialization of a new VM
-  // (proxy_on_start). `google.protobuf.Struct` is serialized as JSON before
-  // passing it to the plugin. `google.protobuf.BytesValue` and
-  // `google.protobuf.StringValue` are passed directly without the wrapper.
+  // (proxy_on_start). ``google.protobuf.Struct`` is serialized as JSON before
+  // passing it to the plugin. ``google.protobuf.BytesValue`` and
+  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
@@ -138,9 +138,9 @@ message PluginConfig {
 
   // Filter/service configuration used to configure or reconfigure a plugin
   // (proxy_on_configuration).
-  // `google.protobuf.Struct` is serialized as JSON before
-  // passing it to the plugin. `google.protobuf.BytesValue` and
-  // `google.protobuf.StringValue` are passed directly without the wrapper.
+  // ``google.protobuf.Struct`` is serialized as JSON before
+  // passing it to the plugin. ``google.protobuf.BytesValue`` and
+  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
   // If there is a fatal error on the VM (e.g. exception, abort(), on_start or on_configure return false),
