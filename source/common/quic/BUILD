@@ -1,15 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
+envoy_extension_package()
+
 # TODO(mattklein123): Default visibility for this package should not be public. We should have
 # default by private to within this package and package tests, and then only expose the libraries
 # that are required to be selected into the build for http3 to work.
-envoy_package()
 
 envoy_cc_library(
     name = "envoy_quic_alarm_lib",
@@ -462,7 +464,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "udp_gso_batch_writer_lib",
     srcs = select({
         "//bazel:linux": ["udp_gso_batch_writer.cc"],
