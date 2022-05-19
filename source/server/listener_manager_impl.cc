@@ -129,7 +129,6 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
       const auto& config_discovery = proto_config.config_discovery();
       const auto& name = proto_config.name();
-      ENVOY_LOG(debug, "   Listener filter:   dynamic filter name: {}", name);
       if (config_discovery.apply_default_config_without_warming() &&
           !config_discovery.has_default_config()) {
         throw EnvoyException(fmt::format(
@@ -161,7 +160,6 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
           *message, createListenerFilterMatcher(proto_config), context);
       auto filter_config_provider =
           config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name());
-      ENVOY_LOG(debug, "      filter config provider name: {}", filter_config_provider->name());
       ret.push_back(std::move(filter_config_provider));
     }
   }
