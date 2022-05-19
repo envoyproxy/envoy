@@ -96,6 +96,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     removed ``envoy.restart_features.no_runtime_singleton`` and replaced with ``envoy.restart_features.remove_runtime_singleton``.
+- area: lightstep
+  change: |
+    removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
 
 new_features:
 - area: access_log

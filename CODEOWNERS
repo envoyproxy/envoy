@@ -262,7 +262,6 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 
 # To be moved to Contrib
 /*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
-/*/extensions/tracers/lightstep @UNOWNED @UNOWNED
 /*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
 
 # Contrib
