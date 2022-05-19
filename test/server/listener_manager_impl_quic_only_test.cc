@@ -26,7 +26,7 @@ public:
 };
 
 #if defined(ENVOY_ENABLE_QUIC)
-TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
+std::string getBasicConfig() {
   std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
@@ -74,6 +74,10 @@ udp_listener_config:
   quic_options: {}
   )EOF",
                                                  Network::Address::IpVersion::v4);
+  return yaml;
+}
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
+  std::string yaml = getBasicConfig();
   if (use_matcher_) {
     yaml = yaml + R"EOF(
 filter_chain_matcher:
@@ -174,57 +178,13 @@ filter_chain_matcher:
 }
 
 TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
-  std::string yaml = TestEnvironment::substitute(R"EOF(
-address:
-  socket_address:
-    address: 127.0.0.1
-    protocol: UDP
-    port_value: 1234
-filter_chains:
-- filter_chain_match:
-    transport_protocol: "quic"
-  name: foo
-  filters:
-  - name: envoy.filters.network.http_connection_manager
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-      codec_type: HTTP3
-      stat_prefix: hcm
-      route_config:
-        name: local_route
-      http_filters:
-        - name: envoy.filters.http.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  transport_socket:
-    name: envoy.transport_sockets.quic
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
-      downstream_tls_context:
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-            private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-          validation_context:
-            trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_typed_subject_alt_names:
-            - matcher:
-                exact: localhost
-              san_type: URI
-            - matcher:
-                exact: 127.0.0.1
-              san_type: IP_ADDRESS
-udp_listener_config:
-  quic_options: {}
+  std::string yaml = getBasicConfig();
+  yaml = yaml + R"EOF(
   udp_packet_packet_writer_config:
     name: envoy.udp.writer.factory.default
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.quic.udp_packet_writer.v3.UdpDefaultWriterFactory
-  )EOF",
-                                                 Network::Address::IpVersion::v4);
+  )EOF";
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
   // Configure GSO support but later verify that the default writer is used instead.

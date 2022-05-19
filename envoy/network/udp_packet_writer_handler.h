@@ -119,6 +119,14 @@ public:
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
 
+/**
+ * UdpPacketWriterFactoryFactory adds an extra layer of indirection In order to
+ * support a UdpPacketWriterFactory whose behavior depends on the
+ * TypedConfig for that factory. The UdpPacketWriterFactoryFactory is created
+ * with a no-arg constructor based on the type of the config. Then this
+ * `createUdpPacketWriterFactory1 can be called with the config to
+ * create an actual UdpPacketWriterFactory.
+ */
 class UdpPacketWriterFactoryFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~UdpPacketWriterFactoryFactory() = default;
