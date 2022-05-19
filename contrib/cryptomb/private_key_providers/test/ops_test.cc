@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,6 +13,8 @@
 #include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
 #include "fake_factory.h"
 #include "gtest/gtest.h"
+#include "openssl/evp.h"
+#include "openssl/rsa.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -133,13 +136,41 @@ TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaSigning) {
 }
 
 TEST_F(CryptoMbProviderRsaTest, TestRsaPkcs1Signing) {
-  // PKCS #1 v1.5 is not supported.
-  TestCallbacks cb;
-  CryptoMbPrivateKeyConnection op(cb, *dispatcher_, bssl::UpRef(pkey_), queue_);
+  // Initialize connections.
+  TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
+  std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
+  for (auto& cb : cbs) {
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
+        cb, *dispatcher_, bssl::UpRef(pkey_), queue_));
+  }
 
-  res_ = rsaPrivateKeySignForTest(&op, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PKCS1_SHA256,
-                                  in_, in_len_);
-  EXPECT_EQ(res_, ssl_private_key_failure);
+  // Create MULTIBUFF_BATCH amount of signing operations.
+  for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
+    // Create request.
+    res_ = rsaPrivateKeySignForTest(connections[i].get(), nullptr, nullptr, max_out_len_,
+                                    SSL_SIGN_RSA_PKCS1_SHA256, in_, in_len_);
+    EXPECT_EQ(res_, ssl_private_key_retry);
+
+    // No processing done after first requests.
+    // After the last request, the status is set only from the event loop which is not run. This
+    // should still be "retry", the cryptographic result is present anyway.
+    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
+    EXPECT_EQ(res_, ssl_private_key_retry);
+  }
+
+  // Timeout does not have to be triggered when queue is at maximum size.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
+  EXPECT_EQ(res_, ssl_private_key_success);
+  EXPECT_NE(out_len_, 0);
+
+  // Check the signature in out_.
+  RSA* rsa = EVP_PKEY_get0_RSA(pkey_.get());
+
+  uint8_t buf[max_out_len_] = {0};
+  size_t buf_len = 0;
+  EXPECT_EQ(RSA_verify_raw(rsa, &buf_len, buf, max_out_len_, out_, out_len_, RSA_PKCS1_PADDING), 1);
 }
 
 TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
@@ -171,6 +202,21 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
   res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
+
+  // Check the signature in out_.
+  RSA* rsa = EVP_PKEY_get0_RSA(pkey_.get());
+
+  uint8_t buf[max_out_len_] = {0};
+  unsigned int buf_len = 0;
+  const EVP_MD* md = SSL_get_signature_algorithm_digest(SSL_SIGN_RSA_PSS_SHA256);
+  EXPECT_NE(md, nullptr);
+  bssl::ScopedEVP_MD_CTX ctx;
+  // Calculate the message digest (so that we can be sure that it has been signed).
+  EXPECT_EQ(EVP_DigestInit_ex(ctx.get(), md, nullptr), 1);
+  EXPECT_EQ(EVP_DigestUpdate(ctx.get(), in_, in_len_), 1);
+  EXPECT_EQ(EVP_DigestFinal_ex(ctx.get(), buf, &buf_len), 1);
+
+  EXPECT_EQ(RSA_verify_pss_mgf1(rsa, buf, buf_len, md, nullptr, -1, out_, out_len_), 1);
 }
 
 TEST_F(CryptoMbProviderRsaTest, TestRsaDecrypt) {

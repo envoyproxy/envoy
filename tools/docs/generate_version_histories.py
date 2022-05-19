@@ -95,21 +95,21 @@ Initial release date:
 """
 
 VERSION_HISTORY_TPL = """
-.. _version_history_{{ changelog.version }}:
+.. _version_history_{{ changelog.base_version }}:
 
-{{ changelog.version }} ({{ changelog.release_date }})
-{{ "=" * (changelog.version|length + changelog.release_date|length + 4) }}
+{{ changelog.base_version }} ({{ changelog.release_date }})
+{{ "=" * (changelog.base_version|length + changelog.release_date|length + 4) }}
 
 {% for name, section in sections.items() %}
 {% if changelog.data[name] %}
 {{ section.title }}
 {{ "-" * section.title|length }}
 {% if section.description %}
-{{ section.description | versionize(minor_version, current_minor_version) }}
+{{ section.description | versionize(mapped_version) }}
 {% endif %}
 
 {% for item in changelog.entries(name) -%}
-* **{{ item.area }}**: {{ item.change | versionize(minor_version, current_minor_version) | indent(width=2, first=false) }}
+* **{{ item.area }}**: {{ item.change | versionize(mapped_version) | indent(width=2, first=false) }}
 {%- endfor %}
 {% endif %}
 {%- endfor %}
@@ -117,11 +117,11 @@ VERSION_HISTORY_TPL = """
 """
 
 
-def versionize_filter(text, minor_version, current_minor_version):
+def versionize_filter(text, mapped_version):
     """Replace refinks with versioned reflinks."""
-    if minor_version >= current_minor_version:
+    if not mapped_version:
         return text
-    version_prefix = f"v{minor_version.base_version}:"
+    version_prefix = f"v{mapped_version.base_version}:"
     matches = set(REFLINK_RE.findall(text))
     replacements = []
 
@@ -147,7 +147,7 @@ class VersionHistories(runner.Runner):
 
     @cached_property
     def project(self) -> IProject:
-        return Project(self.args.version)
+        return Project()
 
     @cached_property
     def sections(self) -> frozendict:
@@ -171,7 +171,6 @@ class VersionHistories(runner.Runner):
 
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
-        parser.add_argument("version")
         parser.add_argument("output_file")
 
     def minor_index_path(self, minor_version) -> pathlib.Path:
@@ -197,10 +196,11 @@ class VersionHistories(runner.Runner):
         minor_version = utils.minor_version_for(changelog_version)
         root_path = self.tpath.joinpath(f"v{minor_version.base_version}")
         root_path.mkdir(parents=True, exist_ok=True)
+        map_version = (
+            minor_version < self.project.minor_version
+            and (minor_version in self.project.inventories.versions))
         version_history = self.version_history_tpl.render(
-            current_minor_version=self.project.minor_version,
-            minor_version=minor_version,
-            current_version=self.project.version,
+            mapped_version=(minor_version if map_version else None),
             sections=self.sections,
             changelog=self.project.changelogs[changelog_version])
         version_path = root_path.joinpath(f"v{changelog_version}.rst")
@@ -246,9 +246,9 @@ class VersionHistories(runner.Runner):
             f"{version_history_minor_index.strip()}\n\n")
 
 
-def main():
-    VersionHistories(*sys.argv[1:])()
+def main(*args):
+    return VersionHistories(*args)()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(*sys.argv[1:]))
