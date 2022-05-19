@@ -4,8 +4,8 @@
 
 # Set NORUNFILES so test/main doesn't fail when runfiles manifest is not found.
 TEXT=$(NORUNFILES=1 "$@" 2>&1)
-if [ $? -ne 0 ]; then
-   echo -e $TEXT
+if [ ! $? ]; then
+   echo "$TEXT"
    echo "Router test failed to pass: debug logs above"
    exit 1
 fi
