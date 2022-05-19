@@ -85,7 +85,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       auto token = jwt_token_cache_->lookUp(audience_str_);
       if (token != nullptr) {
         ENVOY_LOG(error, "Cache hit ");
-        // TODO(tyxia) How to encode decoded token;
         addTokenToRequest(hdrs, token->jwt_);
         return FilterHeadersStatus::Continue;
       } else {

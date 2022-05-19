@@ -189,7 +189,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
-  for (int i = 0; i < 2; ++i) {
+  int num = 2;
+  // Send multiple requests.
+  for (int i = 0; i < num; ++i) {
     initiateClientConnection();
     // Send the request to cluster `gcp_authn`.
     waitForGcpAuthnServerResponse();
@@ -200,9 +202,8 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   }
 
   // Verify request has been routed to both upstream clusters.
-  // cache hit is 1 not hit is 2
-  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 2);
-  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 2);
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {

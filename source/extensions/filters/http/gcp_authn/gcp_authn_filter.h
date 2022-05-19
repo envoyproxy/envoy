@@ -47,15 +47,12 @@ public:
   TokenCacheImpl(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
                  TimeSource& time_source)
       : time_source_(time_source), size_(config.cache_size()) {
-    // cache_size_ = config_.cache_size();
     lru_cache_ = std::make_unique<LRUCache<TokenType>>(size_);
   }
 
   TokenType* lookUp(std::string key);
-  // Why unique pointer??? and pass by r-reference
   void insert(const std::string& key, std::unique_ptr<TokenType> token);
 
-  absl::flat_hash_map<std::string, std::string>& tokenMap() { return token_map_; }
   LRUCache<TokenType>& lruCache() { return *lru_cache_; }
   int size() { return size_; }
 
@@ -68,7 +65,6 @@ public:
 
 private:
   std::unique_ptr<LRUCache<TokenType>> lru_cache_;
-  absl::flat_hash_map<std::string, std::string> token_map_;
   TimeSource& time_source_;
   int size_;
 };
@@ -91,7 +87,6 @@ public:
              Envoy::Server::Configuration::FactoryContext& context)
       : tls(context.threadLocal()) {
     tls.set([config](Envoy::Event::Dispatcher& dispatcher) {
-      // TODO(tyxia) why make_shared here????
       return std::make_shared<ThreadLocalCache>(config.cache_config(), dispatcher.timeSource());
     });
   }
