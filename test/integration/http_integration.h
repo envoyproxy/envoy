@@ -43,6 +43,7 @@ public:
                                                   const std::string& body);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
+  bool streamOpen() const { return !stream_gone_; }
   void sendData(Http::RequestEncoder& encoder, absl::string_view data, bool end_stream);
   void sendData(Http::RequestEncoder& encoder, Buffer::Instance& data, bool end_stream);
   void sendData(Http::RequestEncoder& encoder, uint64_t size, bool end_stream);
@@ -82,14 +83,26 @@ private:
     IntegrationCodecClient& parent_;
   };
 
+  struct CodecClientCallbacks : public Http::CodecClientCallbacks {
+    CodecClientCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
+
+    // Http::CodecClientCallbacks
+    void onStreamDestroy() override { parent_.stream_gone_ = true; }
+    void onStreamReset(Http::StreamResetReason) override { parent_.stream_gone_ = true; }
+
+    IntegrationCodecClient& parent_;
+  };
+
   void flushWrite();
 
   Event::Dispatcher& dispatcher_;
   ConnectionCallbacks callbacks_;
   CodecCallbacks codec_callbacks_;
+  CodecClientCallbacks codec_client_callbacks_;
   bool connected_{};
   bool disconnected_{};
   bool saw_goaway_{};
+  bool stream_gone_{};
   Network::ConnectionEvent last_connection_event_;
 };
 

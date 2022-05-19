@@ -11,6 +11,7 @@
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
+#include "contrib/sip_proxy/filters/network/source/stats.h"
 #include "contrib/sip_proxy/filters/network/source/tra/tra.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
 
@@ -54,6 +55,8 @@ public:
    */
   virtual Router::RouteConstSharedPtr route() PURE;
 
+  virtual SipFilterStats& stats() PURE;
+
   /**
    * Create a locally generated response using the provided response object.
    * @param response DirectResponse the response to send to the downstream client
@@ -90,7 +93,7 @@ public:
   virtual std::shared_ptr<SipProxy::SipSettings> settings() const PURE;
   virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;
-  virtual void continueHandling(const std::string& key) PURE;
+  virtual void continueHandling(const std::string& key, bool try_next_affinity) PURE;
   virtual MessageMetadataSharedPtr metadata() PURE;
 };
 

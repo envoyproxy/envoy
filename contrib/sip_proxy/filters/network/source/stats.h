@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/stats/scope.h"
@@ -34,8 +35,20 @@ struct SipFilterStats {
   static SipFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return SipFilterStats{ALL_SIP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
                                                POOL_GAUGE_PREFIX(scope, prefix),
-                                               POOL_HISTOGRAM_PREFIX(scope, prefix))};
+                                               POOL_HISTOGRAM_PREFIX(scope, prefix)) scope};
   }
+
+  Stats::ElementVec statElements(Stats::Element method, Stats::Element suffix) const {
+    return Stats::ElementVec{Stats::DynamicSavedName("sip"), method, suffix};
+  }
+
+  Stats::Counter& counterFromElements(absl::string_view method, absl::string_view suffix) {
+    Stats::ElementVec elements =
+        statElements(Stats::DynamicName{method}, Stats::DynamicName{suffix});
+    return Stats::Utility::counterFromElements(scope_, elements);
+  }
+
+  Stats::Scope& scope_;
 };
 
 } // namespace SipProxy
