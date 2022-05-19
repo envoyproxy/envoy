@@ -23,23 +23,18 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
 }
 
 template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(std::string key) {
-  ENVOY_LOG(error, "Lookup function hit");
   if (lru_cache_ != nullptr) {
-    ENVOY_LOG(error, "Try to lookup");
     typename LRUCache<TokenType>::ScopedLookup lookup(lru_cache_.get(), key);
     if (lookup.found()) {
-      ENVOY_LOG(error, "Found");
       TokenType* const found_token = lookup.value();
       if constexpr (std::is_same<TokenType, JwtToken>::value) {
         ASSERT(found_token != nullptr);
-        ENVOY_LOG(error, "Try to verify time");
         if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
             ::google::jwt_verify::Status::JwtExpired) {
-          ENVOY_LOG(error, "Expired");
           // Remove the expired entry.
           lru_cache_->remove(key);
         } else {
-          ENVOY_LOG(error, "Cache hit");
+          // Return the found token.
           return found_token;
         }
       }
@@ -84,7 +79,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     if (jwt_token_cache_ != nullptr) {
       auto token = jwt_token_cache_->lookUp(audience_str_);
       if (token != nullptr) {
-        ENVOY_LOG(error, "Cache hit ");
         addTokenToRequest(hdrs, token->jwt_);
         return FilterHeadersStatus::Continue;
       }
