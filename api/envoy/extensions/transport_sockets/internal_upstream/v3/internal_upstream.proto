@@ -57,7 +57,7 @@ message InternalUpstreamTransport {
   // Specifies the metadata namespaces and values to insert into the downstream
   // internal connection dynamic metadata when an internal address is used as a
   // host. If the destination name is repeated across two metadata source
-  // locations, and both locations contains the metadata with the given name,
+  // locations, and both locations contain the metadata with the given name,
   // then the latter in the list overrides the former.
   repeated MetadataValueSource passthrough_metadata = 1;
 
