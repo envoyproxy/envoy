@@ -159,6 +159,56 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// Test extend balance.
+TEST_P(IntegrationTest, PerWorkerStatsAndExtendBalancing) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_connection_balance_config()->mutable_extend_balance();
+    // auto* typed_config =
+    //     listener->mutable_connection_balance_config()->mutable_extend_balance()->mutable_typed_config();
+    // typed_config->set_type_url("type.googleapis.com/network.connection_balance.test");
+  });
+  initialize();
+
+  // Per-worker listener stats.
+  auto check_listener_stats = [this](uint64_t cx1_active, uint64_t cx1_total, uint64_t cx2_active,
+                                     uint64_t cx2_total) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active",
+                                   cx1_active);
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active",
+                                   cx2_active);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total",
+                                     cx1_total);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total",
+                                     cx2_total);
+    } else {
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx1_active);
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx2_active);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx1_total);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx2_total);
+    }
+  };
+  check_listener_stats(0, 0, 0, 0);
+
+  // Main thread admin listener stats.
+  test_server_->waitForCounterExists("listener.admin.main_thread.downstream_cx_total");
+
+  // Per-thread watchdog stats.
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_1.watchdog_miss");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  check_listener_stats(2, 2, 0, 0);
+
+  codec_client_->close();
+  codec_client2->close();
+  check_listener_stats(0, 2, 0, 0);
+}
+
 // On OSX this is flaky as we can end up with connection imbalance.
 #if !defined(__APPLE__)
 // Make sure all workers pick up connections
