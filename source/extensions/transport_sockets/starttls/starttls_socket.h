@@ -59,6 +59,7 @@ public:
 private:
   // This is a proxy for wrapping the transport callback object passed from the consumer.
   // Its primary purpose is to filter Connected events to ensure they only happen once per open.
+  // connection open.
   class CallbackProxy : public Network::TransportSocketCallbacks {
   public:
     CallbackProxy(Network::TransportSocketCallbacks* callbacks) : parent_(callbacks) {}
@@ -73,24 +74,22 @@ private:
     void raiseEvent(Network::ConnectionEvent event) override {
       if (event == Network::ConnectionEvent::Connected) {
         // Don't send the connected event if we're already open
-        if (is_open_) {
+        if (connected_) {
           parent_->flushWriteBuffer();
           return;
         }
-        is_open_ = true;
+        connected_ = true;
       } else {
-        is_open_ = false;
+        connected_ = false;
       }
 
       parent_->raiseEvent(event);
     }
     void flushWriteBuffer() override { parent_->flushWriteBuffer(); }
 
-    void setParent(Network::TransportSocketCallbacks* parent) { parent_ = parent; }
-
   private:
     Network::TransportSocketCallbacks* parent_;
-    bool is_open_{false};
+    bool connected_{false};
   };
 
   // Socket used in all transport socket operations.

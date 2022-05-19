@@ -112,8 +112,6 @@ TEST(StartTlsTest, BasicSwitch) {
 
 TEST(StartTlsTest, CallbackProxy) {
 
-  testing::GMOCK_FLAG(verbose) = "info";
-
   Network::TransportSocketOptionsConstSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();
   Network::MockTransportSocketCallbacks transport_callbacks;
@@ -128,7 +126,6 @@ TEST(StartTlsTest, CallbackProxy) {
   // transport_callbacks
   Network::TransportSocketCallbacks* proxy = raw_socket->callbacks_;
 
-  ///////
   // Verify raiseEvent logic
 
   // Connected should only called once. When ssl_socket takes over it also raises Connected,
@@ -149,7 +146,6 @@ TEST(StartTlsTest, CallbackProxy) {
   proxy->raiseEvent(Network::ConnectionEvent::Connected);
   proxy->raiseEvent(Network::ConnectionEvent::Connected);
 
-  /////////
   // Verify all the passthrough functions work
 
   Network::MockIoHandle handle;
