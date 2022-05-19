@@ -87,9 +87,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
         ENVOY_LOG(error, "Cache hit ");
         addTokenToRequest(hdrs, token->jwt_);
         return FilterHeadersStatus::Continue;
-      } else {
-        // do nothing
-        ENVOY_LOG(error, "No entry found");
       }
     }
     // Save the pointer to the request headers for header manipulation based on http response later.
@@ -135,8 +132,6 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
           std::make_unique<::google::jwt_verify::Jwt>();
       Status status = jwt->parseFromString(token_str);
       if (status == Status::Ok) {
-        uint64_t exp = jwt->exp_;
-        ENVOY_LOG(error, "Experiation time is {}", exp);
         if (jwt_token_cache_ != nullptr) {
           // Pass the token into cache along with the ownership transfer.
           jwt_token_cache_->insert(audience_str_, std::move(jwt));

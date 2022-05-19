@@ -39,6 +39,5 @@ message Audience {
 
 // Token Cache configuration.
 message TokenCacheConfig {
-  // The unit is the number of JWT tokens.
   uint32 cache_size = 1;
 }
