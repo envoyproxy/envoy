@@ -1224,7 +1224,7 @@ request_headers_to_add:
       key: "x-upstream-remote-address"
       value: "%UPSTREAM_REMOTE_ADDRESS%"
     append: true
-    empty_action: EMPTY_STRING
+    keep_empty_value: true
   - header:
       key: "x-upstream-local-port"
       value: "%UPSTREAM_LOCAL_PORT%"

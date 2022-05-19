@@ -229,8 +229,7 @@ HeaderParserPtr HeaderParser::configure(
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
         HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value(),
-                          header_value_option.empty_action() ==
-                              envoy::config::core::v3::HeaderValueOption::EMPTY_STRING});
+                          header_value_option.keep_empty_value()});
   }
 
   return header_parser;

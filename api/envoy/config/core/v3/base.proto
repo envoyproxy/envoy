@@ -347,11 +347,6 @@ message HeaderValueOption {
     OVERWRITE_IF_EXISTS_OR_ADD = 2;
   }
 
-  enum HeaderValueEmptyAction {
-    NO_HEADER = 0;
-    EMPTY_STRING = 1;
-  }
-
   // Header name/value pair that this option applies to.
   HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
@@ -363,7 +358,7 @@ message HeaderValueOption {
   // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
   HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 
-  HeaderValueEmptyAction empty_action = 4 [(validate.rules).enum = {defined_only: true}];
+  bool keep_empty_value = 4;
 }
 
 // Wrapper for a set of headers.
