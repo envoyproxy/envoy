@@ -269,9 +269,6 @@ void Client::DirectStreamCallbacks::onCancel() {
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
   http_client_.stats().stream_cancel_.inc();
-  // Attempt to latch the latest stream info. This will be a no-op if the stream
-  // is already complete.
-  direct_stream_.saveFinalStreamIntel();
   bridge_callbacks_.on_cancel(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
 }
 
@@ -310,7 +307,6 @@ void Client::DirectStream::saveFinalStreamIntel() {
   if (!request_decoder_ || !parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
     return;
   }
-
   StreamInfo::setFinalStreamIntel(request_decoder_->streamInfo(), parent_.dispatcher_.timeSource(),
                                   envoy_final_stream_intel_);
 }
@@ -517,6 +513,9 @@ void Client::cancelStream(envoy_stream_t stream) {
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
   if (direct_stream) {
+    // Attempt to latch the latest stream info. This will be a no-op if the stream
+    // is already complete.
+    direct_stream->saveFinalStreamIntel();
     bool stream_was_open =
         getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS) != nullptr;
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());

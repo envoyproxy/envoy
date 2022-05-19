@@ -137,8 +137,9 @@ public:
       cc_->terminal_callback->setReady();
       return nullptr;
     };
-    bridge_callbacks_.on_cancel = [](envoy_stream_intel, envoy_final_stream_intel,
+    bridge_callbacks_.on_cancel = [](envoy_stream_intel, envoy_final_stream_intel final_intel,
                                      void* context) -> void* {
+      EXPECT_NE(-1, final_intel.stream_start_ms);
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
       cc_->on_cancel_calls++;
       cc_->terminal_callback->setReady();
@@ -344,6 +345,58 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_EQ(cc_.on_complete_calls, 0);
 
   // Now cancel, and make sure the cancel is received.
+  dispatcher_->post([&]() -> void { http_client_->cancelStream(stream_); });
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+  ASSERT_EQ(cc_.on_cancel_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
+  autonomous_upstream_ = false;
+  initialize();
+
+  bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
+                                    void* context) -> void* {
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+    cc_->on_headers_calls++;
+    cc_->status = response_headers->Status()->value().getStringView();
+    // Lie and say the request is complete, so the test has something to wait
+    // on.
+    cc_->terminal_callback->setReady();
+    return nullptr;
+  };
+
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
+
+  // Create a stream with explicit flow control.
+  dispatcher_->post([&]() -> void {
+    http_client_->startStream(stream_, bridge_callbacks_, true);
+    http_client_->sendHeaders(stream_, c_headers, true);
+  });
+
+  Envoy::FakeRawConnectionPtr upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+
+  std::string upstream_request;
+  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
+                                               &upstream_request));
+
+  // Send a complete response with body.
+  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nasd";
+  ASSERT_TRUE(upstream_connection->write(response));
+  // For this test only, the terminal callback is called when headers arrive.
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+  // Due to explicit flow control, the upstream stream is complete, but the
+  // callbacks will not be called for data and completion. Cancel the stream
+  // and make sure the cancel is received.
   dispatcher_->post([&]() -> void { http_client_->cancelStream(stream_); });
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.on_headers_calls, 1);
