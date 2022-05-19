@@ -121,6 +121,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     insert_ = cache_.makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
+    // TODO (capoferro): Note that there is currently no way to communicate back to the CacheFilter
+    // that an insert has failed. This is something we want to fix in future.
     insert_->insertHeaders(headers, metadata, end_stream);
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
