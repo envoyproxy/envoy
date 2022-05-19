@@ -5,6 +5,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -162,13 +163,21 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 // Test extend balance.
 TEST_P(IntegrationTest, PerWorkerStatsAndExtendBalancing) {
   concurrency_ = 2;
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    Network::TestConnectionBalanceFactory test_connection_balancer;
+    Registry::InjectFactory<Envoy::Network::ConnectionBalanceFactory> inject_factory(
+        test_connection_balancer);
+
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_connection_balance_config()->mutable_extend_balance();
-    // auto* typed_config =
-    //     listener->mutable_connection_balance_config()->mutable_extend_balance()->mutable_typed_config();
-    // typed_config->set_type_url("type.googleapis.com/network.connection_balance.test");
+    envoy::config::core::v3::TypedExtensionConfig* config =
+        new envoy::config::core::v3::TypedExtensionConfig();
+    auto* typed_config = config->mutable_typed_config();
+    typed_config->set_type_url(
+        "envoy.config.listener.v3.Listener.ConnectionBalanceConfig.extend_balance");
+    listener->mutable_connection_balance_config()->set_allocated_extend_balance(config);
   });
+
   initialize();
 
   // Per-worker listener stats.
