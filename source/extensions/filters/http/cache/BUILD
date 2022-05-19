@@ -141,14 +141,12 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "cache_filter_logging_info_lib",
     srcs = ["cache_filter_logging_info.cc"],
     hdrs = ["cache_filter_logging_info.h"],
     deps = [
         "//source/common/stream_info:filter_state_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

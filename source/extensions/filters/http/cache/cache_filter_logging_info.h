@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-enum class CacheLookupStatus {
+enum class LookupStatus {
   // The CacheFilter couldn't determine the status of the request, probably
   // because of an internal error.
   Unknown,
@@ -22,8 +22,8 @@ enum class CacheLookupStatus {
   StaleHitWithSuccessfulValidation,
   // The CacheFilter found a stale response, and sent a validation request to
   // the upstream; the upstream responded with anything other than a 304 Not
-  // Modified. (The CacheFilter will currently forward 5xx responses from the
-  // upstream in this case, instead of sending the stale cache entry.)
+  // Modified. The CacheFilter forwards 5xx responses from the
+  // upstream in this case, instead of sending the stale cache entry.
   StaleHitWithFailedValidation,
   // The CacheFilter found a response in cache and served a 304 Not Modified.
   NotModifiedHit,
@@ -38,11 +38,11 @@ enum class CacheLookupStatus {
   LookupError,
 };
 
-absl::string_view cacheLookupStatusToString(CacheLookupStatus status);
+absl::string_view lookupStatusToString(LookupStatus status);
 
-std::ostream& operator<<(std::ostream& os, const CacheLookupStatus& request_cache_status);
+std::ostream& operator<<(std::ostream& os, const LookupStatus& request_cache_status);
 
-enum class CacheInsertStatus {
+enum class InsertStatus {
   // The CacheFilter attempted to insert a cache entry, and succeeded as far as
   // it knows. The filter doesn't wait for a final confirmation from the cache,
   // so the filter may still show this status for an insert that failed at e.g.
@@ -87,9 +87,9 @@ enum class CacheInsertStatus {
   NoInsertLookupError,
 };
 
-absl::string_view cacheInsertStatusToString(CacheInsertStatus status);
+absl::string_view insertStatusToString(InsertStatus status);
 
-std::ostream& operator<<(std::ostream& os, const CacheInsertStatus& cache_insert_status);
+std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_status);
 
 // Cache-related information about a request, to be used for logging and stats.
 class CacheFilterLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
@@ -97,17 +97,17 @@ public:
   static constexpr absl::string_view Key =
       "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo";
 
-  CacheFilterLoggingInfo(CacheLookupStatus cache_lookup_status,
-                         CacheInsertStatus cache_insert_status)
+  CacheFilterLoggingInfo(LookupStatus cache_lookup_status,
+                         InsertStatus cache_insert_status)
       : cache_lookup_status_(cache_lookup_status), cache_insert_status_(cache_insert_status) {}
 
-  CacheLookupStatus cacheLookupStatus() const { return cache_lookup_status_; }
+  LookupStatus lookupStatus() const { return cache_lookup_status_; }
 
-  CacheInsertStatus cacheInsertStatus() const { return cache_insert_status_; }
+  InsertStatus insertStatus() const { return cache_insert_status_; }
 
 private:
-  const CacheLookupStatus cache_lookup_status_;
-  const CacheInsertStatus cache_insert_status_;
+  const LookupStatus cache_lookup_status_;
+  const InsertStatus cache_insert_status_;
 };
 
 } // namespace Cache

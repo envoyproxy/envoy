@@ -89,12 +89,12 @@ private:
   void finalizeEncodingCachedResponse();
 
   // The result of this request's cache lookup.
-  CacheLookupStatus cacheLookupStatus() const;
+  LookupStatus lookupStatus() const;
 
   // The final status of the insert operation or header update, or decision not
   // to insert or update. If the request or insert is ongoing, assumes it's
   // being cancelled.
-  CacheInsertStatus cacheInsertStatus() const;
+  InsertStatus insertStatus() const;
 
   TimeSource& time_source_;
   HttpCache& cache_;
@@ -151,7 +151,7 @@ private:
   bool is_head_request_ = false;
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
-  absl::optional<CacheInsertStatus> insert_status_ = absl::nullopt;
+  absl::optional<InsertStatus> insert_status_ = absl::nullopt;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

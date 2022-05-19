@@ -7,70 +7,68 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-absl::string_view cacheLookupStatusToString(CacheLookupStatus status) {
+absl::string_view lookupStatusToString(LookupStatus status) {
   switch (status) {
-  case CacheLookupStatus::Unknown:
+  case LookupStatus::Unknown:
     return "Unknown";
-  case CacheLookupStatus::CacheHit:
+  case LookupStatus::CacheHit:
     return "CacheHit";
-  case CacheLookupStatus::CacheMiss:
+  case LookupStatus::CacheMiss:
     return "CacheMiss";
-  case CacheLookupStatus::StaleHitWithSuccessfulValidation:
+  case LookupStatus::StaleHitWithSuccessfulValidation:
     return "StaleHitWithSuccessfulValidation";
-  case CacheLookupStatus::StaleHitWithFailedValidation:
+  case LookupStatus::StaleHitWithFailedValidation:
     return "StaleHitWithFailedValidation";
-  case CacheLookupStatus::NotModifiedHit:
+  case LookupStatus::NotModifiedHit:
     return "NotModifiedHit";
-  case CacheLookupStatus::RequestNotCacheable:
+  case LookupStatus::RequestNotCacheable:
     return "RequestNotCacheable";
-  case CacheLookupStatus::RequestIncomplete:
+  case LookupStatus::RequestIncomplete:
     return "RequestIncomplete";
-  case CacheLookupStatus::LookupError:
+  case LookupStatus::LookupError:
     return "LookupError";
-  default:
-    return "UnrecognizedCacheLookupStatus";
   }
+  return "UnknownLookupStatus";
 }
 
-std::ostream& operator<<(std::ostream& os, const CacheLookupStatus& request_cache_status) {
-  return os << cacheLookupStatusToString(request_cache_status);
+std::ostream& operator<<(std::ostream& os, const LookupStatus& request_cache_status) {
+  return os << lookupStatusToString(request_cache_status);
 }
 
-absl::string_view cacheInsertStatusToString(CacheInsertStatus status) {
+absl::string_view insertStatusToString(InsertStatus status) {
   switch (status) {
-  case CacheInsertStatus::InsertSucceeded:
+  case InsertStatus::InsertSucceeded:
     return "InsertSucceeded";
-  case CacheInsertStatus::InsertAbortedByCache:
+  case InsertStatus::InsertAbortedByCache:
     return "InsertAbortedByCache";
-  case CacheInsertStatus::InsertAbortedCacheCongested:
+  case InsertStatus::InsertAbortedCacheCongested:
     return "InsertAbortedCacheCongested";
-  case CacheInsertStatus::InsertAbortedResponseIncomplete:
+  case InsertStatus::InsertAbortedResponseIncomplete:
     return "InsertAbortedResponseIncomplete";
-  case CacheInsertStatus::HeaderUpdate:
+  case InsertStatus::HeaderUpdate:
     return "HeaderUpdate";
-  case CacheInsertStatus::NoInsertCacheHit:
+  case InsertStatus::NoInsertCacheHit:
     return "NoInsertCacheHit";
-  case CacheInsertStatus::NoInsertRequestNotCacheable:
+  case InsertStatus::NoInsertRequestNotCacheable:
     return "NoInsertRequestNotCacheable";
-  case CacheInsertStatus::NoInsertResponseNotCacheable:
+  case InsertStatus::NoInsertResponseNotCacheable:
     return "NoInsertResponseNotCacheable";
-  case CacheInsertStatus::NoInsertRequestIncomplete:
+  case InsertStatus::NoInsertRequestIncomplete:
     return "NoInsertRequestIncomplete";
-  case CacheInsertStatus::NoInsertResponseValidatorsMismatch:
+  case InsertStatus::NoInsertResponseValidatorsMismatch:
     return "NoInsertResponseValidatorsMismatch";
-  case CacheInsertStatus::NoInsertResponseVaryMismatch:
+  case InsertStatus::NoInsertResponseVaryMismatch:
     return "NoInsertResponseVaryMismatch";
-  case CacheInsertStatus::NoInsertResponseVaryDisallowed:
+  case InsertStatus::NoInsertResponseVaryDisallowed:
     return "NoInsertResponseVaryDisallowed";
-  case CacheInsertStatus::NoInsertLookupError:
+  case InsertStatus::NoInsertLookupError:
     return "NoInsertLookupError";
-  default:
-    return "UnrecognizedCacheInsertStatus";
   }
+  return "UnknownInsertStatus";
 }
 
-std::ostream& operator<<(std::ostream& os, const CacheInsertStatus& cache_insert_status) {
-  return os << cacheInsertStatusToString(cache_insert_status);
+std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_status) {
+  return os << insertStatusToString(cache_insert_status);
 }
 
 } // namespace Cache

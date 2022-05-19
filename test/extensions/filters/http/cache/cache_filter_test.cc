@@ -54,18 +54,18 @@ protected:
     return *filter_state_->getDataReadOnly<CacheFilterLoggingInfo>(CacheFilterLoggingInfo::Key);
   }
 
-  absl::StatusOr<CacheLookupStatus> cacheLookupStatus() {
+  absl::StatusOr<LookupStatus> lookupStatus() {
     absl::StatusOr<const CacheFilterLoggingInfo> info_or = cacheFilterLoggingInfo();
     if (info_or.ok()) {
-      return info_or.value().cacheLookupStatus();
+      return info_or.value().lookupStatus();
     }
     return info_or.status();
   }
 
-  absl::StatusOr<CacheInsertStatus> cacheInsertStatus() {
+  absl::StatusOr<InsertStatus> insertStatus() {
     absl::StatusOr<const CacheFilterLoggingInfo> info_or = cacheFilterLoggingInfo();
     if (info_or.ok()) {
-      return info_or.value().cacheInsertStatus();
+      return info_or.value().insertStatus();
     }
     return info_or.status();
   }
@@ -199,8 +199,8 @@ TEST_F(CacheFilterTest, UncacheableRequest) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::RequestNotCacheable));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::NoInsertRequestNotCacheable));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::RequestNotCacheable));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertRequestNotCacheable));
 
     filter->onDestroy();
   }
@@ -222,8 +222,8 @@ TEST_F(CacheFilterTest, UncacheableResponse) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::NoInsertResponseNotCacheable));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertResponseNotCacheable));
 
     filter->onDestroy();
   }
@@ -243,8 +243,8 @@ TEST_F(CacheFilterTest, CacheMiss) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::InsertSucceeded));
 
     filter->onDestroy();
   }
@@ -271,8 +271,8 @@ TEST_F(CacheFilterTest, CacheMissWithTrailers) {
     EXPECT_EQ(filter->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::InsertSucceeded));
 
     filter->onDestroy();
   }
@@ -299,8 +299,8 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
     testDecodeRequestHitNoBody(filter);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheHit));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::NoInsertCacheHit));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertCacheHit));
 
     filter->onDestroy();
   }
@@ -323,8 +323,8 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::InsertSucceeded));
 
     filter->onDestroy();
   }
@@ -336,8 +336,8 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
     testDecodeRequestHitWithBody(filter, body);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheHit));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::NoInsertCacheHit));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertCacheHit));
 
     filter->onDestroy();
   }
@@ -365,7 +365,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
 
     filter->onDestroy();
   }
@@ -424,9 +424,9 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(),
-                IsOkAndHolds(CacheLookupStatus::StaleHitWithSuccessfulValidation));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::HeaderUpdate));
+    EXPECT_THAT(lookupStatus(),
+                IsOkAndHolds(LookupStatus::StaleHitWithSuccessfulValidation));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::HeaderUpdate));
 
     filter->onDestroy();
   }
@@ -454,7 +454,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
 
     filter->onDestroy();
   }
@@ -498,8 +498,8 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::StaleHitWithFailedValidation));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::InsertSucceeded));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::StaleHitWithFailedValidation));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::InsertSucceeded));
 
     filter->onDestroy();
   }
@@ -522,7 +522,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
 
     filter->onDestroy();
   }
@@ -560,8 +560,8 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheHit));
-    EXPECT_THAT(cacheInsertStatus(), IsOkAndHolds(CacheInsertStatus::NoInsertCacheHit));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertCacheHit));
 
     filter->onDestroy();
   }
@@ -584,7 +584,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
 
     filter->onDestroy();
   }
@@ -619,7 +619,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheHit));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
 
     filter->onDestroy();
   }
@@ -642,7 +642,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
 
     filter->onDestroy();
   }
@@ -683,7 +683,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     // correctly got that info from the cache instead of upstream.
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheHit));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
 
     filter->onDestroy();
   }
@@ -705,7 +705,7 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::RequestNotCacheable));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::RequestNotCacheable));
 
     filter->onDestroy();
   }
@@ -731,7 +731,7 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::CacheMiss));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
 
     filter->onDestroy();
   }
@@ -747,7 +747,7 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
     // Destroy the filter
 
     filter->onStreamComplete();
-    EXPECT_THAT(cacheLookupStatus(), IsOkAndHolds(CacheLookupStatus::RequestIncomplete));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::RequestIncomplete));
     filter->onDestroy();
     filter.reset();
 
