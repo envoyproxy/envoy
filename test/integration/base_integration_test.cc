@@ -103,6 +103,10 @@ void BaseIntegrationTest::initialize() {
   createUpstreams();
   createXdsUpstream();
   createEnvoy();
+
+  if (!skip_tag_extraction_rule_check_) {
+    checkForMissingTagExtractionRules();
+  }
 }
 
 Network::TransportSocketFactoryPtr
@@ -692,6 +696,47 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
                               << request.error_detail().message() << "\"";
   }
   return AssertionSuccess();
+}
+
+void BaseIntegrationTest::checkForMissingTagExtractionRules() {
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
+  ASSERT_TRUE(response->complete());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  std::vector<std::string> stat_prefixes;
+  Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
+                                              const Json::Object& root) -> bool {
+    if (name == "stat_prefix") {
+      auto prefix = root.asString();
+      if (!prefix.empty()) {
+        stat_prefixes.push_back(prefix);
+      }
+    } else if (root.isObject()) {
+      root.iterate(find_stat_prefix);
+    } else if (root.isArray()) {
+      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray();
+      for (const auto& element : elements) {
+        find_stat_prefix("", *element);
+      }
+    }
+    return true;
+  };
+  find_stat_prefix("", *json);
+  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", stat_prefixes);
+
+  auto check_metric_array = [&](auto vec) {
+    for (const auto& metric : vec) {
+      const std::string tag_extracted_name = metric->tagExtractedName();
+      for (const std::string& stat_prefix : stat_prefixes) {
+        EXPECT_EQ(tag_extracted_name.find(stat_prefix), std::string::npos)
+            << "Missing stat tag-extraction rule for stat '" << tag_extracted_name
+            << "' and stat_prefix '" << stat_prefix << "'";
+      }
+    }
+  };
+  check_metric_array(test_server_->counters());
+  check_metric_array(test_server_->gauges());
+  check_metric_array(test_server_->histograms());
 }
 
 } // namespace Envoy
