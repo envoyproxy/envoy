@@ -35,6 +35,7 @@ envoy_mobile_swift_test(
     tags = [
         "no-remote-exec",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
@@ -48,6 +49,7 @@ envoy_mobile_swift_test(
     ] + [
         "//test/fbs:test_fb_swift_srcs",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "@swift_flatbuffers//:FlatBuffers",
     ],

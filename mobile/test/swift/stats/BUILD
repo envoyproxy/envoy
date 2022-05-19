@@ -9,6 +9,7 @@ envoy_mobile_swift_test(
         "ElementTests.swift",
         "TagsBuilderTests.swift",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
     ],
