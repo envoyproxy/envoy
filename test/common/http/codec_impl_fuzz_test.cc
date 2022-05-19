@@ -390,6 +390,7 @@ public:
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
       if (stream_action.has_dispatching_action()) {
+        stream_action_active_ = true;
         // Simulate some response action while dispatching request headers, data, or trailers. This
         // may happen as a result of a filter sending a direct response.
         ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
@@ -403,8 +404,14 @@ public:
         } else if (request_action == test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
               .Times(testing::AtLeast(1))
-              .WillRepeatedly(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+              .WillRepeatedly(InvokeWithoutArgs([&] {
+                // Only simulate response action if the stream action is active
+                // otherwise the expectation could trigger in other moments
+                // causing the fuzzer to OOM.
+                if (stream_action_active_) {
+                  directionalAction(response_, stream_action.dispatching_action());
+                }
+              }));
         } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
           EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
               .WillOnce(InvokeWithoutArgs(
@@ -432,6 +439,7 @@ public:
       // Maybe nothing is set?
       break;
     }
+    stream_action_active_ = false;
     ENVOY_LOG_MISC(debug, "Stream action complete");
   }
 
@@ -442,6 +450,8 @@ public:
 
   Protocol http_protocol_;
   int32_t stream_index_{-1};
+  // Whether we're currently dispatching a stream action.
+  bool stream_action_active_{false};
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
