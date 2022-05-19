@@ -229,24 +229,19 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
 
     const auto formatter = headers.formatter();
 
+    auto header_writer = [&header_buffer,
+                          formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      const auto header_key = header.key().getStringView();
+
+      writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
+      writeVarString(header_buffer, header.value().getStringView());
+      return Http::HeaderMap::Iterate::Continue;
+    };
+
     if (metadata.isRequest()) {
-      metadata.requestHeaders().iterate(
-          [&header_buffer, formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-            const auto header_key = header.key().getStringView();
-
-            writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
-            writeVarString(header_buffer, header.value().getStringView());
-            return Http::HeaderMap::Iterate::Continue;
-          });
+      metadata.requestHeaders().iterate(header_writer);
     } else {
-      metadata.responseHeaders().iterate(
-          [&header_buffer, formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-            const auto header_key = header.key().getStringView();
-
-            writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
-            writeVarString(header_buffer, header.value().getStringView());
-            return Http::HeaderMap::Iterate::Continue;
-          });
+      metadata.responseHeaders().iterate(header_writer);
     }
   }
 
