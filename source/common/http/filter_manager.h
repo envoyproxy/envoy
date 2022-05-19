@@ -43,8 +43,7 @@ struct ActiveStreamFilterBase;
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
   ActiveStreamFilterBase(FilterManager& parent, bool dual_filter)
-      : parent_(parent), iteration_state_(IterationState::Continue),
-        iterate_from_current_filter_(false), headers_continued_(false),
+      : parent_(parent), iterate_from_current_filter_(false), headers_continued_(false),
         continued_1xx_headers_(false), end_stream_(false), dual_filter_(dual_filter),
         decode_headers_called_(false), encode_headers_called_(false) {}
 
@@ -137,7 +136,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                          // be buffered until high watermark is reached.
   };
   FilterManager& parent_;
-  IterationState iteration_state_;
+  IterationState iteration_state_{};
 
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
