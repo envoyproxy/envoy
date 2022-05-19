@@ -1,6 +1,5 @@
 #include "source/common/config/well_known_names.h"
 
-#include "source/common/runtime/runtime_features.h"
 #include "absl/strings/str_replace.h"
 
 namespace Envoy {
