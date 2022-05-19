@@ -39,6 +39,7 @@ message UdpListenerConfig {
 
   // Configuration for the UDP packet writer. If empty, the QUICHE writer will use GSO if available
   // or the default kernel sendmsg if not and the ActiveUdpListener will use kernel sendmsg.
+  // [#extension-category: envoy.udp]
   core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
 }
 
