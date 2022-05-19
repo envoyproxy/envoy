@@ -16,10 +16,10 @@ jobs:
       - name: git checkout
         uses: actions/checkout@v2
       - name: Bump Lyft Support Rotation
+        id: bump
         run: ./tools/bump_lyft_support_rotation.sh
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       - name: Create PR
+        id: pr
         uses: peter-evans/create-pull-request@v3
         with:
           token: ${{ secrets.CREDENTIALS_GITHUB_PUSH_TOKEN }}
@@ -33,3 +33,10 @@ jobs:
           delete-branch: true
           branch: support-bump
           branch-suffix: short-commit-hash
+          reviewers: ${{ steps.bump.outputs.NEXT_MAINTAINER }}
+      - name: Post to Slack
+        run: |
+          ./tools/post_to_slack.sh \
+            "Lyft support maintainer changing from <https://github.com/${{ steps.bump.outputs.PREVIOUS_MAINTAINER }}|${{ steps.bump.outputs.PREVIOUS_MAINTAINER }}> to <https://github.com/${{ steps.bump.outputs.NEXT_MAINTAINER }}|${{ steps.bump.outputs.NEXT_MAINTAINER }}>: ${{ steps.pr.outputs.pull-request-url }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
