@@ -783,8 +783,8 @@ message HttpConnectionManager {
   // UHV is an extensible mechanism for checking validity of HTTP requests as well as providing
   // normalization for request attributes, such as URI path.
   // If the typed_header_validation_config is present it overrides the following options:
-  // `normalize_path`, `merge_slashes`, `path_with_escaped_slashes_action`
-  // `http_protocol_options.allow_chunked_length`.
+  // ``normalize_path``, ``merge_slashes``, ``path_with_escaped_slashes_action``
+  // ``http_protocol_options.allow_chunked_length``.
   //
   // The default UHV checks the following:
   // 1. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
@@ -793,8 +793,8 @@ message HttpConnectionManager {
   // 4. Syntax of HTTP/2 pseudo headers
   // 5. HTTP/3 header map validity according to `draft standard <https://datatracker.ietf.org/doc/html/draft-ietf-quic-http-34>`_
   // 6. Syntax of HTTP/3 pseudo headers
-  // 7. Syntax of Content-Length and Transfer-Encoding
-  // 8. Validation of HTTP/1 requests with both Content-Length and Transfer-Encoding headers
+  // 7. Syntax of ``Content-Length`` and ``Transfer-Encoding``
+  // 8. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers
   // 9. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
   //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
   // [#not-implemented-hide:]
