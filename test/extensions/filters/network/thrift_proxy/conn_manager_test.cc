@@ -107,8 +107,8 @@ public:
   }
   void initializeFilter() { initializeFilter(""); }
 
-  std::string accessLogConfig() const {
-    const std::vector<std::string> fields = {
+  std::string accessLogConfig(bool drain_response_header = false) const {
+    std::vector<std::string> fields = {
         "%DYNAMIC_METADATA(thrift.proxy:method)%",
         "%DYNAMIC_METADATA(thrift.proxy:cluster)%",
         "passthrough_enabled=%DYNAMIC_METADATA(thrift.proxy:passthrough)%",
@@ -125,6 +125,10 @@ public:
         "%UPSTREAM_HOST%",
     };
 
+    if (drain_response_header) {
+      fields.push_back("%RESP(:drain)%");
+    }
+
     return fmt::format(R"EOF(
 access_log:
   - name: accesslog
@@ -138,11 +142,8 @@ access_log:
                        absl::StrJoin(fields, " "));
   }
 
-  void initializeFilter(const std::string& yaml,
-                        const std::vector<std::string>& cluster_names = {}) {
-    envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
-    if (yaml.empty()) {
-      const std::string default_yaml = fmt::format(R"EOF(
+  std::string defaultYamlConfig(bool drain_response_header = false) {
+    return fmt::format(R"EOF(
 route_config:
   name: routes
   validate_clusters: false
@@ -154,8 +155,14 @@ route_config:
 stat_prefix: test
 {}
 )EOF",
-                                                   accessLogConfig());
-      TestUtility::loadFromYaml(default_yaml, config);
+                       accessLogConfig(drain_response_header));
+  }
+
+  void initializeFilter(const std::string& yaml,
+                        const std::vector<std::string>& cluster_names = {}) {
+    envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
+    if (yaml.empty()) {
+      TestUtility::loadFromYaml(defaultYamlConfig(), config);
     } else {
       TestUtility::loadFromYaml(yaml, config);
     }
@@ -443,7 +450,7 @@ stat_prefix: test
       EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     }
 
-    initializeFilter();
+    initializeFilter(defaultYamlConfig(true));
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
     checkDecoderEventsCalledToFilters(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
@@ -466,7 +473,7 @@ stat_prefix: test
     EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
     const auto header =
-        callbacks->responseMetadata()->headers().get(ThriftProxy::Headers::get().Drain);
+        callbacks->responseMetadata()->responseHeaders().get(ThriftProxy::Headers::get().Drain);
 
     if (draining) {
       EXPECT_FALSE(header.empty());
@@ -491,8 +498,11 @@ stat_prefix: test
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
 
-    EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
-                                "binary reply success 0 0 0 -\n");
+    std::string expected_access_log =
+        fmt::format("name cluster passthrough_enabled=false framed binary call framed binary reply "
+                    "success 0 0 0 - {}\n",
+                    draining ? "true" : "-");
+    EXPECT_EQ(access_log_data_.value(), expected_access_log);
   }
 
   void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
@@ -1949,13 +1959,13 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
 
   EXPECT_CALL(*custom_decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        EXPECT_THAT(*metadata, HasNoHeaders());
-        metadata->headers().addCopy(key, "value");
+        EXPECT_THAT(*metadata, HasNoRequestHeaders());
+        metadata->requestHeaders().addCopy(key, "value");
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const auto header = metadata->headers().get(key);
+        const auto header = metadata->requestHeaders().get(key);
         EXPECT_FALSE(header.empty());
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
@@ -2005,13 +2015,13 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
   EXPECT_CALL(*encoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        EXPECT_THAT(*metadata, HasNoHeaders());
-        metadata->headers().addCopy(key, "value");
+        EXPECT_THAT(*metadata, HasNoResponseHeaders());
+        metadata->responseHeaders().addCopy(key, "value");
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*custom_encoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const auto header = metadata->headers().get(key);
+        const auto header = metadata->responseHeaders().get(key);
         EXPECT_FALSE(header.empty());
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
