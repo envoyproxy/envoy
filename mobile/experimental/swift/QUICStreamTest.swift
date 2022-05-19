@@ -156,7 +156,7 @@ final class QUICStreamTests: XCTestCase {
     """
     let expectation = self.expectation(description: "Complete response received.")
 
-    let client = try EngineBuilder(yaml: config)
+    let client = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .build()
       .streamClient()
@@ -167,18 +167,18 @@ final class QUICStreamTests: XCTestCase {
 
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, endStream in
+      .setOnResponseHeaders { responseHeaders, endStream, _ in
         XCTAssertEqual(200, responseHeaders.httpStatus)
         if endStream {
           expectation.fulfill()
         }
       }
-      .setOnResponseData { _, endStream in
+      .setOnResponseData { _, endStream, _ in
         if endStream {
           expectation.fulfill()
         }
       }
-      .setOnError { _ in
+      .setOnError { _, _ in
         XCTFail("Unexpected error")
       }
       .start()

@@ -15,6 +15,7 @@ envoy_mobile_swift_test(
         "RetryPolicyMapperTests.swift",
         "RetryPolicyTests.swift",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
     ],

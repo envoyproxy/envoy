@@ -19,7 +19,7 @@ load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], repository = ""):
+def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], repository = "", visibility = []):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
@@ -39,9 +39,10 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], reposit
         deps = [test_lib_name],
         minimum_os_version = MINIMUM_IOS_VERSION,
         tags = tags,
+        visibility = visibility,
     )
 
-def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = []):
+def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibility = []):
     test_lib_name = name + "_lib"
     objc_library(
         name = test_lib_name,
@@ -57,4 +58,5 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = []):
         deps = [test_lib_name],
         minimum_os_version = MINIMUM_IOS_VERSION,
         tags = tags,
+        visibility = visibility,
     )

@@ -7,6 +7,7 @@ envoy_mobile_objc_test(
     srcs = [
         "EnvoyBridgeUtilityTest.m",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
