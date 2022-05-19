@@ -108,10 +108,12 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
   if (validation_clusters.has_value()) {
     route->validateClusters(*validation_clusters);
     for (const auto& shadow_policy : route->shadowPolicies()) {
-      ASSERT(!shadow_policy->cluster().empty());
-      if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-        throw EnvoyException(
-            fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+      if (!shadow_policy->cluster().empty()) {
+        ASSERT(shadow_policy->clusterHeader().get().empty());
+        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+          throw EnvoyException(
+              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+        }
       }
     }
   }
@@ -376,8 +378,23 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
-  cluster_ = config.cluster();
+void validateMirrorClusterSpecifier(
+    const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
+  if (!config.cluster().empty() && !config.cluster_header().empty()) {
+    throw EnvoyException(fmt::format("Only one of cluster '{}' or cluster_header '{}' "
+                                     "in request mirror policy can be specified",
+                                     config.cluster(), config.cluster_header()));
+  } else if (config.cluster().empty() && config.cluster_header().empty()) {
+    // For shadow policies with `cluster_header_`, we only verify that this field is not
+    // empty because the cluster name is not set yet at config time.
+    throw EnvoyException(
+        "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
+  }
+}
+
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config)
+    : cluster_(config.cluster()), cluster_header_(config.cluster_header()) {
+  validateMirrorClusterSpecifier(config);
 
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
@@ -527,6 +544,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
@@ -1528,6 +1546,7 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
@@ -1826,6 +1845,7 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
   if (!config.request_mirror_policies().empty()) {
+    shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
       shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
     }
@@ -1875,11 +1895,31 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
-  auto factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-      Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
-  if (factory == nullptr) {
-    ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
-    return nullptr;
+  Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.get_route_config_factory_by_type")) {
+    factory = Envoy::Config::Utility::getFactoryByType<
+        Server::Configuration::NamedHttpFilterConfigFactory>(typed_config);
+    if (factory == nullptr) {
+      if (is_optional) {
+        ENVOY_LOG(warn,
+                  "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
+                  name, Envoy::Config::Utility::getFactoryType(typed_config));
+        return nullptr;
+      } else {
+        throw EnvoyException(
+            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                        name, Envoy::Config::Utility::getFactoryType(typed_config)));
+      }
+    }
+  } else {
+    factory = Envoy::Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
+    if (factory == nullptr) {
+      ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
+      return nullptr;
+    }
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();

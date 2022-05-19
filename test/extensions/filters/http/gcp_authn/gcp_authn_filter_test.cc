@@ -58,8 +58,7 @@ public:
   }
 
   void setupFilterAndCallback() {
-    std::string stats_prefix = "test";
-    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_, stats_prefix);
+    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_, "stats");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
