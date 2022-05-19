@@ -787,6 +787,7 @@ envoy.matching.inputs.request_trailers:
   status: alpha
 envoy.matching.inputs.http_attributes:
   categories:
+  - envoy.matching.common_inputs
   - envoy.matching.http.input
   security_posture: unknown
   status: wip
