@@ -56,6 +56,10 @@ test_suite(
     name = "ci_tests",
     tests = [
         "http2_platform_api_test",
+        "quiche_balsa_balsa_frame_test",
+        "quiche_balsa_balsa_headers_test",
+        "quiche_balsa_header_properties_test",
+        "quiche_balsa_simple_buffer_test",
         "quiche_common_test",
     ],
 )
@@ -5123,6 +5127,7 @@ envoy_cc_test_library(
         ":quiche_common_platform",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
+        "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
 )
@@ -5264,4 +5269,236 @@ envoy_cc_library(
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_header_policy_impl_lib",
     hdrs = ["quiche/common/platform/default/quiche_platform_impl/quiche_header_policy_impl.h"],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_balsa_enums_lib",
+    srcs = ["quiche/balsa/balsa_enums.cc"],
+    hdrs = ["quiche/balsa/balsa_enums.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [":quiche_common_platform_export"],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_balsa_visitor_interface_lib",
+    hdrs = ["quiche/balsa/balsa_visitor_interface.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_balsa_balsa_enums_lib",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_noop_balsa_visitor_lib",
+    hdrs = ["quiche/balsa/noop_balsa_visitor.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_balsa_balsa_visitor_interface_lib",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_standard_header_map_lib",
+    srcs = ["quiche/balsa/standard_header_map.cc"],
+    hdrs = ["quiche/balsa/standard_header_map.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_text_utils_lib",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_framer_interface_lib",
+    hdrs = ["quiche/balsa/framer_interface.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [":quiche_common_platform_export"],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_http_validation_policy_lib",
+    srcs = ["quiche/balsa/http_validation_policy.cc"],
+    hdrs = ["quiche/balsa/http_validation_policy.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_header_api_lib",
+    hdrs = ["quiche/balsa/header_api.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_lower_case_string",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_simple_buffer_lib",
+    srcs = ["quiche/balsa/simple_buffer.cc"],
+    hdrs = ["quiche/balsa/simple_buffer.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform",
+        ":quiche_common_platform_bug_tracker",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_test(
+    name = "quiche_balsa_simple_buffer_test",
+    srcs = ["quiche/balsa/simple_buffer_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_balsa_simple_buffer_lib",
+        ":quiche_common_platform_expect_bug",
+        ":quiche_common_platform_test",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_header_properties_lib",
+    srcs = ["quiche/balsa/header_properties.cc"],
+    hdrs = ["quiche/balsa/header_properties.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_text_utils_lib",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_test(
+    name = "quiche_balsa_header_properties_test",
+    srcs = ["quiche/balsa/header_properties_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_balsa_header_properties_lib",
+        ":quiche_common_platform_test",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_balsa_headers_lib",
+    srcs = ["quiche/balsa/balsa_headers.cc"],
+    hdrs = ["quiche/balsa/balsa_headers.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_balsa_balsa_enums_lib",
+        ":quiche_balsa_header_api_lib",
+        ":quiche_balsa_header_properties_lib",
+        ":quiche_balsa_standard_header_map_lib",
+        ":quiche_common_platform_bug_tracker",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_header_policy",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_test(
+    name = "quiche_balsa_balsa_headers_test",
+    srcs = ["quiche/balsa/balsa_headers_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_balsa_balsa_enums_lib",
+        ":quiche_balsa_balsa_frame_lib",
+        ":quiche_balsa_balsa_headers_lib",
+        ":quiche_balsa_simple_buffer_lib",
+        ":quiche_common_platform_expect_bug",
+        ":quiche_common_platform_logging",
+        ":quiche_common_platform_test",
+        ":quiche_common_test_tools_test_utils_lib",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_balsa_balsa_frame_lib",
+    srcs = ["quiche/balsa/balsa_frame.cc"],
+    hdrs = ["quiche/balsa/balsa_frame.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_balsa_balsa_enums_lib",
+        ":quiche_balsa_balsa_headers_lib",
+        ":quiche_balsa_balsa_visitor_interface_lib",
+        ":quiche_balsa_framer_interface_lib",
+        ":quiche_balsa_header_properties_lib",
+        ":quiche_balsa_http_validation_policy_lib",
+        ":quiche_balsa_noop_balsa_visitor_lib",
+        ":quiche_common_platform_bug_tracker",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_test(
+    name = "quiche_balsa_balsa_frame_test",
+    srcs = ["quiche/balsa/balsa_frame_test.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_balsa_balsa_enums_lib",
+        ":quiche_balsa_balsa_frame_lib",
+        ":quiche_balsa_balsa_headers_lib",
+        ":quiche_balsa_balsa_visitor_interface_lib",
+        ":quiche_balsa_http_validation_policy_lib",
+        ":quiche_balsa_noop_balsa_visitor_lib",
+        ":quiche_balsa_simple_buffer_lib",
+        ":quiche_common_platform_expect_bug",
+        ":quiche_common_platform_logging",
+        ":quiche_common_platform_test",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
 )
