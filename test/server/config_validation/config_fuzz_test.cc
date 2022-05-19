@@ -39,11 +39,10 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   }
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
-  Fuzz::PerTestEnvironment test_env;
+  ABSL_ATTRIBUTE_UNUSED Filesystem::ScopedUseMemfiles use_memfiles{true};
 
-  const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
-  std::ofstream bootstrap_file(bootstrap_path);
-  bootstrap_file << sanitizedInput.DebugString();
+  const std::string bootstrap_path =
+      TestEnvironment::writeStringToFileForTest("bootstrap.pb_text", sanitizedInput.DebugString());
   options.config_path_ = bootstrap_path;
   options.log_level_ = Fuzz::Runner::logLevel();
 
