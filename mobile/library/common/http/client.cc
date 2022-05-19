@@ -512,6 +512,7 @@ void Client::cancelStream(envoy_stream_t stream) {
   // whether it was closed or not.
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
+  scheduled_callback_ = nullptr;
   if (direct_stream) {
     // Attempt to latch the latest stream info. This will be a no-op if the stream
     // is already complete.

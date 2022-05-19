@@ -450,7 +450,6 @@ public class BidirectionalStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/2213")
   // Regression test for crbug.com/692168.
   public void testCancelWhileWriteDataPending() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
