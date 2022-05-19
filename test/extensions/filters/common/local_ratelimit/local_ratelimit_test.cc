@@ -385,7 +385,11 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
 
   // 0 -> 2 tokens
-  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+  fill_timer_->invokeCallback();
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
@@ -394,7 +398,11 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
 
   // 1 -> 2 tokens
-  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+  fill_timer_->invokeCallback();
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
   fill_timer_->invokeCallback();
@@ -534,10 +542,12 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
 
   // 0 -> 2 tokens for descriptor_
-  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(3000), dispatcher_,
-                                                   Envoy::Event::Dispatcher::RunType::NonBlock);
-  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
-  fill_timer_->invokeCallback();
+  for (int i = 0; i < 60; i++) {
+    dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+                                                     Envoy::Event::Dispatcher::RunType::NonBlock);
+    EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+    fill_timer_->invokeCallback();
+  }
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
   EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 2);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);

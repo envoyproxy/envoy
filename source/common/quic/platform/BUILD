@@ -90,7 +90,6 @@ envoy_quiche_platform_impl_cc_library(
         "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quic_platform_export",
         "@com_github_google_quiche//:quic_platform_ip_address_family",
-        "@com_github_google_quiche//:quiche_common_platform",
         "@com_google_absl//absl/container:btree",
     ],
 )
@@ -126,17 +125,6 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_stack_trace_impl_lib",
     hdrs = [
         "quiche_stack_trace_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_server_stats_impl_lib",
-    hdrs = [
-        "quiche_server_stats_impl.h",
     ],
     tags = ["nofips"],
     deps = [
