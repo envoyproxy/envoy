@@ -105,9 +105,11 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
+    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
+
+    _notes_: See Homebrew python setup notes: https://docs.brew.sh/Homebrew-and-Python.
 
     The full version of Xcode (not just Command Line Tools) is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
