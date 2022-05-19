@@ -95,6 +95,8 @@ public:
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
+  friend class ContextImplPeer;
+
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
 

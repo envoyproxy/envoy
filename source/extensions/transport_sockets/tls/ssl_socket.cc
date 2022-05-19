@@ -333,7 +333,6 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
   }
-
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
@@ -353,7 +352,9 @@ absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 void SslSocket::onAsynchronousCertValidationComplete() {
   ENVOY_CONN_LOG(debug, "Async cert validation completed", callbacks_->connection());
-  resumeHandshake();
+  if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
+    resumeHandshake();
+  }
 }
 
 namespace {

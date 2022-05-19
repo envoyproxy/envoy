@@ -11,28 +11,51 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/extensions/common/tap/common.h"
+#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/registry.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
-#include "test/common/config/dummy_config.pb.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/time/clock.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
+class ContextImplPeer {
+public:
+  static const Extensions::TransportSockets::Tls::CertValidator&
+  getCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
+    return *context.cert_validator_;
+  }
+};
+
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+
+using Extensions::TransportSockets::Tls::ContextImplPeer;
+
 namespace Ssl {
 
 void SslIntegrationTestBase::initialize() {
@@ -47,8 +70,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
                                                       keylog_local_negative_,
                                                       keylog_remote_negative_, keylog_path_,
-                                                      keylog_multiple_ips_, version_)
-                                  );
+                                                      keylog_multiple_ips_, version_));
 
   HttpIntegrationTest::initialize();
 
@@ -338,36 +360,117 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
- config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* filter_chain =
-        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-    auto* connect_timeout = filter_chain->mutable_transport_socket_connect_timeout();
-    connect_timeout->set_seconds(2);
-    connect_timeout->set_nanos(0);
-  });
-
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config = new envoy::config::core::v3::TypedExtensionConfig();
+  // Config client to use an async cert validator which defer the actual validation by 5ms.
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-   auto cert_validator_factory = Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::getFactory(
-      "envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)->setValidationTimeOutMs(std::chrono::milliseconds(0));
   initialize();
 
-  Network::ClientConnectionPtr connection = makeSslClientConnection(ClientSslTransportOptions()
-                                  .setCustomCertValidatorConfig(custom_validator_config));
+  Network::ClientConnectionPtr connection = makeSslClientConnection(
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config));
   ConnectionStatusCallbacks callbacks;
   connection->addConnectionCallbacks(callbacks);
   connection->connect();
-  while (!callbacks.connected()) {
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+  while (socket->state() != Ssl::SocketState::HandshakeInProgress) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
   connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+  initialize();
+  Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
+  auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config),
+      *context_manager_, *api_);
+  Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+  while (socket->state() != Ssl::SocketState::HandshakeInProgress) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  EXPECT_TRUE(cert_validator.validationPending());
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  connection.reset();
+  while (cert_validator.validationPending()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_P(SslIntegrationTest, AsyncCertValidationAfterSslShutdown) {
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+  initialize();
+  Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
+  auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config),
+      *context_manager_, *api_);
+  Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+  while (socket->state() != Ssl::SocketState::HandshakeInProgress) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  EXPECT_TRUE(cert_validator.validationPending());
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  while (cert_validator.validationPending()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  connection.reset();
 }
 
 class RawWriteSslIntegrationTest : public SslIntegrationTest {

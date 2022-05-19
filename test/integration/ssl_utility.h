@@ -57,7 +57,8 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
-  ClientSslTransportOptions& setCustomCertValidatorConfig(envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
+  ClientSslTransportOptions& setCustomCertValidatorConfig(
+      envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
     custom_validator_config_ = custom_validator_config;
     return *this;
   }

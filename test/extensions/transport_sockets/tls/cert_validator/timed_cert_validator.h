@@ -33,9 +33,7 @@ public:
                           SSL_CTX* ssl_ctx, absl::string_view ech_name_override, bool is_server,
                           std::string* /*error_details*/, uint8_t* out_alert) override;
 
-  bool validationPending() const {
-    return validation_timer_->enabled();
-  }
+  bool validationPending() const { return validation_timer_->enabled(); }
 
 private:
   Event::TimerPtr validation_timer_;
