@@ -424,8 +424,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
     filter->onStreamComplete();
-    EXPECT_THAT(lookupStatus(),
-                IsOkAndHolds(LookupStatus::StaleHitWithSuccessfulValidation));
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::StaleHitWithSuccessfulValidation));
     EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::HeaderUpdate));
 
     filter->onDestroy();

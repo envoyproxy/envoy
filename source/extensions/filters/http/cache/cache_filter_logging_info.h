@@ -97,8 +97,7 @@ public:
   static constexpr absl::string_view Key =
       "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo";
 
-  CacheFilterLoggingInfo(LookupStatus cache_lookup_status,
-                         InsertStatus cache_insert_status)
+  CacheFilterLoggingInfo(LookupStatus cache_lookup_status, InsertStatus cache_insert_status)
       : cache_lookup_status_(cache_lookup_status), cache_insert_status_(cache_insert_status) {}
 
   LookupStatus lookupStatus() const { return cache_lookup_status_; }

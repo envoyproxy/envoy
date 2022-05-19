@@ -602,7 +602,8 @@ LookupStatus CacheFilter::lookupStatus() const {
       case FilterState::NotServingFromCache:
         return LookupStatus::StaleHitWithFailedValidation;
       default:
-        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup response required validation, but filter state is ",
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
                                   filter_state_));
         return LookupStatus::Unknown;
       }
@@ -613,8 +614,9 @@ LookupStatus CacheFilter::lookupStatus() const {
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    IS_ENVOY_BUG(absl::StrCat("Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                              std::to_string(static_cast<int>(filter_state_))));
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state_))));
     return LookupStatus::Unknown;
   }
 
