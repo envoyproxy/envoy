@@ -32,6 +32,8 @@ class ActiveClient : public LinkedObject<ActiveClient>,
                      protected Logger::Loggable<Logger::Id::pool> {
 public:
   ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t effective_concurrent_streams, uint32_t concurrent_stream_limit);
+  ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 

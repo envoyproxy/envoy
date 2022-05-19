@@ -1888,7 +1888,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
       ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
