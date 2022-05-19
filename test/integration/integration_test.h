@@ -1,6 +1,7 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
+
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 

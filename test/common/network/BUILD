@@ -82,7 +82,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
