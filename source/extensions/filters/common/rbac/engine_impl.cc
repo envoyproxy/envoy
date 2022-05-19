@@ -4,8 +4,6 @@
 #include "envoy/config/rbac/v3/rbac.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/filters/common/rbac/matching/data_impl.h"
-#include "source/extensions/filters/common/rbac/matching/inputs.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -112,7 +110,7 @@ RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl
     ActionValidationVisitor& validation_visitor, const EnforcementMode mode)
     : mode_(mode) {
   ActionContext context{false};
-  Envoy::Matcher::MatchTreeFactory<Matching::MatchingData, ActionContext> factory(
+  Envoy::Matcher::MatchTreeFactory<Http::HttpMatchingData, ActionContext> factory(
       context, factory_context, validation_visitor);
   matcher_ = factory.create(matcher)();
   has_log_ = context.has_log_;
@@ -133,8 +131,9 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(const Network::Connec
 bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
     const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
     StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
-  Matching::MatchingDataImpl data(connection, headers, info);
-  const auto& result = Envoy::Matcher::evaluateMatch<Matching::MatchingData>(*matcher_, data);
+  Http::Matching::HttpMatchingDataImpl data(connection.connectionInfoProvider());
+  data.onRequestHeaders(headers);
+  const auto& result = Envoy::Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
   ASSERT(result.match_state_ == Envoy::Matcher::MatchState::MatchComplete);
   if (result.result_) {
     auto action = result.result_()->getTyped<Action>();

@@ -86,7 +86,7 @@ void checkMatcherEngine(
 
 void checkMatcherEngine(
     RBAC::RoleBasedAccessControlMatcherEngineImpl& engine, bool expected, LogResult expected_log,
-    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
+    const Envoy::Network::Connection& connection,
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
 
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
@@ -473,7 +473,12 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, Disabled) {
   RBAC::RoleBasedAccessControlMatcherEngineImpl engine(matcher, factory_context,
                                                        validation_visitor);
 
-  checkMatcherEngine(engine, false, LogResult::Undecided);
+  Envoy::Network::MockConnection conn;
+  Network::ConnectionInfoSetterImpl provider(std::make_shared<Network::Address::Ipv4Instance>(80),
+                                             std::make_shared<Network::Address::Ipv4Instance>(80));
+  EXPECT_CALL(conn, connectionInfoProvider()).WillRepeatedly(ReturnRef(provider));
+
+  checkMatcherEngine(engine, false, LogResult::Undecided, conn);
 }
 
 TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {

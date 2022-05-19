@@ -2,10 +2,10 @@
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/common/rbac/engine.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
-#include "source/extensions/filters/common/rbac/matching/data.h"
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -57,7 +57,7 @@ public:
   }
 };
 
-using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Matching::MatchingData>;
+using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData>;
 
 void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log);
 
@@ -106,7 +106,7 @@ public:
 
 private:
   const EnforcementMode mode_;
-  Envoy::Matcher::MatchTreeSharedPtr<Matching::MatchingData> matcher_;
+  Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
   bool has_log_;
 };
 

@@ -4,6 +4,7 @@
 
 #include "source/extensions/filters/common/rbac/engine.h"
 #include "source/extensions/filters/http/rbac/config.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
@@ -65,6 +66,42 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
   EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
                          factory.createEmptyRouteConfigProto().get()));
+}
+
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, InvalidMatcherProto) {
+  xds::type::matcher::v3::Matcher matcher_proto{};
+  TestUtility::loadFromYaml(R"EOF(
+matcher_tree:
+  input:
+    name: source-ip
+    typed_config:
+      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+      header_name: foo
+  exact_match_map:
+    map:
+      "bar":
+        action:
+          name: action
+          typed_config:
+            '@type': type.googleapis.com/envoy.config.rbac.v3.Action
+            name: deny
+)EOF",
+                            matcher_proto);
+
+  envoy::extensions::filters::http::rbac::v3::RBAC config{};
+  *config.mutable_matcher() = matcher_proto;
+
+  Stats::IsolatedStoreImpl store;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
+                   config, "test", store, context, ProtobufMessage::getStrictValidationVisitor()),
+               Envoy::EnvoyException);
+
+  config.clear_matcher();
+  *config.mutable_shadow_matcher() = matcher_proto;
+  EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
+                   config, "test", store, context, ProtobufMessage::getStrictValidationVisitor()),
+               Envoy::EnvoyException);
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {

@@ -1,9 +1,10 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
-#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/http/matching/inputs.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/matching/inputs.h"
 
 #include "absl/strings/str_join.h"
 
@@ -13,9 +14,33 @@ namespace HttpFilters {
 namespace RBACFilter {
 
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&,
-    absl::string_view) {
-  return absl::OkStatus();
+    const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+  static absl::flat_hash_set<std::string> allowed_inputs_set{
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
+                                                 v3::DestinationPortInput::descriptor()
+                                                     ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::SourcePortInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name())}};
+  if (allowed_inputs_set.contains(type_url)) {
+    return absl::OkStatus();
+  }
+
+  return absl::InvalidArgumentError(fmt::format("RBAC HTTP filter cannot match on '{}'", type_url));
 }
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(

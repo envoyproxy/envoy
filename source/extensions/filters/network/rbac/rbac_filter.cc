@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 
-#include "source/extensions/filters/common/rbac/matching/inputs.h"
+#include "source/common/network/matching/inputs.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/str_join.h"
@@ -15,8 +15,7 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&,
-    absl::string_view type_url) {
+    const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
   static absl::flat_hash_set<std::string> allowed_inputs_set{
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
@@ -40,8 +39,7 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
     return absl::OkStatus();
   }
 
-  return absl::InvalidArgumentError(
-      fmt::format("RBAC network filter cannot match on HTTP inputs, saw {}", type_url));
+  return absl::InvalidArgumentError(fmt::format("RBAC network filter cannot match '{}'", type_url));
 }
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(

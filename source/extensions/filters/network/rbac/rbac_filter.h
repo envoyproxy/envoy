@@ -24,8 +24,7 @@ struct Result {
 class ActionValidationVisitor : public Filters::Common::RBAC::ActionValidationVisitor {
 public:
   absl::Status performDataInputValidation(
-      const Envoy::Matcher::DataInputFactory<Filters::Common::RBAC::Matching::MatchingData>&
-          data_input,
+      const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
       absl::string_view type_url) override;
 };
 
