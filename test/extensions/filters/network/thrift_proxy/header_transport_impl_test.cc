@@ -436,11 +436,11 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
   }
 }
 
-MessageMetadata testInfoBlock(bool case_sensitive, const std::string& key,
+MessageMetadata testInfoBlock(bool preserve_keys, const std::string& key,
                               const std::string& value) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
-  MessageMetadata metadata(true, case_sensitive);
+  MessageMetadata metadata(true, preserve_keys);
 
   metadata.requestHeaders().addCopy(Http::LowerCaseString("not"), "empty");
 
@@ -479,10 +479,10 @@ MessageMetadata testInfoBlock(bool case_sensitive, const std::string& key,
   return metadata;
 }
 
-TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(false /* case-sensitive */, "key", "value"); }
+TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(false /* preserve-keys */, "key", "value"); }
 
 TEST(HeaderTransportTest, InfoBlockCaseSensitive) {
-  auto metadata = testInfoBlock(true /* case-sensitive */, "Key", "Value");
+  auto metadata = testInfoBlock(true /* preserve-keys */, "Key", "Value");
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl msg;
@@ -498,7 +498,7 @@ TEST(HeaderTransportTest, InfoBlockCaseSensitive) {
 }
 
 TEST(HeaderTransportTest, InfoBlockCaseSensitiveNewline) {
-  auto metadata = testInfoBlock(true /* case-sensitive */, "K\ny", "Value");
+  auto metadata = testInfoBlock(true /* preserve-keys */, "K\ny", "Value");
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl msg;
