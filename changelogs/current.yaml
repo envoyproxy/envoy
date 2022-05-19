@@ -126,7 +126,7 @@ new_features:
     added support for access logging.
 - area: thrift
   change: |
-    added support for case-sensitive header keys.
+    added support for preserving header keys.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
