@@ -58,7 +58,7 @@ EXTENSION_CATEGORIES = (
     "envoy.request_id", "envoy.resource_monitors", "envoy.retry_host_predicates",
     "envoy.retry_priorities", "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers",
     "envoy.sip_proxy.filters", "envoy.transport_sockets.downstream",
-    "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
+    "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams", "envoy.udp",
     "envoy.wasm.runtime", "envoy.common.key_value", "envoy.network.dns_resolver",
     "envoy.rbac.matchers", "envoy.access_loggers.extension_filters", "envoy.http.stateful_session",
     "envoy.matching.http.input", "envoy.matching.network.input",
