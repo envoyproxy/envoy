@@ -37,7 +37,7 @@ TestCommandFactory::createCommandParserFromProto(const Protobuf::Message& messag
   return std::make_unique<TestCommandParser>();
 }
 
-std::string TestCommandFactory::configType() { return "google.protobuf.StringValue"; }
+std::set<std::string> TestCommandFactory::configTypes() { return {"google.protobuf.StringValue"}; }
 
 ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
   return std::make_unique<ProtobufWkt::StringValue>();
@@ -77,7 +77,9 @@ AdditionalCommandFactory::createCommandParserFromProto(const Protobuf::Message& 
   return std::make_unique<AdditionalCommandParser>();
 }
 
-std::string AdditionalCommandFactory::configType() { return "google.protobuf.UInt32Value"; }
+std::set<std::string> AdditionalCommandFactory::configTypes() {
+  return {"google.protobuf.UInt32Value"};
+}
 
 ProtobufTypes::MessagePtr AdditionalCommandFactory::createEmptyConfigProto() {
   return std::make_unique<ProtobufWkt::UInt32Value>();
@@ -92,7 +94,7 @@ FailCommandFactory::createCommandParserFromProto(const Protobuf::Message& messag
   return nullptr;
 }
 
-std::string FailCommandFactory::configType() { return "google.protobuf.UInt64Value"; }
+std::set<std::string> FailCommandFactory::configTypes() { return {"google.protobuf.UInt64Value"}; }
 
 ProtobufTypes::MessagePtr FailCommandFactory::createEmptyConfigProto() {
   return std::make_unique<ProtobufWkt::UInt64Value>();

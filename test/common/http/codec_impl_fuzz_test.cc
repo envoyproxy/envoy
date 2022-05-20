@@ -179,7 +179,9 @@ public:
           // that the internal book keeping resetStream() below is consistent with the state of the
           // client codec state, which is necessary to prevent multiple simultaneous streams for the
           // HTTP/1 codec.
-          request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          if (response_.stream_state_ != StreamState::Closed) {
+            request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          }
           resetStream();
           stream_reset_callback_();
         }));
@@ -244,7 +246,8 @@ public:
           ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
                                                           *context_.conn_manager_config_,
                                                           /*via=*/"", stream_info_, /*node_id=*/"");
-          if (headers.Status() == nullptr) {
+          // Check for validity of response-status explicitly, as encodeHeaders() might throw.
+          if (!Utility::getResponseStatusNoThrow(headers).has_value()) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);
@@ -386,6 +389,7 @@ public:
       ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
+      stream_action_active_ = true;
       if (stream_action.has_dispatching_action()) {
         // Simulate some response action while dispatching request headers, data, or trailers. This
         // may happen as a result of a filter sending a direct response.
@@ -400,8 +404,18 @@ public:
         } else if (request_action == test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
               .Times(testing::AtLeast(1))
-              .WillRepeatedly(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+              .WillRepeatedly(InvokeWithoutArgs([&] {
+                // Only simulate response action if the stream action is active
+                // otherwise the expectation could trigger in other moments
+                // causing the fuzzer to OOM.
+                // TODO(kbaichoo): In the future if the fuzzer invokes
+                // decodeData from deferred processing callbacks as part of
+                // a request data step, we should allow response data
+                // generation.
+                if (stream_action_active_) {
+                  directionalAction(response_, stream_action.dispatching_action());
+                }
+              }));
         } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
           EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
               .WillOnce(InvokeWithoutArgs(
@@ -416,6 +430,7 @@ public:
       if (response_.stream_state_ != HttpStream::StreamState::Closed) {
         directionalAction(request_, stream_action.request());
       }
+      stream_action_active_ = false;
       break;
     }
     case test::common::http::StreamAction::kResponse: {
@@ -439,6 +454,8 @@ public:
 
   Protocol http_protocol_;
   int32_t stream_index_{-1};
+  // Whether we're currently dispatching a stream action.
+  bool stream_action_active_{false};
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -462,6 +479,7 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
+        const auto buf_length_old = buf.length();
         if (should_close_connection_) {
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
           return codecClientError("preventing buffer drain due to connection closure");
@@ -470,6 +488,9 @@ public:
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
           return status;
+        }
+        if (buf_length_old == buf.length()) {
+          return Http::codecProtocolError("No progress in draining buffer. Breaking endless loop.");
         }
       }
       bufs_.pop_front();
@@ -651,11 +672,11 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   constexpr auto max_actions = 1024;
   bool codec_error = false;
-  for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection &&
-                  !codec_error;
-       ++i) {
+  const auto num_actions = std::min(max_actions, input.actions().size());
+  for (int i = 0; i < num_actions && !should_close_connection && !codec_error; ++i) {
     const auto& action = input.actions(i);
-    ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
+    ENVOY_LOG_MISC(trace, "action #{}/{}: {} with {} streams", i, num_actions, action.DebugString(),
+                   streams.size());
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       if (!http2) {

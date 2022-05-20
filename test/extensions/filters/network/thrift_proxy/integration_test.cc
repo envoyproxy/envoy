@@ -257,6 +257,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
+  DISABLE_UNDER_WINDOWS; // https://github.com/envoyproxy/envoy/issues/21017
   initializeCall(DriverMode::IDLException);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -304,6 +305,7 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, Exception) {
+  DISABLE_UNDER_WINDOWS; // https://github.com/envoyproxy/envoy/issues/21017
   initializeCall(DriverMode::Exception);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));

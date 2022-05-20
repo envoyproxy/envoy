@@ -415,11 +415,13 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

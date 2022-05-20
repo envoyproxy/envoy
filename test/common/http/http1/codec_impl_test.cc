@@ -3149,6 +3149,34 @@ TEST_F(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
   connection_.dispatcher_.clearDeferredDeleteList();
 }
 
+TEST_F(Http1ServerConnectionImplTest, Utf8Path) {
+  initialize();
+
+  MockRequestDecoder decoder;
+  Buffer::OwnedImpl buffer("GET /δ¶/δt/pope?q=1#narf HXXP/1.1\r\n\r\n");
+#ifdef ENVOY_ENABLE_UHV
+  // permissive
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/δ¶/δt/pope?q=1#narf"},
+      {":method", "GET"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+#else
+  // strict
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+#endif
+}
+
 // Tests that incomplete response headers of 80 kB header value fails.
 TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
   initialize();

@@ -323,6 +323,8 @@ stages:
           CI_TARGET: "bazel.clang_tidy"
         asan:
           CI_TARGET: "bazel.asan"
+        msan:
+          CI_TARGET: "bazel.msan"
         tsan:
           CI_TARGET: "bazel.tsan"
         compile_time_options:
@@ -555,7 +557,7 @@ stages:
   dependsOn: ["precheck"]
   jobs:
   - job: release
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool:
       vmImage: "windows-2019"
     steps:

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.thrift_proxy.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 
@@ -73,7 +74,7 @@ message Trds {
   string route_config_name = 2;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy";
@@ -112,6 +113,10 @@ message ThriftProxy {
 
   // Optional maximum requests for a single downstream connection. If not specified, there is no limit.
   google.protobuf.UInt32Value max_requests_per_connection = 7;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by Thrift proxy.
+  repeated config.accesslog.v3.AccessLog access_log = 9;
 }
 
 // ThriftFilter configures a Thrift filter.

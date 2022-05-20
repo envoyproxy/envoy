@@ -161,9 +161,15 @@ class RouteConfigImpl : public Config, public Logger::Loggable<Logger::Id::dubbo
 public:
   using RouteConfigList = Envoy::Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration>;
+  using MultipleRouteConfig =
+      envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration;
   RouteConfigImpl(const RouteConfigList& route_config_list,
                   Server::Configuration::ServerFactoryContext& context,
                   bool validate_clusters_default = false);
+  RouteConfigImpl(const MultipleRouteConfig& multiple_route_config,
+                  Server::Configuration::ServerFactoryContext& context,
+                  bool validate_clusters_default = false)
+      : RouteConfigImpl(multiple_route_config.route_config(), context, validate_clusters_default) {}
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
@@ -171,6 +177,11 @@ private:
   std::vector<SingleRouteMatcherImplPtr> route_matcher_list_;
 };
 using RouteConfigImplPtr = std::unique_ptr<RouteConfigImpl>;
+
+class NullRouteConfigImpl : public Config {
+public:
+  RouteConstSharedPtr route(const MessageMetadata&, uint64_t) const override { return nullptr; }
+};
 
 } // namespace Router
 } // namespace DubboProxy

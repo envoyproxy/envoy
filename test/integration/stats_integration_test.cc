@@ -54,6 +54,26 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
   EXPECT_EQ(counter->tags().size(), 0);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/pull/21069 making
+// sure that the default error_level limits are not applied before runtime is
+// created. As described by the linked issue, this simply bypasses regex size checks.
+TEST_P(StatsIntegrationTest, WithLargeRegex) {
+  // This limit of 1000 will be ignored.
+  config_helper_.addRuntimeOverride("re2.max_program_size.error_level", "1000");
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto pattern = bootstrap.mutable_stats_config()
+                       ->mutable_stats_matcher()
+                       ->mutable_inclusion_list()
+                       ->add_patterns();
+    pattern->mutable_safe_regex()->mutable_google_re2();
+    pattern->mutable_safe_regex()->set_regex(
+        "cluster.(metadata-cluster|iam-cluster|service-control-cluster|backend-cluster-sample-"
+        "backend-s3fctubhaq-uc.a.run.app_443).upstream_rq_(reset|timeout|[1-5]xx)|listener.*");
+  });
+  use_lds_ = false;
+  initialize();
+}
+
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(true);

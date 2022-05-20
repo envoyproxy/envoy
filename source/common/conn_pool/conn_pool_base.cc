@@ -648,8 +648,13 @@ uint32_t translateZeroToUnlimited(uint32_t limit) {
 
 ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                            uint32_t concurrent_stream_limit)
+    : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit,
+                   concurrent_stream_limit) {}
+
+ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+                           uint32_t effective_concurrent_streams, uint32_t concurrent_stream_limit)
     : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
-      configured_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
+      configured_stream_limit_(translateZeroToUnlimited(effective_concurrent_streams)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
       connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(

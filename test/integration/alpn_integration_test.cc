@@ -15,29 +15,34 @@ public:
     autonomous_upstream_ = true;
     setUpstreamCount(2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
-
     upstream_tls_ = true;
+  }
+
+  void initialize() override {
     config_helper_.configureUpstreamTls(true);
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* static_resources = bootstrap.mutable_static_resources();
-      auto* cluster = static_resources->mutable_clusters(0);
-      auto* load_assignment = cluster->mutable_load_assignment();
-      load_assignment->set_cluster_name(cluster->name());
-      auto* locality = load_assignment->add_endpoints();
-      locality->set_priority(0);
-      locality->mutable_locality()->set_region("region");
-      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
-          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
-    });
+    // If the test is configured to have multiple upstreams, make sure the Envoy
+    // config also has 2 upstreams.
+    if (fake_upstreams_count_ == 2) {
+      config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* static_resources = bootstrap.mutable_static_resources();
+        auto* cluster = static_resources->mutable_clusters(0);
+        auto* load_assignment = cluster->mutable_load_assignment();
+        load_assignment->set_cluster_name(cluster->name());
+        auto* locality = load_assignment->add_endpoints();
+        locality->set_priority(0);
+        locality->mutable_locality()->set_region("region");
+        locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+            ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+      });
+    }
+    HttpIntegrationTest::initialize();
   }
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      auto endpoint = upstream_address_fn_(i);
       auto config = upstreamConfig();
       config.upstream_protocol_ = protocols_[i];
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      auto endpoint = upstream_address_fn_(i);
-      fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
-                                                          autonomous_allow_incomplete_streams_));
+      createUpstream(endpoint, config);
     }
   }
   std::vector<Http::CodecType> protocols_;
@@ -134,6 +139,76 @@ TEST_P(AlpnIntegrationTest, Http1New) {
   ASSERT_TRUE(response2->complete());
   EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
   codec_client2->close();
+}
+
+TEST_P(AlpnIntegrationTest, Http1RememberLimits) {
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP1};
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",
+                                    "true");
+  initialize();
+
+  // Send a request and response, then close the connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  default_request_headers_.addCopy(AutonomousStream::CLOSE_AFTER_RESPONSE, "yes");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  fake_upstreams_.clear();
+  {
+    IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
+    auto response1 = codec_client1->makeHeaderOnlyRequest(default_request_headers_);
+    IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+    auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
+    // Envoy should attempt to establish 2 new connections, one for each stream.
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 3);
+    codec_client1->close();
+    codec_client2->close();
+  }
+}
+
+TEST_P(AlpnIntegrationTest, Http2RememberSettings) {
+  setUpstreamCount(1);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  autonomous_upstream_ = false;
+  protocols_ = {Http::CodecType::HTTP2, Http::CodecType::HTTP2};
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_concurrency_for_alpn_pool",
+                                    "true");
+  initialize();
+
+  // Send a request and response, get the settings update then close the connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  // Adjust the max concurrent streams of one connection created above to 2.
+  auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
+  const Http2Frame settings_frame = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
+  std::string settings_data(settings_frame);
+  Buffer::OwnedImpl settings_buffer(settings_data);
+  upstream_request_->postToConnectionThread([this, &settings_buffer]() {
+    fake_upstream_connection_->connection().write(settings_buffer, false);
+  });
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 bytes_read + settings_data.size());
+  // Close the connection.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+
+  {
+    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
+    auto response1 = codec_client1->makeHeaderOnlyRequest(default_request_headers_);
+    IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+    auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
+    // Envoy should attempt to establish 2 new connections, one for each stream.
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 3);
+    codec_client1->close();
+    codec_client2->close();
+  }
 }
 
 TEST_P(AlpnIntegrationTest, Mixed) {

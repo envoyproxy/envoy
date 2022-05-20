@@ -106,24 +106,17 @@ public:
    */
   virtual void onChunkHeader(bool) PURE;
 
-  virtual int setAndCheckCallbackStatus(Status&& status) PURE;
-  virtual int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;
+  virtual ParserStatus setAndCheckCallbackStatus(Status&& status) PURE;
+  virtual ParserStatus setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;
 };
 
 class Parser {
 public:
-  // Struct containing the return value from parser execution.
-  struct RcVal {
-    // Number of parsed bytes.
-    size_t nread;
-    // Integer error from parser indicating return code.
-    int rc;
-  };
   virtual ~Parser() = default;
 
   // Executes the parser.
-  // @return an RcVal containing the number of parsed bytes and return code.
-  virtual RcVal execute(const char* slice, int len) PURE;
+  // @return the number of parsed bytes.
+  virtual size_t execute(const char* slice, int len) PURE;
 
   // Unpauses the parser.
   virtual void resume() PURE;
@@ -154,14 +147,11 @@ public:
   // Returns a textual representation of the method. For requests only.
   virtual absl::string_view methodName() const PURE;
 
-  // Returns a textual representation of the given return code.
-  virtual absl::string_view errnoName(int rc) const PURE;
+  // Returns a textual representation of the internal error state of the parser.
+  virtual absl::string_view errorMessage() const PURE;
 
   // Returns whether the Transfer-Encoding header is present.
   virtual int hasTransferEncoding() const PURE;
-
-  // Converts a ParserStatus code to the parsers' integer return code value.
-  virtual int statusToInt(const ParserStatus code) const PURE;
 };
 
 using ParserPtr = std::unique_ptr<Parser>;
