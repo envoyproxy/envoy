@@ -44,9 +44,9 @@ template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(std::
 }
 
 template <typename TokenType>
-void TokenCacheImpl<TokenType>::insert(const std::string& key, std::unique_ptr<TokenType> token) {
+void TokenCacheImpl<TokenType>::insert(const std::string& key, std::unique_ptr<TokenType>&& token) {
   if (lru_cache_ != nullptr) {
-    // pass the ownership of jwt to cache
+    // Pass the ownership of jwt to cache.
     lru_cache_->insert(key, token.release(), 1);
   }
 }
@@ -83,6 +83,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
         return FilterHeadersStatus::Continue;
       }
     }
+
     // Save the pointer to the request headers for header manipulation based on http response later.
     request_header_map_ = &hdrs;
     // Audience is URL of receiving service that will perform authentication.
@@ -121,7 +122,7 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }
-      // Decode the tokens
+      // Decode the tokens.
       std::unique_ptr<::google::jwt_verify::Jwt> jwt =
           std::make_unique<::google::jwt_verify::Jwt>();
       Status status = jwt->parseFromString(token_str);

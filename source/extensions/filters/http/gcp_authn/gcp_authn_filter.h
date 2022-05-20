@@ -51,7 +51,7 @@ public:
   }
 
   TokenType* lookUp(std::string key);
-  void insert(const std::string& key, std::unique_ptr<TokenType> token);
+  void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
 
   LRUCache<TokenType>& lruCache() { return *lru_cache_; }
   int size() { return size_; }
@@ -81,8 +81,7 @@ private:
   TokenCacheImpl<JwtToken> cache_;
 };
 
-class TokenCache {
-public:
+struct TokenCache {
   TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
              Envoy::Server::Configuration::FactoryContext& context)
       : tls(context.threadLocal()) {
@@ -105,7 +104,7 @@ public:
   GcpAuthnFilter(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
-      TokenCacheImpl<JwtToken>* token_cache = nullptr)
+      TokenCacheImpl<JwtToken>* token_cache)
       : filter_config_(
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
                 config)),
@@ -140,8 +139,9 @@ private:
   bool initiating_call_{};
   State state_{State::NotStarted};
   std::string audience_str_;
-  // This cache is optional.
-  TokenCacheImpl<JwtToken>* jwt_token_cache_ = nullptr;
+  // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
+  // filter.
+  TokenCacheImpl<JwtToken>* jwt_token_cache_;
 };
 
 } // namespace GcpAuthn
