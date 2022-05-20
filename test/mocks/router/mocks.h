@@ -339,7 +339,7 @@ public:
   MOCK_METHOD(PathMatchType, matchType, (), (const));
   MOCK_METHOD(const std::string&, matcher, (), (const));
 
-  PathMatchType type_;
+  PathMatchType type_{};
   std::string matcher_;
 };
 
