@@ -95,9 +95,7 @@ public:
 
   uint16_t statusCode() const { return parser_.status_code; }
 
-  int httpMajor() const { return parser_.http_major; }
-
-  int httpMinor() const { return parser_.http_minor; }
+  bool isHttp11() const { return parser_.http_major == 1 && parser_.http_minor == 1; }
 
   absl::optional<uint64_t> contentLength() const {
     // An unset content length will be have all bits set.
@@ -152,9 +150,7 @@ ParserStatus LegacyHttpParserImpl::getStatus() { return intToStatus(impl_->getEr
 
 uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 
-int LegacyHttpParserImpl::httpMajor() const { return impl_->httpMajor(); }
-
-int LegacyHttpParserImpl::httpMinor() const { return impl_->httpMinor(); }
+bool LegacyHttpParserImpl::isHttp11() const { return impl_->isHttp11(); }
 
 absl::optional<uint64_t> LegacyHttpParserImpl::contentLength() const {
   return impl_->contentLength();
