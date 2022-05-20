@@ -351,7 +351,7 @@ private:
     Buffer::OwnedImpl response_buffer_;
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
-    std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
+    std::function<FilterStatus(DecoderEventHandler*, FilterContext&)> filter_action_;
     FilterContext filter_context_;
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
