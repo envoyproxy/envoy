@@ -6,6 +6,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -95,4 +96,21 @@ Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::I
                                                        int port);
 
 } // namespace Ssl
+
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
+class ContextImplPeer {
+public:
+  static const Extensions::TransportSockets::Tls::CertValidator&
+  getCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
+    return *context.cert_validator_;
+  }
+};
+
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+
 } // namespace Envoy

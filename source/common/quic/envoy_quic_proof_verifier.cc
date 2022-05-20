@@ -38,25 +38,28 @@ public:
 
   void onCertValidationResult(bool succeeded, const std::string& error_details,
                               uint8_t /*out_alert*/) override {
-    std::string error = error_details;
-    if (succeeded) {
-      if (!verifyLeafCertMatchesHostName(*cert_view_, hostname_, &error)) {
-        succeeded = false;
-      }
+    if (!succeeded) {
+      std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(false);
+    quic_callback_->Run(succeeded, error_details, &details);
+      return;
     }
+    std::string error;
+
+std::unique_ptr<quic::CertificateView> cert_view =  quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+    succeeded = verifyLeafCertMatchesHostName(*cert_view, hostname_, &error);
     std::unique_ptr<quic::ProofVerifyDetails> details =
         std::make_unique<CertVerifyResult>(succeeded);
     quic_callback_->Run(succeeded, error, &details);
   }
 
-  void storeLeafCert(std::unique_ptr<quic::CertificateView>&& cert_view) {
-    cert_view_ = std::move(cert_view);
+  void storeLeafCert(const std::string& leaf_cert) {
+    leaf_cert_ = leaf_cert;
   }
 
 private:
   Event::Dispatcher& dispatcher_;
   std::unique_ptr<quic::ProofVerifierCallback> quic_callback_;
-  std::unique_ptr<quic::CertificateView> cert_view_;
+  std::string leaf_cert_;
   const std::string hostname_;
 };
 
@@ -103,7 +106,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   if (result == Ssl::ValidateResult::Pending) {
     // Transfer the ownership of cert_view to callback while asynchronously verifying the cert
     // chain.
-    envoy_callback->storeLeafCert(std::move(cert_view));
+    envoy_callback->storeLeafCert(certs[0]);
     return quic::QUIC_PENDING;
   }
   if (result == Ssl::ValidateResult::Successful) {

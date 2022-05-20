@@ -27,6 +27,7 @@
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -37,22 +38,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
-
-class ContextImplPeer {
-public:
-  static const Extensions::TransportSockets::Tls::CertValidator&
-  getCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
-    return *context.cert_validator_;
-  }
-};
-
-} // namespace Tls
-} // namespace TransportSockets
-} // namespace Extensions
 
 using Extensions::TransportSockets::Tls::ContextImplPeer;
 

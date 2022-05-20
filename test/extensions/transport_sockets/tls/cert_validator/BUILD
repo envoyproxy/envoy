@@ -93,6 +93,7 @@ envoy_cc_extension(
     hdrs = [
         "timed_cert_validator.h",
     ],
+    extra_visibility = ["//test:__subpackages__"],
     deps = [
         "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
