@@ -785,12 +785,6 @@ envoy.matching.inputs.request_trailers:
   - envoy.matching.http.input
   security_posture: unknown
   status: alpha
-envoy.matching.inputs.http_attributes:
-  categories:
-  - envoy.matching.common_inputs
-  - envoy.matching.http.input
-  security_posture: unknown
-  status: wip
 envoy.matching.inputs.response_headers:
   categories:
   - envoy.matching.http.input
