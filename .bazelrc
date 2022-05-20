@@ -95,8 +95,8 @@ build:clang-asan --linkopt --unwindlib=libgcc
 
 # macOS
 build:macos --cxxopt=-std=c++17
-build:macos --action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
-build:macos --host_action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
+build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
+build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
 build:macos --define wasm=disabled
 
