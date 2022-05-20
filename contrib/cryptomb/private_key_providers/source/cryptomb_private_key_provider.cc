@@ -359,9 +359,10 @@ ssl_private_key_result_t rsaPrivateKeyDecryptForTest(CryptoMbPrivateKeyConnectio
 
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                              IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats)
-    : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)), type_(type),
-      key_size_(keysize), ipp_(ipp), timer_(d.createTimer([this]() { processRequests(); })),
-      stats_(stats) {
+    : us_(std::chrono::duration_cast<std::chrono::microseconds>(
+          std::max(poll_delay, std::chrono::milliseconds(1)))),
+      type_(type), key_size_(keysize), ipp_(ipp),
+      timer_(d.createTimer([this]() { processRequests(); })), stats_(stats) {
   request_queue_.reserve(MULTIBUFF_BATCH);
 }
 

@@ -96,6 +96,7 @@ public:
   CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                 IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats);
   void addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx);
+  const std::chrono::microseconds& getPollDelayForTest() const { return us_; }
 
 private:
   void processRequests();
