@@ -14,23 +14,12 @@ namespace {
 
 ParserStatus intToStatus(int rc) {
   switch (rc) {
-  case -1:
-    return ParserStatus::Error;
   case 0:
     return ParserStatus::Ok;
-  // TODO(bnc): The following two are incorrect.  Integer value of 1 corresponds
-  // to an error due to ParserCallbacks::onMessageBegin() returning
-  // CallbackResult::Error, and a value of 2 to onUrl() returning
-  // CallbackResult::Error.  Both should be translated into ParserStatus::Error.
-  case 1:
-    return ParserStatus::NoBody;
-  case 2:
-    return ParserStatus::NoBodyData;
   case 31:
     return ParserStatus::Paused;
-  // TODO(bnc): This should also be translated into ParserStatus::Error.
   default:
-    return ParserStatus::Unknown;
+    return ParserStatus::Error;
   }
 }
 

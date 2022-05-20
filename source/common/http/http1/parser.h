@@ -108,14 +108,8 @@ enum class ParserStatus {
   Error = -1,
   // No error.
   Ok = 0,
-  // TODO(bnc): Remove.
-  NoBody = 1,
-  // TODO(bnc): Remove.
-  NoBodyData = 2,
   // The parser is paused.
   Paused,
-  // TODO(bnc): Remove.
-  Unknown,
 };
 
 class Parser {
