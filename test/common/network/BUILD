@@ -73,19 +73,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "connection_balancer_impl_test",
-    srcs = ["connection_balancer_impl_test.cc"],
-    deps = [
-        "//envoy/registry",
-        "//envoy/server:filter_config_interface",
-        "//source/common/network:connection_balancer_lib",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:registry_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
     deps = [
