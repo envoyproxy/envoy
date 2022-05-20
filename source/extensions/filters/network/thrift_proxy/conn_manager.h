@@ -319,8 +319,9 @@ private:
     // @param filter    the last filter which is already applied to the decoder_event.
     //                  nullptr indicates none is applied and the decoder_event is applied from the
     //                  first filter.
-    FilterStatus applyDecoderFilters(DecoderEvent state, ActiveRpcDecoderFilter* filter = nullptr);
-    FilterStatus applyEncoderFilters(DecoderEvent state,
+    FilterStatus applyDecoderFilters(DecoderEvent state, FilterContext&& data,
+                                     ActiveRpcDecoderFilter* filter = nullptr);
+    FilterStatus applyEncoderFilters(DecoderEvent state, FilterContext&& data,
                                      ProtocolConverterSharedPtr protocol_converter,
                                      ActiveRpcEncoderFilter* filter = nullptr);
     template <typename FilterType>
@@ -328,8 +329,8 @@ private:
                               std::list<std::unique_ptr<FilterType>>& filter_list,
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
-    // Helper to setup filter_action_
-    void prepareFilterAction(DecoderEvent event);
+    // Helper to setup filter_action_ and filter_context_
+    void prepareFilterAction(DecoderEvent event, FilterContext&& data);
 
     void finalizeRequest();
 
