@@ -113,6 +113,10 @@ configure_make(
 
 configure_make(
     name = "ragel",
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+    ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
