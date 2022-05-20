@@ -10,6 +10,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "library/cc/engine_builder.h"
+#include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/client.h"
 #include "library/common/http/header_utility.h"
@@ -46,9 +48,8 @@ typedef struct {
 } callbacks_called;
 
 void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
-  // This test doesn't do DNS lookup
-  EXPECT_EQ(-1, final_intel.dns_start_ms);
-  EXPECT_EQ(-1, final_intel.dns_end_ms);
+  EXPECT_NE(-1, final_intel.dns_start_ms);
+  EXPECT_NE(-1, final_intel.dns_end_ms);
   // This test doesn't do TLS.
   EXPECT_EQ(-1, final_intel.ssl_start_ms);
   EXPECT_EQ(-1, final_intel.ssl_end_ms);
@@ -73,11 +74,26 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
 class ClientIntegrationTest : public BaseIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ClientIntegrationTest() : BaseIntegrationTest(GetParam(), bootstrap_config()) {
+  ClientIntegrationTest() : BaseIntegrationTest(GetParam(), defaultConfig()) {
     use_lds_ = false;
     autonomous_upstream_ = true;
     defer_listener_finalization_ = true;
     HttpTestUtility::addDefaultHeaders(default_request_headers_);
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // The default stats config has overenthusiastic filters.
+      bootstrap.clear_stats_config();
+    });
+    // TODO(alyssawilk) upstream has an issue with logical DNS ipv6 clusters -
+    // remove this once #21359 lands.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      for (int i = 0; i < static_resources->clusters_size(); ++i) {
+        auto* cluster = static_resources->mutable_clusters(i);
+        if (cluster->type() == envoy::config::cluster::v3::Cluster::LOGICAL_DNS) {
+          cluster->clear_type();
+        }
+      }
+    });
   }
 
   void initialize() override {
@@ -91,18 +107,10 @@ public:
       server_started.setReady();
     });
     server_started.waitReady();
+    default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
   }
 
   void SetUp() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // currently ApiListener does not trigger this wait
-      // https://github.com/envoyproxy/envoy/blob/0b92c58d08d28ba7ef0ed5aaf44f90f0fccc5dce/test/integration/integration.cc#L454
-      // Thus, the ApiListener has to be added in addition to the already existing listener in the
-      // config.
-      bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
-          Server::parseListenerFromV3Yaml(api_listener_config()));
-    });
-
     bridge_callbacks_.context = &cc_;
     bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel intel,
                                       void* context) -> void* {
@@ -160,36 +168,12 @@ public:
     )EOF";
   }
 
-  static std::string api_listener_config() {
-    return R"EOF(
-name: api_listener
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1
-api_listener:
-  api_listener:
-    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
-    config:
-      stat_prefix: hcm
-      route_config:
-        virtual_hosts:
-          name: integration
-          routes:
-            route:
-              cluster: cluster_0
-            match:
-              prefix: "/"
-          domains: "*"
-        name: route_config_0
-      http_filters:
-        - name: envoy.filters.http.local_error
-          typed_config:
-            "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
-        - name: envoy.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-      )EOF";
+  // Use the Envoy mobile default config as much as possible in this test.
+  // There are some config modifiers below which do result in deltas.
+  static std::string defaultConfig() {
+    Platform::EngineBuilder builder;
+    std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
+    return config_str;
   }
 
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
@@ -223,8 +207,8 @@ TEST_P(ClientIntegrationTest, Basic) {
 
   // Build a set of request headers.
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  Http::TestRequestHeaderMapImpl headers{
-      {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_data.length())}};
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
 
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
 
@@ -443,15 +427,14 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   };
 
   // Build a set of request headers.
-  Http::TestRequestHeaderMapImpl headers{{"FoO", "bar"}};
-  headers.header_map_->setFormatter(
+  default_request_headers_.header_map_->setFormatter(
       std::make_unique<
           Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(
           false, envoy::extensions::http::header_formatters::preserve_case::v3::
                      PreserveCaseFormatterConfig::DEFAULT));
-  headers.header_map_->formatter().value().get().processKey("FoO");
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+  default_request_headers_.addCopy("FoO", "bar");
+  default_request_headers_.header_map_->formatter().value().get().processKey("FoO");
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
@@ -485,7 +468,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
 
 TEST_P(ClientIntegrationTest, Timeout) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* em_hcm = listener->mutable_api_listener()->mutable_api_listener();
     auto hcm =
         MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::v3::
@@ -507,9 +490,7 @@ TEST_P(ClientIntegrationTest, Timeout) {
   };
 
   // Build a set of request headers.
-  Http::TestRequestHeaderMapImpl headers{{"FoO", "bar"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
