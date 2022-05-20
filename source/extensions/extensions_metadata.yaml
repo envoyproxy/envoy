@@ -539,14 +539,14 @@ envoy.quic.proof_source.filter_chain:
   - envoy.quic.proof_source
   security_posture: robust_to_untrusted_downstream
   status: alpha
-envoy.quic.udp_packet_writer.default:
+envoy.udp_packet_writer.default:
   categories:
-  - envoy.udp
+  - envoy.udp_packet_writer
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
-envoy.quic.udp_packet_writer.gso:
+envoy.udp_packet_writer.gso:
   categories:
-  - envoy.udp
+  - envoy.udp_packet_writer
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
 envoy.quic.crypto_stream.server.quiche:

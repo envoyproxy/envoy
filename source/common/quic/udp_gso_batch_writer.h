@@ -5,7 +5,7 @@
 #else
 #define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
 
-#include "envoy/extensions/quic/udp_packet_writer/v3/udp_gso_batch_writer_factory.pb.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.pb.h"
 #include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/registry/registry.h"
 
@@ -103,14 +103,14 @@ private:
 
 class UdpGsoBatchWriterFactoryFactory : public Network::UdpPacketWriterFactoryFactory {
 public:
-  std::string name() const override { return "envoy.udp.writer.factory.gso"; }
+  std::string name() const override { return "envoy.udp_packet_writer.gso"; }
   Network::UdpPacketWriterFactoryPtr
   createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&) override {
     return std::make_unique<UdpGsoBatchWriterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::quic::udp_packet_writer::v3::UdpGsoBatchWriterFactory>();
+        envoy::extensions::udp_packet_writer::v3::UdpGsoBatchWriterFactory>();
   }
 
 private:

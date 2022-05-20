@@ -37,9 +37,12 @@ message UdpListenerConfig {
   // to the default object to enable QUIC without modifying any additional options.
   QuicProtocolOptions quic_options = 7;
 
-  // Configuration for the UDP packet writer. If empty, the QUICHE writer will use GSO if available
-  // or the default kernel sendmsg if not and the ActiveUdpListener will use kernel sendmsg.
-  // [#extension-category: envoy.udp]
+  // Configuration for the UDP packet writer. If empty, HTTP/3 will use GSO if available
+  // (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory>`)
+  // or the default kernel sendmsg if not,
+  // (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpDefaultWriterFactory>`)
+  // and raw UDP will use kernel sendmsg.
+  // [#extension-category: envoy.udp_packet_writer]
   core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
 }
 

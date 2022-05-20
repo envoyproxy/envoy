@@ -181,7 +181,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   std::string yaml = getBasicConfig();
   yaml = yaml + R"EOF(
   udp_packet_packet_writer_config:
-    name: envoy.udp.writer.factory.default
+    name: envoy.udp_packet_writer.default
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.quic.udp_packet_writer.v3.UdpDefaultWriterFactory
   )EOF";

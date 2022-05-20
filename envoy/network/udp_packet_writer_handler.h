@@ -138,7 +138,7 @@ public:
   virtual UdpPacketWriterFactoryPtr
   createUdpPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
 
-  std::string category() const override { return "envoy.udp"; }
+  std::string category() const override { return "envoy.udp_packet_writer"; }
 };
 
 } // namespace Network
