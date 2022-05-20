@@ -298,6 +298,8 @@ public:
   }
 
   absl::string_view name() override { return "envoy.tls.cert_validator.spiffe"; }
+
+  std::set<std::string> configTypes() { return {}; }
 };
 
 REGISTER_FACTORY(SPIFFEValidatorFactory, CertValidatorFactory);

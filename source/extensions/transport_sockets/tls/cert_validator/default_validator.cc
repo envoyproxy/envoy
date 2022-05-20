@@ -485,6 +485,8 @@ public:
   }
 
   absl::string_view name() override { return "envoy.tls.cert_validator.default"; }
+
+  std::set<std::string> configTypes() { return {}; }
 };
 
 REGISTER_FACTORY(DefaultCertValidatorFactory, CertValidatorFactory);
