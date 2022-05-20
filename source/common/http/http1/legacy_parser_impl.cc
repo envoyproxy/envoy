@@ -44,8 +44,6 @@ int resultToInt(const CallbackResult status) {
     return 1;
   case CallbackResult::NoBodyData:
     return 2;
-  case CallbackResult::Paused:
-    return 31;
   default:
     PANIC("not implemented");
   }

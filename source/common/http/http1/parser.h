@@ -31,10 +31,6 @@ enum class CallbackResult {
   // Returned by onHeadersComplete() to indicate that the parser should not
   // expect either a body or any further data on the connection.
   NoBodyData = 2,
-  // TODO(bnc): Remove.
-  Paused,
-  // TODO(bnc): Remove.
-  Unknown,
 };
 
 class ParserCallbacks {
