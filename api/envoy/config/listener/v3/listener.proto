@@ -109,6 +109,13 @@ message Listener {
   // Required unless *api_listener* or *listener_specifier* is populated.
   core.v3.Address address = 2;
 
+  // The additional addresses the listener should listen on. The address must be unqiue across all
+  // the listeners, also in the single listener. Multiple addresses with port 0 can be supported,
+  // same as the `address` field described. For multiple addresses in single listener,
+  // all addresses use the same protocol, and multiple internal addresses are not yet supported.
+  // [#not-implemented-hide:]
+  repeated core.v3.Address additional_addresses = 33;
+
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
   // `listener.<address as string>.`. If non-empty, stats will be rooted at
   // `listener.<stat_prefix>.`.
