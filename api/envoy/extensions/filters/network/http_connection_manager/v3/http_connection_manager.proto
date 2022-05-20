@@ -787,6 +787,7 @@ message HttpConnectionManager {
   // ``http_protocol_options.allow_chunked_length``.
   //
   // The default UHV checks the following:
+  //
   // #. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
   // #. Syntax of HTTP/1 request target URI and response status
   // #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2<https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2`_
@@ -797,6 +798,7 @@ message HttpConnectionManager {
   // #. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers
   // #. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
   //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
+  //
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig typed_header_validation_config = 50;
