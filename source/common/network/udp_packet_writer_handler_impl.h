@@ -59,8 +59,7 @@ public:
     return std::make_unique<UdpDefaultWriterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::udp_packet_writer::v3::UdpDefaultWriterFactory>();
+    return std::make_unique<envoy::extensions::udp_packet_writer::v3::UdpDefaultWriterFactory>();
   }
 };
 

@@ -109,8 +109,7 @@ public:
     return std::make_unique<UdpGsoBatchWriterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::udp_packet_writer::v3::UdpGsoBatchWriterFactory>();
+    return std::make_unique<envoy::extensions::udp_packet_writer::v3::UdpGsoBatchWriterFactory>();
   }
 
 private:
