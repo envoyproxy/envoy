@@ -13,37 +13,38 @@ namespace Http1 {
 namespace {
 
 ParserStatus intToStatus(int rc) {
-  // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
   switch (rc) {
   case -1:
     return ParserStatus::Error;
   case 0:
-    return ParserStatus::Success;
+    return ParserStatus::Ok;
+  // TODO(bnc): The following two are incorrect.  Integer value of 1 corresponds
+  // to an error due to ParserCallbacks::onMessageBegin() returning
+  // CallbackResult::Error, and a value of 2 to onUrl() returning
+  // CallbackResult::Error.  Both should be translated into ParserStatus::Error.
   case 1:
     return ParserStatus::NoBody;
   case 2:
     return ParserStatus::NoBodyData;
   case 31:
     return ParserStatus::Paused;
+  // TODO(bnc): This should also be translated into ParserStatus::Error.
   default:
     return ParserStatus::Unknown;
   }
 }
 
-int statusToInt(const ParserStatus status) {
-  // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
+int resultToInt(const CallbackResult status) {
   switch (status) {
-  case ParserStatus::Error:
+  case CallbackResult::Error:
     return -1;
-  case ParserStatus::Success:
+  case CallbackResult::Success:
     return 0;
-  case ParserStatus::NoBody:
+  case CallbackResult::NoBody:
     return 1;
-  case ParserStatus::NoBodyData:
+  case CallbackResult::NoBodyData:
     return 2;
-  case ParserStatus::Paused:
+  case CallbackResult::Paused:
     return 31;
   default:
     PANIC("not implemented");
@@ -64,27 +65,27 @@ public:
     settings_ = {
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onMessageBegin());
+          return resultToInt(conn_impl->onMessageBegin());
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onUrl(at, length));
+          return resultToInt(conn_impl->onUrl(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onStatus(at, length));
+          return resultToInt(conn_impl->onStatus(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onHeaderField(at, length));
+          return resultToInt(conn_impl->onHeaderField(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onHeaderValue(at, length));
+          return resultToInt(conn_impl->onHeaderValue(at, length));
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onHeadersComplete());
+          return resultToInt(conn_impl->onHeadersComplete());
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           static_cast<ParserCallbacks*>(parser->data)->bufferBody(at, length);
@@ -92,7 +93,7 @@ public:
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onMessageComplete());
+          return resultToInt(conn_impl->onMessageComplete());
         },
         [](http_parser* parser) -> int {
           // A 0-byte chunk header is used to signal the end of the chunked body.
@@ -113,10 +114,9 @@ public:
 
   void resume() { http_parser_pause(&parser_, 0); }
 
-  ParserStatus pause() {
+  CallbackResult pause() {
     http_parser_pause(&parser_, 1);
-    // http_parser pauses through http_parser_pause above.
-    return ParserStatus::Success;
+    return CallbackResult::Success;
   }
 
   int getErrno() { return HTTP_PARSER_ERRNO(&parser_); }
@@ -174,7 +174,7 @@ size_t LegacyHttpParserImpl::execute(const char* slice, int len) {
 
 void LegacyHttpParserImpl::resume() { impl_->resume(); }
 
-ParserStatus LegacyHttpParserImpl::pause() { return impl_->pause(); }
+CallbackResult LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
 ParserStatus LegacyHttpParserImpl::getStatus() { return intToStatus(impl_->getErrno()); }
 
