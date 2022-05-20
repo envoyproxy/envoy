@@ -203,7 +203,11 @@ const char* config_template = R"(
     wait_for_warm_on_init: false
     connect_timeout: *connect_timeout
     dns_refresh_rate: *dns_refresh_rate
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: stats
@@ -389,7 +393,11 @@ R"(
     circuit_breakers: *circuit_breakers_settings
     typed_extension_protocol_options: *h1_protocol_options
   - name: base_h2
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
@@ -454,9 +462,13 @@ stats_config:
             regex: '^vhost.api.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|retry.*|time|timeout|total)'
   use_all_default_tags:
     false
-watchdog:
-  megamiss_timeout: 60s
-  miss_timeout: 60s
+watchdogs:
+  main_thread_watchdog:
+    megamiss_timeout: 60s
+    miss_timeout: 60s
+  worker_watchdog:
+    megamiss_timeout: 60s
+    miss_timeout: 60s
 node:
   id: envoy-mobile
   cluster: envoy-mobile
