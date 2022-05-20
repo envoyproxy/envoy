@@ -34,21 +34,6 @@ ParserStatus intToStatus(int rc) {
   }
 }
 
-int resultToInt(const CallbackResult status) {
-  switch (status) {
-  case CallbackResult::Error:
-    return -1;
-  case CallbackResult::Success:
-    return 0;
-  case CallbackResult::NoBody:
-    return 1;
-  case CallbackResult::NoBodyData:
-    return 2;
-  default:
-    PANIC("not implemented");
-  }
-}
-
 } // namespace
 
 class LegacyHttpParserImpl::Impl {
@@ -63,27 +48,27 @@ public:
     settings_ = {
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onMessageBegin());
+          return static_cast<int>(conn_impl->onMessageBegin());
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onUrl(at, length));
+          return static_cast<int>(conn_impl->onUrl(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onStatus(at, length));
+          return static_cast<int>(conn_impl->onStatus(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onHeaderField(at, length));
+          return static_cast<int>(conn_impl->onHeaderField(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onHeaderValue(at, length));
+          return static_cast<int>(conn_impl->onHeaderValue(at, length));
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onHeadersComplete());
+          return static_cast<int>(conn_impl->onHeadersComplete());
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           static_cast<ParserCallbacks*>(parser->data)->bufferBody(at, length);
@@ -91,7 +76,7 @@ public:
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return resultToInt(conn_impl->onMessageComplete());
+          return static_cast<int>(conn_impl->onMessageComplete());
         },
         [](http_parser* parser) -> int {
           // A 0-byte chunk header is used to signal the end of the chunked body.
