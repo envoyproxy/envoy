@@ -1833,6 +1833,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::SuccessReply;
       }));
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
@@ -1878,6 +1886,15 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::ErrorReply;
       }));
+
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
@@ -1941,6 +1958,79 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
 
   EXPECT_EQ(access_log_data_,
             "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+}
+
+// Tests multiple filters where one ends the stream in onLocalReply.
+TEST_F(ThriftConnectionManagerTest, OnDataWithFilterEndStreamOnLocalReply) {
+  initializeFilterWithCustomFilters();
+
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
+
+  NiceMock<MockDirectResponse> direct_response;
+  EXPECT_CALL(direct_response, encode(_, _, _))
+      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+                           Buffer::Instance& buffer) -> DirectResponse::ResponseType {
+        buffer.add("response");
+        return DirectResponse::ResponseType::SuccessReply;
+      }));
+  {
+    InSequence s;
+    // Reset the stream by the first filter.
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _))
+        .WillOnce(Invoke(
+            [&](const MessageMetadata&, bool reset_imminent) -> ThriftFilters::LocalErrorStatus {
+              EXPECT_FALSE(reset_imminent);
+              return ThriftFilters::LocalErrorStatus::ContinueAndResetStream;
+            }));
+
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _))
+        .WillOnce(Invoke(
+            [&](const MessageMetadata&, bool reset_imminent) -> ThriftFilters::LocalErrorStatus {
+              EXPECT_TRUE(reset_imminent);
+              return ThriftFilters::LocalErrorStatus::Continue;
+            }));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _))
+        .WillOnce(Invoke(
+            [&](const MessageMetadata&, bool reset_imminent) -> ThriftFilters::LocalErrorStatus {
+              EXPECT_TRUE(reset_imminent);
+              return ThriftFilters::LocalErrorStatus::Continue;
+            }));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _))
+        .WillOnce(Invoke(
+            [&](const MessageMetadata&, bool reset_imminent) -> ThriftFilters::LocalErrorStatus {
+              EXPECT_TRUE(reset_imminent);
+              return ThriftFilters::LocalErrorStatus::Continue;
+            }));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _))
+        .WillOnce(Invoke(
+            [&](const MessageMetadata&, bool reset_imminent) -> ThriftFilters::LocalErrorStatus {
+              EXPECT_TRUE(reset_imminent);
+              return ThriftFilters::LocalErrorStatus::Continue;
+            }));
+  }
+
+  // First filter sends local reply.
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
+        callbacks->sendLocalReply(direct_response, false);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ(8, buffer.drainBEInt<int32_t>());
+        EXPECT_EQ("response", buffer.toString());
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 // Tests a decoder filter that modifies data.

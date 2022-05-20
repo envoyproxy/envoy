@@ -179,8 +179,7 @@ public:
                                         [[maybe_unused]] bool reset_imminent) {
     return LocalErrorStatus::Continue;
   }
-  //
-  bool reset_imminent_;
+
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
    * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
