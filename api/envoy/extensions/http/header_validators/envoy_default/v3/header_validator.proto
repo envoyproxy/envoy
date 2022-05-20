@@ -15,15 +15,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Envoy's default Header Validator config]
 
 // This extension validates that HTTP request and response headers are well formed according to respective RFCs.
-// 1. HTTP/1 header map validity according to `RFC 7230 section 3.2 <https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
-// 2. Syntax of HTTP/1 request target URI and response status
-// 3. HTTP/2 header map validity according to `RFC 7540 section 8.1.2 <https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2>`_
-// 4. Syntax of HTTP/2 pseudo headers
-// 5. HTTP/3 header map validity according to `draft standard <https://datatracker.ietf.org/doc/html/draft-ietf-quic-http-34>`_
-// 6. Syntax of HTTP/3 pseudo headers
-// 7. Syntax of Content-Length and Transfer-Encoding
-// 8. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers
-// 9. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
+// #. HTTP/1 header map validity according to `RFC 7230 section 3.2 <https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
+// #. Syntax of HTTP/1 request target URI and response status
+// #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2 <https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2>`_
+// #. Syntax of HTTP/2 pseudo headers
+// #. HTTP/3 header map validity according to `draft standard <https://datatracker.ietf.org/doc/html/draft-ietf-quic-http-34>`_
+// #. Syntax of HTTP/3 pseudo headers
+// #. Syntax of Content-Length and Transfer-Encoding
+// #. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers
+// #. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
 // without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
 //
 message HeaderValidatorConfig {
