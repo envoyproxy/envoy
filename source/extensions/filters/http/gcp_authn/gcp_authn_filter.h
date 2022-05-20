@@ -50,6 +50,7 @@ public:
     lru_cache_ = std::make_unique<LRUCache<TokenType>>(size_);
   }
 
+  TokenCacheImpl() = delete;
   TokenType* lookUp(std::string key);
   void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
 
@@ -57,10 +58,9 @@ public:
   int size() { return size_; }
 
   ~TokenCacheImpl() {
-    if (lru_cache_) {
-      // Remove all entries from the cache.
-      lru_cache_->clear();
-    }
+    ASSERT(lru_cache_ != nullptr);
+    // Remove all entries from the cache.
+    lru_cache_->clear();
   }
 
 private:

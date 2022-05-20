@@ -63,7 +63,6 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
     options.setBufferBodyForRetry(true);
   }
 
-  ENVOY_LOG(error, "fetch token with request {}", request->headers());
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
 }

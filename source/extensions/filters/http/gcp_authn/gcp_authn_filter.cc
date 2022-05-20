@@ -23,20 +23,20 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
 }
 
 template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(std::string key) {
-  if (lru_cache_ != nullptr) {
-    typename LRUCache<TokenType>::ScopedLookup lookup(lru_cache_.get(), key);
-    if (lookup.found()) {
-      TokenType* const found_token = lookup.value();
-      if constexpr (std::is_same<TokenType, JwtToken>::value) {
-        ASSERT(found_token != nullptr);
-        if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
-            ::google::jwt_verify::Status::JwtExpired) {
-          // Remove the expired entry.
-          lru_cache_->remove(key);
-        } else {
-          // Return the found token.
-          return found_token;
-        }
+  ASSERT(lru_cache_ != nullptr);
+  typename LRUCache<TokenType>::ScopedLookup lookup(lru_cache_.get(), key);
+  if (lookup.found()) {
+    TokenType* const found_token = lookup.value();
+    // Process the JWT token.
+    if constexpr (std::is_same<TokenType, JwtToken>::value) {
+      ASSERT(found_token != nullptr);
+      if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
+          ::google::jwt_verify::Status::JwtExpired) {
+        // Remove the expired entry.
+        lru_cache_->remove(key);
+      } else {
+        // Return the found token.
+        return found_token;
       }
     }
   }
@@ -45,10 +45,9 @@ template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(std::
 
 template <typename TokenType>
 void TokenCacheImpl<TokenType>::insert(const std::string& key, std::unique_ptr<TokenType>&& token) {
-  if (lru_cache_ != nullptr) {
-    // Pass the ownership of jwt to cache.
-    lru_cache_->insert(key, token.release(), 1);
-  }
+  ASSERT(lru_cache_ != nullptr);
+  // Pass the ownership of jwt to cache.
+  lru_cache_->insert(key, token.release(), 1);
 }
 
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
