@@ -163,8 +163,8 @@ jobs:
           name: ios_framework_cocoapods
       - name: Release
         uses: softprops/action-gh-release@v1
-        prerelease: true
         with:
+          prerelease: true
           files: |
             envoy_android_aar_sources.tar.gz
             Envoy.xcframework.zip
