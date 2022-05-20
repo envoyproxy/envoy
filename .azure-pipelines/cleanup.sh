@@ -26,8 +26,7 @@ PURGE_PACKAGES=(
     "podman"
     "powershell"
     "php*"
-    "temurin-*-jdk"
-    "zulu-*-azure-jdk")
+    "temurin-*-jdk")
 
 sudo apt-get update -y || true
 sudo apt-get purge -y --no-upgrade "${PURGE_PACKAGES[@]}"

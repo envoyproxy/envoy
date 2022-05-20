@@ -17,7 +17,7 @@ Linux/Mac Target Requirements
 -----------------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
-recent Linux including Ubuntu 18.04 LTS.
+recent Linux including Ubuntu 20.04 LTS.
 
 Building Envoy has the following requirements:
 
