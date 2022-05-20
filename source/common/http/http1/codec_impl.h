@@ -258,12 +258,6 @@ protected:
 
   // This must be protected because it is called through ServerConnectionImpl::sendProtocolError.
   Status onMessageBeginImpl();
-  // Connection specific ParserCallbacks implementations and helpers.
-  virtual Status onMessageBeginBase() PURE;
-  virtual Status onUrlBase(const char* data, size_t length) PURE;
-  virtual Status onStatusBase(const char* data, size_t length) PURE;
-  virtual StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
-  virtual ParserStatus onMessageCompleteBase() PURE;
 
   /**
    * Get memory used to represent HTTP headers or trailers currently being parsed.
@@ -357,10 +351,17 @@ private:
   ParserStatus onMessageComplete() override;
   void onChunkHeader(bool is_final_chunk) override;
 
+  // Internal implementations of ParserCallbacks methods,
+  // and virtual methods for connection-specific implementations.
+  virtual Status onMessageBeginBase() PURE;
+  virtual Status onUrlBase(const char* data, size_t length) PURE;
+  virtual Status onStatusBase(const char* data, size_t length) PURE;
   Status onHeaderFieldImpl(const char* data, size_t length);
   Status onHeaderValueImpl(const char* data, size_t length);
   StatusOr<ParserStatus> onHeadersCompleteImpl();
+  virtual StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
   StatusOr<ParserStatus> onMessageCompleteImpl();
+  virtual ParserStatus onMessageCompleteBase() PURE;
 
   // These helpers wrap *Impl() calls in the overrides of non-void
   // ParserCallbacks methods.
