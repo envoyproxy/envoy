@@ -312,7 +312,6 @@ EXTENSIONS = {
     "envoy.udp_packet_writer.default":                  "//source/extensions/udp_packet_writer/default:config",
     "envoy.udp_packet_writer.gso":                      "//source/extensions/udp_packet_writer/gso:config",
 
-
     #
     # Formatter
     #
