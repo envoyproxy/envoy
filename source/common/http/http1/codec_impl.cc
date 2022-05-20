@@ -524,6 +524,18 @@ Status ConnectionImpl::completeLastHeader() {
   return okStatus();
 }
 
+Status ConnectionImpl::onMessageBeginImpl() {
+  ENVOY_CONN_LOG(trace, "message begin", connection_);
+  // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
+  // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
+  // in onHeadersCompleteBase
+  protocol_ = Protocol::Http11;
+  processing_trailers_ = false;
+  header_parsing_state_ = HeaderParsingState::Field;
+  allocHeaders(statefulFormatterFromSettings(codec_settings_));
+  return onMessageBeginBase();
+}
+
 uint32_t ConnectionImpl::getHeadersSize() {
   return current_header_field_.size() + current_header_value_.size() +
          headersOrTrailers().byteSize();
@@ -672,8 +684,26 @@ ParserStatus ConnectionImpl::onHeadersComplete() {
   return setAndCheckCallbackStatusOr(onHeadersCompleteImpl());
 }
 
+void ConnectionImpl::bufferBody(const char* data, size_t length) {
+  auto slice = current_dispatching_buffer_->frontSlice();
+  if (data == slice.mem_ && length == slice.len_) {
+    buffered_body_.move(*current_dispatching_buffer_, length);
+    dispatching_slice_already_drained_ = true;
+  } else {
+    buffered_body_.add(data, length);
+  }
+}
+
 ParserStatus ConnectionImpl::onMessageComplete() {
   return setAndCheckCallbackStatusOr(onMessageCompleteImpl());
+}
+
+void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
+  if (is_final_chunk) {
+    // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
+    // while processing trailers.
+    dispatchBufferedBody();
+  }
 }
 
 Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
@@ -833,34 +863,6 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersCompleteImpl() {
   return handling_upgrade_ ? ParserStatus::NoBodyData : statusor.value();
 }
 
-void ConnectionImpl::bufferBody(const char* data, size_t length) {
-  auto slice = current_dispatching_buffer_->frontSlice();
-  if (data == slice.mem_ && length == slice.len_) {
-    buffered_body_.move(*current_dispatching_buffer_, length);
-    dispatching_slice_already_drained_ = true;
-  } else {
-    buffered_body_.add(data, length);
-  }
-}
-
-void ConnectionImpl::dispatchBufferedBody() {
-  ASSERT(parser_->getStatus() == ParserStatus::Success ||
-         parser_->getStatus() == ParserStatus::Paused);
-  ASSERT(codec_status_.ok());
-  if (buffered_body_.length() > 0) {
-    onBody(buffered_body_);
-    buffered_body_.drain(buffered_body_.length());
-  }
-}
-
-void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
-  if (is_final_chunk) {
-    // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
-    // while processing trailers.
-    dispatchBufferedBody();
-  }
-}
-
 StatusOr<ParserStatus> ConnectionImpl::onMessageCompleteImpl() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
@@ -883,16 +885,14 @@ StatusOr<ParserStatus> ConnectionImpl::onMessageCompleteImpl() {
   return onMessageCompleteBase();
 }
 
-Status ConnectionImpl::onMessageBeginImpl() {
-  ENVOY_CONN_LOG(trace, "message begin", connection_);
-  // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
-  // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
-  // in onHeadersCompleteBase
-  protocol_ = Protocol::Http11;
-  processing_trailers_ = false;
-  header_parsing_state_ = HeaderParsingState::Field;
-  allocHeaders(statefulFormatterFromSettings(codec_settings_));
-  return onMessageBeginBase();
+void ConnectionImpl::dispatchBufferedBody() {
+  ASSERT(parser_->getStatus() == ParserStatus::Success ||
+         parser_->getStatus() == ParserStatus::Paused);
+  ASSERT(codec_status_.ok());
+  if (buffered_body_.length() > 0) {
+    onBody(buffered_body_);
+    buffered_body_.drain(buffered_body_.length());
+  }
 }
 
 void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
