@@ -18,22 +18,20 @@ enum class ParserType { Legacy };
 
 enum class MessageType { Request, Response };
 
-// The following define special return values for parser callbacks.
-// These codes do not overlap with standard HTTP Status codes. They are only used for user
-// callbacks.
+// ParserStatus is used both to represent the internal state of the parser,
+// and by the ParserCallbacks implementation to send signals to the parser.
 enum class ParserStatus {
-  // Callbacks other than on_headers_complete should return a non-zero int to indicate an error
-  // and
-  // halt execution.
+  // An error has happened and execution should be halted.
   Error = -1,
+  // Operation successful.
   Success = 0,
-  // Returning '1' from on_headers_complete will tell http_parser that it should not expect a
-  // body.
+  // Returned by onHeadersComplete() to indicate that the parser should not
+  // expect a body.
   NoBody = 1,
-  // Returning '2' from on_headers_complete will tell http_parser that it should not expect a body
-  // nor any further data on the connection.
+  // Returned by onHeadersComplete() to indicate that the parser should not
+  // expect either a body or any further data on the connection.
   NoBodyData = 2,
-  // Pause parser.
+  // Returned by Parser::getStatus() to indicate that the parser is paused.
   Paused,
   // Other. This could be returning from a parser code that does not map to the above.
   Unknown,
@@ -44,7 +42,7 @@ public:
   virtual ~ParserCallbacks() = default;
   /**
    * Called when a request/response is beginning.
-   * @return integer return code from the parser indicating status.
+   * @return ParserStatus representing success or failure.
    */
   virtual ParserStatus onMessageBegin() PURE;
 
@@ -52,7 +50,7 @@ public:
    * Called when URL data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
-   * @return Status representing success or failure.
+   * @return ParserStatus representing success or failure.
    */
   virtual ParserStatus onUrl(const char* data, size_t length) PURE;
 
@@ -60,7 +58,7 @@ public:
    * Called when response status data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
-   * @return Status representing success or failure.
+   * @return ParserStatus representing success or failure.
    */
   virtual ParserStatus onStatus(const char* data, size_t length) PURE;
 
@@ -68,7 +66,7 @@ public:
    * Called when header field data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
-   * @return Status representing success or failure.
+   * @return ParserStatus representing success or failure.
    */
   virtual ParserStatus onHeaderField(const char* data, size_t length) PURE;
 
@@ -76,15 +74,16 @@ public:
    * Called when header value data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
-   * @return Status representing success or failure.
+   * @return ParserStatus representing success or failure.
    */
   virtual ParserStatus onHeaderValue(const char* data, size_t length) PURE;
 
   /**
-   * Called when headers are complete. A base routine happens first then a virtual dispatch is
-   * invoked. Note that this only applies to headers and NOT trailers. End of
-   * trailers are signaled via onMessageCompleteBase().
-   * @return An error status or a ParserStatus.
+   * Called when headers are complete. A base routine happens first then a
+   * virtual dispatch is invoked. Note that this only applies to headers and NOT
+   * trailers. End of trailers are signaled via onMessageCompleteBase().
+   * @return ParserStatus::Error, ParserStatus::Success, ParserStatus::NoBody,
+   * or ParserStatus::NoBodyData.
    */
   virtual ParserStatus onHeadersComplete() PURE;
 
@@ -97,7 +96,7 @@ public:
 
   /**
    * Called when the HTTP message has completed parsing.
-   * @return An error status or a ParserStatus.
+   * @return ParserStatus representing success or failure.
    */
   virtual ParserStatus onMessageComplete() PURE;
 
@@ -118,10 +117,10 @@ public:
   // Unpauses the parser.
   virtual void resume() PURE;
 
-  // Pauses the parser and returns a status indicating pause.
+  // Pauses the parser and returns a status indicating success.
   virtual ParserStatus pause() PURE;
 
-  // Returns a parser status representing the errno value from the parser.
+  // Returns a ParserStatus representing the internal state of the parser.
   virtual ParserStatus getStatus() PURE;
 
   // Returns an integer representing the status code stored in the parser structure. For responses
