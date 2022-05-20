@@ -13,6 +13,7 @@ envoy_cc_test(
     },
     repository = "@envoy",
     deps = [
+        "//library/cc:engine_builder_lib",
         "//library/common/extensions/filters/http/local_error:config",
         "//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "//library/common/http:client_lib",
