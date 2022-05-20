@@ -1,4 +1,5 @@
 abstracts>=0.0.12
+aio.api.bazel
 cffi>=1.15.0
 colorama
 coloredlogs
