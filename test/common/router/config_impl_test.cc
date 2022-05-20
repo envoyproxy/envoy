@@ -2038,6 +2038,67 @@ virtual_hosts:
   }
 }
 
+// Tests that when 'ignore_port_in_host_matching' is true, port from host header
+// is ignored in host matching.
+TEST_F(RouteMatcherTest, IgnorePortInHostMatching) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["www.foo.com", "12.34.56.78", "[12:34:56:7890::]"]
+  routes:
+  - match:
+      prefix: ""
+    name: "business-specific-route"
+    route:
+      cluster: local_service_grpc
+- name: catchall_host
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: ""
+    name: "default-route"
+    route:
+      cluster: default_catch_all_service
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"local_service_grpc", "default_catch_all_service"}, {});
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->routeName(),
+              "default-route");
+    EXPECT_EQ(
+        config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "default-route");
+    EXPECT_EQ(
+        config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "default-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "default-route");
+  }
+  // Set ignore_port_in_host_matching to true, and port will be ignored.
+  route_configuration.set_ignore_port_in_host_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->routeName(),
+              "default-route");
+    EXPECT_EQ(
+        config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(
+        config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "business-specific-route");
+  }
+}
+
 TEST_F(RouteMatcherTest, Priority) {
   const std::string yaml = R"EOF(
 virtual_hosts:
