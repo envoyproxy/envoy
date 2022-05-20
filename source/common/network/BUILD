@@ -496,7 +496,6 @@ envoy_cc_library(
         "//envoy/network:socket_interface",
         "//envoy/network:udp_packet_writer_handler_interface",
         "//source/common/buffer:buffer_lib",
-        "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ],
 )
 
