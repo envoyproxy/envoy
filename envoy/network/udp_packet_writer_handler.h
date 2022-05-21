@@ -129,7 +129,7 @@ using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
  */
 class UdpPacketWriterFactoryFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~UdpPacketWriterFactoryFactory() = default;
+  ~UdpPacketWriterFactoryFactory() override = default;
 
   /**
    * Creates an UdpPacketWriterFactory based on the specified config.
