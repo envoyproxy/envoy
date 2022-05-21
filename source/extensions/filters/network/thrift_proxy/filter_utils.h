@@ -17,8 +17,7 @@ public:
   // ThriftBaseFilter
   void onDestroy() override { parent_->onDestroy(); }
 
-  virtual LocalErrorStatus onLocalReply(const MessageMetadata& metadata,
-                                        bool reset_imminent) override {
+  LocalErrorStatus onLocalReply(const MessageMetadata& metadata, bool reset_imminent) override {
     return parent_->onLocalReply(metadata, reset_imminent);
   }
 
