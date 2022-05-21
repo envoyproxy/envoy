@@ -196,6 +196,7 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    const absl::optional<std::string> statPrefix() const override { return absl::optional<std::string>();}
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;
     }

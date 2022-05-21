@@ -464,6 +464,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
       append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
+             stat_prefix_(route.name()),
       cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -517,7 +518,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      route_name_(route.name()),
+      time_source_(factory_context.mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(

@@ -258,14 +258,13 @@ message Route {
     // in Envoy for a filter that directly generates responses for requests.
     NonForwardingAction non_forwarding_action = 18;
 
-    // [#not-implemented-hide:]
     // The human readable prefix to use when emitting statistics for this endpoint.
-    // The statistics are rooted at vhost.<stat_prefix>.
+    // The statistics are rooted at vhost.<<virtual host name>.<stat_prefix>.
     // This should be set for highly critical
     // endpoints that one wishes to get “perfect” statistics on.
     // If not set, endpoint statistics are not generated.
     //
-    // This emitted statistics are the same as those documented :ref:`virtual cluster statistics <config_http_filters_router_vcluster_stats>`.
+    // The emitted statistics are the same as those documented for:ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
     //
     // .. warning::
     //

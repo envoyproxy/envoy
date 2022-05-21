@@ -988,6 +988,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+    /**
+   * @return std::string& the stats prefix of the route.
+   */
+  virtual const absl::optional<std::string> statPrefix() const PURE;
 };
 
 /**

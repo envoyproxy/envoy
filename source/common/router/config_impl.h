@@ -526,6 +526,9 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const absl::optional<std::string> statPrefix() const override {
+        return stat_prefix_;
+  }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
@@ -629,6 +632,9 @@ public:
     const std::string& routeName() const override { return parent_->routeName(); }
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+      const absl::optional<std::string> statPrefix() const override {
+        return parent_->statPrefix();
+  }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
     }
@@ -767,6 +773,8 @@ public:
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
+
+        const absl::optional<std::string> statPrefix() const override { return absl::optional<std::string>();}
 
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
       if (cluster_metadata_match_criteria_) {
@@ -924,6 +932,7 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
+  const absl::optional<std::string> stat_prefix_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
