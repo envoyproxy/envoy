@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_extension_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -13,6 +14,7 @@ envoy_cc_extension(
     srcs = [
         "config.cc",
     ],
+    tags = ["nofips"],
     hdrs = [
         "config.h",
     ],
@@ -20,7 +22,11 @@ envoy_cc_extension(
         "//source/server:__subpackages__",
     ],
     deps = [
-        "//source/common/quic:udp_gso_batch_writer_lib",
+        "//envoy/config:typed_config_interface",
+        "//envoy/registry",
+        "//envoy/network:udp_packet_writer_handler_interface",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:udp_gso_batch_writer_lib",
+    ]),
 )
