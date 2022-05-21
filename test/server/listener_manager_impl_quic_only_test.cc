@@ -183,7 +183,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   udp_packet_packet_writer_config:
     name: envoy.udp_packet_writer.default
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.quic.udp_packet_writer.v3.UdpDefaultWriterFactory
+      "@type": type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpDefaultWriterFactory
   )EOF";
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);

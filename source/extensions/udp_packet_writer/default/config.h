@@ -21,7 +21,7 @@ public:
   }
 };
 
-DECLARE_FACTORY(UdpDefaultWriterFactory);
+DECLARE_FACTORY(UdpDefaultWriterFactoryFactory);
 
 } // namespace Network
 } // namespace Envoy

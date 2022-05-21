@@ -16,6 +16,9 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    extra_visibility = [
+        "//source/server:__subpackages__",
+    ],
     deps = [
         "//source/common/quic:udp_gso_batch_writer_lib",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
