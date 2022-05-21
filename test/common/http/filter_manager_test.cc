@@ -148,20 +148,6 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   filter_manager_->destroyFilters();
 }
 
-struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
-
-template <class InputType, class ActionType>
-Matcher::MatchTreeSharedPtr<HttpMatchingData> createMatchingTree(const std::string& name,
-                                                                 const std::string& value) {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
-      std::make_unique<InputType>(name), absl::nullopt);
-
-  tree->addChild(value, Matcher::OnMatch<HttpMatchingData>{
-                            []() { return std::make_unique<ActionType>(); }, nullptr});
-
-  return tree;
-}
-
 TEST_F(FilterManagerTest, OnLocalReply) {
   initialize();
 

@@ -2,9 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
@@ -17,9 +15,6 @@ namespace Http {
 namespace MatchWrapper {
 
 namespace {
-
-class SkipAction : public Matcher::ActionBase<
-                       envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
 class SkipActionFactory
     : public Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext> {
