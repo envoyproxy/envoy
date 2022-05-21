@@ -32,6 +32,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/path_utility.h"
@@ -1639,7 +1640,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
     : vhost_scope_(factory_context.scope().scopeFromStatName(
-          factory_context.routerContext().virtualClusterStatNames().vhost_)) {
+          factory_context.routerContext().virtualClusterStatNames().vhost_)),
+      ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
   absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
   if (validate_clusters) {
     validation_clusters = factory_context.clusterManager().clusters();
@@ -1771,10 +1773,19 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     return nullptr;
   }
 
+  // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
+  absl::string_view host_header_value = headers.getHostValue();
+  if (ignorePortInHostMatching()) {
+    if (const absl::string_view::size_type port_start =
+            Http::HeaderUtility::getPortStart(host_header_value);
+        port_start != absl::string_view::npos) {
+      host_header_value = host_header_value.substr(0, port_start);
+    }
+  }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(headers.getHostValue());
+  const std::string host = absl::AsciiStrToLower(host_header_value);
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
