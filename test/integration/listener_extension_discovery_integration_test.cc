@@ -51,6 +51,18 @@ public:
     });
   }
 
+  void addStaticFilter(const std::string& name, uint32_t drain_bytes) {
+    config_helper_.addConfigModifier(
+        [name, drain_bytes](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* listener_filter =
+              bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+          listener_filter->set_name(name);
+          auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
+          configuration.set_drain_bytes(drain_bytes);
+          listener_filter->mutable_typed_config()->PackFrom(configuration);
+        });
+  }
+
   void initialize() override {
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
@@ -104,7 +116,8 @@ public:
     ecds_stream_->startGrpcStream();
   }
 
-  void sendXdsResponse(const std::string& version, const uint32_t drain_bytes, bool ttl = false) {
+  void sendXdsResponse(const std::string& name, const std::string& version,
+                       const uint32_t drain_bytes, bool ttl = false) {
     // The to-be-drained bytes has to be smaller than data size.
     ASSERT(drain_bytes <= data_.size());
 
@@ -112,9 +125,9 @@ public:
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
     envoy::config::core::v3::TypedExtensionConfig typed_config;
-    typed_config.set_name(filter_name_);
+    typed_config.set_name(name);
     envoy::service::discovery::v3::Resource resource;
-    resource.set_name(filter_name_);
+    resource.set_name(name);
 
     auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
     configuration.set_drain_bytes(drain_bytes);
@@ -131,6 +144,7 @@ public:
   // upstream.
   void sendDataVerifyResults(uint32_t drain_bytes) {
     test_server_->waitUntilListenersReady();
+    test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
     EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
@@ -167,13 +181,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccess) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update to have listener filter drain 5 bytes of data.
-  sendXdsResponse("1", 5);
+  sendXdsResponse(filter_name_, "1", 5);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   sendDataVerifyResults(5);
 
   // Send 2nd config update to have listener filter drain 3 bytes of data.
-  sendXdsResponse("2", 3);
+  sendXdsResponse(filter_name_, "2", 3);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
   sendDataVerifyResults(3);
@@ -187,7 +201,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update with TTL 1s, and have listener filter drain 5 bytes of data.
-  sendXdsResponse("1", 5, true);
+  sendXdsResponse(filter_name_, "1", 5, true);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   sendDataVerifyResults(5);
@@ -213,7 +227,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update with TTL 1s, and have listener filter drain 5 bytes of data.
-  sendXdsResponse("1", 5, true);
+  sendXdsResponse(filter_name_, "1", 5, true);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   sendDataVerifyResults(5);
@@ -225,7 +239,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault
   sendDataVerifyResults(default_drain_bytes_);
 }
 
-// This one TBD
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, true);
@@ -234,14 +247,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with invalid config (drain_bytes has to >=2).
-  sendXdsResponse("1", 1);
+  sendXdsResponse(filter_name_, "1", 1);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
   // The default filter will be installed. Start a TCP connection. The default filter drain 2 bytes.
   sendDataVerifyResults(default_drain_bytes_);
 }
 
-// This one TBD
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, false);
@@ -250,11 +262,11 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with invalid config (drain_bytes has to >=2).
-  sendXdsResponse("1", 1);
+  sendXdsResponse(filter_name_, "1", 1);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
-  // The missing config filter will be installed when a correction is created.
-  // The missing config filter will close the connection.
+  // The missing config filter will be installed and close the connection when a correction is
+  // created.
   EXPECT_LOG_CONTAINS("warn", "Close socket and stop the iteration onAccept.", {
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
     auto result = tcp_client->write(data_);
@@ -272,34 +284,83 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   // Send data without send config update.
   sendDataVerifyResults(default_drain_bytes_);
   // Send update should cause a different response.
-  sendXdsResponse("1", 3);
+  sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   sendDataVerifyResults(3);
 }
 
-TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarmingConfigFail) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
   initialize();
 
-  sendXdsResponse("1", 1);
+  // Send data without send config update.
+  sendDataVerifyResults(default_drain_bytes_);
+  // Send config update with invalid config (drain_bytes has to >=2).
+  sendXdsResponse(filter_name_, "1", 1);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
   sendDataVerifyResults(default_drain_bytes_);
 }
 
-TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
   addDynamicFilter(filter_name_, false);
   initialize();
 
-  sendXdsResponse("1", 3);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   // Each filter drain 3 bytes.
   sendDataVerifyResults(6);
+}
+
+// Testing it works with two static listener filter configuration.
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoStaticFilters) {
+  addStaticFilter("foo", 3);
+  addStaticFilter("bar", 5);
+  initialize();
+
+  // filter drain 3+5 bytes.
+  sendDataVerifyResults(8);
+}
+
+// Testing it works with mixed static/dynamic listener filter configuration.
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, false);
+  addStaticFilter("bar", 2);
+  addDynamicFilter(filter_name_, true);
+  addStaticFilter("foobar", 2);
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  sendXdsResponse(filter_name_, "1", 3);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  // filter drain 3 + 2 + 3  + 2 bytes.
+  sendDataVerifyResults(10);
+}
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixedDifferentOrder) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addStaticFilter("bar", 2);
+  addStaticFilter("baz", 2);
+  addDynamicFilter(filter_name_, true);
+  addDynamicFilter(filter_name_, false);
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  sendXdsResponse(filter_name_, "1", 2);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  // filter drain 2 + 2 + 2 + 2 bytes.
+  sendDataVerifyResults(8);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
