@@ -70,6 +70,10 @@ bug_fixes:
 - area: tcp_proxy
   change: |
     Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
+- area: listener
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
+    is properly extracted.
 
 removed_config_or_runtime:
 - area: compressor
