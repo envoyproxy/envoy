@@ -41,6 +41,7 @@ public:
   std::string describe() const override;
   Api::OsSysCalls& posix() const { return posix_; }
 
+#ifdef O_TMPFILE
   // The first time we try to open an anonymous file, these values are used to capture whether
   // opening with O_TMPFILE works. If it does not, the first open is retried using 'mkstemp',
   // and all subsequent tries are redirected down that path. If it works, the first try is
@@ -50,6 +51,7 @@ public:
   // different capabilities.
   std::once_flag once_flag_;
   bool supports_o_tmpfile_;
+#endif // O_TMPFILE
 
 private:
   std::function<void()> enqueue(std::shared_ptr<AsyncFileAction> action)

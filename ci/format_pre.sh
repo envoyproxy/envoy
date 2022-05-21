@@ -48,14 +48,8 @@ time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code:check -- --fix
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
-CURRENT=extensions
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check
-
 CURRENT=spelling
 "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
-
-CURRENT=versions
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:versions_check
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

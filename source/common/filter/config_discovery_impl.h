@@ -364,7 +364,7 @@ protected:
                                 const std::string& filter_config_name);
   void validateProtoConfigDefaultFactory(const bool null_default_factory,
                                          const std::string& filter_config_name,
-                                         const std::string& type_url) const;
+                                         absl::string_view type_url) const;
   void validateProtoConfigTypeUrl(const std::string& type_url,
                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
 
