@@ -42,7 +42,10 @@ class ListenerFilterChainFactoryBuilder;
 class ProdListenerComponentFactory : public ListenerComponentFactory,
                                      Logger::Loggable<Logger::Id::config> {
 public:
-  ProdListenerComponentFactory(Instance& server) : server_(server) {}
+  ProdListenerComponentFactory(Instance& server)
+      : server_(server),
+        tcp_listener_config_provider_manager_(
+            std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {}
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
@@ -85,7 +88,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryListImpl(filters, context,
-                                               tcp_listener_config_provider_manager_);
+                                               *tcp_listener_config_provider_manager_);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -100,22 +103,16 @@ public:
   DrainManagerPtr
   createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
-
-  Filter::FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>
-  createStaticFilterConfigProvider(const Network::ListenerFilterFactoryCb& callback,
-                                   const std::string& filter_config_name) override {
-    return tcp_listener_config_provider_manager_.createStaticFilterConfigProvider(
-        callback, filter_config_name);
-  }
-
-  Filter::TcpListenerFilterConfigProviderManagerImpl& getTcpListenerConfigProviderManager() {
+  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>&
+  getTcpListenerConfigProviderManager() override {
     return tcp_listener_config_provider_manager_;
   }
 
 private:
   Instance& server_;
   uint64_t next_listener_tag_{1};
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
 };
 
 class ListenerImpl;

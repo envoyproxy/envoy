@@ -101,7 +101,7 @@ public:
       EXPECT_EQ(1U, manager_->listeners().size());
     } else {
       EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(listener), EnvoyException,
-                                "MockProdListenerComponentFactory: Setting socket options failed");
+                                "MockListenerComponentFactory: Setting socket options failed");
       EXPECT_EQ(0U, manager_->listeners().size());
     }
   }
@@ -4677,7 +4677,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
                      -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
             return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                filters, context, listener_factory_.getTcpListenerConfigProviderManager());
+                filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));

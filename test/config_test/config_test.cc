@@ -56,7 +56,9 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options), component_factory_(server_) {
+      : api_(Api::createApiForTest(time_system_)), options_(options),
+        tcp_listener_config_provider_manager_(
+            std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -111,6 +113,8 @@ public:
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, context);
             }));
+    ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
+        .WillByDefault(ReturnRef(tcp_listener_config_provider_manager_));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -118,7 +122,7 @@ public:
                 Server::Configuration::ListenerFactoryContext& context)
                 -> Filter::ListenerFilterFactoriesList {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                  filters, context, component_factory_.getTcpListenerConfigProviderManager());
+                  filters, context, *component_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -148,7 +152,7 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Server::MockProdListenerComponentFactory> component_factory_;
+  NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
                                                 server_.quic_stat_names_};
@@ -158,6 +162,8 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
+  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
 };
 
 void testMerge() {

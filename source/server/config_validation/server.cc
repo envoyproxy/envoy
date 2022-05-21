@@ -55,7 +55,9 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this),
-      quic_stat_names_(stats_store_.symbolTable()) {
+      quic_stat_names_(stats_store_.symbolTable()),
+      tcp_listener_config_provider_manager_(
+          std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {

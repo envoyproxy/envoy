@@ -65,8 +65,9 @@ public:
 
 protected:
   ListenerManagerImplTest()
-      : listener_factory_(server_), api_(Api::createApiForTest(server_.api_.random_)),
-        use_matcher_(GetParam()) {}
+      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()),
+        tcp_listener_config_provider_manager_(
+            std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -88,6 +89,8 @@ protected:
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, filter_chain_factory_context);
             }));
+    ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
+        .WillByDefault(ReturnRef(tcp_listener_config_provider_manager_));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -95,7 +98,7 @@ protected:
                    Configuration::ListenerFactoryContext& context)
                 -> Filter::ListenerFilterFactoriesList {
               return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                  filters, context, listener_factory_.getTcpListenerConfigProviderManager());
+                  filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(
@@ -348,7 +351,7 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
-  NiceMock<MockProdListenerComponentFactory> listener_factory_;
+  NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;
@@ -365,6 +368,8 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
+  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy
