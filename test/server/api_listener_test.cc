@@ -22,12 +22,11 @@ namespace Server {
 class ApiListenerTest : public testing::Test {
 protected:
   ApiListenerTest()
-      : listener_factory_(server_),
-        listener_manager_(std::make_unique<ListenerManagerImpl>(
+      : listener_manager_(std::make_unique<ListenerManagerImpl>(
             server_, listener_factory_, worker_factory_, false, server_.quic_stat_names_)) {}
 
   NiceMock<MockInstance> server_;
-  NiceMock<MockProdListenerComponentFactory> listener_factory_;
+  NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
 };
