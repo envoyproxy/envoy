@@ -4,6 +4,8 @@
 
 #include "source/extensions/udp_packet_writer/gso/config.h"
 
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -30,4 +32,5 @@ TEST(FactoryTest, CreateUdpPacketWriterFactory) {
 } // namespace Quic
 } // namespace Envoy
 
+#endif
 #endif
