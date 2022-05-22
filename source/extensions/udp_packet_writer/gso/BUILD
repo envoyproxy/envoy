@@ -14,13 +14,13 @@ envoy_cc_extension(
     srcs = [
         "config.cc",
     ],
-    tags = ["nofips"],
     hdrs = [
         "config.h",
     ],
     extra_visibility = [
         "//source/server:__subpackages__",
     ],
+    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/registry",
