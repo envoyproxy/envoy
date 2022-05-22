@@ -62,7 +62,7 @@ public:
       : PassthroughFactory(std::move(inner_factory)) {}
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const {
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
     auto inner_socket = transport_socket_factory_->createTransportSocket(options);
     if (inner_socket == nullptr) {
       return nullptr;
