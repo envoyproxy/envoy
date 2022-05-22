@@ -46,8 +46,8 @@ template <typename TokenType> class TokenCacheImpl : public Logger::Loggable<Log
 public:
   TokenCacheImpl(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
                  TimeSource& time_source)
-      : time_source_(time_source), size_(config.cache_size()) {
-    lru_cache_ = std::make_unique<LRUCache<TokenType>>(size_);
+      : time_source_(time_source) {
+    lru_cache_ = std::make_unique<LRUCache<TokenType>>(config.cache_size());
   }
 
   TokenCacheImpl() = delete;
@@ -65,7 +65,6 @@ public:
 private:
   std::unique_ptr<LRUCache<TokenType>> lru_cache_;
   TimeSource& time_source_;
-  int size_;
 };
 
 class ThreadLocalCache : public Envoy::ThreadLocal::ThreadLocalObject {
@@ -139,7 +138,7 @@ private:
   State state_{State::NotStarted};
   std::string audience_str_;
   // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
-  // filter.
+  // filter (thread local storage).
   TokenCacheImpl<JwtToken>* jwt_token_cache_;
 };
 
