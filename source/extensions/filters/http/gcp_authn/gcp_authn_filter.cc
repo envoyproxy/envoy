@@ -22,14 +22,14 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
   hdrs.addCopy(authorizationHeaderKey(), id_token);
 }
 
-template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(std::string key) {
+template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(const std::string& key) {
   ASSERT(lru_cache_ != nullptr);
   typename LRUCache<TokenType>::ScopedLookup lookup(lru_cache_.get(), key);
   if (lookup.found()) {
     TokenType* const found_token = lookup.value();
-    // Process the JWT token.
     if constexpr (std::is_same<TokenType, JwtToken>::value) {
       ASSERT(found_token != nullptr);
+      // Verify the validness of the token by checking its expiration time field.
       if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
           ::google::jwt_verify::Status::JwtExpired) {
         // Remove the expired entry.
@@ -40,13 +40,14 @@ template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(std::
       }
     }
   }
+  // Return `nullptr` if no entry is found.
   return nullptr;
 }
 
 template <typename TokenType>
 void TokenCacheImpl<TokenType>::insert(const std::string& key, std::unique_ptr<TokenType>&& token) {
   ASSERT(lru_cache_ != nullptr);
-  // Pass the ownership of jwt to cache.
+  // Release the token to transfer the ownership of token.
   lru_cache_->insert(key, token.release(), 1);
 }
 
@@ -78,6 +79,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     if (jwt_token_cache_ != nullptr) {
       auto token = jwt_token_cache_->lookUp(audience_str_);
       if (token != nullptr) {
+        // If token is found in the cache, we add the token string to the request directly and
+        // continue the filter chain iteration.
         addTokenToRequest(hdrs, token->jwt_);
         return FilterHeadersStatus::Continue;
       }
@@ -127,9 +130,11 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
       Status status = jwt->parseFromString(token_str);
       if (status == Status::Ok) {
         if (jwt_token_cache_ != nullptr) {
-          // Pass the token into cache along with the ownership transfer.
+          // Insert the token into cache along with the ownership transfer.
           jwt_token_cache_->insert(audience_str_, std::move(jwt));
         }
+      } else {
+        ENVOY_LOG(error, "Failed to parse the token string, status : {}", Envoy::enumToInt(status));
       }
     }
     decoder_callbacks_->continueDecoding();

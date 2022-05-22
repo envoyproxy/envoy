@@ -51,11 +51,10 @@ public:
   }
 
   TokenCacheImpl() = delete;
-  TokenType* lookUp(std::string key);
+  TokenType* lookUp(const std::string& key);
   void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
 
   LRUCache<TokenType>& lruCache() { return *lru_cache_; }
-  int size() { return size_; }
 
   ~TokenCacheImpl() {
     ASSERT(lru_cache_ != nullptr);
