@@ -18,5 +18,4 @@ envoy_cc_test(
     ] + envoy_select_enable_http3([
         "//source/extensions/udp_packet_writer/gso:config",
     ]),
-
 )
