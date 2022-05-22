@@ -1,5 +1,7 @@
 #include "envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.pb.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+
 #include "source/extensions/udp_packet_writer/gso/config.h"
 
 #include "gtest/gtest.h"
@@ -27,3 +29,5 @@ TEST(FactoryTest, CreateUdpPacketWriterFactory) {
 
 } // namespace Quic
 } // namespace Envoy
+
+#endif
