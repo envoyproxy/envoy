@@ -131,7 +131,7 @@ message Extension {
   // Indicates that the extension is present but was disabled via dynamic configuration.
   bool disabled = 5;
 
-  // Type URLs of extension configuration proto.
+  // Type URLs of extension configuration protos.
   repeated string type_urls = 6;
 }
 
