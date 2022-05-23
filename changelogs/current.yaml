@@ -75,6 +75,10 @@ bug_fixes:
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
     is properly extracted.
 
+- area: upstream
+  change: |
+    Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
+
 removed_config_or_runtime:
 - area: compressor
   change: |
