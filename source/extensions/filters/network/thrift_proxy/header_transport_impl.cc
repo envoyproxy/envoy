@@ -133,6 +133,8 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   }
 
   const bool is_request = metadata.isRequest();
+  Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter =
+      is_request ? metadata.requestHeaders().formatter() : metadata.responseHeaders().formatter();
 
   while (header_size > 0) {
     // Attempt to read info blocks
@@ -149,7 +151,6 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
       throw EnvoyException(absl::StrCat("invalid header transport header count ", num_headers));
     }
 
-    Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter = metadata.headers().formatter();
     while (num_headers-- > 0) {
       std::string key_string = drainVarString(buffer, header_size, "header key");
       if (formatter) {
