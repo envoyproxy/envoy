@@ -45,9 +45,10 @@ public:
           auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
-          auto* header = new_route->mutable_response_headers_to_add()->Add()->mutable_header();
-          header->set_key("fake_header");
-          header->set_value("fake_value");
+          auto* response_header =
+              new_route->mutable_response_headers_to_add()->Add()->mutable_header();
+          response_header->set_key("fake_header");
+          response_header->set_value("fake_value");
 
           const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
@@ -507,7 +508,7 @@ typed_config:
   cleanup();
 }
 
-// Test whether respond api will call response_headers_to_add.
+// Test whether the 'response_headers_to_add' is valid for the Lua 'respond' method.
 TEST_P(LuaIntegrationTest, Respond) {
   const std::string FILTER_AND_CODE =
       R"EOF(
