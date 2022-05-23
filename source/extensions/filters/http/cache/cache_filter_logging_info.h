@@ -56,13 +56,12 @@ enum class InsertStatus {
   // The CacheFilter started an insert, but couldn't finish it because the
   // stream was closed before the response finished. Until the CacheFilter
   // supports caching response trailers, this will also be reported if it tries
-  // to cache a response with
-  // trailers.
+  // to cache a response with trailers.
   InsertAbortedResponseIncomplete,
   // The CacheFilter attempted to update the headers of an existing cache entry.
   // This doesn't record whether or not the update succeeded.
   HeaderUpdate,
-  // The CacheFilter found a cache entry and didn't need to insert or update its
+  // The CacheFilter found a cache entry and didn't attempt to insert or update its
   // headers.
   NoInsertCacheHit,
   // The CacheFilter got an uncacheable request and didn't try to cache the
@@ -74,13 +73,12 @@ enum class InsertStatus {
   // insert the response.
   NoInsertRequestIncomplete,
   // The CacheFilter got a 304 validation response not matching the etag strong
-  // validator of our cached entry. The cached entry needs to be removed
+  // validator of our cached entry. The cached entry should be replaced or removed.
   NoInsertResponseValidatorsMismatch,
   // The CacheFilter got a 304 validation response not matching the vary header
   // fields. The cached variant set needs to be removed.
   NoInsertResponseVaryMismatch,
-  // The CacheFilter got a 304 validation response, but the vary header is now
-  // disallowed by the vary allow list
+  // The CacheFilter got a 304 validation response, but the vary header was disallowed by the vary allow list
   NoInsertResponseVaryDisallowed,
   // The CacheFilter couldn't determine whether the request was in cache and
   // didn't try to insert it.
@@ -94,7 +92,8 @@ std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_stat
 // Cache-related information about a request, to be used for logging and stats.
 class CacheFilterLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  static constexpr absl::string_view Key =
+  // FilterStateKey is used to store the FilterState::Object in the FilterState.
+  static constexpr absl::string_view FilterStateKey =
       "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo";
 
   CacheFilterLoggingInfo(LookupStatus cache_lookup_status, InsertStatus cache_insert_status)
