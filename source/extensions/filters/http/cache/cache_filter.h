@@ -151,7 +151,7 @@ private:
   bool is_head_request_ = false;
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
-  absl::optional<InsertStatus> insert_status_ = absl::nullopt;
+  absl::optional<InsertStatus> insert_status_;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
