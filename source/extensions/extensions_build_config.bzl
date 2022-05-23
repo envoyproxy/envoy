@@ -340,6 +340,12 @@ EXTENSIONS = {
     #
 
     "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+
+    #
+    # Early Data option
+    #
+
+    "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
