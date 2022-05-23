@@ -13,6 +13,7 @@ TEST(Coverage, CacheEntryStatusString) {
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Unusable), "Unusable");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::RequiresValidation), "RequiresValidation");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::FoundNotModified), "FoundNotModified");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::LookupError), "LookupError");
 }
 
 TEST(Coverage, CacheEntryStatusStream) {

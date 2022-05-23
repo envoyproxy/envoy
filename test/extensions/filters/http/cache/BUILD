@@ -35,6 +35,15 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "cache_filter_logging_info_test",
+    srcs = ["cache_filter_logging_info_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "cache_entry_utils_test",
     srcs = ["cache_entry_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
