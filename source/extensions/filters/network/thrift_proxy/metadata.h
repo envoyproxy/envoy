@@ -58,17 +58,17 @@ class MessageMetadata {
 public:
   MessageMetadata(bool is_request = true, bool preserve_keys = false) : is_request_(is_request) {
     if (is_request) {
-      request_headers_ = Http::RequestHeaderMapImpl::create();
-
+      auto request_headers = Http::RequestHeaderMapImpl::create();
       if (preserve_keys) {
-        request_headers_->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+        request_headers->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
       }
+      request_headers_ = std::move(request_headers);
     } else {
-      response_headers_ = Http::ResponseHeaderMapImpl::create();
-
+      auto response_headers = Http::ResponseHeaderMapImpl::create();
       if (preserve_keys) {
-        response_headers_->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+        response_headers->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
       }
+      response_headers_ = std::move(response_headers);
     }
   }
 
