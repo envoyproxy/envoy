@@ -4,14 +4,14 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/common/quic/test_utils.h"
+#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
-#include "test/common/config/dummy_config.pb.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -26,8 +26,8 @@ namespace Envoy {
 namespace Quic {
 
 class MockProofVerifierCallback : public quic::ProofVerifierCallback {
- public:
-  MOCK_METHOD(void, Run, (bool , const std::string&,  std::unique_ptr<quic::ProofVerifyDetails>* ));
+public:
+  MOCK_METHOD(void, Run, (bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>*));
 };
 
 class EnvoyQuicProofVerifierTest : public testing::Test {
@@ -125,7 +125,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
   custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
-TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
@@ -142,17 +142,20 @@ typed_config:
   auto* quic_verify_callback = new MockProofVerifierCallback();
   Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_EQ(quic::QUIC_PENDING,
-            verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                       {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
-                                       &error_details, &verify_details, nullptr, std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
+            verifier_->VerifyCertChain(
+                std::string(cert_view->subject_alt_name_domains()[0]), 54321, {leaf_cert_},
+                ocsp_response, cert_sct, &verify_context_, &error_details, &verify_details, nullptr,
+                std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
   EXPECT_EQ(verify_details, nullptr);
   EXPECT_TRUE(verify_timer->enabled());
 
-  EXPECT_CALL(*quic_verify_callback, Run(true, _, _)).WillOnce(Invoke([](bool,  const std::string&,  std::unique_ptr<quic::ProofVerifyDetails>* verify_details){
-     EXPECT_NE(verify_details, nullptr);
-     auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
-EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
-  }));
+  EXPECT_CALL(*quic_verify_callback, Run(true, _, _))
+      .WillOnce(Invoke(
+          [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
+            EXPECT_NE(verify_details, nullptr);
+            auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
+            EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
+          }));
   verify_timer->invokeCallback();
 }
 
@@ -229,8 +232,8 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {
-     custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
-TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+  custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
@@ -242,20 +245,24 @@ typed_config:
   const std::string cert_sct;
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
-   auto* quic_verify_callback = new MockProofVerifierCallback();
+  auto* quic_verify_callback = new MockProofVerifierCallback();
   Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_EQ(quic::QUIC_PENDING,
-            verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
-                                       &verify_context_, &error_details, &verify_details, nullptr,
-                                  std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
- EXPECT_EQ(verify_details, nullptr);
+  EXPECT_EQ(
+      quic::QUIC_PENDING,
+      verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
+                                 &verify_context_, &error_details, &verify_details, nullptr,
+                                 std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
+  EXPECT_EQ(verify_details, nullptr);
   EXPECT_TRUE(verify_timer->enabled());
 
-  EXPECT_CALL(*quic_verify_callback, Run(false, "Leaf certificate doesn't match hostname: unknown.org", _)).WillOnce(Invoke([](bool,  const std::string&,  std::unique_ptr<quic::ProofVerifyDetails>* verify_details){
-     EXPECT_NE(verify_details, nullptr);
-     auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
-EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
-  }));
+  EXPECT_CALL(*quic_verify_callback,
+              Run(false, "Leaf certificate doesn't match hostname: unknown.org", _))
+      .WillOnce(Invoke(
+          [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
+            EXPECT_NE(verify_details, nullptr);
+            auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
+            EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
+          }));
   verify_timer->invokeCallback();
 }
 

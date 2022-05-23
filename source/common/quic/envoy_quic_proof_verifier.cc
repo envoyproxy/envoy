@@ -40,21 +40,20 @@ public:
                               uint8_t /*out_alert*/) override {
     if (!succeeded) {
       std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(false);
-    quic_callback_->Run(succeeded, error_details, &details);
+      quic_callback_->Run(succeeded, error_details, &details);
       return;
     }
     std::string error;
 
-std::unique_ptr<quic::CertificateView> cert_view =  quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+    std::unique_ptr<quic::CertificateView> cert_view =
+        quic::CertificateView::ParseSingleCertificate(leaf_cert_);
     succeeded = verifyLeafCertMatchesHostName(*cert_view, hostname_, &error);
     std::unique_ptr<quic::ProofVerifyDetails> details =
         std::make_unique<CertVerifyResult>(succeeded);
     quic_callback_->Run(succeeded, error, &details);
   }
 
-  void storeLeafCert(const std::string& leaf_cert) {
-    leaf_cert_ = leaf_cert;
-  }
+  void storeLeafCert(const std::string& leaf_cert) { leaf_cert_ = leaf_cert; }
 
 private:
   Event::Dispatcher& dispatcher_;
