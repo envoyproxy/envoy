@@ -54,7 +54,11 @@ bool TestRootContext::onStart(size_t configuration_size) {
   return true;
 }
 
-bool TestRootContext::onConfigure(size_t) {
+bool TestRootContext::onConfigure(size_t size) {
+  if (size > 0 &&
+      getBufferBytes(WasmBufferType::PluginConfiguration, 0, size)->toString() == "invalid") {
+    return false;
+  }
   if (test_ == "property") {
     {
       // Many properties are not available in the root context.
