@@ -48,7 +48,7 @@ For local builds, set ``ANDROID_HOME`` and ``ANDROID_NDK_HOME`` to point to the 
 .. code-block:: bash
 
   ANDROID_HOME=$HOME/Library/Android/sdk
-  ANDROID_SDK_HOME=$HOME/Library/Android/ndk/21.3.6528147
+  ANDROID_NDK_HOME=$HOME/Library/Android/ndk/21.3.6528147
 
 See `ci/mac_ci_setup.sh` for the specific NDK version used during builds.
 
