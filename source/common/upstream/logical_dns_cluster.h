@@ -67,7 +67,8 @@ private:
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   Event::TimerPtr resolve_timer_;
-  std::string dns_url_;
+  std::string dns_address_;
+  uint32_t dns_port_;
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;

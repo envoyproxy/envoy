@@ -23,6 +23,7 @@ Common messages
   ../config/common/key_value/v3/config.proto
   ../config/common/mutation_rules/v3/mutation_rules.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
+  ../extensions/early_data/v3/default_early_data_policy.proto
   ../extensions/filters/common/fault/v3/fault.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
   ../extensions/common/matching/v3/extension_matcher.proto
