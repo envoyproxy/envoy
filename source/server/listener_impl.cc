@@ -679,9 +679,12 @@ void ListenerImpl::buildSocketOptions() {
 #else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
-      if (config_.connection_balance_config().has_exact_balance()) {
+      switch (config_.connection_balance_config().balance_type_case()) {
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExactBalance: {
         connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
-      } else if (config_.connection_balance_config().has_extend_balance()) {
+        break;
+      }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExtendBalance: {
         const std::string connection_balance_library_type{TypeUtil::typeUrlToDescriptorFullName(
             config_.connection_balance_config().extend_balance().typed_config().type_url())};
         auto factory =
@@ -693,6 +696,12 @@ void ListenerImpl::buildSocketOptions() {
         }
         connection_balancer_ = factory->createConnectionBalancerFromProto(
             config_.connection_balance_config().extend_balance(), *listener_factory_context_);
+        break;
+      }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
+        ENVOY_LOG(warn, "No valid balance type, switch to default NOP connection balancer");
+        break;
+      }
       }
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
