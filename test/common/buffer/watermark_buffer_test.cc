@@ -449,7 +449,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
 TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 // Disabling execution with TSAN as it causes the test to use too much memory
 // and time, making the test fail in some settings (such as CI)
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(memory_sanitizer))
   ENVOY_LOG_MISC(critical, "WatermarkBufferTest::OverflowWatermarkDisabledOnVeryHighValue not "
                            "supported by this compiler configuration");
 #else
