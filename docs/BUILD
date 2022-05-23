@@ -4,7 +4,6 @@ load(
 )
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -146,18 +145,19 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = ["inventories"],
+    srcs = glob(["inventories/**/*"]),
+    strip_prefix = "",
 )
 
 genrule(
     name = "version_histories",
     outs = ["version_histories.tar"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) \
-        %s \
-        $@
-    """ % VERSION,
+    $(location //tools/docs:generate_version_histories) $@
+    """,
     tools = [
+        ":versions.yaml",
+        "//:VERSION.txt",
         "//changelogs",
         "//changelogs:sections.yaml",
         "//tools/docs:generate_version_histories",

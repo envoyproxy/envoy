@@ -57,6 +57,9 @@ minor_behavior_changes:
     get route config factories by the configuration proto full names by default. This behavior change
     can be reverted by setting the ``envoy.reloadable_features.get_route_config_factory_by_type``
     runtime flag to false.
+  change: |
+    add an ignore_port_in_host_matching config entry in RouteConfiguration. When set to true, port number(if any) in host
+    header is ignored during host matching.
 - area: lua
   change: |
     lua ``respond`` api will call ``sendLocalReply`` instead ``encodeHeaders`` and ``encodeData``.
@@ -72,6 +75,10 @@ bug_fixes:
 - area: tcp_proxy
   change: |
     Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
+- area: listener
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
+    is properly extracted.
 
 removed_config_or_runtime:
 - area: compressor
@@ -150,6 +157,9 @@ new_features:
 - area: build
   change: |
     official released binary is now built with Clang 14.0.0.
+- area: conn pool
+  change: |
+    Changed HTTP/2 connection pooling and the :ref:`ALPN pool <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` to remember the number of streams allowed by the endpoint and cap multiplexed streams for subsequent connections based on that. With that working, defaulted the ALPN pool to assume HTTP/2 will work, as it will only incur a latency hit once until the TLS handshake is complete, and then will cache that the effective stream limit is 1.  This behavioral change can be revered by setting ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` to false.
 - area: http
   change: |
     added :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
