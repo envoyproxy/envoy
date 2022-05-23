@@ -70,6 +70,8 @@ message HeaderValidatorConfig {
     // for details of normalization.
     // Note that Envoy does not perform
     // `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
+    // URI path normalization can be applied to a portion of requests by setting the
+    // ``envoy_default_header_validator.path_normalization`` runtime value.
     bool skip_path_normalization = 1;
 
     // Determines if adjacent slashes in the path are merged into one.
@@ -78,6 +80,8 @@ message HeaderValidatorConfig {
     // Setting this option to true will cause incoming requests with path ``//dir///file`` to not match against
     // route with ``prefix`` match set to ``/dir``. Defaults to ``false``. Note that slash merging is not part of
     // `HTTP spec <https://datatracker.ietf.org/doc/html/rfc3986>`_ and is provided for convenience.
+    // Merging of slashes in URI path can be applied to a portion of requests by setting the
+    // ``envoy_default_header_validator.merge_slashes`` runtime value.
     bool skip_merging_slashes = 2;
 
     // The action to take when request URL path contains escaped slash sequences (``%2F``, ``%2f``, ``%5C`` and ``%5c``).
@@ -101,8 +105,11 @@ message HeaderValidatorConfig {
   Http1ProtocolOptions http1_protocol_options = 1;
 
   // The URI path normalization options.
-  // The URI path will be unmodified if this configuration was not specified (the default). Note that omitting path
-  // normalization may lead to path confusion vulnerabilities in access control or incorrect service
+  // By default Envoy normalizes URI path using the default values of the :ref:`UriPathNormalizationOptions
+  // <envoy_v3_api_msg_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.UriPathNormalizationOptions>`.
+  // URI path transformations specified by the ``uri_path_normalization_options`` configuration can be applied to a portion
+  // of requests by setting the ``envoy_default_header_validator.uri_path_transformations`` runtime value.
+  // Caution: disabling path normalization may lead to path confusion vulnerabilities in access control or incorrect service
   // selection.
   UriPathNormalizationOptions uri_path_normalization_options = 2;
 
