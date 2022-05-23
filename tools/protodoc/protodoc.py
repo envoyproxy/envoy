@@ -3,10 +3,12 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
-from collections import defaultdict
 import json
+import logging
 import functools
 import sys
+from collections import defaultdict
+from functools import cached_property
 
 from google.protobuf import json_format
 from bazel_tools.tools.python.runfiles import runfiles
@@ -22,6 +24,7 @@ from jinja2 import Template
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from envoy.base import utils
+from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
@@ -33,6 +36,8 @@ from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
+
+logger = logging.getLogger(__name__)
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
@@ -153,18 +158,6 @@ def build_categories(extensions_db):
 
 EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
 CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
-
-V2_LINK_TEMPLATE = Template(
-    """
-This documentation is for the Envoy v3 API.
-
-As of Envoy v1.18 the v2 API has been removed and is no longer supported.
-
-If you are upgrading from v2 API config you may wish to view the v2 API documentation:
-
-    :ref:`{{v2_text}} <{{v2_url}}>`
-
-""")
 
 
 class ProtodocError(Exception):
@@ -320,7 +313,7 @@ def format_extension_category(extension_category):
         contrib_extensions=sorted(contrib_extensions))
 
 
-def format_header_from_file(style, source_code_info, proto_name, v2_link):
+def format_header_from_file(style, source_code_info, proto_name):
     """Format RST header based on special file level title
 
     Args:
@@ -341,10 +334,10 @@ def format_header_from_file(style, source_code_info, proto_name, v2_link):
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
-        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[
+                annotations.DOC_TITLE_ANNOTATION]) + "\n\n" + formatted_extension, stripped_comment
     return anchor + format_header(
-        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
+        style, proto_name) + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -713,15 +706,16 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
-            self.v2_mapping = json.load(f)
-
         # Load as YAML, emit as JSON and then parse as proto to provide type
         # checking.
         protodoc_manifest_untyped = utils.from_yaml(
             r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
         self.protodoc_manifest = manifest_pb2.Manifest()
         json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+
+    @cached_property
+    def backticks_check(self):
+        return BackticksCheck()
 
     def visit_enum(self, enum_proto, type_context):
         normal_enum_type = normalize_type_context_name(type_context.name)
@@ -751,10 +745,14 @@ class RstFormatVisitor(visitor.Visitor):
         if hide_not_implemented(leading_comment):
             return ''
 
-        return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
+        message = anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+        error = self.backticks_check(message)
+        if error:
+            logger.warning(f"Bad RST ({msg_proto.name}): {error}")
+        return message
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
         # If there is a file-level 'not-implemented-hide' annotation then return empty string.
@@ -765,13 +763,6 @@ class RstFormatVisitor(visitor.Visitor):
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
-
-        v2_link = ""
-        if file_proto.name in self.v2_mapping:
-            v2_filepath = f"envoy_api_file_{self.v2_mapping[file_proto.name]}"
-            v2_text = v2_filepath.split('/', 1)[1]
-            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
-            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
@@ -786,7 +777,7 @@ class RstFormatVisitor(visitor.Visitor):
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name, v2_link)
+            '=', type_context.source_code_info, file_proto.name)
 
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the

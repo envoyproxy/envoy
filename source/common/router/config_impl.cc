@@ -46,6 +46,7 @@
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "absl/strings/match.h"
 
@@ -652,6 +653,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               path_redirect_);
+  }
+
+  if (route.route().has_early_data_policy()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<EarlyDataPolicyFactory>(
+        route.route().early_data_policy());
+    auto message = Envoy::Config::Utility::translateToFactoryConfig(
+        route.route().early_data_policy(), validator, factory);
+    early_data_policy_ = factory.createEarlyDataPolicy(*message);
+  } else {
+    early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
 }
 

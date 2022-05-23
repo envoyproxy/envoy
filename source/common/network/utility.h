@@ -132,34 +132,6 @@ public:
   static bool urlIsUnixScheme(absl::string_view url);
 
   /**
-   * Parses the host from a TCP URL
-   * @param the URL to parse host from
-   * @return std::string the parsed host
-   */
-  static std::string hostFromTcpUrl(const std::string& url);
-
-  /**
-   * Parses the port from a TCP URL
-   * @param the URL to parse port from
-   * @return uint32_t the parsed port
-   */
-  static uint32_t portFromTcpUrl(const std::string& url);
-
-  /**
-   * Parses the host from a UDP URL
-   * @param the URL to parse host from
-   * @return std::string the parsed host
-   */
-  static std::string hostFromUdpUrl(const std::string& url);
-
-  /**
-   * Parses the port from a UDP URL
-   * @param the URL to parse port from
-   * @return uint32_t the parsed port
-   */
-  static uint32_t portFromUdpUrl(const std::string& url);
-
-  /**
    * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
    * not include a port number. Throws EnvoyException if unable to parse the address.
    * @param ip_address string to be parsed as an internet address.
