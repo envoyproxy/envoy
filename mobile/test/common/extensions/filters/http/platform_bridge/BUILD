@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//library/common/extensions/filters/http/platform_bridge:filter_cc_proto",
         "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/http:http_mocks",
+        "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/test_common:utility_lib",
     ],
 )

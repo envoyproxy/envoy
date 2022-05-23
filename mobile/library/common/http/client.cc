@@ -27,6 +27,12 @@ namespace Http {
  * For implementation details @see Client::DirectStreamCallbacks::closeRemote.
  */
 
+namespace {
+
+constexpr auto SlowCallbackWarningTreshold = std::chrono::seconds(1);
+
+} // namespace
+
 Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream,
                                                      envoy_http_callbacks bridge_callbacks,
                                                      Client& http_client)
@@ -66,8 +72,19 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
+
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      http_client_.stats().on_headers_callback_latency_, http_client_.timeSource());
+
   bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers, alpn), end_stream, streamIntel(),
                                bridge_callbacks_.context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningTreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", std::to_string(elapsed.count()) + "ms");
+  }
+
   response_headers_forwarded_ = true;
   if (end_stream) {
     onComplete();
@@ -136,8 +153,18 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
             "[S{}] dispatching to platform response data for stream (length={} end_stream={})",
             direct_stream_.stream_handle_, bytes_to_send, send_end_stream);
 
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      http_client_.stats().on_data_callback_latency_, http_client_.timeSource());
+
   bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), send_end_stream,
                             streamIntel(), bridge_callbacks_.context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningTreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_data_cb", std::to_string(elapsed.count()) + "ms");
+  }
+
   if (send_end_stream) {
     onComplete();
   }
@@ -170,8 +197,18 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   ENVOY_LOG(debug, "[S{}] dispatching to platform response trailers for stream:\n{}",
             direct_stream_.stream_handle_, trailers);
 
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      http_client_.stats().on_trailers_callback_latency_, http_client_.timeSource());
+
   bridge_callbacks_.on_trailers(Utility::toBridgeHeaders(trailers), streamIntel(),
                                 bridge_callbacks_.context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningTreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", std::to_string(elapsed.count()) + "ms");
+  }
+
   onComplete();
 }
 
@@ -228,7 +265,16 @@ void Client::DirectStreamCallbacks::onComplete() {
     http_client_.stats().stream_failure_.inc();
   }
 
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      http_client_.stats().on_complete_callback_latency_, http_client_.timeSource());
+
   bridge_callbacks_.on_complete(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningTreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", std::to_string(elapsed.count()) + "ms");
+  }
 }
 
 void Client::DirectStreamCallbacks::onError() {
@@ -255,8 +301,17 @@ void Client::DirectStreamCallbacks::onError() {
             direct_stream_.stream_handle_);
   http_client_.stats().stream_failure_.inc();
 
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      http_client_.stats().on_error_callback_latency_, http_client_.timeSource());
+
   bridge_callbacks_.on_error(error_.value(), streamIntel(), finalStreamIntel(),
                              bridge_callbacks_.context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningTreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_error_cb", std::to_string(elapsed.count()) + "ms");
+  }
 }
 
 void Client::DirectStreamCallbacks::onSendWindowAvailable() {
@@ -269,7 +324,21 @@ void Client::DirectStreamCallbacks::onCancel() {
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
   http_client_.stats().stream_cancel_.inc();
+
+  // Attempt to latch the latest stream info. This will be a no-op if the stream
+  // is already complete.
+  direct_stream_.saveFinalStreamIntel();
+
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      http_client_.stats().on_cancel_callback_latency_, http_client_.timeSource());
+
   bridge_callbacks_.on_cancel(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningTreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", std::to_string(elapsed.count()) + "ms");
+  }
 }
 
 void Client::DirectStreamCallbacks::onHasBufferedData() {

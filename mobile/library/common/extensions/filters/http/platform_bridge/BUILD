@@ -36,8 +36,13 @@ envoy_cc_extension(
         "//library/common/types:c_types_lib",
         "@envoy//envoy/common:scope_tracker_interface",
         "@envoy//envoy/http:filter_interface",
+        "@envoy//envoy/stats:stats_interface",
+        "@envoy//envoy/stats:stats_macros",
+        "@envoy//envoy/stats:timespan_interface",
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:scope_tracker",
+        "@envoy//source/common/stats:timespan_lib",
+        "@envoy//source/extensions/filters/http/common:factory_base_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
